@@ -1,0 +1,17 @@
+export const queryKeys = {
+  events: ["events"] as const,
+  categories: ["categories"] as const,
+  products: (params?: { categoryID?: number; sort?: string; q?: string }) => ["products", params] as const,
+  product: (id: number) => ["product", id] as const,
+  productReviews: (id: number) => ["product-reviews", id] as const,
+  personalizedProducts: ["personalized-products"] as const,
+  me: (token: string) => ["me", token] as const,
+  homeMe: (token: string | null | undefined) => ["home-me", token] as const,
+  orders: (token: string) => ["orders", token] as const,
+  coupons: (token: string) => ["coupons", token] as const,
+  issuableCoupons: (token: string) => ["issuable-coupons", token] as const,
+  addresses: (token: string) => ["addresses", token] as const,
+  integratedSearch: (q: string) => ["integrated-search", q] as const,
+  searchSuggestions: (q: string) => ["search-page-suggestions", q] as const,
+  trendingSearches: (segment: string) => ["trending-searches", segment] as const,
+};
