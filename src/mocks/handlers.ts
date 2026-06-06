@@ -179,13 +179,20 @@ export const handlers = [
   http.get(`${API_BASE_URL}/api/v1/products/:id/reviews`, ({ params }) =>
     HttpResponse.json(reviews.filter((review) => review.product_id === Number(params.id))),
   ),
-  http.post(`${API_BASE_URL}/api/v1/auth/login`, async () =>
-    HttpResponse.json({
-      memberID: 1,
-      role: "CUSTOMER",
-      accessToken: "mock-access-token",
-    }),
-  ),
+  http.post(`${API_BASE_URL}/api/v1/auth/login`, async ({ request }) => {
+    const payload = (await request.json()) as { email?: string };
+    const role = payload.email?.includes("admin")
+      ? "ADMIN"
+      : payload.email?.includes("seller")
+        ? "SELLER"
+        : "CUSTOMER";
+
+    return HttpResponse.json({
+      memberID: role === "ADMIN" ? 3 : role === "SELLER" ? 2 : 1,
+      role,
+      accessToken: `${role.toLowerCase()}-mock-access-token`,
+    });
+  }),
   http.post(`${API_BASE_URL}/api/v1/auth/register`, () => HttpResponse.json({ id: 1 }, { status: 201 })),
   http.get(`${API_BASE_URL}/api/v1/me`, () =>
     HttpResponse.json({

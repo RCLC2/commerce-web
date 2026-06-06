@@ -31,7 +31,7 @@ export function LoginPage() {
   const login = useMutation({
     mutationFn: api.login,
     onSuccess: (data) => {
-      setSession({ accessToken: data.accessToken, memberID: data.memberID });
+      setSession({ accessToken: data.accessToken, memberID: data.memberID, role: data.role });
       router.push("/mypage");
     },
   });

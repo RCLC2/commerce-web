@@ -1,12 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Camera, Grid2X2, Heart, Home, Menu, Search, Star, User, X } from "lucide-react";
+import { Camera, Grid2X2, Heart, Home, Menu, Search, ShieldCheck, Star, Store, User, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
+import { useSessionStore } from "@/lib/session-store";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 
@@ -30,6 +31,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
+  const role = useSessionStore((state) => state.role);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const { data: suggestions = [] } = useQuery({
     queryKey: ["global-search-suggestions", search.trim()],
@@ -110,6 +112,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             ) : null}
           </form>
+          {role === "SELLER" ? (
+            <Link href="/seller" aria-label="셀러 콘솔">
+              <Button variant="ghost" size="icon" title="셀러 콘솔">
+                <Store size={20} />
+              </Button>
+            </Link>
+          ) : null}
+          {role === "ADMIN" ? (
+            <Link href="/admin" aria-label="어드민 콘솔">
+              <Button variant="ghost" size="icon" title="어드민 콘솔">
+                <ShieldCheck size={20} />
+              </Button>
+            </Link>
+          ) : null}
           <Link href="/mypage" aria-label="마이페이지">
             <Button variant="ghost" size="icon">
               <User size={20} />
