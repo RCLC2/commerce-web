@@ -1,4 +1,5 @@
 import { http, HttpResponse } from "msw";
+import type { ReviewImage } from "@/lib/types";
 import {
   adminDashboard,
   addresses,
@@ -22,6 +23,45 @@ import {
 import { getApiBaseUrl } from "@/lib/api-base-url";
 
 const API_BASE_URL = getApiBaseUrl();
+
+type PendingReviewImageAsset = {
+  id: number;
+  width: number;
+  height: number;
+  content_type: string;
+  content_length: number;
+  status: "PENDING_UPLOAD" | "VALIDATED";
+  url?: string;
+  detail_url?: string;
+  thumbnail_url?: string;
+};
+
+type ReviewImageUploadPayload = {
+  filename?: string;
+  width?: number;
+  height?: number;
+  content_type?: string;
+  content_length?: number;
+};
+
+type CreateReviewPayload = {
+  rating_x2?: number;
+  content?: string;
+  images?: {
+    media_asset_id: number;
+    sort_order: number;
+    is_representative: boolean;
+  }[];
+};
+
+const reviewImageAssets = new Map<number, PendingReviewImageAsset>();
+let nextReviewImageAssetID = 7000;
+let nextReviewImageID = 8000;
+let nextReviewID = 9000;
+
+function getMockReviewImageURL(assetID: number) {
+  return `/images/fashion-placeholder.svg?review_asset_id=${assetID}`;
+}
 
 function normalizeSearch(value: string | null) {
   return (value ?? "").trim().toLowerCase();
@@ -179,6 +219,61 @@ export const handlers = [
   http.get(`${API_BASE_URL}/api/v1/products/:id/reviews`, ({ params }) =>
     HttpResponse.json(reviews.filter((review) => review.product_id === Number(params.id))),
   ),
+  http.post(`${API_BASE_URL}/api/v1/media/review-images/presign`, async ({ request }) => {
+    const payload = (await request.json()) as ReviewImageUploadPayload;
+    const id = nextReviewImageAssetID++;
+    const asset: PendingReviewImageAsset = {
+      id,
+      width: payload.width ?? 1,
+      height: payload.height ?? 1,
+      content_type: payload.content_type ?? "image/png",
+      content_length: payload.content_length ?? 0,
+      status: "PENDING_UPLOAD",
+    };
+
+    reviewImageAssets.set(id, asset);
+
+    return HttpResponse.json(
+      {
+        id,
+        upload_url: `${API_BASE_URL}/mock-storage/review-images/${id}`,
+        headers: {
+          "Content-Type": asset.content_type,
+        },
+        expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+        width: asset.width,
+        height: asset.height,
+        content_type: asset.content_type,
+        content_length: asset.content_length,
+        status: asset.status,
+      },
+      { status: 201 },
+    );
+  }),
+  http.put(`${API_BASE_URL}/mock-storage/review-images/:assetID`, ({ params }) => {
+    const asset = reviewImageAssets.get(Number(params.assetID));
+    return asset ? new HttpResponse(null, { status: 200 }) : new HttpResponse(null, { status: 404 });
+  }),
+  http.post(`${API_BASE_URL}/api/v1/media/review-images/:assetID/complete`, ({ params }) => {
+    const assetID = Number(params.assetID);
+    const asset = reviewImageAssets.get(assetID);
+
+    if (!asset) {
+      return HttpResponse.json({ message: "review image asset not found" }, { status: 404 });
+    }
+
+    const url = getMockReviewImageURL(assetID);
+    const completedAsset = {
+      ...asset,
+      status: "VALIDATED" as const,
+      url,
+      detail_url: url,
+      thumbnail_url: url,
+    };
+    reviewImageAssets.set(assetID, completedAsset);
+
+    return HttpResponse.json(completedAsset);
+  }),
   http.post(`${API_BASE_URL}/api/v1/auth/login`, async ({ request }) => {
     const payload = (await request.json()) as { email?: string };
     const role = payload.email?.includes("admin")
@@ -237,6 +332,62 @@ export const handlers = [
   http.get(`${API_BASE_URL}/api/v1/orders/:orderCode`, ({ params }) => {
     const order = orders.find((item) => item.order_code === params.orderCode);
     return order ? HttpResponse.json(order) : new HttpResponse(null, { status: 404 });
+  }),
+  http.post(`${API_BASE_URL}/api/v1/orders/:orderCode/items/:itemID/reviews`, async ({ params, request }) => {
+    const order = orders.find((item) => item.order_code === params.orderCode);
+    const lineItem = order?.market_orders
+      ?.flatMap((marketOrder) => marketOrder.line_items)
+      .find((item) => item.id === Number(params.itemID));
+
+    if (!order || !lineItem) {
+      return HttpResponse.json({ message: "order line item not found" }, { status: 404 });
+    }
+    if (lineItem.status !== "COMPLETED") {
+      return HttpResponse.json({ message: "completed order item is required" }, { status: 409 });
+    }
+
+    const payload = (await request.json()) as CreateReviewPayload;
+    const ratingX2 = payload.rating_x2 ?? 10;
+    const reviewImages: ReviewImage[] = [];
+
+    for (const [index, image] of (payload.images ?? []).entries()) {
+      const asset = reviewImageAssets.get(image.media_asset_id);
+      if (!asset || asset.status !== "VALIDATED") {
+        return HttpResponse.json({ message: "validated review image is required" }, { status: 400 });
+      }
+
+      reviewImages.push({
+        id: nextReviewImageID++,
+        media_asset_id: image.media_asset_id,
+        url: asset.url,
+        detail_url: asset.detail_url,
+        thumbnail_url: asset.thumbnail_url,
+        sort_order: image.sort_order ?? index + 1,
+        is_representative: image.is_representative ?? index === 0,
+        width: asset.width,
+        height: asset.height,
+        content_type: asset.content_type,
+        status: asset.status,
+      });
+    }
+
+    const review = {
+      id: nextReviewID++,
+      product_id: lineItem.product_id,
+      member_id: order.member_id ?? 1,
+      order_id: order.id,
+      order_line_item_id: lineItem.id,
+      rating_x2: ratingX2,
+      rating: ratingX2 / 2,
+      content: payload.content ?? "",
+      is_photo_review: reviewImages.length > 0,
+      images: reviewImages,
+      created_at: new Date().toISOString(),
+    };
+
+    reviews.unshift(review);
+
+    return HttpResponse.json(review, { status: 201 });
   }),
   http.post(`${API_BASE_URL}/api/v1/orders/:orderCode/complete-payment`, ({ params }) =>
     HttpResponse.json({ orderCode: params.orderCode, status: "PAYMENT_COMPLETED" }, { status: 202 }),

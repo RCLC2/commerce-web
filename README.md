@@ -18,6 +18,7 @@ It is designed for Vercel deployment and can run locally either against the Go b
 - Zustand
 - React Hook Form + Zod
 - MSW for local mock API
+- Playwright for browser e2e
 - Vercel deployment ready
 
 ## Local Setup
@@ -60,8 +61,12 @@ NEXT_PUBLIC_API_MOCKING=disabled
 npm run dev
 npm run lint
 npm run build
+npm run test:e2e
+npm run test:e2e:ui
 npm run start
 ```
+
+`npm run test:e2e` starts a dedicated Next.js dev server on `127.0.0.1:3100` with MSW enabled and runs the Chromium Playwright suite.
 
 ## Current Customer Routes
 
@@ -102,6 +107,9 @@ Currently wired in the API client and MSW:
 - `GET /api/v1/products`
 - `GET /api/v1/products/:id`
 - `GET /api/v1/products/:id/reviews`
+- `POST /api/v1/media/review-images/presign`
+- `PUT /mock-storage/review-images/:assetID` (MSW-only object storage shim)
+- `POST /api/v1/media/review-images/:assetID/complete`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/register`
 - `GET /api/v1/me`
@@ -112,6 +120,7 @@ Currently wired in the API client and MSW:
 - `POST /api/v1/orders`
 - `GET /api/v1/orders`
 - `GET /api/v1/orders/:orderCode`
+- `POST /api/v1/orders/:orderCode/items/:itemID/reviews`
 - `POST /api/v1/orders/:orderCode/complete-payment`
 - `GET /api/v1/seller/dashboard`
 - `GET /api/v1/seller/products`
@@ -146,6 +155,7 @@ MSW includes:
 - 12 fashion products
 - Product options and inventory quantities
 - Reviews
+- Review image upload and review creation flow
 - Coupons
 - Cart item
 - Order list and order detail

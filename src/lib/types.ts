@@ -114,9 +114,51 @@ export type Review = {
   product_id: number;
   member_id: number;
   order_id: number;
+  order_line_item_id?: number;
+  rating_x2?: number;
   rating: number;
   content: string;
+  is_photo_review?: boolean;
+  images?: ReviewImage[];
   created_at: string;
+};
+
+export type ReviewImage = {
+  id: number;
+  media_asset_id: number;
+  url?: string;
+  detail_url?: string;
+  thumbnail_url?: string;
+  sort_order: number;
+  is_representative: boolean;
+  width: number;
+  height: number;
+  content_type: string;
+  status: string;
+};
+
+export type ReviewImageUpload = {
+  id: number;
+  upload_url: string;
+  headers: Record<string, string>;
+  expires_at: string;
+  width: number;
+  height: number;
+  content_type: string;
+  content_length: number;
+  status: string;
+};
+
+export type ReviewImageAsset = {
+  id: number;
+  url?: string;
+  detail_url?: string;
+  thumbnail_url?: string;
+  width: number;
+  height: number;
+  content_type: string;
+  content_length: number;
+  status: string;
 };
 
 export type Coupon = {

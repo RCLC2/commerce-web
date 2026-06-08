@@ -1,5 +1,5 @@
 import { request } from "../api-client";
-import type { Address, CartItem, Coupon, OrderResponse } from "../types";
+import type { Address, CartItem, Coupon, OrderResponse, Review } from "../types";
 
 export const customerApi = {
   addCartItem: (token: string, payload: { product_id: number; option_id: number; quantity: number }) =>
@@ -25,6 +25,21 @@ export const customerApi = {
     }),
   listOrders: (token: string) => request<OrderResponse[]>("/api/v1/orders", { token }),
   getOrder: (token: string, orderCode: string) => request<OrderResponse>(`/api/v1/orders/${orderCode}`, { token }),
+  createOrderLineReview: (
+    token: string,
+    orderCode: string,
+    lineItemID: number,
+    payload: {
+      rating_x2: number;
+      content: string;
+      images: { media_asset_id: number; sort_order: number; is_representative: boolean }[];
+    },
+  ) =>
+    request<Review>(`/api/v1/orders/${orderCode}/items/${lineItemID}/reviews`, {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    }),
   completePayment: (
     token: string,
     orderCode: string,
