@@ -15,6 +15,11 @@
   - Submits the review.
   - Navigates to `/products/101` through the product link.
   - Confirms the review content, photo review badge, and review image are visible.
+  - Confirms the review submit button is disabled until content is entered.
+  - Rejects non-image file attachments without increasing the attachment count.
+  - Removes an attached review image and returns the count to zero.
+  - Caps attached review images at five files.
+  - Registers a text-only review and confirms it appears without photo review UI.
 
 ## Commands
 
@@ -28,4 +33,4 @@ npm run test:e2e
 
 - `npm run lint`: passed
 - `npm run build`: passed
-- `npm run test:e2e`: passed
+- `npm run test:e2e`: passed, 6 tests
