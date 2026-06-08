@@ -433,7 +433,26 @@ export const handlers = [
   http.get(`${API_BASE_URL}/api/v1/seller/inventory/sync-logs`, () => HttpResponse.json(inventoryLogs)),
   http.get(`${API_BASE_URL}/api/v1/seller/orders`, () => HttpResponse.json(orders)),
   http.get(`${API_BASE_URL}/api/v1/seller/settlements`, () => HttpResponse.json(settlements.filter((item) => item.market_id === 1))),
-  http.get(`${API_BASE_URL}/api/v1/seller/reviews`, () => HttpResponse.json(reviews)),
+  http.get(`${API_BASE_URL}/api/v1/seller/reviews`, () => {
+    const sellerProductIDs = new Set(products.filter((product) => product.market_id === 1).map((product) => product.id));
+    return HttpResponse.json(
+      reviews
+        .filter((review) => sellerProductIDs.has(review.product_id) && review.status !== "DELETED")
+        .map((review) => ({
+          id: review.id,
+          product_id: review.product_id,
+          option_id: review.option_id,
+          rating_x2: review.rating_x2,
+          rating: review.rating,
+          content: review.content,
+          is_photo_review: review.is_photo_review,
+          image_count: review.images?.length ?? 0,
+          images: review.images,
+          created_at: review.created_at,
+          updated_at: review.updated_at,
+        })),
+    );
+  }),
   http.post(`${API_BASE_URL}/api/v1/inventory/sources`, async ({ request }) => {
     const payload = (await request.json()) as { provider?: string; display_name?: string };
     return HttpResponse.json(

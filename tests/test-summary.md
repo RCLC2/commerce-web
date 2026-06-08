@@ -18,7 +18,7 @@
   - Confirms the review content, photo review badge, and review image are visible.
   - Confirms the review submit button is disabled until content is entered.
   - Confirms completed order lines with an existing active review show `리뷰 작성 완료` and link to `내 리뷰 보기`.
-  - Opens `/mypage/reviews`, edits a written review, and deletes it.
+  - Opens `/mypage/reviews`, edits a written review, confirms deletion, and deletes it.
   - Rejects non-image file attachments without increasing the attachment count.
   - Removes an attached review image and returns the count to zero.
   - Caps attached review images at five files.

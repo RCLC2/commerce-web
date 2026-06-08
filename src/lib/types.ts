@@ -113,13 +113,14 @@ export type Review = {
   id: number;
   product_id: number;
   option_id?: number;
-  member_id: number;
-  order_id: number;
+  member_id?: number;
+  order_id?: number;
   order_line_item_id?: number;
   rating_x2?: number;
   rating: number;
   content: string;
   is_photo_review?: boolean;
+  image_count?: number;
   status?: string;
   images?: ReviewImage[];
   created_at: string;

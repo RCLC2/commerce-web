@@ -19,8 +19,9 @@ export function MyReviewsPage() {
   const [editingID, setEditingID] = useState<number | null>(null);
   const [editRatingX2, setEditRatingX2] = useState(10);
   const [editContent, setEditContent] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<Review | null>(null);
 
-  const { data: reviews = [], isLoading } = useQuery({
+  const { data: reviews = [], isLoading, isError, error } = useQuery({
     queryKey: queryKeys.myReviews(effectiveToken),
     queryFn: () => api.listMyReviews(effectiveToken),
     enabled: Boolean(effectiveToken),
@@ -44,6 +45,7 @@ export function MyReviewsPage() {
   const deleteReview = useMutation({
     mutationFn: (review: Review) => api.deleteReview(effectiveToken, review.id).then(() => review),
     onSuccess: async (review) => {
+      setPendingDelete(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.myReviews(effectiveToken) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.productReviews(review.product_id) }),
@@ -82,10 +84,16 @@ export function MyReviewsPage() {
       </div>
 
       {isLoading ? <p className="mt-8 text-sm text-muted">리뷰를 불러오는 중입니다.</p> : null}
+      {isError ? <p className="mt-8 rounded-md border border-line bg-white p-4 text-sm font-bold text-brand">{error.message}</p> : null}
+      {updateReview.isError ? <p className="mt-4 text-sm font-bold text-brand">{updateReview.error.message}</p> : null}
+      {deleteReview.isError ? <p className="mt-4 text-sm font-bold text-brand">{deleteReview.error.message}</p> : null}
 
-      {!isLoading && reviews.length === 0 ? (
+      {!isLoading && !isError && reviews.length === 0 ? (
         <section className="mt-8 rounded-md border border-line bg-white p-6 text-sm text-muted">
-          아직 작성한 리뷰가 없습니다.
+          <p>아직 작성한 리뷰가 없습니다.</p>
+          <Link href="/mypage" className="mt-3 inline-flex text-sm font-bold text-foreground underline">
+            마이페이지로 이동
+          </Link>
         </section>
       ) : null}
 
@@ -115,7 +123,7 @@ export function MyReviewsPage() {
                     variant="ghost"
                     aria-label={`리뷰 ${review.id} 삭제`}
                     disabled={deleteReview.isPending}
-                    onClick={() => deleteReview.mutate(review)}
+                    onClick={() => setPendingDelete(review)}
                   >
                     <Trash2 size={16} />
                   </Button>
@@ -189,6 +197,23 @@ export function MyReviewsPage() {
           );
         })}
       </section>
+
+      {pendingDelete ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 px-4 py-6 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="delete-review-title">
+          <div className="w-full max-w-sm rounded-md bg-white p-5 shadow-lg">
+            <h2 id="delete-review-title" className="text-lg font-black">리뷰를 삭제할까요?</h2>
+            <p className="mt-2 text-sm leading-6 text-muted">삭제한 리뷰는 목록과 상품 상세에서 사라집니다.</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={() => setPendingDelete(null)} disabled={deleteReview.isPending}>
+                취소
+              </Button>
+              <Button type="button" onClick={() => deleteReview.mutate(pendingDelete)} disabled={deleteReview.isPending}>
+                {deleteReview.isPending ? "삭제 중" : "삭제"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

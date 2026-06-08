@@ -148,6 +148,9 @@ test("내 리뷰 페이지에서 작성한 리뷰를 수정하고 삭제한다",
   await expect(reviewArticle.getByText(reviewContent, { exact: true })).toHaveCount(0);
 
   await reviewArticle.getByRole("button", { name: /삭제/ }).click();
+  const deleteDialog = page.getByRole("dialog", { name: "리뷰를 삭제할까요?" });
+  await expect(deleteDialog).toBeVisible();
+  await deleteDialog.getByRole("button", { name: "삭제" }).click();
   await expect(page.locator("article").filter({ hasText: updatedContent })).toHaveCount(0);
   await expect(page.getByText("아직 작성한 리뷰가 없습니다.")).toBeVisible();
 });
