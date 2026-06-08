@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, MapPin, Ticket, Wallet } from "lucide-react";
+import { ChevronRight, MapPin, Star, Ticket, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
@@ -44,6 +44,11 @@ export function MyPage() {
     queryFn: () => api.listAddresses(effectiveToken),
     enabled: Boolean(effectiveToken),
   });
+  const { data: myReviews = [] } = useQuery({
+    queryKey: queryKeys.myReviews(effectiveToken),
+    queryFn: () => api.listMyReviews(effectiveToken),
+    enabled: Boolean(effectiveToken),
+  });
   const issueCoupon = useMutation({
     mutationFn: (couponID: number) => api.issueCoupon(effectiveToken, couponID),
     onSuccess: () => {
@@ -84,7 +89,7 @@ export function MyPage() {
         </Button>
       </div>
 
-      <section className="mt-6 grid gap-3 md:grid-cols-3">
+      <section className="mt-6 grid gap-3 md:grid-cols-4">
         <div className="rounded-md border border-line bg-white p-4">
           <div className="flex items-center gap-2 text-sm text-muted"><Ticket size={16} /> 발급 가능 쿠폰</div>
           <p className="mt-2 text-2xl font-black">{issuableCoupons.length}장</p>
@@ -97,6 +102,10 @@ export function MyPage() {
           <div className="flex items-center gap-2 text-sm text-muted"><Ticket size={16} /> 보유 쿠폰</div>
           <p className="mt-2 text-2xl font-black">{myCoupons.length}장</p>
         </div>
+        <Link href="/mypage/reviews" className="rounded-md border border-line bg-white p-4 hover:bg-zinc-50">
+          <div className="flex items-center gap-2 text-sm text-muted"><Star size={16} /> 작성한 리뷰</div>
+          <p className="mt-2 text-2xl font-black">{myReviews.length}개</p>
+        </Link>
       </section>
 
       <section className="mt-4 rounded-md border border-line bg-white p-4">

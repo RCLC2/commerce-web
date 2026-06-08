@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
+import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import { formatPrice } from "@/lib/utils";
 import { ReviewWritePanel } from "./review-write-panel";
@@ -32,6 +33,11 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   const { data: order, isLoading, error } = useQuery({
     queryKey: ["order", orderCode],
     queryFn: () => api.getOrder(effectiveToken ?? "", orderCode),
+    enabled: Boolean(effectiveToken),
+  });
+  const { data: myReviews = [] } = useQuery({
+    queryKey: effectiveToken ? queryKeys.myReviews(effectiveToken) : ["my-reviews", "anonymous"],
+    queryFn: () => api.listMyReviews(effectiveToken ?? ""),
     enabled: Boolean(effectiveToken),
   });
 
@@ -91,7 +97,8 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
             </div>
             <div className="mt-4 space-y-3">
               {marketOrder.line_items.map((item) => {
-                const canWriteReview = item.status === "COMPLETED";
+                const writtenReview = myReviews.find((review) => review.order_line_item_id === item.id);
+                const canWriteReview = item.status === "COMPLETED" && !writtenReview;
                 const isReviewing = reviewingLineItemID === item.id;
 
                 return (
@@ -109,6 +116,14 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
                         </div>
                         <p className="mt-1 text-muted">옵션 #{item.option_id} · {item.quantity}개 · {statusLabel(item.status)}</p>
                         <p className="mt-1 text-xs text-muted">상품 ID {item.product_id} · 라인 ID {item.id}</p>
+                        {writtenReview ? (
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <span className="rounded bg-zinc-100 px-2 py-1 text-xs font-bold text-muted">리뷰 작성 완료</span>
+                            <Link href="/mypage/reviews" className="text-xs font-bold text-foreground underline">
+                              내 리뷰 보기
+                            </Link>
+                          </div>
+                        ) : null}
                         {canWriteReview && effectiveToken ? (
                           <div className="mt-3">
                             <Button

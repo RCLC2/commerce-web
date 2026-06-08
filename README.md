@@ -121,6 +121,9 @@ Currently wired in the API client and MSW:
 - `GET /api/v1/orders`
 - `GET /api/v1/orders/:orderCode`
 - `POST /api/v1/orders/:orderCode/items/:itemID/reviews`
+- `GET /api/v1/me/reviews`
+- `PATCH /api/v1/reviews/:reviewID`
+- `DELETE /api/v1/reviews/:reviewID`
 - `POST /api/v1/orders/:orderCode/complete-payment`
 - `GET /api/v1/seller/dashboard`
 - `GET /api/v1/seller/products`

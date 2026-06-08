@@ -217,7 +217,7 @@ export const handlers = [
     return product ? HttpResponse.json(product) : new HttpResponse(null, { status: 404 });
   }),
   http.get(`${API_BASE_URL}/api/v1/products/:id/reviews`, ({ params }) =>
-    HttpResponse.json(reviews.filter((review) => review.product_id === Number(params.id))),
+    HttpResponse.json(reviews.filter((review) => review.product_id === Number(params.id) && review.status !== "DELETED")),
   ),
   http.post(`${API_BASE_URL}/api/v1/media/review-images/presign`, async ({ request }) => {
     const payload = (await request.json()) as ReviewImageUploadPayload;
@@ -318,6 +318,36 @@ export const handlers = [
       created_at: new Date().toISOString(),
     });
   }),
+  http.get(`${API_BASE_URL}/api/v1/me/reviews`, () =>
+    HttpResponse.json(reviews.filter((review) => review.member_id === 1 && review.status !== "DELETED")),
+  ),
+  http.patch(`${API_BASE_URL}/api/v1/reviews/:reviewID`, async ({ params, request }) => {
+    const review = reviews.find((item) => item.id === Number(params.reviewID) && item.member_id === 1 && item.status !== "DELETED");
+    if (!review) {
+      return HttpResponse.json({ message: "review not found" }, { status: 404 });
+    }
+
+    const payload = (await request.json()) as Partial<CreateReviewPayload>;
+    if (typeof payload.rating_x2 === "number") {
+      review.rating_x2 = payload.rating_x2;
+      review.rating = payload.rating_x2 / 2;
+    }
+    if (typeof payload.content === "string") {
+      review.content = payload.content;
+    }
+    review.updated_at = new Date().toISOString();
+
+    return HttpResponse.json(review);
+  }),
+  http.delete(`${API_BASE_URL}/api/v1/reviews/:reviewID`, ({ params }) => {
+    const review = reviews.find((item) => item.id === Number(params.reviewID) && item.member_id === 1 && item.status !== "DELETED");
+    if (!review) {
+      return HttpResponse.json({ message: "review not found" }, { status: 404 });
+    }
+    review.status = "DELETED";
+    review.updated_at = new Date().toISOString();
+    return new HttpResponse(null, { status: 204 });
+  }),
   http.post(`${API_BASE_URL}/api/v1/cart/items`, () => HttpResponse.json({ status: "ADDED" }, { status: 201 })),
   http.get(`${API_BASE_URL}/api/v1/cart`, () => HttpResponse.json(cartItems)),
   http.get(`${API_BASE_URL}/api/v1/coupons`, () => HttpResponse.json(coupons)),
@@ -344,6 +374,9 @@ export const handlers = [
     }
     if (lineItem.status !== "COMPLETED") {
       return HttpResponse.json({ message: "completed order item is required" }, { status: 409 });
+    }
+    if (reviews.some((review) => review.order_line_item_id === lineItem.id && review.status !== "DELETED")) {
+      return HttpResponse.json({ message: "review already exists" }, { status: 409 });
     }
 
     const payload = (await request.json()) as CreateReviewPayload;
@@ -381,8 +414,10 @@ export const handlers = [
       rating: ratingX2 / 2,
       content: payload.content ?? "",
       is_photo_review: reviewImages.length > 0,
+      status: "ACTIVE",
       images: reviewImages,
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
     reviews.unshift(review);

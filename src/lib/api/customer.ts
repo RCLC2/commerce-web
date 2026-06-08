@@ -25,6 +25,7 @@ export const customerApi = {
     }),
   listOrders: (token: string) => request<OrderResponse[]>("/api/v1/orders", { token }),
   getOrder: (token: string, orderCode: string) => request<OrderResponse>(`/api/v1/orders/${orderCode}`, { token }),
+  listMyReviews: (token: string) => request<Review[]>("/api/v1/me/reviews", { token }),
   createOrderLineReview: (
     token: string,
     orderCode: string,
@@ -39,6 +40,25 @@ export const customerApi = {
       method: "POST",
       token,
       body: JSON.stringify(payload),
+    }),
+  updateReview: (
+    token: string,
+    reviewID: number,
+    payload: {
+      rating_x2?: number;
+      content?: string;
+      images?: { media_asset_id: number; sort_order: number; is_representative: boolean }[];
+    },
+  ) =>
+    request<Review>(`/api/v1/reviews/${reviewID}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify(payload),
+    }),
+  deleteReview: (token: string, reviewID: number) =>
+    request<void>(`/api/v1/reviews/${reviewID}`, {
+      method: "DELETE",
+      token,
     }),
   completePayment: (
     token: string,

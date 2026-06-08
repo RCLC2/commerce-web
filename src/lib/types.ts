@@ -112,6 +112,7 @@ export type MemberProfile = {
 export type Review = {
   id: number;
   product_id: number;
+  option_id?: number;
   member_id: number;
   order_id: number;
   order_line_item_id?: number;
@@ -119,8 +120,10 @@ export type Review = {
   rating: number;
   content: string;
   is_photo_review?: boolean;
+  status?: string;
   images?: ReviewImage[];
   created_at: string;
+  updated_at?: string;
 };
 
 export type ReviewImage = {

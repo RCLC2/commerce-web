@@ -69,6 +69,7 @@ export function ReviewWritePanel({ token, orderCode, lineItemID, productID, onSu
       setRatingX2(10);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["order", orderCode] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.myReviews(token) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.productReviews(productID) }),
       ]);
       onSubmitted?.();

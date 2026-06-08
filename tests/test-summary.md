@@ -4,7 +4,8 @@
 
 - Added customer review image upload UI on `/orders/[orderCode]`.
 - Verified the flow from completed order line item to product review visibility.
-- Covered presign, object upload, upload completion, review creation, and product review list rendering through MSW.
+- Added `/mypage/reviews` management coverage for listing, editing, and deleting written reviews.
+- Covered presign, object upload, upload completion, review creation, duplicate prevention, product review list rendering, and review management through MSW.
 
 ## Test Case
 
@@ -16,6 +17,8 @@
   - Navigates to `/products/101` through the product link.
   - Confirms the review content, photo review badge, and review image are visible.
   - Confirms the review submit button is disabled until content is entered.
+  - Confirms completed order lines with an existing active review show `리뷰 작성 완료` and link to `내 리뷰 보기`.
+  - Opens `/mypage/reviews`, edits a written review, and deletes it.
   - Rejects non-image file attachments without increasing the attachment count.
   - Removes an attached review image and returns the count to zero.
   - Caps attached review images at five files.
@@ -33,4 +36,4 @@ npm run test:e2e
 
 - `npm run lint`: passed
 - `npm run build`: passed
-- `npm run test:e2e`: passed, 6 tests
+- `npm run test:e2e`: passed, 7 tests

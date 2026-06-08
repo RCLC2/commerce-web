@@ -586,10 +586,11 @@ export function SellerReviewsPage() {
         }
       >
         <DataTable
-          columns={["상품", "평점", "내용", "작성일"]}
+          columns={["상품", "평점", "사진", "내용", "작성일"]}
           rows={filteredReviews.map((review) => [
             `#${review.product_id}`,
             <span key="rating" className="inline-flex items-center gap-1 font-black text-brand"><Star size={14} className="fill-brand" /> {review.rating}</span>,
+            review.images?.length ? `${review.images.length}장` : "-",
             <span key="content" className="line-clamp-2">{review.content}</span>,
             new Date(review.created_at).toLocaleDateString("ko-KR"),
           ])}
