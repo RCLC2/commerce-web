@@ -26,6 +26,10 @@ type ReviewWritePanelProps = {
 };
 
 const maxReviewImages = 5;
+const maxReviewImageBytes = 10 * 1024 * 1024;
+const maxReviewImageWidth = 8000;
+const maxReviewImageHeight = 8000;
+const supportedReviewImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export function ReviewWritePanel({ token, orderCode, lineItemID, productID, onSubmitted }: ReviewWritePanelProps) {
   const inputID = useId();
@@ -90,15 +94,25 @@ export function ReviewWritePanel({ token, orderCode, lineItemID, productID, onSu
     try {
       const uploaded: UploadedReviewImage[] = [];
       for (const file of nextFiles) {
-        if (!file.type.startsWith("image/")) {
+        const contentType = file.type.toLowerCase();
+        if (!contentType.startsWith("image/")) {
           throw new Error("이미지 파일만 첨부할 수 있습니다");
         }
+        if (!supportedReviewImageTypes.has(contentType)) {
+          throw new Error("PNG, JPG, WEBP 이미지만 첨부할 수 있습니다");
+        }
+        if (file.size <= 0 || file.size > maxReviewImageBytes) {
+          throw new Error("리뷰 이미지는 10MB 이하만 첨부할 수 있습니다");
+        }
         const dimensions = await readImageDimensions(file);
+        if (dimensions.width > maxReviewImageWidth || dimensions.height > maxReviewImageHeight) {
+          throw new Error("리뷰 이미지는 8000x8000px 이하만 첨부할 수 있습니다");
+        }
         const upload = await api.createReviewImageUpload(token, {
           filename: file.name,
           width: dimensions.width,
           height: dimensions.height,
-          content_type: file.type,
+          content_type: contentType,
           content_length: file.size,
         });
         await api.uploadReviewImageObject(upload, file);
