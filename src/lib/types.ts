@@ -142,7 +142,12 @@ export type Address = {
 export type LoginResponse = {
   memberID: number;
   role: string;
+  type?: string;
   accessToken: string;
+  member?: {
+    role?: string;
+    type?: string;
+  };
 };
 
 export type CartItem = {
@@ -158,6 +163,7 @@ export type CartItem = {
 export type OrderResponse = {
   id: number;
   order_code: string;
+  orderCode?: string;
   member_id?: number;
   total_order_price: number;
   total_discount_price: number;
@@ -168,6 +174,14 @@ export type OrderResponse = {
   status: string;
   ordered_at?: string;
   shipping_address?: Address;
+  delivery_id?: number;
+  delivery?: {
+    id?: number;
+    carrier?: string;
+    tracking_number?: string;
+  };
+  carrier?: string;
+  tracking_number?: string;
   market_orders?: MarketOrderResponse[];
 };
 
@@ -196,6 +210,8 @@ export type InventorySource = {
   market_id: number;
   provider: "SHOPIFY" | "CAFE24" | string;
   display_name: string;
+  name?: string;
+  shop_name?: string;
   status: "ACTIVE" | "FAILED" | "PAUSED" | string;
   last_synced_at?: string;
 };
@@ -205,6 +221,7 @@ export type InventorySyncLog = {
   source_id: number;
   product_id: number;
   option_id: number;
+  product_option_id?: number;
   status: "SUCCESS" | "FAILED" | string;
   message: string;
   created_at: string;

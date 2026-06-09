@@ -243,19 +243,46 @@ export const handlers = [
   ),
   http.get(`${API_BASE_URL}/api/v1/seller/dashboard`, () => HttpResponse.json(sellerDashboard)),
   http.get(`${API_BASE_URL}/api/v1/seller/products`, () => HttpResponse.json(products.filter((product) => product.market_id === 1))),
+  http.get(`${API_BASE_URL}/api/v1/inventory/sources`, ({ request }) => {
+    const url = new URL(request.url);
+    const marketID = Number(url.searchParams.get("market_id") ?? 0);
+    return HttpResponse.json(marketID ? inventorySources.filter((source) => source.market_id === marketID) : inventorySources);
+  }),
+  http.get(`${API_BASE_URL}/api/v1/inventory/sync-logs`, ({ request }) => {
+    const url = new URL(request.url);
+    const status = url.searchParams.get("status");
+    const optionID = Number(url.searchParams.get("product_option_id") ?? 0);
+    const result = inventoryLogs.filter((log) => {
+      const matchesStatus = !status || log.status === status;
+      const matchesOption = !optionID || log.option_id === optionID || log.product_option_id === optionID;
+      return matchesStatus && matchesOption;
+    });
+    return HttpResponse.json(result);
+  }),
+  http.patch(`${API_BASE_URL}/api/v1/inventory/sources/:sourceID/tokens`, () => new HttpResponse(null, { status: 204 })),
+  http.post(`${API_BASE_URL}/api/v1/inventory/options/:optionID/pull`, ({ params }) =>
+    HttpResponse.json({ quantity: Number(params.optionID) % 17 + 3 }),
+  ),
+  http.post(`${API_BASE_URL}/api/v1/inventory/sync-logs/:logID/retry`, () => new HttpResponse(null, { status: 204 })),
   http.get(`${API_BASE_URL}/api/v1/seller/inventory/sources`, () => HttpResponse.json(inventorySources)),
   http.get(`${API_BASE_URL}/api/v1/seller/inventory/sync-logs`, () => HttpResponse.json(inventoryLogs)),
   http.get(`${API_BASE_URL}/api/v1/seller/orders`, () => HttpResponse.json(orders)),
+  http.get(`${API_BASE_URL}/api/v1/seller/markets/:marketID/orders`, ({ params }) =>
+    HttpResponse.json(orders.filter((order) => order.market_orders?.some((marketOrder) => marketOrder.market_id === Number(params.marketID)))),
+  ),
+  http.post(`${API_BASE_URL}/api/v1/seller/deliveries/invoices`, () => new HttpResponse(null, { status: 204 })),
+  http.post(`${API_BASE_URL}/api/v1/seller/markets/:marketID/deliveries/:deliveryID/start`, () => new HttpResponse(null, { status: 204 })),
+  http.post(`${API_BASE_URL}/api/v1/seller/markets/:marketID/deliveries/:deliveryID/complete`, () => new HttpResponse(null, { status: 204 })),
   http.get(`${API_BASE_URL}/api/v1/seller/settlements`, () => HttpResponse.json(settlements.filter((item) => item.market_id === 1))),
   http.get(`${API_BASE_URL}/api/v1/seller/reviews`, () => HttpResponse.json(reviews)),
   http.post(`${API_BASE_URL}/api/v1/inventory/sources`, async ({ request }) => {
-    const payload = (await request.json()) as { provider?: string; display_name?: string };
+    const payload = (await request.json()) as { market_id?: number; provider?: string; name?: string; display_name?: string };
     return HttpResponse.json(
       {
         id: 99,
-        market_id: 1,
+        market_id: payload.market_id ?? 1,
         provider: payload.provider ?? "SHOPIFY",
-        display_name: payload.display_name ?? "New source",
+        display_name: payload.display_name ?? payload.name ?? "New source",
         status: "ACTIVE",
         last_synced_at: new Date().toISOString(),
       },

@@ -414,6 +414,9 @@ export const orders: OrderResponse[] = [
     status: "PLACED",
     ordered_at: "2026-06-05T10:30:00.000Z",
     shipping_address: addresses[0],
+    delivery_id: 77,
+    carrier: "kr.cjlogistics",
+    tracking_number: "",
     market_orders: [
       {
         id: 88,

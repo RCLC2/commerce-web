@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Boxes, CircleDollarSign, RefreshCw, Star, Store, Truck } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
@@ -48,6 +48,10 @@ function useSellerToken() {
 
 function useSellerContextName() {
   return useSessionStore((state) => state.sellerContext?.marketName);
+}
+
+function useSellerContextMarketID() {
+  return useSessionStore((state) => state.sellerContext?.marketID);
 }
 
 function SellerAuthRequired() {
@@ -312,11 +316,63 @@ export function SellerProductsPage() {
 export function SellerInventoryPage() {
   const token = useSellerToken();
   const effectiveToken = token ?? "";
+  const queryClient = useQueryClient();
+  const contextMarketID = useSellerContextMarketID();
   const [sourceStatus, setSourceStatus] = useState("ALL");
   const [logStatus, setLogStatus] = useState("ALL");
-  const { data: sources = [] } = useQuery({ queryKey: ["seller-inventory-sources"], queryFn: () => api.sellerInventorySources(effectiveToken), enabled: Boolean(token) });
-  const { data: logs = [] } = useQuery({ queryKey: ["seller-inventory-logs"], queryFn: () => api.sellerInventoryLogs(effectiveToken), enabled: Boolean(token) });
-  const register = useMutation({ mutationFn: () => api.registerInventorySource(effectiveToken, { provider: "SHOPIFY", display_name: "New Shopify source" }) });
+  const [selectedSourceID, setSelectedSourceID] = useState<number | null>(null);
+  const [selectedOptionID, setSelectedOptionID] = useState<number | null>(null);
+  const [tokenForm, setTokenForm] = useState({ access_token: "", refresh_token: "", client_secret: "", webhook_secret: "" });
+  const { data: products = [] } = useQuery({ queryKey: ["seller-products"], queryFn: () => api.sellerProducts(effectiveToken), enabled: Boolean(token) });
+  const marketID = contextMarketID ?? products[0]?.market_id;
+  const optionChoices = products.flatMap((product) =>
+    (product.options ?? []).map((option) => ({
+      id: option.id,
+      label: `${product.name} · ${option.option_value}`,
+    })),
+  );
+  const effectiveOptionID = selectedOptionID ?? optionChoices[0]?.id;
+  const { data: sources = [] } = useQuery({
+    queryKey: ["seller-inventory-sources", marketID],
+    queryFn: () => api.sellerInventorySources(effectiveToken, marketID),
+    enabled: Boolean(token && marketID),
+  });
+  const { data: logs = [] } = useQuery({
+    queryKey: ["seller-inventory-logs", effectiveOptionID, logStatus],
+    queryFn: () => api.sellerInventoryLogs(effectiveToken, { productOptionID: effectiveOptionID, status: logStatus, limit: 30 }),
+    enabled: Boolean(token && effectiveOptionID),
+  });
+  const register = useMutation({
+    mutationFn: () =>
+      api.registerInventorySource(effectiveToken, {
+        market_id: marketID,
+        provider: "SHOPIFY",
+        display_name: "New Shopify source",
+        shop_name: "new-shop.myshopify.com",
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["seller-inventory-sources"] });
+    },
+  });
+  const replaceTokens = useMutation({
+    mutationFn: () => api.replaceInventorySourceTokens(effectiveToken, selectedSourceID ?? 0, tokenForm),
+    onSuccess: () => {
+      setTokenForm({ access_token: "", refresh_token: "", client_secret: "", webhook_secret: "" });
+      void queryClient.invalidateQueries({ queryKey: ["seller-inventory-sources"] });
+    },
+  });
+  const pullStock = useMutation({
+    mutationFn: () => api.pullOptionStock(effectiveToken, effectiveOptionID ?? 0),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["seller-inventory-logs"] });
+    },
+  });
+  const retryLog = useMutation({
+    mutationFn: (logID: number) => api.retryInventorySyncLog(effectiveToken, logID),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["seller-inventory-logs"] });
+    },
+  });
   const sellerName = useSellerContextName() ?? sources[0]?.display_name.replace(/ Shopify| Cafe24/g, "") ?? "셀러 마켓";
 
   if (!token) {
@@ -331,10 +387,11 @@ export function SellerInventoryPage() {
       <ConsoleHeader
         title="외부몰 재고 연동"
         description="Shopify/Cafe24 재고 연동 상태와 동기화 실패 로그를 관리합니다."
-        action={<Button onClick={() => register.mutate()} disabled={register.isPending}>{register.isPending ? "등록 중" : "Shopify 등록"}</Button>}
+        action={<Button onClick={() => register.mutate()} disabled={!marketID || register.isPending}>{register.isPending ? "등록 중" : "Shopify 등록"}</Button>}
       />
       {register.data ? <p className="mt-3 rounded-md border border-line bg-white p-3 text-sm font-bold text-brand">{register.data.display_name} 연동 소스를 등록했습니다.</p> : null}
       {register.error ? <p className="mt-3 text-sm font-bold text-brand">{register.error.message}</p> : null}
+      {!marketID ? <p className="mt-3 rounded-md border border-line bg-white p-3 text-sm font-bold text-brand">마켓 ID를 확인한 뒤 재고 소스를 조회할 수 있습니다.</p> : null}
 
       <ConsoleSection
         className="mt-5"
@@ -352,21 +409,72 @@ export function SellerInventoryPage() {
                 <StatusBadge value={source.status} />
               </div>
               <p className="mt-4 text-sm text-muted">최근 동기화 {source.last_synced_at ? new Date(source.last_synced_at).toLocaleString("ko-KR") : "-"}</p>
+              <Button className="mt-3" size="sm" variant="secondary" onClick={() => setSelectedSourceID(source.id)}>
+                토큰 교체 선택
+              </Button>
             </div>
           ))}
         </div>
       </ConsoleSection>
+      <ConsoleSection className="mt-5" title="소스 토큰 교체" description="access/refresh token 또는 secret이 교체된 경우 선택한 source에 반영합니다.">
+        <div className="grid gap-3 md:grid-cols-2">
+          <select
+            className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold"
+            value={selectedSourceID ?? ""}
+            onChange={(event) => setSelectedSourceID(Number(event.target.value) || null)}
+            aria-label="토큰 교체 대상 소스"
+          >
+            <option value="">소스 선택</option>
+            {sources.map((source) => (
+              <option key={source.id} value={source.id}>{source.display_name}</option>
+            ))}
+          </select>
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={tokenForm.access_token} onChange={(event) => setTokenForm({ ...tokenForm, access_token: event.target.value })} placeholder="access token" aria-label="access token" />
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={tokenForm.refresh_token} onChange={(event) => setTokenForm({ ...tokenForm, refresh_token: event.target.value })} placeholder="refresh token" aria-label="refresh token" />
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={tokenForm.client_secret} onChange={(event) => setTokenForm({ ...tokenForm, client_secret: event.target.value })} placeholder="client secret" aria-label="client secret" />
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={tokenForm.webhook_secret} onChange={(event) => setTokenForm({ ...tokenForm, webhook_secret: event.target.value })} placeholder="webhook secret" aria-label="webhook secret" />
+          <Button disabled={!selectedSourceID || replaceTokens.isPending} onClick={() => replaceTokens.mutate()}>
+            {replaceTokens.isPending ? "교체 중" : "토큰 교체"}
+          </Button>
+        </div>
+        {replaceTokens.isSuccess ? <p className="mt-3 text-sm font-bold text-brand">소스 토큰을 교체했습니다.</p> : null}
+        {replaceTokens.error ? <p className="mt-3 text-sm font-bold text-brand">{replaceTokens.error.message}</p> : null}
+      </ConsoleSection>
+      <ConsoleSection
+        className="mt-5"
+        title="외부 재고 조회"
+        description="선택한 상품 옵션의 외부몰 재고를 pull API로 확인합니다."
+        action={
+          <div className="flex flex-col gap-2 md:flex-row">
+            <select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={effectiveOptionID ?? ""} onChange={(event) => setSelectedOptionID(Number(event.target.value) || null)} aria-label="재고 조회 옵션">
+              {optionChoices.map((option) => (
+                <option key={option.id} value={option.id}>{option.label}</option>
+              ))}
+            </select>
+            <Button onClick={() => pullStock.mutate()} disabled={!effectiveOptionID || pullStock.isPending}>{pullStock.isPending ? "조회 중" : "재고 가져오기"}</Button>
+          </div>
+        }
+      >
+        {pullStock.data ? <p className="text-sm font-bold text-brand">외부몰 재고 수량: {pullStock.data.quantity.toLocaleString("ko-KR")}개</p> : <p className="text-sm text-muted">옵션을 선택한 뒤 외부몰 재고를 조회하세요.</p>}
+        {pullStock.error ? <p className="mt-3 text-sm font-bold text-brand">{pullStock.error.message}</p> : null}
+      </ConsoleSection>
       <ConsoleSection className="mt-5" title="동기화 로그" description="실패 로그는 토큰 갱신 또는 옵션 매핑을 먼저 확인하세요." action={<StatusFilter value={logStatus} onChange={setLogStatus} options={["ALL", "SUCCESS", "FAILED"]} />}>
         <DataTable
-          columns={["상품", "옵션", "상태", "메시지", "일시"]}
+          columns={["상품", "옵션", "상태", "메시지", "일시", "처리"]}
           rows={filteredLogs.map((log) => [
             `#${log.product_id}`,
-            `#${log.option_id}`,
+            `#${log.option_id || log.product_option_id}`,
             <StatusBadge key="status" value={log.status} />,
             log.message,
             new Date(log.created_at).toLocaleString("ko-KR"),
+            log.status === "FAILED" ? (
+              <Button key="retry" size="sm" variant="secondary" disabled={retryLog.isPending} onClick={() => retryLog.mutate(log.id)}>
+                재시도
+              </Button>
+            ) : "-",
           ])}
         />
+        {retryLog.error ? <p className="mt-3 text-sm font-bold text-brand">{retryLog.error.message}</p> : null}
       </ConsoleSection>
     </SellerConsoleLayout>
   );
@@ -374,11 +482,57 @@ export function SellerInventoryPage() {
 
 export function SellerOrdersPage() {
   const token = useSellerToken();
+  const effectiveToken = token ?? "";
+  const queryClient = useQueryClient();
+  const contextMarketID = useSellerContextMarketID();
   const [status, setStatus] = useState("ALL");
   const [query, setQuery] = useState("");
   const [invoiceMap, setInvoiceMap] = useState<Record<string, string>>({});
+  const [carrierMap, setCarrierMap] = useState<Record<string, string>>({});
+  const [processedOrders, setProcessedOrders] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { data = [] } = useQuery({ queryKey: ["seller-orders"], queryFn: () => api.sellerOrders(token ?? ""), enabled: Boolean(token) });
+  const { data: products = [] } = useQuery({ queryKey: ["seller-products"], queryFn: () => api.sellerProducts(effectiveToken), enabled: Boolean(token) });
+  const marketID = contextMarketID ?? products[0]?.market_id;
+  const { data = [] } = useQuery({
+    queryKey: ["seller-orders", marketID],
+    queryFn: () => api.sellerOrders(effectiveToken, marketID),
+    enabled: Boolean(token),
+  });
+  const shipOrder = useMutation({
+    mutationFn: async (order: OrderResponse) => {
+      const orderCode = order.order_code;
+      const invoiceNumber = invoiceMap[orderCode];
+      const carrier = carrierMap[orderCode] || order.carrier || order.delivery?.carrier || "kr.cjlogistics";
+      const deliveryID = deliveryIDForOrder(order);
+      if (!marketID || !invoiceNumber || !deliveryID) {
+        throw new Error("마켓, 송장, 배송 ID를 확인해주세요");
+      }
+      await api.registerSellerInvoices(effectiveToken, {
+        market_id: marketID,
+        invoices: [{ order_id: order.id, carrier, invoice_number: invoiceNumber, is_fake_invoice: false }],
+      });
+      await api.startSellerDelivery(effectiveToken, marketID, deliveryID, { carrier, tracking_number: invoiceNumber });
+      return { orderCode };
+    },
+    onSuccess: ({ orderCode }) => {
+      setProcessedOrders((current) => ({ ...current, [orderCode]: "배송 시작 처리 완료" }));
+      void queryClient.invalidateQueries({ queryKey: ["seller-orders"] });
+    },
+  });
+  const completeDelivery = useMutation({
+    mutationFn: async (order: OrderResponse) => {
+      const deliveryID = deliveryIDForOrder(order);
+      if (!marketID || !deliveryID) {
+        throw new Error("마켓 또는 배송 ID를 확인해주세요");
+      }
+      await api.completeSellerDelivery(effectiveToken, marketID, deliveryID);
+      return { orderCode: order.order_code };
+    },
+    onSuccess: ({ orderCode }) => {
+      setProcessedOrders((current) => ({ ...current, [orderCode]: "배송 완료 처리 완료" }));
+      void queryClient.invalidateQueries({ queryKey: ["seller-orders"] });
+    },
+  });
   const sellerName = useSellerContextName() ?? "셀러 마켓";
 
   if (!token) {
@@ -468,29 +622,47 @@ export function SellerOrdersPage() {
         }
       >
         <DataTable
-          columns={["주문", "대표 상품", "배송지", "결제 금액", "송장 번호", "상태", "처리"]}
+          columns={["주문", "대표 상품", "배송지", "결제 금액", "배송사", "송장 번호", "상태", "처리"]}
           rows={filteredOrders.map((order) => {
             const item = firstOrderItem(order);
+            const orderCode = order.order_code;
+            const currentStatus = item?.status === "ORDERED" ? order.status : item?.status ?? order.status;
             return [
-              <span key="code" className="text-xs font-black">{order.order_code}</span>,
+              <span key="code" className="text-xs font-black">{orderCode}</span>,
               <OrderProduct key="product" order={order} />,
               order.shipping_address ? `${order.shipping_address.receiver} · ${order.shipping_address.line1}` : "-",
               formatPrice(orderPayableAmount(order)),
               <input
+                key="carrier"
+                value={carrierMap[orderCode] ?? order.carrier ?? order.delivery?.carrier ?? "kr.cjlogistics"}
+                onChange={(event) => setCarrierMap((current) => ({ ...current, [orderCode]: event.target.value }))}
+                className="h-9 w-full rounded-md border border-line px-2 text-sm outline-none focus:border-foreground"
+                placeholder="carrier"
+                aria-label={`${orderCode} 배송사`}
+              />,
+              <input
                 key="invoice"
-                value={invoiceMap[order.order_code] ?? ""}
-                onChange={(event) => setInvoiceMap((current) => ({ ...current, [order.order_code]: event.target.value }))}
+                value={invoiceMap[orderCode] ?? order.tracking_number ?? order.delivery?.tracking_number ?? ""}
+                onChange={(event) => setInvoiceMap((current) => ({ ...current, [orderCode]: event.target.value }))}
                 className="h-9 w-full rounded-md border border-line px-2 text-sm outline-none focus:border-foreground"
                 placeholder="송장 번호"
-                aria-label={`${order.order_code} 송장 번호`}
+                aria-label={`${orderCode} 송장 번호`}
               />,
-              <StatusBadge key="status" value={item?.status === "ORDERED" ? order.status : item?.status ?? order.status} />,
-              <Button key="ship" size="sm" disabled={!invoiceMap[order.order_code]}>
-                발송 처리
-              </Button>,
+              <StatusBadge key="status" value={currentStatus} />,
+              <div key="actions" className="flex flex-wrap gap-2">
+                <Button size="sm" disabled={!invoiceMap[orderCode] || !marketID || shipOrder.isPending} onClick={() => shipOrder.mutate(order)}>
+                  발송
+                </Button>
+                <Button size="sm" variant="secondary" disabled={!marketID || completeDelivery.isPending || currentStatus === "DELIVERED"} onClick={() => completeDelivery.mutate(order)}>
+                  완료
+                </Button>
+                {processedOrders[orderCode] ? <span className="text-xs font-bold text-brand">{processedOrders[orderCode]}</span> : null}
+              </div>,
             ];
           })}
         />
+        {shipOrder.error ? <p className="mt-3 text-sm font-bold text-brand">{shipOrder.error.message}</p> : null}
+        {completeDelivery.error ? <p className="mt-3 text-sm font-bold text-brand">{completeDelivery.error.message}</p> : null}
       </ConsoleSection>
     </SellerConsoleLayout>
   );
@@ -653,6 +825,10 @@ function OrderProduct({ order }: { order: OrderResponse }) {
       </div>
     </div>
   );
+}
+
+function deliveryIDForOrder(order: OrderResponse) {
+  return order.delivery_id ?? order.delivery?.id ?? order.id;
 }
 
 function StatusFilter({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: string[] }) {
