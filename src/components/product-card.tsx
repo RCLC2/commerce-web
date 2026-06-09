@@ -4,8 +4,8 @@ import { discountRate, formatPrice } from "@/lib/utils";
 import { SafeImage } from "./safe-image";
 
 export function ProductCard({ product, imageAspect = "aspect-[3/4]" }: { product: Product; imageAspect?: string }) {
-  const saleRate = discountRate(product.base_price, product.discount_price);
-  const price = product.discount_price || product.base_price;
+  const price = product.display_price ?? (product.discount_price || product.base_price);
+  const saleRate = product.discount_percent ?? discountRate(product.base_price, price);
   const discountAmount = Math.max(0, product.base_price - price);
   const tags = product.tags ?? [];
 
