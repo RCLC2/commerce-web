@@ -11,10 +11,10 @@ import { ProductCard } from "./product-card";
 import { Button } from "./ui/button";
 
 const sorts = [
-  { label: "인기순", value: "popular" },
-  { label: "신상품", value: "new" },
-  { label: "낮은 가격", value: "price-low" },
-  { label: "높은 가격", value: "price-high" },
+  { label: "인기순", value: "popularity" },
+  { label: "신상품", value: "created_desc" },
+  { label: "낮은 가격", value: "price_asc" },
+  { label: "높은 가격", value: "price_desc" },
 ];
 
 const categories = [
@@ -34,72 +34,51 @@ const priceRanges = [
   { label: "5만원 이상", value: "over-50000", min: 50_000, max: Infinity },
 ];
 
-const tagFilters = ["오늘출발", "신상", "무료배송", "리뷰많음", "쿠폰가능"];
+const pageLimit = 20;
 
 function productPrice(product: Product) {
-  return product.discount_price || product.base_price;
+  return product.display_price ?? (product.discount_price || product.base_price);
 }
 
 export function ProductListPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const q = searchParams.get("q") ?? "";
-  const sort = searchParams.get("sort") ?? "popular";
+  const sort = normalizeSort(searchParams.get("sort"));
   const category = searchParams.get("category") ?? "";
-  const shipping = searchParams.get("shipping") ?? "";
-  const sale = searchParams.get("sale") ?? "";
-  const stock = searchParams.get("stock") ?? "";
   const market = searchParams.get("market") ?? "";
-  const tag = searchParams.get("tag") ?? "";
   const price = searchParams.get("price") ?? "";
+  const offset = Math.max(0, Number(searchParams.get("offset") ?? 0) || 0);
   const [filtersOpen, setFiltersOpen] = useState(true);
-  const { data: products = [], isLoading, error } = useQuery({
-    queryKey: ["products", "catalog"],
-    queryFn: () => api.listProducts({ sort: "popular" }),
-  });
-
-  const markets = useMemo(
-    () => Array.from(new Set(products.map((product) => product.market_name).filter((item): item is string => Boolean(item)))).sort(),
-    [products],
-  );
-
   const selectedCategory = categories.find((item) => item.value === category) ?? categories[0];
   const selectedPrice = priceRanges.find((item) => item.value === price) ?? priceRanges[0];
-
-  const filteredProducts = useMemo(() => {
-    const query = q.trim().toLowerCase();
-    const result = products.filter((product) => {
-      const matchesQuery =
-        !query ||
-        product.name.toLowerCase().includes(query) ||
-        product.description.toLowerCase().includes(query) ||
-        product.tags?.some((item) => item.toLowerCase().includes(query)) ||
-        product.market_name?.toLowerCase().includes(query);
-      const matchesCategory = !selectedCategory.ids.length || selectedCategory.ids.includes(product.category_id);
-      const matchesShipping = shipping !== "free" || product.shipping_type === "FREE";
-      const matchesSale = sale !== "on" || product.discount_price < product.base_price;
-      const matchesStock =
-        stock !== "available" || product.options?.some((option) => option.is_active && option.quantity > 0);
-      const matchesMarket = !market || product.market_name === market;
-      const matchesTag = !tag || product.tags?.includes(tag) || (tag === "무료배송" && product.shipping_type === "FREE");
-      const matchesPrice = productPrice(product) >= selectedPrice.min && productPrice(product) <= selectedPrice.max;
-
-      return matchesQuery && matchesCategory && matchesShipping && matchesSale && matchesStock && matchesMarket && matchesTag && matchesPrice;
-    });
-
-    return result.sort((a, b) => {
-      if (sort === "price-low") {
-        return productPrice(a) - productPrice(b);
-      }
-      if (sort === "price-high") {
-        return productPrice(b) - productPrice(a);
-      }
-      if (sort === "new") {
-        return b.id - a.id;
-      }
-      return b.popularity_score - a.popularity_score;
-    });
-  }, [market, products, q, sale, selectedCategory.ids, selectedPrice.max, selectedPrice.min, shipping, sort, stock, tag]);
+  const selectedMarketID = Number(market) || undefined;
+  const { data: markets = [] } = useQuery({
+    queryKey: ["markets"],
+    queryFn: () => api.listMarkets(),
+  });
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["products", "catalog", q, sort, selectedCategory.value, selectedPrice.value, selectedMarketID, offset],
+    queryFn: () =>
+      api.listProductPage({
+        q: q || undefined,
+        sort,
+        categoryID: selectedCategory.ids[0],
+        marketID: selectedMarketID,
+        minPrice: selectedPrice.min,
+        maxPrice: Number.isFinite(selectedPrice.max) ? selectedPrice.max : undefined,
+        status: "SELLING",
+        limit: pageLimit,
+        offset,
+      }),
+  });
+  const marketNameByID = useMemo(() => new Map(markets.map((item) => [item.id, item.name])), [markets]);
+  const products = useMemo(
+    () => (data?.items ?? []).map((product) => ({ ...product, market_name: product.market_name ?? marketNameByID.get(product.market_id) })),
+    [data?.items, marketNameByID],
+  );
+  const selectedMarket = selectedMarketID ? markets.find((item) => item.id === selectedMarketID) : undefined;
+  const pagination = data?.pagination ?? { limit: pageLimit, offset, count: 0, hasMore: false };
 
   function updateSearch(next: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -110,22 +89,29 @@ export function ProductListPage() {
         params.delete(key);
       }
     });
+    params.delete("offset");
+    router.replace(`/products${params.toString() ? `?${params.toString()}` : ""}`);
+  }
+
+  function updateOffset(nextOffset: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextOffset > 0) {
+      params.set("offset", String(nextOffset));
+    } else {
+      params.delete("offset");
+    }
     router.replace(`/products${params.toString() ? `?${params.toString()}` : ""}`);
   }
 
   function clearFilters() {
-    router.replace("/products?sort=popular");
+    router.replace("/products?sort=popularity");
   }
 
   const activeFilters = [
     selectedCategory.value ? `카테고리: ${selectedCategory.label}` : null,
     q ? `검색: ${q}` : null,
-    market ? `마켓: ${market}` : null,
+    selectedMarket ? `마켓: ${selectedMarket.name}` : null,
     selectedPrice.value ? selectedPrice.label : null,
-    shipping === "free" ? "무료배송" : null,
-    sale === "on" ? "할인중" : null,
-    stock === "available" ? "재고 있음" : null,
-    tag ? `태그: ${tag}` : null,
   ].filter(Boolean);
 
   return (
@@ -134,7 +120,7 @@ export function ProductListPage() {
         <div>
           <h1 className="text-2xl font-black">{selectedCategory.value ? `${selectedCategory.label} 상품` : "상품"}</h1>
           <p className="mt-1 text-sm text-muted">
-            {filteredProducts.length.toLocaleString("ko-KR")}개 상품을 필터 조건에 맞춰 보여드립니다.
+            {pagination.count.toLocaleString("ko-KR")}개 상품을 필터 조건에 맞춰 보여드립니다.
           </p>
         </div>
         <form
@@ -194,7 +180,7 @@ export function ProductListPage() {
             <select className="mt-2 h-10 w-full rounded-md border border-line px-3 text-sm outline-none" value={market} onChange={(event) => updateSearch({ market: event.target.value || undefined })}>
               <option value="">전체 마켓</option>
               {markets.map((item) => (
-                <option key={item} value={item}>{item}</option>
+                <option key={item.id} value={item.id}>{item.name}</option>
               ))}
             </select>
           </label>
@@ -206,27 +192,10 @@ export function ProductListPage() {
               ))}
             </select>
           </label>
-          <label className="block">
-            <span className="text-xs font-black text-muted">태그</span>
-            <select className="mt-2 h-10 w-full rounded-md border border-line px-3 text-sm outline-none" value={tag} onChange={(event) => updateSearch({ tag: event.target.value || undefined })}>
-              <option value="">전체 태그</option>
-              {tagFilters.map((item) => (
-                <option key={item} value={item}>{item}</option>
-              ))}
-            </select>
-          </label>
           <div>
-            <span className="text-xs font-black text-muted">빠른 조건</span>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button className={`h-9 rounded-md px-3 text-sm font-bold ${shipping === "free" ? "bg-emerald-600 text-white" : "bg-zinc-100"}`} onClick={() => updateSearch({ shipping: shipping === "free" ? undefined : "free" })}>
-                무료배송
-              </button>
-              <button className={`h-9 rounded-md px-3 text-sm font-bold ${sale === "on" ? "bg-brand text-white" : "bg-zinc-100"}`} onClick={() => updateSearch({ sale: sale === "on" ? undefined : "on" })}>
-                할인중
-              </button>
-              <button className={`h-9 rounded-md px-3 text-sm font-bold ${stock === "available" ? "bg-sky-600 text-white" : "bg-zinc-100"}`} onClick={() => updateSearch({ stock: stock === "available" ? undefined : "available" })}>
-                재고 있음
-              </button>
+            <span className="text-xs font-black text-muted">공개 상태</span>
+            <div className="mt-2 inline-flex h-10 items-center rounded-md bg-emerald-50 px-3 text-sm font-black text-emerald-700">
+              판매중
             </div>
           </div>
         </section>
@@ -248,22 +217,46 @@ export function ProductListPage() {
 
       {error ? <p className="mt-8 rounded-md border border-line bg-white p-4 text-sm text-brand">{error.message}</p> : null}
       {isLoading ? <p className="mt-8 text-sm text-muted">상품을 불러오는 중입니다.</p> : null}
-      {!isLoading && !filteredProducts.length ? (
+      {!isLoading && !products.length ? (
         <div className="mt-8 rounded-md border border-line bg-white p-8 text-center">
           <p className="font-bold">조건에 맞는 상품이 없습니다.</p>
           <p className="mt-1 text-sm text-muted">카테고리나 필터를 조정해보세요.</p>
         </div>
       ) : null}
       <div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
-        {filteredProducts.map((product) => (
+        {products.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
       </div>
-      {filteredProducts.length ? (
+      {products.length ? (
         <p className="mt-8 text-center text-xs text-muted">
-          평균 상품가 {formatPrice(Math.round(filteredProducts.reduce((sum, product) => sum + productPrice(product), 0) / filteredProducts.length))}
+          평균 상품가 {formatPrice(Math.round(products.reduce((sum, product) => sum + productPrice(product), 0) / products.length))}
         </p>
       ) : null}
+      <div className="mt-6 flex justify-center gap-2">
+        <Button variant="secondary" disabled={offset === 0 || isLoading} onClick={() => updateOffset(Math.max(0, offset - pageLimit))}>
+          이전
+        </Button>
+        <Button variant="secondary" disabled={!pagination.hasMore || isLoading} onClick={() => updateOffset(offset + pageLimit)}>
+          다음
+        </Button>
+      </div>
     </main>
   );
+}
+
+function normalizeSort(value: string | null) {
+  if (value === "popular") {
+    return "popularity";
+  }
+  if (value === "new") {
+    return "created_desc";
+  }
+  if (value === "price-low") {
+    return "price_asc";
+  }
+  if (value === "price-high") {
+    return "price_desc";
+  }
+  return value ?? "popularity";
 }

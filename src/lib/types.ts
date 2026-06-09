@@ -6,6 +6,7 @@ export type ProductOption = {
   additional_price: number;
   quantity: number;
   is_active: boolean;
+  available?: boolean;
 };
 
 export type Market = {
@@ -59,14 +60,36 @@ export type Product = {
   description: string;
   base_price: number;
   discount_price: number;
+  display_price?: number;
+  discount_percent?: number;
   shipping_type: "NORMAL" | "FREE" | string;
   popularity_score: number;
   status: "SELLING" | "SOLD_OUT" | string;
+  availability?: ProductAvailability;
   options?: ProductOption[];
   image_url?: string;
   detail_html?: string;
   market_name?: string;
   tags?: string[];
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ProductAvailability = {
+  available: boolean;
+  reason: string;
+};
+
+export type ProductPagination = {
+  limit: number;
+  offset: number;
+  count: number;
+  hasMore: boolean;
+};
+
+export type ProductListResponse = {
+  items: Product[];
+  pagination: ProductPagination;
 };
 
 export type SearchSuggestion = {

@@ -156,21 +156,59 @@ export const handlers = [
   }),
   http.get(`${API_BASE_URL}/api/v1/products`, ({ request }) => {
     const url = new URL(request.url);
-    const q = url.searchParams.get("q")?.toLowerCase();
-    const sort = url.searchParams.get("sort");
+    const q = url.searchParams.get("q")?.toLowerCase().trim();
+    const categoryID = Number(url.searchParams.get("category_id") ?? url.searchParams.get("categoryID") ?? 0);
+    const marketID = Number(url.searchParams.get("market_id") ?? url.searchParams.get("marketID") ?? 0);
+    const minPrice = Number(url.searchParams.get("min_price") ?? url.searchParams.get("minPrice") ?? 0);
+    const maxPrice = Number(url.searchParams.get("max_price") ?? url.searchParams.get("maxPrice") ?? Number.POSITIVE_INFINITY);
+    const status = url.searchParams.get("status") ?? "SELLING";
+    const sort = normalizeProductSort(url.searchParams.get("sort"));
+    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? 20)));
+    const offset = Math.max(0, Number(url.searchParams.get("offset") ?? 0));
     let result = [...products];
 
+    result = result.filter((product) => product.status === status);
     if (q) {
-      result = result.filter((product) => product.name.toLowerCase().includes(q));
+      result = result.filter((product) =>
+        [product.name, product.description, product.market_name, ...(product.tags ?? [])].some((value) => value?.toLowerCase().includes(q)),
+      );
     }
-    if (sort === "price-low") {
-      result.sort((a, b) => (a.discount_price || a.base_price) - (b.discount_price || b.base_price));
+    if (categoryID) {
+      result = result.filter((product) => product.category_id === categoryID);
     }
-    if (sort === "popular") {
+    if (marketID) {
+      result = result.filter((product) => product.market_id === marketID);
+    }
+    result = result.filter((product) => {
+      const price = product.discount_price || product.base_price;
+      return price >= minPrice && price <= maxPrice;
+    });
+    if (sort === "price_asc") {
+      result.sort((a, b) => productDisplayPrice(a) - productDisplayPrice(b));
+    }
+    if (sort === "price_desc") {
+      result.sort((a, b) => productDisplayPrice(b) - productDisplayPrice(a));
+    }
+    if (sort === "popularity") {
       result.sort((a, b) => b.popularity_score - a.popularity_score);
     }
+    if (sort === "created_asc") {
+      result.sort((a, b) => a.id - b.id);
+    }
+    if (sort === "created_desc") {
+      result.sort((a, b) => b.id - a.id);
+    }
 
-    return HttpResponse.json(result);
+    const paged = result.slice(offset, offset + limit);
+    return HttpResponse.json({
+      items: paged.map(toPublicProductItem),
+      pagination: {
+        limit,
+        offset,
+        count: paged.length,
+        hasMore: offset + limit < result.length,
+      },
+    });
   }),
   http.get(`${API_BASE_URL}/api/v1/products/:id`, ({ params }) => {
     const product = products.find((item) => item.id === Number(params.id));
@@ -273,3 +311,43 @@ export const handlers = [
   http.get(`${API_BASE_URL}/api/v1/admin/carousels`, () => HttpResponse.json(carousels)),
   http.post(`${API_BASE_URL}/api/v1/admin/:domain/:id/:action`, () => HttpResponse.json({ status: "RECORDED" })),
 ];
+
+function productDisplayPrice(product: { base_price: number; discount_price: number }) {
+  return product.discount_price || product.base_price;
+}
+
+function toPublicProductItem(product: (typeof products)[number]) {
+  const displayPrice = productDisplayPrice(product);
+  return {
+    id: product.id,
+    marketId: product.market_id,
+    categoryId: product.category_id,
+    name: product.name,
+    originalPrice: product.base_price,
+    salePrice: displayPrice,
+    displayPrice,
+    discountPercent: product.base_price > displayPrice ? Math.floor(((product.base_price - displayPrice) * 100) / product.base_price) : 0,
+    status: product.status,
+    availability: {
+      available: product.options?.some((option) => option.is_active && option.quantity > 0) ?? false,
+      reason: product.options?.some((option) => option.is_active && option.quantity > 0) ? "AVAILABLE" : "SOLD_OUT",
+    },
+    createdAt: new Date(Date.now() - product.id * 1000).toISOString(),
+  };
+}
+
+function normalizeProductSort(value: string | null) {
+  if (value === "popular") {
+    return "popularity";
+  }
+  if (value === "new") {
+    return "created_desc";
+  }
+  if (value === "price-low") {
+    return "price_asc";
+  }
+  if (value === "price-high") {
+    return "price_desc";
+  }
+  return value ?? "created_desc";
+}
