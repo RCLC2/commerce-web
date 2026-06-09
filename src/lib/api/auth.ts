@@ -6,7 +6,10 @@ export const authApi = {
     request<LoginResponse>("/api/v1/auth/login", {
       method: "POST",
       body: JSON.stringify(payload),
-    }),
+    }).then((data) => ({
+      ...data,
+      role: data.role ?? data.type ?? data.member?.role ?? data.member?.type ?? "CUSTOMER",
+    })),
   register: (payload: {
     email: string;
     password: string;
@@ -16,7 +19,13 @@ export const authApi = {
   }) =>
     request<{ id: number }>("/api/v1/auth/register", {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        email: payload.email,
+        password: payload.password,
+        type: payload.role,
+        marketingConsent: payload.marketingConsent,
+        nighttimeConsent: payload.nighttimeConsent,
+      }),
     }),
   me: (token: string) => request<MemberProfile>("/api/v1/me", { token }),
   updateMe: (
