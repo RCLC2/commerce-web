@@ -411,7 +411,7 @@ export const orders: OrderResponse[] = [
     used_coupon_id: 501,
     payment_method: "CARD",
     payment_key: "mock-payment-key",
-    status: "PLACED",
+    status: "COMPLETED",
     ordered_at: "2026-06-05T10:30:00.000Z",
     shipping_address: addresses[0],
     market_orders: [
@@ -419,7 +419,7 @@ export const orders: OrderResponse[] = [
         id: 88,
         market_id: 1,
         shipping_fee: 0,
-        status: "READY_TO_SHIP",
+        status: "COMPLETED",
         expected_settlement_amount: 23360,
         line_items: [
           {
@@ -429,7 +429,7 @@ export const orders: OrderResponse[] = [
             option_id: 301,
             quantity: 1,
             price: 29900,
-            status: "ORDERED",
+            status: "COMPLETED",
             product: products[0],
           },
         ],

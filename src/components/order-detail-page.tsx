@@ -2,11 +2,15 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { useState } from "react";
 import { api } from "@/lib/api";
+import { getEffectiveToken } from "@/lib/auth-token";
+import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import { formatPrice } from "@/lib/utils";
-import { Button } from "./ui/button";
+import { ReviewWritePanel } from "./review-write-panel";
 import { SafeImage } from "./safe-image";
+import { Button } from "./ui/button";
 
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
@@ -15,17 +19,25 @@ function statusLabel(status: string) {
     READY_TO_SHIP: "배송 준비중",
     SHIPPING: "배송중",
     DELIVERED: "배송 완료",
+    COMPLETED: "구매확정",
     ORDERED: "주문 완료",
+    REVIEWED: "리뷰 작성 완료",
   };
   return labels[status] ?? status;
 }
 
 export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   const token = useSessionStore((state) => state.accessToken);
-  const effectiveToken = token ?? (process.env.NEXT_PUBLIC_API_MOCKING === "enabled" ? "mock-access-token" : "");
+  const effectiveToken = getEffectiveToken(token);
+  const [reviewingLineItemID, setReviewingLineItemID] = useState<number | null>(null);
   const { data: order, isLoading, error } = useQuery({
     queryKey: ["order", orderCode],
-    queryFn: () => api.getOrder(effectiveToken, orderCode),
+    queryFn: () => api.getOrder(effectiveToken ?? "", orderCode),
+    enabled: Boolean(effectiveToken),
+  });
+  const { data: myReviews = [] } = useQuery({
+    queryKey: effectiveToken ? queryKeys.myReviews(effectiveToken) : ["my-reviews", "anonymous"],
+    queryFn: () => api.listMyReviews(effectiveToken ?? ""),
     enabled: Boolean(effectiveToken),
   });
 
@@ -84,21 +96,59 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
               <span className="text-muted">{statusLabel(marketOrder.status)}</span>
             </div>
             <div className="mt-4 space-y-3">
-              {marketOrder.line_items.map((item) => (
-                <div key={item.id} className="flex gap-3 text-sm">
-                  <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-zinc-100">
-                    <SafeImage src={item.product?.image_url} alt="" fill sizes="80px" className="object-cover" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex justify-between gap-3">
-                      <p className="font-bold">{item.product?.name ?? `상품 ${item.product_id}`}</p>
-                      <p className="font-black">{formatPrice(item.price * item.quantity)}</p>
+              {marketOrder.line_items.map((item) => {
+                const writtenReview = myReviews.find((review) => review.order_line_item_id === item.id);
+                const canWriteReview = item.status === "COMPLETED" && !writtenReview;
+                const isReviewing = reviewingLineItemID === item.id;
+
+                return (
+                  <div key={item.id} className="border-t border-line pt-3 first:border-t-0 first:pt-0">
+                    <div className="flex gap-3 text-sm">
+                      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-zinc-100">
+                        <SafeImage src={item.product?.image_url} alt="" fill sizes="80px" className="object-cover" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex justify-between gap-3">
+                          <Link href={`/products/${item.product_id}`} className="font-bold hover:underline">
+                            {item.product?.name ?? `상품 ${item.product_id}`}
+                          </Link>
+                          <p className="font-black">{formatPrice(item.price * item.quantity)}</p>
+                        </div>
+                        <p className="mt-1 text-muted">옵션 #{item.option_id} · {item.quantity}개 · {statusLabel(item.status)}</p>
+                        <p className="mt-1 text-xs text-muted">상품 ID {item.product_id} · 라인 ID {item.id}</p>
+                        {writtenReview ? (
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <span className="rounded bg-zinc-100 px-2 py-1 text-xs font-bold text-muted">리뷰 작성 완료</span>
+                            <Link href="/mypage/reviews" className="text-xs font-bold text-foreground underline">
+                              내 리뷰 보기
+                            </Link>
+                          </div>
+                        ) : null}
+                        {canWriteReview && effectiveToken ? (
+                          <div className="mt-3">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={isReviewing ? "secondary" : "primary"}
+                              onClick={() => setReviewingLineItemID(isReviewing ? null : item.id)}
+                            >
+                              {isReviewing ? "닫기" : "리뷰 작성"}
+                            </Button>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
-                    <p className="mt-1 text-muted">옵션 #{item.option_id} · {item.quantity}개 · {statusLabel(item.status)}</p>
-                    <p className="mt-1 text-xs text-muted">상품 ID {item.product_id} · 라인 ID {item.id}</p>
+                    {canWriteReview && isReviewing && effectiveToken ? (
+                      <ReviewWritePanel
+                        token={effectiveToken}
+                        orderCode={order.order_code}
+                        lineItemID={item.id}
+                        productID={item.product_id}
+                      />
+                    ) : null}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ))}
