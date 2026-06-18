@@ -114,9 +114,58 @@ export type Review = {
   product_id: number;
   member_id: number;
   order_id: number;
+  order_line_item_id?: number;
+  option_id?: number;
+  rating_x2?: number;
   rating: number;
   content: string;
   created_at: string;
+  is_photo_review?: boolean;
+  images?: ReviewImage[];
+};
+
+export type ReviewImage = {
+  id: number;
+  media_asset_id: number;
+  sort_order: number;
+  is_representative: boolean;
+  s3_key: string;
+  content_type: string;
+  size_bytes: number;
+};
+
+export type ReviewImageInput = {
+  media_asset_id: number;
+  sort_order: number;
+  is_representative: boolean;
+};
+
+export type ReviewImageUploadRequest = {
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+};
+
+export type ReviewImageUpload = {
+  s3_key: string;
+  upload_url: string;
+  headers: Record<string, string>;
+  expires_at: string;
+  content_type: string;
+  size_bytes: number;
+};
+
+export type MediaAsset = {
+  id: number;
+  s3_key: string;
+  content_type: string;
+  size_bytes: number;
+};
+
+export type CreateReviewPayload = {
+  rating_x2: number;
+  content: string;
+  images?: ReviewImageInput[];
 };
 
 export type Coupon = {

@@ -20,8 +20,10 @@ import {
   settlements,
 } from "./mock-data";
 import { getApiBaseUrl } from "@/lib/api-base-url";
+import type { Review } from "@/lib/types";
 
 const API_BASE_URL = getApiBaseUrl();
+let nextMockMediaAssetID = 9000;
 
 function normalizeSearch(value: string | null) {
   return (value ?? "").trim().toLowerCase();
@@ -179,6 +181,39 @@ export const handlers = [
   http.get(`${API_BASE_URL}/api/v1/products/:id/reviews`, ({ params }) =>
     HttpResponse.json(reviews.filter((review) => review.product_id === Number(params.id))),
   ),
+  http.post(`${API_BASE_URL}/api/v1/media/review-images/presign`, async ({ request }) => {
+    const payload = (await request.json()) as { filename?: string; content_type?: string; size_bytes?: number };
+    const extension = payload.content_type === "image/webp" ? "webp" : payload.content_type === "image/png" ? "png" : "jpg";
+
+    return HttpResponse.json(
+      {
+        s3_key: `tmp/reviews/2026/06/18/mock-${Date.now()}.${extension}`,
+        upload_url: `${API_BASE_URL}/mock-s3/review-image-upload`,
+        headers: {
+          "Content-Type": payload.content_type ?? "image/jpeg",
+        },
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        content_type: payload.content_type ?? "image/jpeg",
+        size_bytes: payload.size_bytes ?? 0,
+      },
+      { status: 201 },
+    );
+  }),
+  http.put(`${API_BASE_URL}/mock-s3/review-image-upload`, async ({ request }) => {
+    await request.arrayBuffer();
+    return new HttpResponse(null, { status: 200 });
+  }),
+  http.post(`${API_BASE_URL}/api/v1/media/review-images/complete`, async ({ request }) => {
+    const payload = (await request.json()) as { s3_key?: string };
+    const id = nextMockMediaAssetID++;
+
+    return HttpResponse.json({
+      id,
+      s3_key: payload.s3_key?.replace(/^tmp\/reviews\//, "reviews/") ?? `reviews/2026/06/18/mock-${id}.jpg`,
+      content_type: "image/jpeg",
+      size_bytes: 2048,
+    });
+  }),
   http.post(`${API_BASE_URL}/api/v1/auth/login`, async ({ request }) => {
     const payload = (await request.json()) as { email?: string };
     const role = payload.email?.includes("admin")
@@ -241,6 +276,43 @@ export const handlers = [
   http.post(`${API_BASE_URL}/api/v1/orders/:orderCode/complete-payment`, ({ params }) =>
     HttpResponse.json({ orderCode: params.orderCode, status: "PAYMENT_COMPLETED" }, { status: 202 }),
   ),
+  http.post(`${API_BASE_URL}/api/v1/orders/:orderCode/items/:itemID/reviews`, async ({ params, request }) => {
+    const payload = (await request.json()) as {
+      rating_x2?: number;
+      content?: string;
+      images?: { media_asset_id: number; sort_order: number; is_representative: boolean }[];
+    };
+    const order = orders.find((item) => item.order_code === params.orderCode);
+    const lineItemID = Number(params.itemID);
+    const lineItem = order?.market_orders?.flatMap((marketOrder) => marketOrder.line_items).find((item) => item.id === lineItemID);
+    const ratingX2 = payload.rating_x2 ?? 10;
+
+    const created: Review = {
+      id: reviews.length + 1,
+      product_id: lineItem?.product_id ?? 101,
+      member_id: 1,
+      order_id: order?.id ?? 77,
+      order_line_item_id: lineItemID,
+      option_id: lineItem?.option_id,
+      rating_x2: ratingX2,
+      rating: ratingX2 / 2,
+      content: payload.content ?? "",
+      created_at: new Date().toISOString(),
+      is_photo_review: Boolean(payload.images?.length),
+      images: (payload.images ?? []).map((image, index) => ({
+        id: index + 1,
+        media_asset_id: image.media_asset_id,
+        sort_order: image.sort_order,
+        is_representative: image.is_representative,
+        s3_key: `reviews/2026/06/18/mock-${image.media_asset_id}.jpg`,
+        content_type: "image/jpeg",
+        size_bytes: 2048,
+      })),
+    };
+
+    reviews.unshift(created);
+    return HttpResponse.json(created, { status: 201 });
+  }),
   http.get(`${API_BASE_URL}/api/v1/seller/dashboard`, () => HttpResponse.json(sellerDashboard)),
   http.get(`${API_BASE_URL}/api/v1/seller/products`, () => HttpResponse.json(products.filter((product) => product.market_id === 1))),
   http.get(`${API_BASE_URL}/api/v1/seller/inventory/sources`, () => HttpResponse.json(inventorySources)),
