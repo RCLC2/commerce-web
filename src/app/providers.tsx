@@ -3,6 +3,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
+let mockWorkerReady: Promise<unknown> | null = null;
+
 export function Providers({ children }: { children: React.ReactNode }) {
   const [mockReady, setMockReady] = useState(() => process.env.NEXT_PUBLIC_API_MOCKING !== "enabled");
   const [queryClient] = useState(
@@ -22,9 +24,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    void import("@/mocks/browser").then(({ worker }) => {
-      void worker.start({ onUnhandledRequest: "bypass" }).then(() => setMockReady(true));
-    });
+    mockWorkerReady ??= import("@/mocks/browser").then(({ worker }) => worker.start({ onUnhandledRequest: "bypass" }));
+    void mockWorkerReady.then(() => setMockReady(true));
   }, []);
 
   if (!mockReady) {
