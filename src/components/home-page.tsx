@@ -18,7 +18,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { queryKeys } from "@/lib/query-keys";
-import type { CommerceCategory, Product } from "@/lib/types";
+import type { CMSCarousel, CommerceCategory, CommerceEvent, Product } from "@/lib/types";
 import { useSessionStore } from "@/lib/session-store";
 import { formatPrice } from "@/lib/utils";
 import { ProductCard } from "./product-card";
@@ -42,11 +42,15 @@ function categoryIcon(category: CommerceCategory) {
 
 export function HomePage() {
   const token = useSessionStore((state) => state.accessToken);
-  const [eventIndex, setEventIndex] = useState(0);
+  const [heroIndex, setHeroIndex] = useState(0);
   const [visibleCount, setVisibleCount] = useState(8);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const popularCarouselRef = useRef<HTMLDivElement | null>(null);
   const effectiveToken = getEffectiveToken(token);
+  const { data: activeCarousels = [] } = useQuery({
+    queryKey: queryKeys.activeCarousels,
+    queryFn: api.activeCarousels,
+  });
   const { data: events = [] } = useQuery({
     queryKey: queryKeys.events,
     queryFn: api.listEvents,
@@ -77,6 +81,9 @@ export function HomePage() {
     return Array.from({ length: 20 }, (_, index) => products[index % products.length]);
   }, [products]);
   const recommendationTitle = `${profile?.user_name ?? "사용자"}님을 위한 추천 상품`;
+  const heroItems = activeCarousels.length ? activeCarousels : events;
+  const usingCMSCarousels = activeCarousels.length > 0;
+  const safeHeroIndex = heroItems.length ? Math.min(heroIndex, heroItems.length - 1) : 0;
 
   useEffect(() => {
     const target = loadMoreRef.current;
@@ -92,15 +99,17 @@ export function HomePage() {
     return () => observer.disconnect();
   }, [recommendationProducts.length]);
 
-  function moveEvent(direction: "prev" | "next") {
-    if (!events.length) {
+  function moveHero(direction: "prev" | "next") {
+    if (!heroItems.length) {
       return;
     }
-    setEventIndex((current) => {
+    setHeroIndex((current) => {
+      const lastIndex = heroItems.length - 1;
+      const currentIndex = Math.min(current, lastIndex);
       if (direction === "prev") {
-        return current === 0 ? events.length - 1 : current - 1;
+        return currentIndex === 0 ? lastIndex : currentIndex - 1;
       }
-      return current === events.length - 1 ? 0 : current + 1;
+      return currentIndex === lastIndex ? 0 : currentIndex + 1;
     });
   }
 
@@ -114,36 +123,36 @@ export function HomePage() {
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24">
       <section className="py-5">
-        {events.length ? (
+        {heroItems.length ? (
           <div className="relative overflow-hidden rounded-md border border-line bg-white">
             <div
               className="flex transition-transform duration-500 ease-out"
-              style={{ transform: `translateX(-${eventIndex * 100}%)` }}
+              style={{ transform: `translateX(-${safeHeroIndex * 100}%)` }}
             >
-              {events.map((event, index) => (
-                <Link key={event.id} href={`/events/${event.id}`} className="block min-w-full">
+              {heroItems.map((item, index) => (
+                <Link key={`${usingCMSCarousels ? "cms" : "event"}-${item.id}`} href={heroHref(item, usingCMSCarousels)} className="block min-w-full">
                   <div className="relative h-64 bg-zinc-100 md:h-[380px]">
-                    <SafeImage src={event.image_url} alt={event.title} fill sizes="100vw" className="object-cover" priority={index === 0} />
+                    <SafeImage src={item.image_url} alt={item.title} fill sizes="100vw" className="object-cover" priority={index === 0} />
                     <div className="absolute inset-0 bg-black/30" />
                     <div className="absolute bottom-0 left-0 max-w-lg p-5 text-white md:p-8">
-                      <p className="text-sm font-bold">진행중인 이벤트</p>
-                      <h1 className="mt-2 text-3xl font-black md:text-5xl">{event.title}</h1>
-                      <p className="mt-2 text-sm text-white/90">{event.subtitle}</p>
+                      <p className="text-sm font-bold">{usingCMSCarousels ? heroTargetLabel(item as CMSCarousel) : "진행중인 이벤트"}</p>
+                      <h1 className="mt-2 text-3xl font-black md:text-5xl">{item.title}</h1>
+                      <p className="mt-2 text-sm text-white/90">{usingCMSCarousels ? "지금 노출 중인 CMS 캐러셀" : (item as CommerceEvent).subtitle}</p>
                     </div>
                   </div>
                 </Link>
               ))}
             </div>
             <div className="absolute right-4 top-4 rounded-full bg-black/55 px-3 py-1 text-xs font-bold text-white">
-              {eventIndex + 1}/{events.length}
+              {safeHeroIndex + 1}/{heroItems.length}
             </div>
             <div className="absolute inset-y-0 left-0 flex items-center px-2">
-              <Button variant="secondary" size="icon" aria-label="이전 이벤트" onClick={() => moveEvent("prev")}>
+              <Button variant="secondary" size="icon" aria-label="이전 캐러셀" onClick={() => moveHero("prev")}>
                 <ChevronLeft size={18} />
               </Button>
             </div>
             <div className="absolute inset-y-0 right-0 flex items-center px-2">
-              <Button variant="secondary" size="icon" aria-label="다음 이벤트" onClick={() => moveEvent("next")}>
+              <Button variant="secondary" size="icon" aria-label="다음 캐러셀" onClick={() => moveHero("next")}>
                 <ChevronRight size={18} />
               </Button>
             </div>
@@ -230,6 +239,21 @@ export function HomePage() {
       </section>
     </main>
   );
+}
+
+function heroHref(item: CMSCarousel | CommerceEvent, isCMSCarousel: boolean) {
+  if (!isCMSCarousel) {
+    return `/events/${item.id}`;
+  }
+  const carousel = item as CMSCarousel;
+  if (carousel.target_type === "MARKET") {
+    return `/markets/${carousel.target_id}`;
+  }
+  return `/products/${carousel.target_id}`;
+}
+
+function heroTargetLabel(carousel: CMSCarousel) {
+  return carousel.target_type === "MARKET" ? `마켓 #${carousel.target_id}` : `상품 #${carousel.target_id}`;
 }
 
 function PopularSquareCard({ product }: { product: Product }) {

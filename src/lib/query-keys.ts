@@ -1,5 +1,6 @@
 export const queryKeys = {
   events: ["events"] as const,
+  activeCarousels: ["active-carousels"] as const,
   categories: ["categories"] as const,
   products: (params?: { categoryID?: number; sort?: string; q?: string }) => ["products", params] as const,
   product: (id: number) => ["product", id] as const,

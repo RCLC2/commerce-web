@@ -18,6 +18,10 @@ import type {
   Settlement,
 } from "@/lib/types";
 
+const dayMs = 24 * 60 * 60 * 1000;
+const mockDataLoadedAt = Date.now();
+const relativeISODate = (daysFromNow: number) => new Date(mockDataLoadedAt + daysFromNow * dayMs).toISOString();
+
 export const categories: CommerceCategory[] = [
   { id: 11, name: "상의", slug: "tops", href: "/products?category=tops", sort_order: 1 },
   { id: 12, name: "팬츠", slug: "pants", href: "/products?category=pants", sort_order: 2 },
@@ -577,15 +581,23 @@ export const carousels: CMSCarousel[] = [
     id: 1,
     title: "Weekly Drop",
     image_url: "https://images.unsplash.com/photo-1496747611176-843222e1e57c?q=80&w=1200&auto=format&fit=crop",
-    link_url: "/products",
-    status: "ACTIVE",
+    target_type: "PRODUCT",
+    target_id: 101,
+    display_order: 1,
+    is_active: true,
+    starts_at: relativeISODate(-1),
+    ends_at: relativeISODate(14),
   },
   {
     id: 2,
     title: "오늘출발 모음",
     image_url: "https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=1200&auto=format&fit=crop",
-    link_url: "/products?sort=popular",
-    status: "INACTIVE",
+    target_type: "MARKET",
+    target_id: 1,
+    display_order: 2,
+    is_active: false,
+    starts_at: null,
+    ends_at: null,
   },
 ];
 
