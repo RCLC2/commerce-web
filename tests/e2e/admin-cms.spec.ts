@@ -67,7 +67,6 @@ test("admin can create update and deactivate CMS carousel", async ({ page }) => 
   const targetID = await visibleWeeklyDropTargetID(page);
 
   await page.getByLabel("제목").fill(title);
-  await page.getByLabel("이미지 URL").fill("https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1200&auto=format&fit=crop");
   await page.getByLabel("대상 ID").fill(targetID);
   await page.getByLabel("노출 순서").fill("3");
   await page.locator("form").getByRole("button", { name: "등록" }).click();

@@ -251,7 +251,7 @@ export type AuditLog = {
 export type CMSCarousel = {
   id: number;
   title: string;
-  image_url: string;
+  image_url?: string | null;
   target_type: "PRODUCT" | "MARKET" | string;
   target_id: number;
   display_order: number;
@@ -262,7 +262,7 @@ export type CMSCarousel = {
 
 export type CMSCarouselMutation = {
   title: string;
-  image_url: string;
+  image_url?: string | null;
   target_type: "PRODUCT" | "MARKET";
   target_id: number;
   display_order: number;

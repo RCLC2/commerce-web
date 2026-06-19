@@ -580,7 +580,7 @@ export const carousels: CMSCarousel[] = [
   {
     id: 1,
     title: "Weekly Drop",
-    image_url: "https://images.unsplash.com/photo-1496747611176-843222e1e57c?q=80&w=1200&auto=format&fit=crop",
+    image_url: null,
     target_type: "PRODUCT",
     target_id: 101,
     display_order: 1,
@@ -591,7 +591,7 @@ export const carousels: CMSCarousel[] = [
   {
     id: 2,
     title: "오늘출발 모음",
-    image_url: "https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=1200&auto=format&fit=crop",
+    image_url: null,
     target_type: "MARKET",
     target_id: 1,
     display_order: 2,

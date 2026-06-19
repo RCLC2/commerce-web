@@ -750,7 +750,7 @@ export function AdminCMSPage() {
           </label>
           <label className="grid gap-1 text-xs font-black text-muted md:col-span-2">
             이미지 URL
-            <input className="h-10 rounded-md border border-line px-3 text-sm text-foreground" value={form.image_url} onChange={(event) => updateForm("image_url", event.target.value)} required />
+            <input className="h-10 rounded-md border border-line px-3 text-sm text-foreground" value={form.image_url} onChange={(event) => updateForm("image_url", event.target.value)} />
           </label>
           <label className="grid gap-1 text-xs font-black text-muted">
             대상
@@ -843,7 +843,7 @@ function formFromCarousel(carousel: CMSCarousel): CarouselFormState {
   return {
     id: carousel.id,
     title: carousel.title,
-    image_url: carousel.image_url,
+    image_url: carousel.image_url ?? "",
     target_type: carousel.target_type === "MARKET" ? "MARKET" : "PRODUCT",
     target_id: String(carousel.target_id),
     display_order: String(carousel.display_order),
@@ -856,7 +856,7 @@ function formFromCarousel(carousel: CMSCarousel): CarouselFormState {
 function carouselPayload(form: CarouselFormState): CMSCarouselMutation {
   return {
     title: form.title.trim(),
-    image_url: form.image_url.trim(),
+    image_url: form.image_url.trim() || null,
     target_type: form.target_type,
     target_id: Number(form.target_id),
     display_order: Number(form.display_order || 0),

@@ -94,10 +94,14 @@ function activeCMSCarousels(now = new Date()) {
 }
 
 function normalizeCarouselPayload(payload: Partial<CMSCarouselMutation>, current?: CMSCarousel): CMSCarousel {
+  const imageURL = Object.prototype.hasOwnProperty.call(payload, "image_url")
+    ? payload.image_url ?? null
+    : current?.image_url ?? null;
+
   return {
     id: current?.id ?? Math.max(0, ...cmsCarousels.map((carousel) => carousel.id)) + 1,
     title: payload.title ?? current?.title ?? "새 캐러셀",
-    image_url: payload.image_url ?? current?.image_url ?? "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1200&auto=format&fit=crop",
+    image_url: imageURL,
     target_type: payload.target_type ?? current?.target_type ?? "PRODUCT",
     target_id: payload.target_id ?? current?.target_id ?? 101,
     display_order: payload.display_order ?? current?.display_order ?? 0,

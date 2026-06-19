@@ -75,7 +75,7 @@ function normalizeCarousel(raw: unknown): CMSCarousel {
   return {
     id: numberValue(record.id ?? record.ID),
     title: stringValue(record.title ?? record.Title),
-    image_url: stringValue(record.image_url ?? record.ImageURL),
+    image_url: nullableString(record.image_url ?? record.ImageURL),
     target_type: stringValue(record.target_type ?? record.TargetType, "PRODUCT"),
     target_id: numberValue(record.target_id ?? record.TargetID),
     display_order: numberValue(record.display_order ?? record.DisplayOrder),
