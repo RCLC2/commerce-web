@@ -37,15 +37,17 @@ test("admin can review scheduled CMS carousels", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "CMS" })).toBeVisible();
   await expect(page.getByText("홈 캐러셀과 운영 배너의 노출 상태를 관리합니다.")).toBeVisible();
 
-  await expect(page.getByText("Weekly Drop")).toBeVisible();
-  await expect(page.getByText(/PRODUCT #\d+/)).toBeVisible();
-  await expect(page.getByText(/KST/)).toBeVisible();
-  await expect(page.getByText("노출 순서 1")).toBeVisible();
+  const weeklyDropCard = page.locator("section").filter({ hasText: "Weekly Drop" }).last();
+  await expect(weeklyDropCard).toBeVisible();
+  await expect(weeklyDropCard.getByText(/PRODUCT #\d+/)).toBeVisible();
+  await expect(weeklyDropCard.getByText(/KST/)).toBeVisible();
+  await expect(weeklyDropCard.getByText("노출 순서 1")).toBeVisible();
 
-  await expect(page.getByText("오늘출발 모음")).toBeVisible();
-  await expect(page.getByText(/MARKET #\d+/)).toBeVisible();
-  await expect(page.getByText("즉시 - 무기한")).toBeVisible();
-  await expect(page.locator("span").filter({ hasText: "비활성" })).toBeVisible();
+  const todayCard = page.locator("section").filter({ hasText: "오늘출발 모음" }).last();
+  await expect(todayCard).toBeVisible();
+  await expect(todayCard.getByText(/MARKET #\d+/)).toBeVisible();
+  await expect(todayCard.getByText("즉시 - 무기한")).toBeVisible();
+  await expect(todayCard.locator("span").filter({ hasText: "비활성" })).toBeVisible();
 });
 
 test("admin CMS status filter hides inactive carousels", async ({ page }) => {

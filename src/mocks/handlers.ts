@@ -351,6 +351,9 @@ export const handlers = [
   }),
   http.delete(`${API_BASE_URL}/api/v1/carousels/:id`, ({ params }) => {
     const carouselID = Number(params.id);
+    if (!cmsCarousels.some((carousel) => carousel.id === carouselID)) {
+      return new HttpResponse(null, { status: 404 });
+    }
     cmsCarousels = cmsCarousels.map((carousel) => (carousel.id === carouselID ? { ...carousel, is_active: false } : carousel));
     return new HttpResponse(null, { status: 204 });
   }),

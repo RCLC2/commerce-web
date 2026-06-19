@@ -246,14 +246,26 @@ function heroHref(item: CMSCarousel | CommerceEvent, isCMSCarousel: boolean) {
     return `/events/${item.id}`;
   }
   const carousel = item as CMSCarousel;
+  if (carousel.target_id <= 0) {
+    return "/";
+  }
   if (carousel.target_type === "MARKET") {
     return `/markets/${carousel.target_id}`;
   }
-  return `/products/${carousel.target_id}`;
+  if (carousel.target_type === "PRODUCT") {
+    return `/products/${carousel.target_id}`;
+  }
+  return "/";
 }
 
 function heroTargetLabel(carousel: CMSCarousel) {
-  return carousel.target_type === "MARKET" ? `마켓 #${carousel.target_id}` : `상품 #${carousel.target_id}`;
+  if (carousel.target_type === "MARKET") {
+    return `마켓 #${carousel.target_id}`;
+  }
+  if (carousel.target_type === "PRODUCT") {
+    return `상품 #${carousel.target_id}`;
+  }
+  return "알 수 없는 대상";
 }
 
 function PopularSquareCard({ product }: { product: Product }) {

@@ -696,12 +696,14 @@ export function AdminCMSPage() {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState("ALL");
   const [form, setForm] = useState<CarouselFormState>(emptyCarouselForm());
+  const [formError, setFormError] = useState<string | null>(null);
   const { data = [] } = useQuery({ queryKey: ["admin-carousels"], queryFn: () => api.adminCarousels(token ?? ""), enabled: Boolean(token) });
   const saveCarousel = useMutation({
     mutationFn: (payload: CMSCarouselMutation) => (
       form.id ? api.updateCarousel(token ?? "", form.id, payload) : api.createCarousel(token ?? "", payload)
     ),
     onSuccess: () => {
+      setFormError(null);
       setForm(emptyCarouselForm());
       void queryClient.invalidateQueries({ queryKey: ["admin-carousels"] });
       void queryClient.invalidateQueries({ queryKey: ["active-carousels"] });
@@ -709,8 +711,8 @@ export function AdminCMSPage() {
   });
   const deactivateCarousel = useMutation({
     mutationFn: (carouselID: number) => api.deactivateCarousel(token ?? "", carouselID),
-    onSuccess: () => {
-      if (form.id) {
+    onSuccess: (_result, carouselID) => {
+      if (form.id === carouselID) {
         setForm(emptyCarouselForm());
       }
       void queryClient.invalidateQueries({ queryKey: ["admin-carousels"] });
@@ -727,13 +729,21 @@ export function AdminCMSPage() {
   const isEditing = Boolean(form.id);
 
   function updateForm<K extends keyof CarouselFormState>(key: K, value: CarouselFormState[K]) {
+    setFormError(null);
     setForm((current) => ({ ...current, [key]: value }));
   }
 
   function submitCarousel(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const validationError = validateCarouselForm(form);
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
     saveCarousel.mutate(carouselPayload(form));
   }
+
+  const saveErrorMessage = formError ?? saveCarousel.error?.message;
 
   return (
     <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
@@ -781,11 +791,12 @@ export function AdminCMSPage() {
           </label>
           <div className="flex flex-wrap items-end gap-2 xl:col-span-2">
             <Button type="submit" size="sm" disabled={saveCarousel.isPending}>{saveCarousel.isPending ? "저장 중" : isEditing ? "수정" : "등록"}</Button>
-            <Button type="button" size="sm" variant="secondary" onClick={() => setForm(emptyCarouselForm())}>초기화</Button>
-            {saveCarousel.error ? <p className="text-xs font-bold text-red-600">{saveCarousel.error.message}</p> : null}
+            <Button type="button" size="sm" variant="secondary" onClick={() => { setFormError(null); setForm(emptyCarouselForm()); }}>초기화</Button>
+            {saveErrorMessage ? <p className="text-xs font-bold text-red-600">{saveErrorMessage}</p> : null}
           </div>
         </form>
       </ConsoleSection>
+      {deactivateCarousel.error ? <p className="mt-3 text-xs font-bold text-red-600">{deactivateCarousel.error.message}</p> : null}
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         {filteredCarousels.map((carousel) => (
           <ConsoleSection key={carousel.id}>
@@ -872,6 +883,9 @@ function carouselStatus(carousel: CMSCarousel, now = new Date()): CarouselStatus
   }
   const startsAt = validCarouselDate(carousel.starts_at);
   const endsAt = validCarouselDate(carousel.ends_at);
+  if ((carousel.starts_at && !startsAt) || (carousel.ends_at && !endsAt)) {
+    return "INACTIVE";
+  }
   if (startsAt && now < startsAt) {
     return "SCHEDULED";
   }
@@ -916,6 +930,25 @@ function validCarouselDate(value: string | null | undefined) {
   }
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function validateCarouselForm(form: CarouselFormState) {
+  const targetID = Number(form.target_id);
+  if (!Number.isFinite(targetID) || targetID <= 0) {
+    return "대상 ID는 1 이상이어야 합니다.";
+  }
+  const startsAt = validCarouselDate(form.starts_at);
+  const endsAt = validCarouselDate(form.ends_at);
+  if (form.starts_at && !startsAt) {
+    return "시작 시간이 올바르지 않습니다.";
+  }
+  if (form.ends_at && !endsAt) {
+    return "종료 시간이 올바르지 않습니다.";
+  }
+  if (startsAt && endsAt && startsAt >= endsAt) {
+    return "시작 시간은 종료 시간보다 이전이어야 합니다.";
+  }
+  return null;
 }
 
 function datetimeLocalValue(value: string | null | undefined) {
