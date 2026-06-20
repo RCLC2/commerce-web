@@ -48,11 +48,13 @@ For Vercel or real backend integration, set `NEXT_PUBLIC_API_BASE_URL` to the de
 For production deployments, configure:
 
 ```bash
-NEXT_PUBLIC_API_BASE_URL=
+NEXT_PUBLIC_API_BASE_URL=same-origin
+BACKEND_API_BASE_URL=http://awseb--AWSEB-25VUEV1O1LDt-1190913415.ap-northeast-2.elb.amazonaws.com
 NEXT_PUBLIC_API_MOCKING=disabled
 ```
 
 `NEXT_PUBLIC_API_BASE_URL` may be provided with or without `http://`; the app normalizes it before making requests.
+Use `NEXT_PUBLIC_API_BASE_URL=same-origin` with `BACKEND_API_BASE_URL` when the frontend is served over HTTPS but the Elastic Beanstalk or ELB backend is still HTTP. In that mode, browser requests stay on the HTTPS frontend origin and Next.js rewrites `/api/v1/*` to the configured backend server-side.
 
 ## Scripts
 
@@ -186,7 +188,8 @@ Do not assume the working tree has been committed. This project was intentionall
 Vercel environment variables:
 
 ```bash
-NEXT_PUBLIC_API_BASE_URL=
+NEXT_PUBLIC_API_BASE_URL=same-origin
+BACKEND_API_BASE_URL=http://awseb--AWSEB-25VUEV1O1LDt-1190913415.ap-northeast-2.elb.amazonaws.com
 NEXT_PUBLIC_API_MOCKING=disabled
 ```
 
