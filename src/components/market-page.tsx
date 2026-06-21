@@ -41,7 +41,7 @@ export function MarketPage({ marketId }: { marketId: number }) {
               </div>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{market.description}</p>
               <div className="mt-3 flex flex-wrap gap-1">
-                {market.tags.map((tag) => (
+                {(market.tags ?? []).map((tag) => (
                   <span key={tag} className="rounded-sm bg-zinc-100 px-2 py-1 text-xs font-bold text-zinc-600">
                     {tag}
                   </span>
@@ -51,7 +51,7 @@ export function MarketPage({ marketId }: { marketId: number }) {
           </div>
           <Button variant="secondary">
             <Heart size={18} />
-            {market.follower_count.toLocaleString("ko-KR")} 팔로워
+            {market.follower_count?.toLocaleString("ko-KR") ?? "-"} 팔로워
           </Button>
         </div>
       </section>

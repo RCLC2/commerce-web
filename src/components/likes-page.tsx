@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Package, Smile, Sparkles, Users, type LucideIcon } from "lucide-react";
 import { api } from "@/lib/api";
-import { ProductCard } from "./product-card";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
@@ -15,14 +14,8 @@ export function LikesPage() {
   const [page, setPage] = useState(1);
   const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: () => api.listProducts({ sort: "popular" }) });
   const { data: markets = [] } = useQuery({ queryKey: ["markets"], queryFn: api.listMarkets });
-  const likedProducts = useMemo(() => {
-    if (!products.length) {
-      return [];
-    }
-    return Array.from({ length: 40 }, (_, index) => products[index % products.length]);
-  }, [products]);
+  const likedProducts: never[] = [];
   const totalPages = Math.max(1, Math.ceil(likedProducts.length / PAGE_SIZE));
-  const visibleProducts = likedProducts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24 pt-8">
@@ -38,7 +31,6 @@ export function LikesPage() {
           {markets.map((market) => {
             const marketProducts = products.filter((product) => product.market_id === market.id);
             const newCount = marketProducts.filter((product) => product.tags?.includes("신상")).length;
-            const satisfaction = Math.min(99, 88 + (market.id * 2));
             return (
               <Link key={market.id} href={`/markets/${market.id}`} className="w-[82vw] shrink-0 snap-start rounded-md border border-line bg-white p-4 hover:bg-zinc-50 sm:w-80">
                 <div className="flex gap-3">
@@ -52,8 +44,8 @@ export function LikesPage() {
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
                   <Metric icon={Sparkles} label="신상품" value={`${newCount}개`} />
-                  <Metric icon={Smile} label="만족도" value={`${satisfaction}%`} />
-                  <Metric icon={Users} label="즐겨찾기" value={market.follower_count.toLocaleString("ko-KR")} />
+                  <Metric icon={Smile} label="만족도" value="-" />
+                  <Metric icon={Users} label="즐겨찾기" value={market.follower_count?.toLocaleString("ko-KR") ?? "-"} />
                   <Metric icon={Package} label="전체 상품" value={`${marketProducts.length}개`} />
                 </div>
               </Link>
@@ -69,11 +61,7 @@ export function LikesPage() {
             {likedProducts.length}개 · {page}/{totalPages}
           </span>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
-          {visibleProducts.map((product, index) => (
-            <ProductCard key={`${product.id}-liked-${page}-${index}`} product={product} />
-          ))}
-        </div>
+        <p className="mt-4 rounded-md border border-line bg-white p-5 text-sm text-muted">찜한 상품이 없습니다.</p>
         <div className="mt-8 flex items-center justify-center gap-2">
           <Button variant="secondary" size="sm" disabled={page === 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
             <ChevronLeft size={16} />

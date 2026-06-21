@@ -9,8 +9,8 @@ export const sellerApi = {
   sellerOrders: (token: string) => request<OrderResponse[]>("/api/v1/seller/orders", { token }),
   sellerSettlements: (token: string) => request<Settlement[]>("/api/v1/seller/settlements", { token }),
   sellerReviews: (token: string) => request<Review[]>("/api/v1/seller/reviews", { token }),
-  registerInventorySource: (token: string, payload: { provider: string; display_name: string }) =>
-    request<InventorySource>("/api/v1/inventory/sources", {
+  registerInventorySource: (token: string, payload: { market_id: number; provider: string; display_name: string }) =>
+    request<InventorySource>("/api/v1/fulfillment/sources", {
       method: "POST",
       token,
       body: JSON.stringify(payload),
