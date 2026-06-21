@@ -21,10 +21,12 @@ export type Market = {
 
 export type CommerceCategory = {
   id: number;
+  parent_id?: number;
   name: string;
   slug: string;
   href: string;
   sort_order: number;
+  category_ids?: number[];
 };
 
 export type Metric = {
