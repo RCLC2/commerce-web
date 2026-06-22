@@ -127,6 +127,7 @@ export function ProductListPage() {
 
   const activeFilters = [
     selectedCategory ? `카테고리: ${selectedCategory.name}` : null,
+    selectedCategory ? `카테고리: ${selectedCategory.name}` : null,
     q ? `검색: ${q}` : null,
     market ? `마켓: ${market}` : null,
     selectedPrice.value ? selectedPrice.label : null,
@@ -140,6 +141,7 @@ export function ProductListPage() {
     <main className="mx-auto max-w-6xl px-4 pb-24 pt-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
+          <h1 className="text-2xl font-black">{selectedCategory ? `${selectedCategory.name} 상품` : "상품"}</h1>
           <h1 className="text-2xl font-black">{selectedCategory ? `${selectedCategory.name} 상품` : "상품"}</h1>
           <p className="mt-1 text-sm text-muted">
             {filteredProducts.length.toLocaleString("ko-KR")}개 상품을 필터 조건에 맞춰 보여드립니다.

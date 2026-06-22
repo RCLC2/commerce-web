@@ -62,6 +62,14 @@ function productPrice(product: Product) {
   return product.discount_price || product.base_price;
 }
 
+function auditTargetID(log: { target_id?: number; settlement_id?: number }) {
+  return log.target_id ?? log.settlement_id ?? "-";
+}
+
+function auditReason(log: { reason?: string }) {
+  return log.reason || "-";
+}
+
 export function AdminHomePage() {
   const token = useAdminToken();
   const { data: dashboard } = useQuery({ queryKey: ["admin-dashboard"], queryFn: () => api.adminDashboard(token ?? ""), enabled: Boolean(token) });
@@ -107,9 +115,9 @@ export function AdminHomePage() {
         <DataTable
           columns={["대상", "작업", "사유", "일시"]}
           rows={(dashboard?.recent_actions ?? []).map((log) => [
-            `${log.target_type} #${log.target_id}`,
+            `${log.target_type} #${auditTargetID(log)}`,
             log.action,
-            log.reason,
+            auditReason(log),
             new Date(log.created_at).toLocaleString("ko-KR"),
           ])}
         />
@@ -219,7 +227,7 @@ export function AdminMarketsPage() {
   }
 
   const filteredMarkets = data.filter((market) => {
-    const matchesQuery = !query || market.name.toLowerCase().includes(query.toLowerCase()) || market.tags.some((tag) => tag.toLowerCase().includes(query.toLowerCase()));
+    const matchesQuery = !query || market.name.toLowerCase().includes(query.toLowerCase()) || market.tags?.some((tag) => tag.toLowerCase().includes(query.toLowerCase()));
     const matchesStatus = status === "ALL" || market.status === status;
     return matchesQuery && matchesStatus;
   });
@@ -284,9 +292,9 @@ export function AdminMarketsPage() {
           columns={["마켓", "팔로워", "상태", "태그", "페널티", "운영"]}
           rows={filteredMarkets.map((market) => [
             <MarketName key="market" market={market} />,
-            market.follower_count.toLocaleString("ko-KR"),
+            market.follower_count?.toLocaleString("ko-KR") ?? "-",
             <StatusBadge key="status" value={market.status} />,
-            market.tags.join(", "),
+            market.tags?.join(", ") ?? "-",
             penaltyRecords[market.id] ? `${penaltyRecords[market.id].score}점 · ${penaltyRecords[market.id].reason}` : "-",
             <Button key="select" variant="secondary" size="sm" onClick={() => setSelectedMarketID(market.id)}>선택</Button>,
           ])}
@@ -620,7 +628,7 @@ export function AdminAuditLogsPage() {
     return <AdminAuthRequired />;
   }
 
-  const filteredLogs = data.filter((log) => !query || `${log.target_type} ${log.action} ${log.reason}`.toLowerCase().includes(query.toLowerCase()));
+  const filteredLogs = data.filter((log) => !query || `${log.target_type} ${log.action} ${auditReason(log)}`.toLowerCase().includes(query.toLowerCase()));
 
   return (
     <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
@@ -630,9 +638,9 @@ export function AdminAuditLogsPage() {
           columns={["관리자", "대상", "작업", "사유", "일시"]}
           rows={filteredLogs.map((log) => [
             `#${log.admin_id}`,
-            `${log.target_type} #${log.target_id}`,
+            `${log.target_type} #${auditTargetID(log)}`,
             log.action,
-            log.reason,
+            auditReason(log),
             new Date(log.created_at).toLocaleString("ko-KR"),
           ])}
         />
@@ -690,29 +698,27 @@ export function AdminTokenLookupPage() {
     return <AdminAuthRequired />;
   }
 
-  const filteredMarkets = markets.filter((market) => !query || market.name.toLowerCase().includes(query.toLowerCase()) || market.tags.some((tag) => tag.toLowerCase().includes(query.toLowerCase())));
+  const filteredMarkets = markets.filter((market) => !query || market.name.toLowerCase().includes(query.toLowerCase()) || market.tags?.some((tag) => tag.toLowerCase().includes(query.toLowerCase())));
 
   function enterSeller(market: Market) {
-    const sellerToken = `seller-market-${market.id}-mock-token`;
-    setSellerContext({ marketID: market.id, marketName: market.name, token: sellerToken });
+    if (!token) {
+      return;
+    }
+    setSellerContext({ marketID: market.id, marketName: market.name, token });
     router.push("/seller");
   }
 
   return (
     <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
-      <ConsoleHeader title="토큰 조회" description="마켓을 검색한 뒤 해당 마켓 셀러 토큰 컨텍스트로 셀러 페이지에 진입합니다." />
-      <ConsoleSection className="mt-5" title="마켓 토큰 목록" action={<SearchBox value={query} onChange={setQuery} placeholder="마켓명 또는 태그 검색" />}>
+      <ConsoleHeader title="셀러 화면 진입" description="관리자 권한으로 마켓 기준 셀러 화면에 진입합니다." />
+      <ConsoleSection className="mt-5" title="마켓 목록" action={<SearchBox value={query} onChange={setQuery} placeholder="마켓명 또는 태그 검색" />}>
         <DataTable
-          columns={["마켓", "상태", "토큰 미리보기", "작업"]}
-          rows={filteredMarkets.map((market) => {
-            const sellerToken = `seller-market-${market.id}-mock-token`;
-            return [
+          columns={["마켓", "상태", "작업"]}
+          rows={filteredMarkets.map((market) => [
               <MarketName key="market" market={market} />,
               <StatusBadge key="status" value={market.status} />,
-              <code key="token" className="rounded bg-zinc-100 px-2 py-1 text-xs">{sellerToken}</code>,
-              <Button key="enter" size="sm" onClick={() => enterSeller(market)}>셀러 페이지 진입</Button>,
-            ];
-          })}
+              <Button key="enter" size="sm" disabled={!token} onClick={() => enterSeller(market)}>셀러 페이지 진입</Button>,
+          ])}
         />
       </ConsoleSection>
     </ConsoleLayout>

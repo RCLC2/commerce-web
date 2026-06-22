@@ -7,7 +7,7 @@ Repository: [RCLC2/commerce-web](https://github.com/RCLC2/commerce-web)
 ## Overview
 
 The app targets an Ably-inspired fashion commerce experience with a customer shopping app first, then seller and admin consoles.
-It is designed for Vercel deployment and can run locally either against the Go backend API or against MSW mock APIs.
+It is designed for Vercel deployment and always reads commerce data from the Go backend API.
 
 ## Stack
 
@@ -17,7 +17,6 @@ It is designed for Vercel deployment and can run locally either against the Go b
 - TanStack Query
 - Zustand
 - React Hook Form + Zod
-- MSW for local mock API
 - Vercel deployment ready
 
 ## Local Setup
@@ -39,18 +38,15 @@ Create `.env.local` from `.env.example`.
 
 ```bash
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
-NEXT_PUBLIC_API_MOCKING=enabled
 ```
 
-When `NEXT_PUBLIC_API_MOCKING=enabled`, MSW serves the same frontend API contracts without the backend server.
-For Vercel or real backend integration, set `NEXT_PUBLIC_API_BASE_URL` to the deployed API host and disable or unset `NEXT_PUBLIC_API_MOCKING`.
+The frontend always reads data from the configured backend API. It does not fall back to mock catalog, order, seller, or admin data.
 
 For production deployments, configure:
 
 ```bash
 NEXT_PUBLIC_API_BASE_URL=same-origin
 BACKEND_API_BASE_URL=http://awseb--AWSEB-25VUEV1O1LDt-1190913415.ap-northeast-2.elb.amazonaws.com
-NEXT_PUBLIC_API_MOCKING=disabled
 ```
 
 `NEXT_PUBLIC_API_BASE_URL` may be provided with or without `http://`; the app normalizes it before making requests.
@@ -71,7 +67,7 @@ npm run start
 - `/products`: PLP with search and sort controls
 - `/products/[id]`: PDP with image, option selection, reviews, add-to-cart
 - `/cart`: cart summary
-- `/checkout`: order sheet, coupon/point usage, mock payment completion
+- `/checkout`: order sheet, coupon/point usage, payment completion
 - `/orders/[orderCode]`: order detail
 - `/login`: login
 - `/register`: customer/seller registration
@@ -98,7 +94,7 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for the phased pl
 
 ## API Coverage
 
-Currently wired in the API client and MSW:
+Currently wired in the API client:
 
 - `GET /api/v1/markets`
 - `GET /api/v1/products`
@@ -135,27 +131,8 @@ Currently wired in the API client and MSW:
 
 Notes:
 
-- `PATCH /api/v1/me` is currently a frontend/MSW contract. The backend route is not connected yet.
-- `GET /api/v1/markets` is currently a frontend/MSW contract for richer UI fixtures.
+- The frontend does not provide mock fallbacks. Empty catalog, category, seller, or admin screens reflect backend/database state.
 - Seller/admin API contracts are planned and documented but not fully implemented.
-- Seller/admin screens are available through MSW contracts first. Replace these contracts with real backend routes as they are connected.
-
-## Mock Data
-
-MSW includes:
-
-- 6 markets
-- 12 fashion products
-- Product options and inventory quantities
-- Reviews
-- Coupons
-- Cart item
-- Order list and order detail
-
-Mock definitions live in:
-
-- `src/mocks/mock-data.ts`
-- `src/mocks/handlers.ts`
 
 ## Backend Relationship
 
@@ -190,11 +167,6 @@ Vercel environment variables:
 ```bash
 NEXT_PUBLIC_API_BASE_URL=same-origin
 BACKEND_API_BASE_URL=http://awseb--AWSEB-25VUEV1O1LDt-1190913415.ap-northeast-2.elb.amazonaws.com
-NEXT_PUBLIC_API_MOCKING=disabled
 ```
 
-For demo deployments without a backend, set:
-
-```bash
-NEXT_PUBLIC_API_MOCKING=enabled
-```
+Demo and production deployments both require a reachable backend API and seeded database records.

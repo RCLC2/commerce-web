@@ -50,6 +50,7 @@ export function ProductDetailPage({ productId }: { productId: number }) {
   const price = product.discount_price || product.base_price;
   const saleRate = discountRate(product.base_price, product.discount_price);
   const detailHtml = resolveProductDetailHtml(product);
+  const description = product.description || "등록된 상품 설명이 없습니다.";
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-28 pt-5 md:pt-8">
@@ -133,7 +134,7 @@ export function ProductDetailPage({ productId }: { productId: number }) {
             </div>
 
             <div className="rounded-md bg-white p-4">
-              <p className="text-sm leading-6 text-zinc-700">{product.description}</p>
+              <p className="text-sm leading-6 text-zinc-700">{description}</p>
             </div>
           </div>
 

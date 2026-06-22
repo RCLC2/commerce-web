@@ -5,7 +5,7 @@ import { ChevronRight, MapPin, Ticket, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { getEffectiveToken, isMockingEnabled } from "@/lib/auth-token";
+import { getEffectiveToken } from "@/lib/auth-token";
 import { firstOrderItem, orderStatusLabel } from "@/lib/order-utils";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
@@ -52,7 +52,7 @@ export function MyPage() {
     },
   });
 
-  if (!token && !isMockingEnabled()) {
+  if (!token) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-16">
         <h1 className="text-2xl font-black">마이페이지</h1>
@@ -71,7 +71,7 @@ export function MyPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black">마이페이지</h1>
-          <p className="mt-1 text-sm text-muted">{profile?.email ?? "customer@commerce.test"}</p>
+          <p className="mt-1 text-sm text-muted">{profile?.email ?? "-"}</p>
         </div>
         <Button
           variant="secondary"

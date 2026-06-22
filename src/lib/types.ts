@@ -10,13 +10,15 @@ export type ProductOption = {
 
 export type Market = {
   id: number;
+  member_id?: number;
   name: string;
   description: string;
-  profile_image_url: string;
-  cover_image_url: string;
-  follower_count: number;
+  business_number?: string;
+  profile_image_url?: string;
+  cover_image_url?: string;
+  follower_count?: number;
   status: "ACTIVE" | "PENDING" | "SUSPENDED" | string;
-  tags: string[];
+  tags?: string[];
 };
 
 export type CommerceCategory = {
@@ -62,6 +64,9 @@ export type Product = {
   base_price: number;
   discount_price: number;
   shipping_type: "NORMAL" | "FREE" | string;
+  delivery_type?: string;
+  delivery_label?: string;
+  today_shipping_available?: boolean;
   popularity_score: number;
   status: "SELLING" | "SOLD_OUT" | string;
   options?: ProductOption[];
@@ -227,9 +232,10 @@ export type AuditLog = {
   id: number;
   admin_id: number;
   target_type: string;
-  target_id: number;
+  target_id?: number;
+  settlement_id?: number;
   action: string;
-  reason: string;
+  reason?: string;
   created_at: string;
 };
 

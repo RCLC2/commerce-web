@@ -22,14 +22,14 @@ function statusLabel(status: string) {
 
 export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   const token = useSessionStore((state) => state.accessToken);
-  const effectiveToken = token ?? (process.env.NEXT_PUBLIC_API_MOCKING === "enabled" ? "mock-access-token" : "");
+  const effectiveToken = token ?? "";
   const { data: order, isLoading, error } = useQuery({
     queryKey: ["order", orderCode],
     queryFn: () => api.getOrder(effectiveToken, orderCode),
     enabled: Boolean(effectiveToken),
   });
 
-  if (!token && process.env.NEXT_PUBLIC_API_MOCKING !== "enabled") {
+  if (!token) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-16">
         <h1 className="text-2xl font-black">로그인이 필요합니다</h1>

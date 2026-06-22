@@ -50,6 +50,10 @@ function useSellerContextName() {
   return useSessionStore((state) => state.sellerContext?.marketName);
 }
 
+function useSellerContextMarketID() {
+  return useSessionStore((state) => state.sellerContext?.marketID);
+}
+
 function SellerAuthRequired() {
   return (
     <ConsoleLayout title="Seller" subtitle="마켓 운영 콘솔" links={sellerLinks}>
@@ -312,11 +316,20 @@ export function SellerProductsPage() {
 export function SellerInventoryPage() {
   const token = useSellerToken();
   const effectiveToken = token ?? "";
+  const sellerContextMarketID = useSellerContextMarketID();
   const [sourceStatus, setSourceStatus] = useState("ALL");
   const [logStatus, setLogStatus] = useState("ALL");
   const { data: sources = [] } = useQuery({ queryKey: ["seller-inventory-sources"], queryFn: () => api.sellerInventorySources(effectiveToken), enabled: Boolean(token) });
   const { data: logs = [] } = useQuery({ queryKey: ["seller-inventory-logs"], queryFn: () => api.sellerInventoryLogs(effectiveToken), enabled: Boolean(token) });
-  const register = useMutation({ mutationFn: () => api.registerInventorySource(effectiveToken, { provider: "SHOPIFY", display_name: "New Shopify source" }) });
+  const marketID = sellerContextMarketID ?? sources[0]?.market_id;
+  const register = useMutation({
+    mutationFn: () => {
+      if (!marketID) {
+        throw new Error("등록할 마켓을 먼저 확인해 주세요.");
+      }
+      return api.registerInventorySource(effectiveToken, { market_id: marketID, provider: "SHOPIFY", display_name: "New Shopify source" });
+    },
+  });
   const sellerName = useSellerContextName() ?? sources[0]?.display_name.replace(/ Shopify| Cafe24/g, "") ?? "셀러 마켓";
 
   if (!token) {
@@ -331,7 +344,7 @@ export function SellerInventoryPage() {
       <ConsoleHeader
         title="외부몰 재고 연동"
         description="Shopify/Cafe24 재고 연동 상태와 동기화 실패 로그를 관리합니다."
-        action={<Button onClick={() => register.mutate()} disabled={register.isPending}>{register.isPending ? "등록 중" : "Shopify 등록"}</Button>}
+        action={<Button onClick={() => register.mutate()} disabled={!marketID || register.isPending}>{register.isPending ? "등록 중" : "Shopify 등록"}</Button>}
       />
       {register.data ? <p className="mt-3 rounded-md border border-line bg-white p-3 text-sm font-bold text-brand">{register.data.display_name} 연동 소스를 등록했습니다.</p> : null}
       {register.error ? <p className="mt-3 text-sm font-bold text-brand">{register.error.message}</p> : null}
