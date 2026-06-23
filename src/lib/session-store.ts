@@ -6,24 +6,30 @@ type SessionState = {
   accessToken: string | null;
   memberID: number | null;
   role: string | null;
-  sellerContext: { marketID: number; marketName: string; token: string } | null;
+  sellerContext: { marketID: number; marketName: string; token: string; expiresAt?: string } | null;
+  hydrate: () => void;
   setSession: (session: { accessToken: string; memberID: number; role: string }) => void;
-  setSellerContext: (context: { marketID: number; marketName: string; token: string }) => void;
+  setSellerContext: (context: { marketID: number; marketName: string; token: string; expiresAt?: string }) => void;
   clearSellerContext: () => void;
   logout: () => void;
 };
 
 export const useSessionStore = create<SessionState>((set) => ({
-  accessToken: typeof window === "undefined" ? null : window.localStorage.getItem("commerce.accessToken"),
-  memberID:
-    typeof window === "undefined"
-      ? null
-      : Number(window.localStorage.getItem("commerce.memberID")) || null,
-  role: typeof window === "undefined" ? null : window.localStorage.getItem("commerce.role"),
-  sellerContext:
-    typeof window === "undefined"
-      ? null
-      : JSON.parse(window.localStorage.getItem("commerce.sellerContext") ?? "null"),
+  accessToken: null,
+  memberID: null,
+  role: null,
+  sellerContext: null,
+  hydrate: () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    set({
+      accessToken: window.localStorage.getItem("commerce.accessToken"),
+      memberID: Number(window.localStorage.getItem("commerce.memberID")) || null,
+      role: window.localStorage.getItem("commerce.role"),
+      sellerContext: parseSellerContext(window.localStorage.getItem("commerce.sellerContext")),
+    });
+  },
   setSession: ({ accessToken, memberID, role }) => {
     window.localStorage.setItem("commerce.accessToken", accessToken);
     window.localStorage.setItem("commerce.memberID", String(memberID));
@@ -46,3 +52,14 @@ export const useSessionStore = create<SessionState>((set) => ({
     set({ accessToken: null, memberID: null, role: null, sellerContext: null });
   },
 }));
+
+function parseSellerContext(value: string | null) {
+  if (!value) {
+    return null;
+  }
+  try {
+    return JSON.parse(value) as { marketID: number; marketName: string; token: string; expiresAt?: string };
+  } catch {
+    return null;
+  }
+}

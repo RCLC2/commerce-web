@@ -12,7 +12,6 @@ import { Button } from "./ui/button";
 const schema = z.object({
   email: z.string().email("이메일을 확인해주세요."),
   password: z.string().min(6, "비밀번호는 6자 이상이어야 합니다."),
-  role: z.enum(["CUSTOMER", "SELLER"]),
   marketingConsent: z.boolean(),
   nighttimeConsent: z.boolean(),
 });
@@ -26,7 +25,6 @@ export function RegisterPage() {
     defaultValues: {
       email: "",
       password: "",
-      role: "CUSTOMER",
       marketingConsent: true,
       nighttimeConsent: false,
     },
@@ -55,13 +53,6 @@ export function RegisterPage() {
               {...form.register("password")}
             />
             <span className="mt-1 block text-xs text-brand">{form.formState.errors.password?.message}</span>
-          </label>
-          <label className="block">
-            <span className="text-sm font-bold">가입 유형</span>
-            <select className="mt-2 h-12 w-full rounded-md border border-line px-3 outline-none focus:border-foreground" {...form.register("role")}>
-              <option value="CUSTOMER">고객</option>
-              <option value="SELLER">셀러</option>
-            </select>
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" {...form.register("marketingConsent")} />

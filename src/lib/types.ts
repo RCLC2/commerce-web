@@ -5,6 +5,8 @@ export type ProductOption = {
   option_value: string;
   additional_price: number;
   quantity: number;
+  reserved_quantity?: number;
+  safety_quantity?: number;
   is_active: boolean;
 };
 
@@ -176,6 +178,7 @@ export type OrderResponse = {
   ordered_at?: string;
   shipping_address?: Address;
   market_orders?: MarketOrderResponse[];
+  delivery?: Delivery;
 };
 
 export type MarketOrderResponse = {
@@ -187,6 +190,17 @@ export type MarketOrderResponse = {
   line_items: OrderLineItemResponse[];
 };
 
+export type Delivery = {
+  id: number;
+  order_id: number;
+  tracking_number?: string;
+  carrier?: string;
+  status: "PENDING" | "SHIPPING" | "DELIVERED" | "CANCELLED" | string;
+  receiver_name?: string;
+  receiver_phone?: string;
+  address?: string;
+};
+
 export type OrderLineItemResponse = {
   id: number;
   cart_id?: number;
@@ -195,7 +209,36 @@ export type OrderLineItemResponse = {
   quantity: number;
   price: number;
   status: string;
+  reviewable?: boolean;
+  purchase_confirmed_at?: string;
   product?: Product;
+};
+
+export type TrackingInfo = {
+  CarrierCode?: string;
+  carrier_code?: string;
+  Invoice?: string;
+  invoice?: string;
+  Status?: string;
+  status?: string;
+  Location?: string;
+  location?: string;
+  Description?: string;
+  description?: string;
+};
+
+export type CreateReviewResponse = {
+  id: number;
+  product_id: number;
+  option_id: number;
+  member_id: number;
+  order_id: number;
+  order_line_item_id: number;
+  rating_x2: number;
+  rating: number;
+  content: string;
+  status: string;
+  created_at: string;
 };
 
 export type InventorySource = {
@@ -203,17 +246,49 @@ export type InventorySource = {
   market_id: number;
   provider: "SHOPIFY" | "CAFE24" | string;
   display_name: string;
-  status: "ACTIVE" | "FAILED" | "PAUSED" | string;
+  shop_name?: string;
+  status: "ACTIVE" | "FAILED" | "PAUSED" | "INACTIVE" | string;
+  access_token_expires_at?: string;
+  refresh_token_expires_at?: string;
   last_synced_at?: string;
+  updated_at?: string;
+};
+
+export type InventorySourceForm = {
+  market_id: number;
+  provider: "SHOPIFY" | "CAFE24" | string;
+  display_name: string;
+  shop_name: string;
+  access_token: string;
+  refresh_token?: string;
+  client_id?: string;
+  client_secret?: string;
+  webhook_secret?: string;
+};
+
+export type ExternalInventoryMapping = {
+  id: number;
+  inventory_source_id: number;
+  provider: string;
+  product_option_id: number;
+  external_product_id?: string;
+  external_variant_id?: string;
+  external_inventory_item_id?: string;
+  external_location_id?: string;
+  disconnect_if_necessary?: boolean;
+  created_at?: string;
 };
 
 export type InventorySyncLog = {
   id: number;
-  source_id: number;
-  product_id: number;
-  option_id: number;
+  provider?: string;
+  product_option_id?: number;
+  external_reference?: string;
+  previous_quantity?: number;
+  new_quantity?: number;
   status: "SUCCESS" | "FAILED" | string;
-  message: string;
+  error_message?: string;
+  message?: string;
   created_at: string;
 };
 
@@ -243,6 +318,13 @@ export type CMSCarousel = {
   id: number;
   title: string;
   image_url: string;
+  target_type?: "PRODUCT" | "MARKET" | "URL" | string;
+  target_id?: number;
+  display_order?: number;
+  is_active?: boolean;
+  starts_at?: string;
+  ends_at?: string;
+  created_at?: string;
   link_url: string;
   status: "ACTIVE" | "INACTIVE" | string;
 };

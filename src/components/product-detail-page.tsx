@@ -57,7 +57,7 @@ export function ProductDetailPage({ productId }: { productId: number }) {
       <div className="grid gap-8 md:grid-cols-[1fr_420px]">
         <section className="space-y-3">
           <div className="relative aspect-[4/5] overflow-hidden rounded-md bg-zinc-100 md:aspect-[5/6]">
-            <SafeImage src={product.image_url} alt={product.name} fill sizes="(max-width: 768px) 100vw, 55vw" className="object-cover" priority />
+            <SafeImage src={product.image_url} alt={product.name} fill sizes="(max-width: 768px) 100vw, 55vw" className="object-cover" />
           </div>
           <div className="grid grid-cols-4 gap-2">
             {Array.from({ length: 4 }).map((_, index) => (
