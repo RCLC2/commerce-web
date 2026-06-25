@@ -32,6 +32,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const role = useSessionStore((state) => state.role);
+  const hydrateSession = useSessionStore((state) => state.hydrate);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const { data: suggestions = [] } = useQuery({
     queryKey: ["global-search-suggestions", search.trim()],
@@ -46,6 +47,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isActive = (href: string) => (href === "/" ? pathname === href : pathname.startsWith(href));
   const showSuggestions = searchFocused && suggestions.length > 0;
   const searchPage = pathname.startsWith("/search");
+
+  useEffect(() => {
+    hydrateSession();
+  }, [hydrateSession]);
 
   useEffect(() => {
     if (pathname === "/search") {

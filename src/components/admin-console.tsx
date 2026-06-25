@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleDollarSign, ShoppingBag, Store, Users } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
@@ -131,7 +130,16 @@ export function AdminMembersPage() {
   const [query, setQuery] = useState("");
   const [role, setRole] = useState("ALL");
   const [status, setStatus] = useState("ALL");
+  const queryClient = useQueryClient();
   const { data = [] } = useQuery({ queryKey: ["admin-members"], queryFn: () => api.adminMembers(token ?? ""), enabled: Boolean(token) });
+  const approveSeller = useMutation({
+    mutationFn: (memberID: number) => api.approveSeller(token ?? "", memberID),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-members"] }),
+  });
+  const rejectSeller = useMutation({
+    mutationFn: (memberID: number) => api.rejectSeller(token ?? "", memberID),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-members"] }),
+  });
 
   if (!token) {
     return <AdminAuthRequired />;
@@ -181,7 +189,7 @@ export function AdminMembersPage() {
         </FilterPanel>
         <div className="mt-4" />
         <DataTable
-          columns={["회원", "권한", "상태", "알림", "포인트", "가입일"]}
+          columns={["회원", "권한", "상태", "알림", "포인트", "가입일", "작업"]}
           rows={filteredMembers.map((member) => [
             <MemberName key="member" member={member} />,
             member.role,
@@ -189,6 +197,12 @@ export function AdminMembersPage() {
             member.notification_type,
             formatPrice(member.point_balance),
             new Date(member.created_at).toLocaleDateString("ko-KR"),
+            member.role === "SELLER" ? (
+              <div key="actions" className="flex flex-wrap gap-2">
+                <Button size="sm" disabled={approveSeller.isPending || member.status === "ACTIVE"} onClick={() => approveSeller.mutate(member.id)}>승인</Button>
+                <Button size="sm" variant="secondary" disabled={rejectSeller.isPending || member.status === "SUSPENDED"} onClick={() => rejectSeller.mutate(member.id)}>거절</Button>
+              </div>
+            ) : "-",
           ])}
         />
       </ConsoleSection>
@@ -378,16 +392,21 @@ export function AdminProductsPage() {
 
 export function AdminOrdersPage() {
   const token = useAdminToken();
+  const queryClient = useQueryClient();
   const effectiveToken = token ?? "";
   const [reason, setReason] = useState("고객 요청에 따른 운영 취소");
+  const [selectedOrderCode, setSelectedOrderCode] = useState("");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("ALL");
   const { data = [] } = useQuery({ queryKey: ["admin-orders"], queryFn: () => api.adminOrders(effectiveToken), enabled: Boolean(token) });
   const forceCancel = useMutation({
-    mutationFn: () =>
-      api.adminMutation(effectiveToken, "/api/v1/admin/orders/ORD-20260605-0001/force-cancel", {
-        reason,
-      }),
+    mutationFn: () => {
+      if (!selectedOrderCode) {
+        throw new Error("취소할 주문을 선택해 주세요.");
+      }
+      return api.forceCancelOrder(effectiveToken, selectedOrderCode, { reason });
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-orders"] }),
   });
 
   if (!token) {
@@ -405,6 +424,10 @@ export function AdminOrdersPage() {
       <ConsoleHeader title="주문 관리" description="주문 상태, 결제 금액, 배송지 정보를 보고 민감 작업은 사유와 함께 기록합니다." />
       <ConsoleSection className="mt-5" title="주문 강제 취소" description="강제 취소는 감사 로그 대상 작업입니다. 실제 연결 시 주문 선택과 권한 검증이 필요합니다.">
         <div className="flex flex-col gap-2 md:flex-row">
+          <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={selectedOrderCode} onChange={(event) => setSelectedOrderCode(event.target.value)}>
+            <option value="">주문 선택</option>
+            {data.map((order) => <option key={order.order_code} value={order.order_code}>{order.order_code}</option>)}
+          </select>
           <input
             value={reason}
             onChange={(event) => setReason(event.target.value)}
@@ -435,7 +458,7 @@ export function AdminOrdersPage() {
         </FilterPanel>
         <div className="mt-4" />
         <DataTable
-          columns={["주문", "대표 상품", "회원", "배송지", "금액", "상태"]}
+          columns={["주문", "대표 상품", "회원", "배송지", "금액", "상태", "작업"]}
           rows={filteredOrders.map((order) => {
             const amount = order.total_order_price - order.total_discount_price - order.used_point;
             return [
@@ -445,6 +468,7 @@ export function AdminOrdersPage() {
               order.shipping_address ? `${order.shipping_address.receiver} · ${order.shipping_address.line1}` : "-",
               formatPrice(amount),
               <StatusBadge key="status" value={order.status} />,
+              <Button key="select" size="sm" variant="secondary" onClick={() => setSelectedOrderCode(order.order_code)}>선택</Button>,
             ];
           })}
         />
@@ -455,16 +479,20 @@ export function AdminOrdersPage() {
 
 export function AdminSettlementsPage() {
   const token = useAdminToken();
+  const queryClient = useQueryClient();
   const effectiveToken = token ?? "";
   const [reason, setReason] = useState("정산 검증 완료 후 지급 처리");
+  const [selectedSettlementID, setSelectedSettlementID] = useState<number | null>(null);
   const [status, setStatus] = useState("ALL");
   const { data = [] } = useQuery({ queryKey: ["admin-settlements"], queryFn: () => api.adminSettlements(effectiveToken), enabled: Boolean(token) });
   const markPaid = useMutation({
-    mutationFn: () =>
-      api.adminMutation(effectiveToken, "/api/v1/admin/settlements/1/mark-paid", {
-        reason,
-        status: "PAID",
-      }),
+    mutationFn: () => {
+      if (!selectedSettlementID) {
+        throw new Error("지급 처리할 정산 건을 선택해 주세요.");
+      }
+      return api.markSettlementPaid(effectiveToken, selectedSettlementID, { reason });
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-settlements"] }),
   });
 
   if (!token) {
@@ -488,6 +516,10 @@ export function AdminSettlementsPage() {
       </div>
       <ConsoleSection className="mt-5" title="지급 완료 처리" description="지급 처리와 정산 제외는 사유가 필요한 민감 작업입니다.">
         <div className="flex flex-col gap-2 md:flex-row">
+          <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={selectedSettlementID ?? ""} onChange={(event) => setSelectedSettlementID(Number(event.target.value) || null)}>
+            <option value="">정산 선택</option>
+            {data.map((item) => <option key={item.id} value={item.id}>{item.market_name} · {item.target_month}</option>)}
+          </select>
           <input
             value={reason}
             onChange={(event) => setReason(event.target.value)}
@@ -503,7 +535,7 @@ export function AdminSettlementsPage() {
       </ConsoleSection>
       <ConsoleSection className="mt-5" title="정산 목록" action={<select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">전체 상태</option><option value="PREPARED">지급 대기</option><option value="PAID">지급 완료</option><option value="EXCLUDED">정산 제외</option></select>}>
         <DataTable
-          columns={["마켓", "월", "매출", "수수료", "지급액", "상태"]}
+          columns={["마켓", "월", "매출", "수수료", "지급액", "상태", "작업"]}
           rows={filteredSettlements.map((item) => [
             item.market_name,
             item.target_month,
@@ -511,6 +543,7 @@ export function AdminSettlementsPage() {
             formatPrice(item.commission_amount),
             formatPrice(item.final_settlement_amount),
             <StatusBadge key="status" value={item.status} />,
+            <Button key="select" size="sm" variant="secondary" disabled={item.status === "PAID"} onClick={() => setSelectedSettlementID(item.id)}>선택</Button>,
           ])}
         />
       </ConsoleSection>
@@ -529,9 +562,9 @@ export function AdminCouponsPage() {
   const { data: issuableCoupons = [] } = useQuery({ queryKey: ["admin-issuable-coupons"], queryFn: () => api.listIssuableCoupons(token ?? ""), enabled: Boolean(token) });
   const { data: members = [] } = useQuery({ queryKey: ["admin-members"], queryFn: () => api.adminMembers(token ?? ""), enabled: Boolean(token) });
   const issueCoupon = useMutation({
-    mutationFn: (couponID: number) => api.issueCoupon(token ?? "", couponID),
-    onSuccess: (coupon) => {
-      setIssuedCouponIDs((current) => [...new Set([...current, coupon.id])]);
+    mutationFn: (couponID: number) => api.issueCouponToMember(token ?? "", couponID, targetMemberID),
+    onSuccess: (result) => {
+      setIssuedCouponIDs((current) => [...new Set([...current, result.coupon_id])]);
       void queryClient.invalidateQueries({ queryKey: ["admin-coupons"] });
       void queryClient.invalidateQueries({ queryKey: ["admin-issuable-coupons"] });
     },
@@ -575,7 +608,7 @@ export function AdminCouponsPage() {
         </select>
         {issueCoupon.data ? (
           <p className="mt-3 text-sm font-bold text-brand">
-            회원 #{targetMemberID}에게 {issueCoupon.data.name} 쿠폰을 발급했습니다.
+            회원 #{issueCoupon.data.member_id}에게 쿠폰 #{issueCoupon.data.coupon_id}을 발급했습니다.
           </p>
         ) : null}
         {issueCoupon.error ? <p className="mt-3 text-sm font-bold text-brand">{issueCoupon.error.message}</p> : null}
@@ -651,8 +684,35 @@ export function AdminAuditLogsPage() {
 
 export function AdminCMSPage() {
   const token = useAdminToken();
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState("ALL");
+  const [editingID, setEditingID] = useState<number | null>(null);
+  const [form, setForm] = useState({
+    title: "",
+    image_url: "",
+    target_type: "PRODUCT",
+    target_id: "",
+    display_order: "0",
+    status: "ACTIVE",
+    starts_at: "",
+    ends_at: "",
+  });
   const { data = [] } = useQuery({ queryKey: ["admin-carousels"], queryFn: () => api.adminCarousels(token ?? ""), enabled: Boolean(token) });
+  const saveCarousel = useMutation({
+    mutationFn: () => {
+      const payload = cmsCarouselPayload(form);
+      return editingID ? api.updateCarousel(token ?? "", editingID, payload) : api.createCarousel(token ?? "", payload);
+    },
+    onSuccess: () => {
+      setEditingID(null);
+      setForm(emptyCMSCarouselForm());
+      void queryClient.invalidateQueries({ queryKey: ["admin-carousels"] });
+    },
+  });
+  const deactivateCarousel = useMutation({
+    mutationFn: (carouselID: number) => api.deactivateCarousel(token ?? "", carouselID),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-carousels"] }),
+  });
 
   if (!token) {
     return <AdminAuthRequired />;
@@ -660,13 +720,53 @@ export function AdminCMSPage() {
 
   const filteredCarousels = status === "ALL" ? data : data.filter((carousel) => carousel.status === status);
 
+  function editCarousel(carousel: (typeof data)[number]) {
+    setEditingID(carousel.id);
+    setForm({
+      title: carousel.title,
+      image_url: carousel.image_url,
+      target_type: carousel.target_type ?? "PRODUCT",
+      target_id: String(carousel.target_id ?? ""),
+      display_order: String(carousel.display_order ?? 0),
+      status: carousel.status === "ACTIVE" ? "ACTIVE" : "INACTIVE",
+      starts_at: toDateTimeLocal(carousel.starts_at),
+      ends_at: toDateTimeLocal(carousel.ends_at),
+    });
+  }
+
   return (
-    <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
+    <ConsoleLayout title="Admin" subtitle="??? ?? ??" links={adminLinks}>
       <ConsoleHeader
         title="CMS"
-        description="홈 캐러셀과 운영 배너의 노출 상태를 관리합니다."
-        action={<select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">전체 상태</option><option value="ACTIVE">활성</option><option value="INACTIVE">비활성</option></select>}
+        description="? ???? ??, ??, ?? ??? ?????."
+        action={<select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">?? ??</option><option value="ACTIVE">??</option><option value="INACTIVE">???</option></select>}
       />
+      <ConsoleSection className="mt-5" title={editingID ? "??? ??" : "??? ??"}>
+        <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr_130px_110px]">
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="??" aria-label="??? ??" />
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.image_url} onChange={(event) => setForm((current) => ({ ...current, image_url: event.target.value }))} placeholder="??? URL" aria-label="??? URL" />
+          <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={form.target_type} onChange={(event) => setForm((current) => ({ ...current, target_type: event.target.value }))} aria-label="?? ??">
+            <option value="PRODUCT">??</option>
+            <option value="MARKET">??</option>
+            <option value="URL">URL</option>
+          </select>
+          <input type="number" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.target_id} onChange={(event) => setForm((current) => ({ ...current, target_id: event.target.value }))} placeholder="?? ID" aria-label="?? ID" />
+        </div>
+        <div className="mt-3 grid gap-3 md:grid-cols-[120px_150px_1fr_1fr_auto]">
+          <input type="number" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.display_order} onChange={(event) => setForm((current) => ({ ...current, display_order: event.target.value }))} placeholder="??" aria-label="?? ??" />
+          <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))} aria-label="?? ??">
+            <option value="ACTIVE">??</option>
+            <option value="INACTIVE">???</option>
+          </select>
+          <input type="datetime-local" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.starts_at} onChange={(event) => setForm((current) => ({ ...current, starts_at: event.target.value }))} aria-label="?? ??" />
+          <input type="datetime-local" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.ends_at} onChange={(event) => setForm((current) => ({ ...current, ends_at: event.target.value }))} aria-label="?? ??" />
+          <div className="flex gap-2">
+            <Button disabled={!form.title || !form.image_url || saveCarousel.isPending} onClick={() => saveCarousel.mutate()}>{saveCarousel.isPending ? "?? ?" : editingID ? "?? ??" : "??"}</Button>
+            {editingID ? <Button variant="secondary" onClick={() => { setEditingID(null); setForm(emptyCMSCarouselForm()); }}>??</Button> : null}
+          </div>
+        </div>
+        {saveCarousel.error ? <p className="mt-3 text-sm font-bold text-brand">{saveCarousel.error.message}</p> : null}
+      </ConsoleSection>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         {filteredCarousels.map((carousel) => (
           <ConsoleSection key={carousel.id}>
@@ -677,8 +777,13 @@ export function AdminCMSPage() {
               <div>
                 <p className="font-black">{carousel.title}</p>
                 <p className="mt-1 text-xs font-bold text-muted">{carousel.link_url}</p>
+                <p className="mt-1 text-xs font-bold text-muted">{cmsScheduleText(carousel.starts_at, carousel.ends_at)}</p>
               </div>
               <StatusBadge value={carousel.status} />
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => editCarousel(carousel)}>??</Button>
+              <Button size="sm" variant="secondary" disabled={deactivateCarousel.isPending || carousel.status !== "ACTIVE"} onClick={() => deactivateCarousel.mutate(carousel.id)}>????</Button>
             </div>
           </ConsoleSection>
         ))}
@@ -689,10 +794,17 @@ export function AdminCMSPage() {
 
 export function AdminTokenLookupPage() {
   const token = useAdminToken();
-  const router = useRouter();
   const setSellerContext = useSessionStore((state) => state.setSellerContext);
   const [query, setQuery] = useState("");
   const { data: markets = [] } = useQuery({ queryKey: ["admin-markets"], queryFn: () => api.adminMarkets(token ?? ""), enabled: Boolean(token) });
+
+  const enterSellerMutation = useMutation({
+    mutationFn: (market: Market) => api.createSellerImpersonationToken(token ?? "", market.id),
+    onSuccess: (response) => {
+      setSellerContext({ marketID: response.market_id, marketName: response.market_name, token: response.access_token, expiresAt: response.expires_at });
+      window.location.href = "/seller";
+    },
+  });
 
   if (!token) {
     return <AdminAuthRequired />;
@@ -704,8 +816,7 @@ export function AdminTokenLookupPage() {
     if (!token) {
       return;
     }
-    setSellerContext({ marketID: market.id, marketName: market.name, token });
-    router.push("/seller");
+    enterSellerMutation.mutate(market);
   }
 
   return (
@@ -717,13 +828,61 @@ export function AdminTokenLookupPage() {
           rows={filteredMarkets.map((market) => [
               <MarketName key="market" market={market} />,
               <StatusBadge key="status" value={market.status} />,
-              <Button key="enter" size="sm" disabled={!token} onClick={() => enterSeller(market)}>셀러 페이지 진입</Button>,
+              <Button key="enter" size="sm" disabled={!token || enterSellerMutation.isPending} onClick={() => enterSeller(market)}>{enterSellerMutation.isPending ? "발급 중" : "셀러 페이지 진입"}</Button>,
           ])}
         />
       </ConsoleSection>
     </ConsoleLayout>
   );
 }
+
+function emptyCMSCarouselForm() {
+  return {
+    title: "",
+    image_url: "",
+    target_type: "PRODUCT",
+    target_id: "",
+    display_order: "0",
+    status: "ACTIVE",
+    starts_at: "",
+    ends_at: "",
+  };
+}
+
+function cmsCarouselPayload(form: ReturnType<typeof emptyCMSCarouselForm>) {
+  return {
+    title: form.title.trim(),
+    image_url: form.image_url.trim(),
+    target_type: form.target_type,
+    target_id: Number(form.target_id) || 0,
+    display_order: Number(form.display_order) || 0,
+    status: form.status,
+    starts_at: form.starts_at ? new Date(form.starts_at).toISOString() : undefined,
+    ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : undefined,
+  };
+}
+
+function toDateTimeLocal(value?: string) {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const offsetMs = date.getTimezoneOffset() * 60 * 1000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+function cmsScheduleText(startsAt?: string, endsAt?: string) {
+  if (!startsAt && !endsAt) {
+    return "?? ??";
+  }
+  const start = startsAt ? new Date(startsAt).toLocaleString("ko-KR") : "??";
+  const end = endsAt ? new Date(endsAt).toLocaleString("ko-KR") : "?? ??";
+  return `${start} ~ ${end}`;
+}
+
 
 function AdminSignal({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
