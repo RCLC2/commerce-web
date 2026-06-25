@@ -1,27 +1,32 @@
 import { request } from "../api-client";
-import type { ReviewImageAsset, ReviewImageUpload } from "../types";
+import type { MediaImageAsset, MediaImageDomain, MediaImageUpload } from "../types";
 
-export type ReviewImageUploadInput = {
+export type ImageUploadInput = {
+  domain?: MediaImageDomain;
   filename: string;
-  width: number;
-  height: number;
   content_type: string;
-  content_length: number;
+  size_bytes: number;
+};
+
+export type CompleteImageUploadInput = {
+  domain?: MediaImageDomain;
+  s3_key: string;
 };
 
 export const mediaApi = {
-  createReviewImageUpload: (token: string, payload: ReviewImageUploadInput) =>
-    request<ReviewImageUpload>("/api/v1/media/review-images/presign", {
+  createImageUpload: (token: string, payload: ImageUploadInput) =>
+    request<MediaImageUpload>("/api/v1/media/images/presign", {
       method: "POST",
       token,
       body: JSON.stringify(payload),
     }),
-  completeReviewImageUpload: (token: string, assetID: number) =>
-    request<ReviewImageAsset>(`/api/v1/media/review-images/${assetID}/complete`, {
+  completeImageUpload: (token: string, payload: CompleteImageUploadInput) =>
+    request<MediaImageAsset>("/api/v1/media/images/complete", {
       method: "POST",
       token,
+      body: JSON.stringify(payload),
     }),
-  uploadReviewImageObject: async (upload: ReviewImageUpload, file: File) => {
+  uploadImageObject: async (upload: MediaImageUpload, file: File) => {
     const headers = new Headers(upload.headers);
     if (!headers.has("Content-Type")) {
       headers.set("Content-Type", file.type);

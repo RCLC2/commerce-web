@@ -28,7 +28,7 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
   return (
     <main className="pb-24">
       <section className="relative min-h-[420px] bg-zinc-100">
-        <SafeImage src={event.image_url} alt={event.title} fill sizes="100vw" className="object-cover" priority />
+        <SafeImage src={event.image_url} alt={event.title} fill sizes="100vw" className="object-cover" />
         <div className="absolute inset-0 bg-black/35" />
         <div className="relative mx-auto flex min-h-[420px] max-w-6xl flex-col justify-end px-4 py-10 text-white">
           <p className="text-sm font-black">진행중 이벤트</p>

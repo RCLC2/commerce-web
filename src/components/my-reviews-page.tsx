@@ -5,7 +5,7 @@ import { Star, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/lib/api";
-import { getEffectiveToken, isMockingEnabled } from "@/lib/auth-token";
+import { getEffectiveToken } from "@/lib/auth-token";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import { cn } from "@/lib/utils";
@@ -53,7 +53,7 @@ export function MyReviewsPage() {
     },
   });
 
-  if (!token && !isMockingEnabled()) {
+  if (!token) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-16">
         <h1 className="text-2xl font-black">내 리뷰</h1>

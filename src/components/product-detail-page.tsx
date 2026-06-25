@@ -50,13 +50,14 @@ export function ProductDetailPage({ productId }: { productId: number }) {
   const price = product.discount_price || product.base_price;
   const saleRate = discountRate(product.base_price, product.discount_price);
   const detailHtml = resolveProductDetailHtml(product);
+  const description = product.description || "등록된 상품 설명이 없습니다.";
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-28 pt-5 md:pt-8">
       <div className="grid gap-8 md:grid-cols-[1fr_420px]">
         <section className="space-y-3">
           <div className="relative aspect-[4/5] overflow-hidden rounded-md bg-zinc-100 md:aspect-[5/6]">
-            <SafeImage src={product.image_url} alt={product.name} fill sizes="(max-width: 768px) 100vw, 55vw" className="object-cover" priority />
+            <SafeImage src={product.image_url} alt={product.name} fill sizes="(max-width: 768px) 100vw, 55vw" className="object-cover" />
           </div>
           <div className="grid grid-cols-4 gap-2">
             {Array.from({ length: 4 }).map((_, index) => (
@@ -161,7 +162,7 @@ export function ProductDetailPage({ productId }: { productId: number }) {
             </div>
 
             <div className="rounded-md bg-white p-4">
-              <p className="text-sm leading-6 text-zinc-700">{product.description}</p>
+              <p className="text-sm leading-6 text-zinc-700">{description}</p>
             </div>
           </div>
 

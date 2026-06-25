@@ -10,7 +10,6 @@ export const authApi = {
   register: (payload: {
     email: string;
     password: string;
-    role: "CUSTOMER" | "SELLER";
     marketingConsent: boolean;
     nighttimeConsent: boolean;
   }) =>

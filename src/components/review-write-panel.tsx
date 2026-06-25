@@ -12,9 +12,6 @@ type UploadedReviewImage = {
   mediaAssetID: number;
   previewURL: string;
   filename: string;
-  width: number;
-  height: number;
-  contentType: string;
 };
 
 type ReviewWritePanelProps = {
@@ -27,8 +24,6 @@ type ReviewWritePanelProps = {
 
 const maxReviewImages = 5;
 const maxReviewImageBytes = 10 * 1024 * 1024;
-const maxReviewImageWidth = 8000;
-const maxReviewImageHeight = 8000;
 const supportedReviewImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export function ReviewWritePanel({ token, orderCode, lineItemID, productID, onSubmitted }: ReviewWritePanelProps) {
@@ -91,8 +86,8 @@ export function ReviewWritePanel({ token, orderCode, lineItemID, productID, onSu
     }
 
     setIsUploading(true);
+    const uploaded: UploadedReviewImage[] = [];
     try {
-      const uploaded: UploadedReviewImage[] = [];
       for (const file of nextFiles) {
         const contentType = file.type.toLowerCase();
         if (!contentType.startsWith("image/")) {
@@ -104,34 +99,31 @@ export function ReviewWritePanel({ token, orderCode, lineItemID, productID, onSu
         if (file.size <= 0 || file.size > maxReviewImageBytes) {
           throw new Error("리뷰 이미지는 10MB 이하만 첨부할 수 있습니다");
         }
-        const dimensions = await readImageDimensions(file);
-        if (dimensions.width > maxReviewImageWidth || dimensions.height > maxReviewImageHeight) {
-          throw new Error("리뷰 이미지는 8000x8000px 이하만 첨부할 수 있습니다");
-        }
-        const upload = await api.createReviewImageUpload(token, {
+        const upload = await api.createImageUpload(token, {
+          domain: "REVIEW",
           filename: file.name,
-          width: dimensions.width,
-          height: dimensions.height,
           content_type: contentType,
-          content_length: file.size,
+          size_bytes: file.size,
         });
-        await api.uploadReviewImageObject(upload, file);
-        const asset = await api.completeReviewImageUpload(token, upload.id);
+        await api.uploadImageObject(upload, file);
+        const asset = await api.completeImageUpload(token, {
+          domain: "REVIEW",
+          s3_key: upload.s3_key,
+        });
         const previewURL = URL.createObjectURL(file);
         previewURLsRef.current.add(previewURL);
         uploaded.push({
           mediaAssetID: asset.id,
           previewURL,
           filename: file.name,
-          width: asset.width,
-          height: asset.height,
-          contentType: asset.content_type,
         });
       }
-      setImages((current) => [...current, ...uploaded].slice(0, maxReviewImages));
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "이미지 업로드에 실패했습니다");
     } finally {
+      if (uploaded.length > 0) {
+        setImages((current) => [...current, ...uploaded].slice(0, maxReviewImages));
+      }
       setIsUploading(false);
     }
   };
@@ -250,27 +242,4 @@ export function ReviewWritePanel({ token, orderCode, lineItemID, productID, onSu
       {createReview.isSuccess ? <p className="mt-2 text-xs font-bold text-foreground">리뷰가 등록되었습니다.</p> : null}
     </form>
   );
-}
-
-async function readImageDimensions(file: File): Promise<{ width: number; height: number }> {
-  if ("createImageBitmap" in window) {
-    const bitmap = await createImageBitmap(file);
-    const dimensions = { width: bitmap.width, height: bitmap.height };
-    bitmap.close();
-    return dimensions;
-  }
-
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    const url = URL.createObjectURL(file);
-    image.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve({ width: image.naturalWidth, height: image.naturalHeight });
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("이미지 정보를 읽지 못했습니다"));
-    };
-    image.src = url;
-  });
 }
