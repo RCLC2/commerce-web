@@ -1,5 +1,5 @@
 import { request } from "../api-client";
-import type { AdminDashboard, AuditLog, CMSCarousel, Coupon, Market, MemberProfile, OrderResponse, Product, Settlement } from "../types";
+import type { AdminDashboard, AuditLog, CMSCarousel, CMSCarouselMutation, Coupon, Market, MemberProfile, OrderResponse, Product, Settlement } from "../types";
 
 export const adminApi = {
   adminDashboard: (token: string) => request<AdminDashboard>("/api/v1/admin/dashboard", { token }),
@@ -10,7 +10,24 @@ export const adminApi = {
   adminSettlements: (token: string) => request<Settlement[]>("/api/v1/admin/settlements", { token }),
   adminCoupons: (token: string) => request<Coupon[]>("/api/v1/admin/coupons", { token }),
   adminAuditLogs: (token: string) => request<AuditLog[]>("/api/v1/admin/audit-logs", { token }),
-  adminCarousels: (token: string) => request<CMSCarousel[]>("/api/v1/admin/carousels", { token }),
+  adminCarousels: (token: string) => request<unknown[]>("/api/v1/admin/carousels", { token }).then((items) => items.map(normalizeCarousel)),
+  createCarousel: (token: string, payload: CMSCarouselMutation) =>
+    request<unknown>("/api/v1/admin/carousels", {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    }).then(normalizeCarousel),
+  updateCarousel: (token: string, carouselID: number, payload: CMSCarouselMutation) =>
+    request<unknown>(`/api/v1/admin/carousels/${carouselID}`, {
+      method: "PUT",
+      token,
+      body: JSON.stringify(payload),
+    }).then(normalizeCarousel),
+  deactivateCarousel: (token: string, carouselID: number) =>
+    request<void>(`/api/v1/admin/carousels/${carouselID}`, {
+      method: "DELETE",
+      token,
+    }),
   adminMutation: (token: string, path: string, payload: { reason: string; [key: string]: unknown }) =>
     request<{ status: string }>(path, {
       method: "POST",
@@ -51,10 +68,42 @@ function normalizeMember(raw: unknown): MemberProfile {
   };
 }
 
+function normalizeCarousel(raw: unknown): CMSCarousel {
+  const record = typeof raw === "object" && raw !== null ? raw as Record<string, unknown> : {};
+  const startsAt = nullableString(record.starts_at ?? record.StartsAt);
+  const endsAt = nullableString(record.ends_at ?? record.EndsAt);
+  return {
+    id: numberValue(record.id ?? record.ID),
+    title: stringValue(record.title ?? record.Title),
+    image_url: nullableString(record.image_url ?? record.ImageURL),
+    target_type: stringValue(record.target_type ?? record.TargetType, "PRODUCT"),
+    target_id: numberValue(record.target_id ?? record.TargetID),
+    display_order: numberValue(record.display_order ?? record.DisplayOrder),
+    is_active: booleanValue(record.is_active ?? record.IsActive, true),
+    starts_at: startsAt,
+    ends_at: endsAt,
+  };
+}
+
 function stringValue(value: unknown, fallback = "") {
   return typeof value === "string" && value ? value : fallback;
 }
 
+function nullableString(value: unknown) {
+  return typeof value === "string" && value ? value : null;
+}
+
 function numberValue(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function booleanValue(value: unknown, fallback = false) {
+  return typeof value === "boolean" ? value : fallback;
 }

@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:e2e": "playwright test",
+    "test:e2e:mock": "NEXT_PUBLIC_API_MOCKING=enabled playwright test",
+    "test:e2e:live": "NEXT_PUBLIC_API_MOCKING=disabled playwright test"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
@@ -24,6 +27,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

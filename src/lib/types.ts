@@ -251,9 +251,24 @@ export type AuditLog = {
 export type CMSCarousel = {
   id: number;
   title: string;
-  image_url: string;
-  link_url: string;
-  status: "ACTIVE" | "INACTIVE" | string;
+  image_url?: string | null;
+  target_type: "PRODUCT" | "MARKET" | string;
+  target_id: number;
+  display_order: number;
+  is_active: boolean;
+  starts_at?: string | null;
+  ends_at?: string | null;
+};
+
+export type CMSCarouselMutation = {
+  title: string;
+  image_url?: string | null;
+  target_type: "PRODUCT" | "MARKET";
+  target_id: number;
+  display_order: number;
+  is_active: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
 };
 
 export type CommerceEvent = {

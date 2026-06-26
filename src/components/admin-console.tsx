@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { firstOrderItem } from "@/lib/order-utils";
 import { useSessionStore } from "@/lib/session-store";
-import type { Market, MemberProfile, Product } from "@/lib/types";
+import type { CMSCarousel, CMSCarouselMutation, Market, MemberProfile, Product } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import {
   ConsoleHeader,
@@ -693,22 +693,110 @@ export function AdminAuditLogsPage() {
 
 export function AdminCMSPage() {
   const token = useAdminToken();
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState("ALL");
+  const [form, setForm] = useState<CarouselFormState>(emptyCarouselForm());
+  const [formError, setFormError] = useState<string | null>(null);
   const { data = [] } = useQuery({ queryKey: ["admin-carousels"], queryFn: () => api.adminCarousels(token ?? ""), enabled: Boolean(token) });
+  const saveCarousel = useMutation({
+    mutationFn: (payload: CMSCarouselMutation) => (
+      form.id ? api.updateCarousel(token ?? "", form.id, payload) : api.createCarousel(token ?? "", payload)
+    ),
+    onSuccess: () => {
+      setFormError(null);
+      setForm(emptyCarouselForm());
+      void queryClient.invalidateQueries({ queryKey: ["admin-carousels"] });
+      void queryClient.invalidateQueries({ queryKey: ["active-carousels"] });
+    },
+  });
+  const deactivateCarousel = useMutation({
+    mutationFn: (carouselID: number) => api.deactivateCarousel(token ?? "", carouselID),
+    onSuccess: (_result, carouselID) => {
+      if (form.id === carouselID) {
+        setForm(emptyCarouselForm());
+      }
+      void queryClient.invalidateQueries({ queryKey: ["admin-carousels"] });
+      void queryClient.invalidateQueries({ queryKey: ["active-carousels"] });
+    },
+  });
 
   if (!token) {
     return <AdminAuthRequired />;
   }
 
-  const filteredCarousels = status === "ALL" ? data : data.filter((carousel) => carousel.status === status);
+  const now = new Date();
+  const filteredCarousels = status === "ALL" ? data : data.filter((carousel) => carouselStatus(carousel, now) === status);
+  const isEditing = Boolean(form.id);
+
+  function updateForm<K extends keyof CarouselFormState>(key: K, value: CarouselFormState[K]) {
+    setFormError(null);
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function submitCarousel(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const validationError = validateCarouselForm(form);
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+    saveCarousel.mutate(carouselPayload(form));
+  }
+
+  const saveErrorMessage = formError ?? saveCarousel.error?.message;
 
   return (
     <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <ConsoleHeader
         title="CMS"
         description="홈 캐러셀과 운영 배너의 노출 상태를 관리합니다."
-        action={<select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">전체 상태</option><option value="ACTIVE">활성</option><option value="INACTIVE">비활성</option></select>}
+        action={<label className="grid gap-1 text-xs font-black text-muted">상태<select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold text-foreground" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">전체 상태</option><option value="ACTIVE">활성</option><option value="SCHEDULED">예약</option><option value="ENDED">종료</option><option value="INACTIVE">비활성</option></select></label>}
       />
+      <ConsoleSection className="mt-5" title={isEditing ? "캐러셀 수정" : "캐러셀 등록"}>
+        <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" onSubmit={submitCarousel}>
+          <label className="grid gap-1 text-xs font-black text-muted">
+            제목
+            <input className="h-10 rounded-md border border-line px-3 text-sm text-foreground" value={form.title} onChange={(event) => updateForm("title", event.target.value)} required />
+          </label>
+          <label className="grid gap-1 text-xs font-black text-muted md:col-span-2">
+            이미지 URL
+            <input className="h-10 rounded-md border border-line px-3 text-sm text-foreground" value={form.image_url} onChange={(event) => updateForm("image_url", event.target.value)} />
+          </label>
+          <label className="grid gap-1 text-xs font-black text-muted">
+            대상
+            <select className="h-10 rounded-md border border-line bg-white px-3 text-sm text-foreground" value={form.target_type} onChange={(event) => updateForm("target_type", event.target.value as CarouselFormState["target_type"])}>
+              <option value="PRODUCT">상품</option>
+              <option value="MARKET">마켓</option>
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-black text-muted">
+            대상 ID
+            <input className="h-10 rounded-md border border-line px-3 text-sm text-foreground" type="number" min={1} value={form.target_id} onChange={(event) => updateForm("target_id", event.target.value)} required />
+          </label>
+          <label className="grid gap-1 text-xs font-black text-muted">
+            노출 순서
+            <input className="h-10 rounded-md border border-line px-3 text-sm text-foreground" type="number" value={form.display_order} onChange={(event) => updateForm("display_order", event.target.value)} />
+          </label>
+          <label className="flex h-10 items-center gap-2 self-end rounded-md border border-line px-3 text-sm font-bold">
+            <input type="checkbox" checked={form.is_active} onChange={(event) => updateForm("is_active", event.target.checked)} />
+            활성
+          </label>
+          <label className="grid gap-1 text-xs font-black text-muted">
+            시작
+            <input className="h-10 rounded-md border border-line px-3 text-sm text-foreground" type="datetime-local" value={form.starts_at} onChange={(event) => updateForm("starts_at", event.target.value)} />
+          </label>
+          <label className="grid gap-1 text-xs font-black text-muted">
+            종료
+            <input className="h-10 rounded-md border border-line px-3 text-sm text-foreground" type="datetime-local" value={form.ends_at} onChange={(event) => updateForm("ends_at", event.target.value)} />
+          </label>
+          <div className="flex flex-wrap items-end gap-2 xl:col-span-2">
+            <Button type="submit" size="sm" disabled={saveCarousel.isPending}>{saveCarousel.isPending ? "저장 중" : isEditing ? "수정" : "등록"}</Button>
+            <Button type="button" size="sm" variant="secondary" onClick={() => { setFormError(null); setForm(emptyCarouselForm()); }}>초기화</Button>
+            {saveErrorMessage ? <p className="text-xs font-bold text-red-600">{saveErrorMessage}</p> : null}
+          </div>
+        </form>
+      </ConsoleSection>
+      {deactivateCarousel.error ? <p className="mt-3 text-xs font-bold text-red-600">{deactivateCarousel.error.message}</p> : null}
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         {filteredCarousels.map((carousel) => (
           <ConsoleSection key={carousel.id}>
@@ -718,15 +806,166 @@ export function AdminCMSPage() {
             <div className="mt-3 flex items-start justify-between gap-3">
               <div>
                 <p className="font-black">{carousel.title}</p>
-                <p className="mt-1 text-xs font-bold text-muted">{carousel.link_url}</p>
+                <p className="mt-1 text-xs font-bold text-muted">{carouselTargetLabel(carousel)}</p>
+                <p className="mt-1 text-xs text-muted">{carouselScheduleLabel(carousel)}</p>
+                <p className="mt-1 text-xs text-muted">노출 순서 {carousel.display_order}</p>
               </div>
-              <StatusBadge value={carousel.status} />
+              <StatusBadge value={carouselStatus(carousel, now)} />
+            </div>
+            <div className="mt-3 flex gap-2">
+              <Button type="button" size="sm" variant="secondary" onClick={() => setForm(formFromCarousel(carousel))}>수정</Button>
+              <Button type="button" size="sm" variant="secondary" disabled={!carousel.is_active || deactivateCarousel.isPending} onClick={() => deactivateCarousel.mutate(carousel.id)}>비활성화</Button>
             </div>
           </ConsoleSection>
         ))}
       </div>
     </ConsoleLayout>
   );
+}
+
+type CarouselStatus = "ACTIVE" | "INACTIVE" | "SCHEDULED" | "ENDED";
+
+type CarouselFormState = {
+  id?: number;
+  title: string;
+  image_url: string;
+  target_type: "PRODUCT" | "MARKET";
+  target_id: string;
+  display_order: string;
+  is_active: boolean;
+  starts_at: string;
+  ends_at: string;
+};
+
+function emptyCarouselForm(): CarouselFormState {
+  return {
+    title: "",
+    image_url: "",
+    target_type: "PRODUCT",
+    target_id: "",
+    display_order: "0",
+    is_active: true,
+    starts_at: "",
+    ends_at: "",
+  };
+}
+
+function formFromCarousel(carousel: CMSCarousel): CarouselFormState {
+  return {
+    id: carousel.id,
+    title: carousel.title,
+    image_url: carousel.image_url ?? "",
+    target_type: carousel.target_type === "MARKET" ? "MARKET" : "PRODUCT",
+    target_id: String(carousel.target_id),
+    display_order: String(carousel.display_order),
+    is_active: carousel.is_active,
+    starts_at: datetimeLocalValue(carousel.starts_at),
+    ends_at: datetimeLocalValue(carousel.ends_at),
+  };
+}
+
+function carouselPayload(form: CarouselFormState): CMSCarouselMutation {
+  return {
+    title: form.title.trim(),
+    image_url: form.image_url.trim() || null,
+    target_type: form.target_type,
+    target_id: Number(form.target_id),
+    display_order: Number(form.display_order || 0),
+    is_active: form.is_active,
+    starts_at: apiDateTimeValue(form.starts_at),
+    ends_at: apiDateTimeValue(form.ends_at),
+  };
+}
+
+function carouselStatus(carousel: CMSCarousel, now = new Date()): CarouselStatus {
+  if (!carousel.is_active) {
+    return "INACTIVE";
+  }
+  const startsAt = validCarouselDate(carousel.starts_at);
+  const endsAt = validCarouselDate(carousel.ends_at);
+  if ((carousel.starts_at && !startsAt) || (carousel.ends_at && !endsAt)) {
+    return "INACTIVE";
+  }
+  if (startsAt && now < startsAt) {
+    return "SCHEDULED";
+  }
+  if (endsAt && now >= endsAt) {
+    return "ENDED";
+  }
+  return "ACTIVE";
+}
+
+function carouselTargetLabel(carousel: CMSCarousel) {
+  const targetType = carousel.target_type || "TARGET";
+  return `${targetType} #${carousel.target_id}`;
+}
+
+function carouselScheduleLabel(carousel: CMSCarousel) {
+  const startsAt = formatCarouselDate(carousel.starts_at, "즉시");
+  const endsAt = formatCarouselDate(carousel.ends_at, "무기한");
+  return `${startsAt} - ${endsAt}`;
+}
+
+function formatCarouselDate(value: string | null | undefined, fallback: string) {
+  if (!value) {
+    return fallback;
+  }
+  const date = validCarouselDate(value);
+  if (!date) {
+    return "잘못된 시간";
+  }
+  return `${date.toLocaleString("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  })} KST`;
+}
+
+function validCarouselDate(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function validateCarouselForm(form: CarouselFormState) {
+  const targetID = Number(form.target_id);
+  if (!Number.isFinite(targetID) || targetID <= 0) {
+    return "대상 ID는 1 이상이어야 합니다.";
+  }
+  const startsAt = validCarouselDate(form.starts_at);
+  const endsAt = validCarouselDate(form.ends_at);
+  if (form.starts_at && !startsAt) {
+    return "시작 시간이 올바르지 않습니다.";
+  }
+  if (form.ends_at && !endsAt) {
+    return "종료 시간이 올바르지 않습니다.";
+  }
+  if (startsAt && endsAt && startsAt >= endsAt) {
+    return "시작 시간은 종료 시간보다 이전이어야 합니다.";
+  }
+  return null;
+}
+
+function datetimeLocalValue(value: string | null | undefined) {
+  const date = validCarouselDate(value);
+  if (!date) {
+    return "";
+  }
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function apiDateTimeValue(value: string) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 export function AdminTokenLookupPage() {

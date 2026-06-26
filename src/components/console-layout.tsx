@@ -207,6 +207,8 @@ export function SearchBox({
 function statusMeta(value: string) {
   const labels: Record<string, string> = {
     ACTIVE: "활성",
+    SCHEDULED: "예약",
+    ENDED: "종료",
     PENDING: "대기",
     SUSPENDED: "정지",
     SELLING: "판매중",
@@ -241,6 +243,7 @@ function statusMeta(value: string) {
     DELIVERED: "bg-emerald-50 text-emerald-700",
     PAYMENT_COMPLETED: "bg-emerald-50 text-emerald-700",
     WARNING: "bg-amber-50 text-amber-700",
+    SCHEDULED: "bg-amber-50 text-amber-700",
     READY_TO_SHIP: "bg-amber-50 text-amber-700",
     PREPARED: "bg-amber-50 text-amber-700",
     PENDING: "bg-amber-50 text-amber-700",
@@ -254,6 +257,7 @@ function statusMeta(value: string) {
     SHIPPING: "bg-sky-50 text-sky-700",
     ISSUABLE: "bg-sky-50 text-sky-700",
     INACTIVE: "bg-zinc-100 text-zinc-600",
+    ENDED: "bg-zinc-100 text-zinc-600",
     PAUSED: "bg-zinc-100 text-zinc-600",
     PENALTY: "bg-red-50 text-red-700",
     IMPERSONATING: "bg-violet-50 text-violet-700",

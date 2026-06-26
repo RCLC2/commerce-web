@@ -20,8 +20,10 @@ import {
   settlements,
 } from "./mock-data";
 import { getApiBaseUrl } from "@/lib/api-base-url";
+import type { CMSCarousel, CMSCarouselMutation } from "@/lib/types";
 
 const API_BASE_URL = getApiBaseUrl();
+let cmsCarousels: CMSCarousel[] = carousels.map((carousel) => ({ ...carousel }));
 
 function normalizeSearch(value: string | null) {
   return (value ?? "").trim().toLowerCase();
@@ -76,6 +78,49 @@ function createSearchSuggestions(q: string) {
     }));
 
   return [...keywordSuggestions, ...productSuggestions, ...marketSuggestions].slice(0, 10);
+}
+
+function activeCMSCarousels(now = new Date()) {
+  return cmsCarousels
+    .filter((carousel) => {
+      if (!carousel.is_active || carousel.target_id <= 0 || !["PRODUCT", "MARKET"].includes(carousel.target_type)) {
+        return false;
+      }
+      const startsAt = carousel.starts_at ? new Date(carousel.starts_at) : null;
+      const endsAt = carousel.ends_at ? new Date(carousel.ends_at) : null;
+      return targetIsDisplayable(carousel) && (!startsAt || startsAt <= now) && (!endsAt || endsAt > now);
+    })
+    .sort((a, b) => a.display_order - b.display_order || a.id - b.id);
+}
+
+function targetIsDisplayable(carousel: CMSCarousel) {
+  if (carousel.target_type === "PRODUCT") {
+    const product = products.find((item) => item.id === carousel.target_id);
+    return product?.status === "SELLING" || product?.status === "PRE_ORDER";
+  }
+  if (carousel.target_type === "MARKET") {
+    const market = markets.find((item) => item.id === carousel.target_id);
+    return market?.status === "OPEN" || market?.status === "ACTIVE";
+  }
+  return false;
+}
+
+function normalizeCarouselPayload(payload: Partial<CMSCarouselMutation>, current?: CMSCarousel): CMSCarousel {
+  const imageURL = Object.prototype.hasOwnProperty.call(payload, "image_url")
+    ? payload.image_url ?? null
+    : current?.image_url ?? null;
+
+  return {
+    id: current?.id ?? Math.max(0, ...cmsCarousels.map((carousel) => carousel.id)) + 1,
+    title: payload.title ?? current?.title ?? "새 캐러셀",
+    image_url: imageURL,
+    target_type: payload.target_type ?? current?.target_type ?? "PRODUCT",
+    target_id: payload.target_id ?? current?.target_id ?? 101,
+    display_order: payload.display_order ?? current?.display_order ?? 0,
+    is_active: payload.is_active ?? current?.is_active ?? true,
+    starts_at: payload.starts_at ?? current?.starts_at ?? null,
+    ends_at: payload.ends_at ?? current?.ends_at ?? null,
+  };
 }
 
 const trendingSegments = ["전체", "10대", "20대 초반", "20대 중반", "20대 후반", "30대 이상"];
@@ -154,6 +199,7 @@ export const handlers = [
     const event = events.find((item) => item.id === Number(params.id));
     return event ? HttpResponse.json(event) : new HttpResponse(null, { status: 404 });
   }),
+  http.get(`${API_BASE_URL}/api/v1/carousels/active`, () => HttpResponse.json(activeCMSCarousels())),
   http.get(`${API_BASE_URL}/api/v1/products`, ({ request }) => {
     const url = new URL(request.url);
     const q = url.searchParams.get("q")?.toLowerCase();
@@ -297,6 +343,31 @@ export const handlers = [
   http.get(`${API_BASE_URL}/api/v1/admin/settlements`, () => HttpResponse.json(settlements)),
   http.get(`${API_BASE_URL}/api/v1/admin/coupons`, () => HttpResponse.json(coupons)),
   http.get(`${API_BASE_URL}/api/v1/admin/audit-logs`, () => HttpResponse.json(auditLogs)),
-  http.get(`${API_BASE_URL}/api/v1/admin/carousels`, () => HttpResponse.json(carousels)),
+  http.get(`${API_BASE_URL}/api/v1/admin/carousels`, () => HttpResponse.json(cmsCarousels)),
+  http.post(`${API_BASE_URL}/api/v1/admin/carousels`, async ({ request }) => {
+    const payload = (await request.json()) as Partial<CMSCarouselMutation>;
+    const created = normalizeCarouselPayload(payload);
+    cmsCarousels = [...cmsCarousels, created];
+    return HttpResponse.json(created, { status: 201 });
+  }),
+  http.put(`${API_BASE_URL}/api/v1/admin/carousels/:id`, async ({ params, request }) => {
+    const carouselID = Number(params.id);
+    const current = cmsCarousels.find((carousel) => carousel.id === carouselID);
+    if (!current) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    const payload = (await request.json()) as Partial<CMSCarouselMutation>;
+    const updated = normalizeCarouselPayload(payload, current);
+    cmsCarousels = cmsCarousels.map((carousel) => (carousel.id === carouselID ? updated : carousel));
+    return HttpResponse.json(updated);
+  }),
+  http.delete(`${API_BASE_URL}/api/v1/admin/carousels/:id`, ({ params }) => {
+    const carouselID = Number(params.id);
+    if (!cmsCarousels.some((carousel) => carousel.id === carouselID)) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    cmsCarousels = cmsCarousels.map((carousel) => (carousel.id === carouselID ? { ...carousel, is_active: false } : carousel));
+    return new HttpResponse(null, { status: 204 });
+  }),
   http.post(`${API_BASE_URL}/api/v1/admin/:domain/:id/:action`, () => HttpResponse.json({ status: "RECORDED" })),
 ];
