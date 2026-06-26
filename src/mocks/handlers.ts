@@ -88,9 +88,21 @@ function activeCMSCarousels(now = new Date()) {
       }
       const startsAt = carousel.starts_at ? new Date(carousel.starts_at) : null;
       const endsAt = carousel.ends_at ? new Date(carousel.ends_at) : null;
-      return (!startsAt || startsAt <= now) && (!endsAt || endsAt > now);
+      return targetIsDisplayable(carousel) && (!startsAt || startsAt <= now) && (!endsAt || endsAt > now);
     })
-    .sort((a, b) => a.display_order - b.display_order || b.id - a.id);
+    .sort((a, b) => a.display_order - b.display_order || a.id - b.id);
+}
+
+function targetIsDisplayable(carousel: CMSCarousel) {
+  if (carousel.target_type === "PRODUCT") {
+    const product = products.find((item) => item.id === carousel.target_id);
+    return product?.status === "SELLING" || product?.status === "PRE_ORDER";
+  }
+  if (carousel.target_type === "MARKET") {
+    const market = markets.find((item) => item.id === carousel.target_id);
+    return market?.status === "OPEN" || market?.status === "ACTIVE";
+  }
+  return false;
 }
 
 function normalizeCarouselPayload(payload: Partial<CMSCarouselMutation>, current?: CMSCarousel): CMSCarousel {
@@ -332,13 +344,13 @@ export const handlers = [
   http.get(`${API_BASE_URL}/api/v1/admin/coupons`, () => HttpResponse.json(coupons)),
   http.get(`${API_BASE_URL}/api/v1/admin/audit-logs`, () => HttpResponse.json(auditLogs)),
   http.get(`${API_BASE_URL}/api/v1/admin/carousels`, () => HttpResponse.json(cmsCarousels)),
-  http.post(`${API_BASE_URL}/api/v1/carousels`, async ({ request }) => {
+  http.post(`${API_BASE_URL}/api/v1/admin/carousels`, async ({ request }) => {
     const payload = (await request.json()) as Partial<CMSCarouselMutation>;
     const created = normalizeCarouselPayload(payload);
     cmsCarousels = [...cmsCarousels, created];
     return HttpResponse.json(created, { status: 201 });
   }),
-  http.put(`${API_BASE_URL}/api/v1/carousels/:id`, async ({ params, request }) => {
+  http.put(`${API_BASE_URL}/api/v1/admin/carousels/:id`, async ({ params, request }) => {
     const carouselID = Number(params.id);
     const current = cmsCarousels.find((carousel) => carousel.id === carouselID);
     if (!current) {
@@ -349,7 +361,7 @@ export const handlers = [
     cmsCarousels = cmsCarousels.map((carousel) => (carousel.id === carouselID ? updated : carousel));
     return HttpResponse.json(updated);
   }),
-  http.delete(`${API_BASE_URL}/api/v1/carousels/:id`, ({ params }) => {
+  http.delete(`${API_BASE_URL}/api/v1/admin/carousels/:id`, ({ params }) => {
     const carouselID = Number(params.id);
     if (!cmsCarousels.some((carousel) => carousel.id === carouselID)) {
       return new HttpResponse(null, { status: 404 });

@@ -12,19 +12,19 @@ export const adminApi = {
   adminAuditLogs: (token: string) => request<AuditLog[]>("/api/v1/admin/audit-logs", { token }),
   adminCarousels: (token: string) => request<unknown[]>("/api/v1/admin/carousels", { token }).then((items) => items.map(normalizeCarousel)),
   createCarousel: (token: string, payload: CMSCarouselMutation) =>
-    request<unknown>("/api/v1/carousels", {
+    request<unknown>("/api/v1/admin/carousels", {
       method: "POST",
       token,
       body: JSON.stringify(payload),
     }).then(normalizeCarousel),
   updateCarousel: (token: string, carouselID: number, payload: CMSCarouselMutation) =>
-    request<unknown>(`/api/v1/carousels/${carouselID}`, {
+    request<unknown>(`/api/v1/admin/carousels/${carouselID}`, {
       method: "PUT",
       token,
       body: JSON.stringify(payload),
     }).then(normalizeCarousel),
   deactivateCarousel: (token: string, carouselID: number) =>
-    request<void>(`/api/v1/carousels/${carouselID}`, {
+    request<void>(`/api/v1/admin/carousels/${carouselID}`, {
       method: "DELETE",
       token,
     }),
