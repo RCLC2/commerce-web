@@ -1,5 +1,5 @@
 import { request } from "../api-client";
-import type { MediaImageAsset, MediaImageDomain, MediaImageUpload } from "../types";
+import type { MediaImageDomain, MediaImageUpload } from "../types";
 
 export type ImageUploadInput = {
   domain?: MediaImageDomain;
@@ -8,20 +8,9 @@ export type ImageUploadInput = {
   size_bytes: number;
 };
 
-export type CompleteImageUploadInput = {
-  domain?: MediaImageDomain;
-  s3_key: string;
-};
-
 export const mediaApi = {
   createImageUpload: (token: string, payload: ImageUploadInput) =>
     request<MediaImageUpload>("/api/v1/media/images/presign", {
-      method: "POST",
-      token,
-      body: JSON.stringify(payload),
-    }),
-  completeImageUpload: (token: string, payload: CompleteImageUploadInput) =>
-    request<MediaImageAsset>("/api/v1/media/images/complete", {
       method: "POST",
       token,
       body: JSON.stringify(payload),

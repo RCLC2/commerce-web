@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { RefObject } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { queryKeys } from "@/lib/query-keys";
@@ -57,25 +57,25 @@ export function HomePage() {
     queryKey: queryKeys.categories,
     queryFn: api.listCategories,
   });
-  const { data: products = [], isLoading } = useQuery({
-    queryKey: queryKeys.personalizedProducts,
-    queryFn: () => api.listProducts({ sort: "popular" }),
+  const { data: popularProducts = [], isLoading: isPopularLoading } = useQuery({
+    queryKey: queryKeys.products({ sort: "popular" }),
+    queryFn: api.listPopularProducts,
+  });
+  const { data: promotionProducts = [], isLoading: isPromotionLoading } = useQuery({
+    queryKey: queryKeys.products({ sort: "promotion" }),
+    queryFn: api.listPromotionProducts,
+  });
+  const { data: recommendationProducts = [], isLoading: isRecommendationLoading } = useQuery({
+    queryKey: queryKeys.personalizedProducts({ sort: "new" }),
+    queryFn: api.listRecommendedProducts,
   });
   const { data: profile } = useQuery({
     queryKey: queryKeys.homeMe(effectiveToken),
     queryFn: () => api.me(effectiveToken ?? ""),
     enabled: Boolean(effectiveToken),
   });
-  const recommendationProducts = useMemo(() => {
-    return products.slice(0, 20);
-  }, [products]);
-  const popularProducts = useMemo(() => {
-    return products.slice(0, 20);
-  }, [products]);
-  const promotionProducts = useMemo(() => {
-    return products.filter((product) => product.discount_price > 0).slice(0, 20);
-  }, [products]);
   const recommendationTitle = `${profile?.user_name ?? "사용자"}님을 위한 추천 상품`;
+  const rootCategories = categories.filter((category) => !category.parent_id && category.level === 1);
 
   useEffect(() => {
     const target = loadMoreRef.current;
@@ -154,7 +154,7 @@ export function HomePage() {
 
       <section className="rounded-md border border-line bg-white p-3">
         <div className="grid grid-cols-5 gap-1 md:grid-cols-10">
-          {categories.map((category) => {
+          {rootCategories.map((category) => {
             const Icon = categoryIcon(category);
             return (
               <Link key={category.href} href={category.href} className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-md p-1 hover:bg-zinc-50">
@@ -172,7 +172,7 @@ export function HomePage() {
         title="인기 상품"
         description="지금 많이 찾는 상품 20개"
         products={popularProducts}
-        isLoading={isLoading}
+        isLoading={isPopularLoading}
         carouselRef={popularCarouselRef}
         onPrev={() => slideCarousel(popularCarouselRef, "prev")}
         onNext={() => slideCarousel(popularCarouselRef, "next")}
@@ -182,7 +182,7 @@ export function HomePage() {
         title="프로모션 상품"
         description="혜택과 함께 둘러보는 추천 프로모션"
         products={promotionProducts}
-        isLoading={isLoading}
+        isLoading={isPromotionLoading}
         carouselRef={promotionCarouselRef}
         onPrev={() => slideCarousel(promotionCarouselRef, "prev")}
         onNext={() => slideCarousel(promotionCarouselRef, "next")}
@@ -194,7 +194,7 @@ export function HomePage() {
             <h2 className="text-xl font-black">{recommendationTitle}</h2>
           </div>
         </div>
-        {isLoading ? (
+        {isRecommendationLoading ? (
           <div className="grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
             {Array.from({ length: 4 }).map((_, index) => (
               <div key={index} className="aspect-[3/4] animate-pulse rounded-md bg-zinc-200" />

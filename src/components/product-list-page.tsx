@@ -56,8 +56,8 @@ export function ProductListPage() {
     queryFn: api.listCategories,
   });
   const { data: products = [], isLoading, error } = useQuery({
-    queryKey: ["products", "catalog"],
-    queryFn: () => api.listProducts({ sort: "popular" }),
+    queryKey: queryKeys.products({ sort }),
+    queryFn: () => api.listProducts({ sort }),
   });
 
   const categories = useMemo(
@@ -70,6 +70,7 @@ export function ProductListPage() {
     [products],
   );
 
+  const rootCategories = useMemo(() => categories.filter((item) => !item.parent_id && item.level === 1), [categories]);
   const selectedCategory = categories.find((item) => item.slug === category);
   const selectedCategoryIDs = useMemo(() => categoryFilterIDs(selectedCategory), [selectedCategory]);
   const selectedPrice = priceRanges.find((item) => item.value === price) ?? priceRanges[0];
@@ -127,7 +128,6 @@ export function ProductListPage() {
 
   const activeFilters = [
     selectedCategory ? `카테고리: ${selectedCategory.name}` : null,
-    selectedCategory ? `카테고리: ${selectedCategory.name}` : null,
     q ? `검색: ${q}` : null,
     market ? `마켓: ${market}` : null,
     selectedPrice.value ? selectedPrice.label : null,
@@ -141,7 +141,6 @@ export function ProductListPage() {
     <main className="mx-auto max-w-6xl px-4 pb-24 pt-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-black">{selectedCategory ? `${selectedCategory.name} 상품` : "상품"}</h1>
           <h1 className="text-2xl font-black">{selectedCategory ? `${selectedCategory.name} 상품` : "상품"}</h1>
           <p className="mt-1 text-sm text-muted">
             {filteredProducts.length.toLocaleString("ko-KR")}개 상품을 필터 조건에 맞춰 보여드립니다.
@@ -176,7 +175,7 @@ export function ProductListPage() {
         >
           전체
         </button>
-        {categories.map((item) => (
+        {rootCategories.map((item) => (
           <button
             key={item.id}
             className={`h-10 shrink-0 rounded-md px-4 text-sm font-bold ${

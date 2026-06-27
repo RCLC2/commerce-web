@@ -1,10 +1,10 @@
 import { request } from "../api-client";
-import type { Address, CartItem, Coupon, CreateReviewResponse, OrderResponse, Review, TrackingInfo } from "../types";
+import type { Address, CartItem, Coupon, CreateReviewResponse, Notification, OrderResponse, Recommendation, Review, SettlementSummary, TrackingInfo } from "../types";
 
 export type CreateOrderLineReviewPayload = {
   rating_x2: number;
   content: string;
-  images?: { media_asset_id: number; sort_order: number; is_representative: boolean }[];
+  images?: { s3_key?: string; object_key?: string; sort_order: number; is_representative: boolean }[];
 };
 
 export const customerApi = {
@@ -23,6 +23,8 @@ export const customerApi = {
       token,
     }),
   listAddresses: (token: string) => request<Address[]>("/api/v1/me/addresses", { token }),
+  listNotifications: (token: string) => request<Notification[]>("/api/v1/me/notifications", { token }),
+  listMyRecommendations: (token: string) => request<Recommendation[]>("/api/v1/me/recommendations", { token }),
   placeOrder: (token: string, payload: { cart_item_ids: number[]; used_coupon_id?: number; used_point: number }) =>
     request<{ orderCode: string }>("/api/v1/orders", {
       method: "POST",
@@ -41,6 +43,8 @@ export const customerApi = {
   listMyReviews: (token: string) => request<Review[]>("/api/v1/me/reviews", { token }),
   confirmPurchase: (token: string, orderCode: string, itemID: number) =>
     request<OrderResponse>(`/api/v1/orders/${orderCode}/items/${itemID}/confirm-purchase`, { method: "POST", token }),
+  createPaymentCheckout: (token: string, orderCode: string) =>
+    request<{ checkout_url?: string; url?: string }>(`/api/v1/orders/${orderCode}/payment-checkout`, { method: "POST", token }),
   trackDelivery: (token: string, orderCode: string, deliveryID: number) =>
     request<TrackingInfo>(`/api/v1/orders/${orderCode}/deliveries/${deliveryID}/track`, { method: "POST", token }),
   createOrderLineReview: (token: string, orderCode: string, itemID: number, payload: CreateOrderLineReviewPayload) =>
@@ -49,25 +53,19 @@ export const customerApi = {
       token,
       body: JSON.stringify(payload),
     }),
-  updateReview: (
-    token: string,
-    reviewID: number,
-    payload: {
-      rating_x2?: number;
-      content?: string;
-      images?: { media_asset_id: number; sort_order: number; is_representative: boolean }[];
-    },
-  ) =>
+  updateReview: (token: string, reviewID: number, payload: { rating_x2?: number; content?: string }) =>
     request<Review>(`/api/v1/reviews/${reviewID}`, {
       method: "PATCH",
       token,
       body: JSON.stringify(payload),
     }),
-  deleteReview: (token: string, reviewID: number) =>
-    request<void>(`/api/v1/reviews/${reviewID}`, {
-      method: "DELETE",
-      token,
-    }),
+  deleteReview: (token: string, reviewID: number) => request<void>(`/api/v1/reviews/${reviewID}`, { method: "DELETE", token }),
+  addWishlist: (token: string, productID: number) => request<{ status: string }>(`/api/v1/products/${productID}/wishlist`, { method: "POST", token }),
+  removeWishlist: (token: string, productID: number) => request<void>(`/api/v1/products/${productID}/wishlist`, { method: "DELETE", token }),
+  addLike: (token: string, productID: number) => request<{ status: string }>(`/api/v1/products/${productID}/like`, { method: "POST", token }),
+  removeLike: (token: string, productID: number) => request<void>(`/api/v1/products/${productID}/like`, { method: "DELETE", token }),
+  markNotificationRead: (token: string, notificationID: number) => request<{ status: string }>(`/api/v1/notifications/${notificationID}/read`, { method: "POST", token }),
+  getSettlementSummary: (token: string, marketID: number) => request<SettlementSummary>(`/api/v1/settlements/${marketID}/summary`, { token }),
   completePayment: (
     token: string,
     orderCode: string,

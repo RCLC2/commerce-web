@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 
 type UploadedReviewImage = {
-  mediaAssetID: number;
+  s3Key: string;
+  objectKey?: string;
   previewURL: string;
   filename: string;
 };
@@ -56,7 +57,8 @@ export function ReviewWritePanel({ token, orderCode, lineItemID, productID, onSu
         rating_x2: ratingX2,
         content,
         images: images.map((image, index) => ({
-          media_asset_id: image.mediaAssetID,
+          s3_key: image.s3Key,
+          object_key: image.objectKey,
           sort_order: index + 1,
           is_representative: index === 0,
         })),
@@ -106,14 +108,11 @@ export function ReviewWritePanel({ token, orderCode, lineItemID, productID, onSu
           size_bytes: file.size,
         });
         await api.uploadImageObject(upload, file);
-        const asset = await api.completeImageUpload(token, {
-          domain: "REVIEW",
-          s3_key: upload.s3_key,
-        });
         const previewURL = URL.createObjectURL(file);
         previewURLsRef.current.add(previewURL);
         uploaded.push({
-          mediaAssetID: asset.id,
+          s3Key: upload.s3_key,
+          objectKey: upload.object_key,
           previewURL,
           filename: file.name,
         });
@@ -128,13 +127,13 @@ export function ReviewWritePanel({ token, orderCode, lineItemID, productID, onSu
     }
   };
 
-  const removeImage = (mediaAssetID: number) => {
+  const removeImage = (s3Key: string) => {
     setImages((current) => {
-      const target = current.find((image) => image.mediaAssetID === mediaAssetID);
+      const target = current.find((image) => image.s3Key === s3Key);
       if (target) {
         revokePreviewURL(target.previewURL);
       }
-      return current.filter((image) => image.mediaAssetID !== mediaAssetID);
+      return current.filter((image) => image.s3Key !== s3Key);
     });
   };
 
@@ -184,7 +183,7 @@ export function ReviewWritePanel({ token, orderCode, lineItemID, productID, onSu
       {images.length > 0 ? (
         <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
           {images.map((image, index) => (
-            <div key={image.mediaAssetID} className="relative aspect-square overflow-hidden rounded-md border border-line bg-white">
+            <div key={image.s3Key} className="relative aspect-square overflow-hidden rounded-md border border-line bg-white">
               <div
                 className="h-full w-full bg-cover bg-center"
                 style={{ backgroundImage: `url(${image.previewURL})` }}
@@ -198,7 +197,7 @@ export function ReviewWritePanel({ token, orderCode, lineItemID, productID, onSu
                 type="button"
                 aria-label={`${image.filename} 제거`}
                 className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-foreground shadow-sm"
-                onClick={() => removeImage(image.mediaAssetID)}
+                onClick={() => removeImage(image.s3Key)}
               >
                 <X size={14} />
               </button>
