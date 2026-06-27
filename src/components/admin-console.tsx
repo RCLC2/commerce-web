@@ -1,13 +1,13 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleDollarSign, ShoppingBag, Store, Users } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { firstOrderItem } from "@/lib/order-utils";
 import { useSessionStore } from "@/lib/session-store";
-import type { Market, MemberProfile, Product } from "@/lib/types";
+import type { Market, MarketPenalty, MemberProfile, Product } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import {
   ConsoleHeader,
@@ -57,6 +57,14 @@ function AdminAuthRequired() {
   );
 }
 
+function marketPenaltyLabel(penalties: MarketPenalty[]) {
+  if (!penalties.length) {
+    return "-";
+  }
+  const totalScore = penalties.reduce((sum, penalty) => sum + penalty.score, 0);
+  const latest = penalties[0];
+  return `${totalScore}점 · ${latest.reason}`;
+}
 function productPrice(product: Product) {
   return product.discount_price || product.base_price;
 }
@@ -212,13 +220,22 @@ export function AdminMembersPage() {
 
 export function AdminMarketsPage() {
   const token = useAdminToken();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("ALL");
   const [selectedMarketID, setSelectedMarketID] = useState<number | null>(null);
   const [penaltyReason, setPenaltyReason] = useState("배송 지연 반복에 따른 페널티 부여");
   const [penaltyScore, setPenaltyScore] = useState(10);
-  const [lastPenaltyMessage, setLastPenaltyMessage] = useState("");
+
   const { data = [] } = useQuery({ queryKey: ["admin-markets"], queryFn: () => api.adminMarkets(token ?? ""), enabled: Boolean(token) });
+  const penaltyQueries = useQueries({
+    queries: data.map((market) => ({
+      queryKey: ["admin-market-penalties", market.id],
+      queryFn: () => api.adminMarketPenalties(token ?? "", market.id),
+      enabled: Boolean(token),
+    })),
+  });
+  const penaltiesByMarketID = new Map(data.map((market, index) => [market.id, penaltyQueries[index]?.data ?? []]));
   const selectedMarket = data.find((market) => market.id === selectedMarketID) ?? data[0];
   const penaltyMutation = useMutation({
     mutationFn: () =>
@@ -227,7 +244,7 @@ export function AdminMarketsPage() {
         score: penaltyScore,
       }),
     onSuccess: () => {
-      setLastPenaltyMessage(selectedMarket ? `${selectedMarket.name}에 ${penaltyScore}점 페널티를 기록했습니다.` : "페널티를 기록했습니다.");
+      void queryClient.invalidateQueries({ queryKey: ["admin-market-penalties", selectedMarket?.id] });
     },
   });
 
@@ -275,7 +292,6 @@ export function AdminMarketsPage() {
             {penaltyMutation.isPending ? "기록 중" : "페널티 부여"}
           </Button>
         </div>
-        {lastPenaltyMessage ? <p className="mt-3 text-sm font-bold text-brand">{lastPenaltyMessage}</p> : null}
         {penaltyMutation.error ? <p className="mt-3 text-sm font-bold text-brand">{penaltyMutation.error.message}</p> : null}
       </ConsoleSection>
       <ConsoleSection className="mt-5" title="마켓 목록">
@@ -300,7 +316,7 @@ export function AdminMarketsPage() {
             market.follower_count?.toLocaleString("ko-KR") ?? "-",
             <StatusBadge key="status" value={market.status} />,
             market.tags?.join(", ") ?? "-",
-            "조회 API 필요",
+            marketPenaltyLabel(penaltiesByMarketID.get(market.id) ?? []),
             <Button key="select" variant="secondary" size="sm" onClick={() => setSelectedMarketID(market.id)}>선택</Button>,
           ])}
         />
@@ -548,8 +564,7 @@ export function AdminCouponsPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("ALL");
   const [targetMemberID, setTargetMemberID] = useState<number | null>(null);
-  const { data = [] } = useQuery({ queryKey: ["admin-coupons"], queryFn: () => api.adminCoupons(token ?? ""), enabled: Boolean(token) });
-  const { data: issuableCoupons = [] } = useQuery({ queryKey: ["admin-issuable-coupons"], queryFn: () => api.listIssuableCoupons(token ?? ""), enabled: Boolean(token) });
+  const { data = [] } = useQuery({ queryKey: ["admin-coupons", targetMemberID], queryFn: () => api.adminCoupons(token ?? "", targetMemberID), enabled: Boolean(token) });
   const { data: members = [] } = useQuery({ queryKey: ["admin-members"], queryFn: () => api.adminMembers(token ?? ""), enabled: Boolean(token) });
   const issueCoupon = useMutation({
     mutationFn: (couponID: number) => {
@@ -559,8 +574,7 @@ export function AdminCouponsPage() {
       return api.issueCouponToMember(token ?? "", couponID, targetMemberID);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["admin-coupons"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin-issuable-coupons"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin-coupons", targetMemberID] });
     },
   });
 
@@ -568,8 +582,7 @@ export function AdminCouponsPage() {
     return <AdminAuthRequired />;
   }
 
-  const couponMap = new Map([...data, ...issuableCoupons].map((coupon) => [coupon.id, coupon]));
-  const coupons = Array.from(couponMap.values());
+  const coupons = data;
   const filteredCoupons = coupons.filter((coupon) => {
     const matchesQuery = !query || coupon.name.toLowerCase().includes(query.toLowerCase()) || coupon.condition_text?.toLowerCase().includes(query.toLowerCase());
     const matchesStatus = status === "ALL" || coupon.status === status;
@@ -632,10 +645,10 @@ export function AdminCouponsPage() {
             <Button
               key="issue"
               size="sm"
-              disabled={coupon.status === "ISSUED" || issueCoupon.isPending}
+              disabled={!targetMemberID || coupon.status === "ISSUED" || coupon.status === "USED" || issueCoupon.isPending}
               onClick={() => issueCoupon.mutate(coupon.id)}
             >
-              {coupon.status === "ISSUED" ? "발급됨" : issueCoupon.isPending ? "발급 중" : "발급"}
+              {coupon.status === "ISSUED" ? "발급됨" : coupon.status === "USED" ? "사용됨" : issueCoupon.isPending ? "발급 중" : "발급"}
             </Button>,
           ])}
         />

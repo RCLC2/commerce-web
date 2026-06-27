@@ -1,5 +1,5 @@
 import { request } from "../api-client";
-import type { AdminDashboard, AuditLog, CMSCarousel, Coupon, Market, MemberProfile, Notification, OrderResponse, Product, Recommendation, Settlement, TrackingInfo } from "../types";
+import type { AdminDashboard, AuditLog, CMSCarousel, Coupon, Market, MarketPenalty, MemberProfile, Notification, OrderResponse, Product, Recommendation, Settlement, TrackingInfo } from "../types";
 
 export const adminApi = {
   adminDashboard: (token: string) => request<AdminDashboard>("/api/v1/admin/dashboard", { token }),
@@ -19,13 +19,14 @@ export const adminApi = {
     }),
   adminMarkets: (token: string) => request<Market[]>("/api/v1/admin/markets", { token }),
   adminMarket: (token: string, marketID: number) => request<Market>(`/api/v1/admin/markets/${marketID}`, { token }),
+  adminMarketPenalties: (token: string, marketID: number) => request<MarketPenalty[]>(`/api/v1/admin/markets/${marketID}/penalties`, { token }),
   adminProducts: (token: string) => request<Product[]>("/api/v1/admin/products", { token }),
   adminOrders: (token: string) => request<OrderResponse[]>("/api/v1/admin/orders", { token }),
   adminOrder: (token: string, orderCode: string) => request<OrderResponse>(`/api/v1/admin/orders/${orderCode}`, { token }),
   adminOrderActionLogs: (token: string) => request<AuditLog[]>("/api/v1/admin/orders/action-logs", { token }),
   adminSettlements: (token: string) => request<Settlement[]>("/api/v1/admin/settlements", { token }),
   adminSettlementActionLogs: (token: string) => request<AuditLog[]>("/api/v1/admin/settlements/action-logs", { token }),
-  adminCoupons: (token: string) => request<Coupon[]>("/api/v1/admin/coupons", { token }),
+  adminCoupons: (token: string, memberID?: number | null) => request<Coupon[]>(`/api/v1/admin/coupons${memberID ? `?member_id=${memberID}` : ""}`, { token }),
   adminAuditLogs: (token: string) => request<AuditLog[]>("/api/v1/admin/audit-logs", { token }),
   adminCarousels: (token: string) => request<CMSCarousel[]>("/api/v1/admin/carousels", { token }),
   createCarousel: (token: string, payload: Partial<CMSCarousel>) =>

@@ -23,6 +23,13 @@ export type Market = {
   tags?: string[];
 };
 
+export type MarketPenalty = {
+  id: number;
+  market_id: number;
+  score: number;
+  reason: string;
+  created_at: string;
+};
 export type CommerceCategory = {
   id: number;
   parent_id?: number;
