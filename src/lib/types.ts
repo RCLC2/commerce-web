@@ -29,8 +29,11 @@ export type CommerceCategory = {
   name: string;
   slug: string;
   href: string;
+  depth: number;
+  level: number;
   sort_order: number;
   category_ids?: number[];
+  children?: CommerceCategory[];
 };
 
 export type Metric = {
@@ -338,4 +341,65 @@ export type CommerceEvent = {
   status: "ACTIVE" | "ENDED" | string;
   starts_at: string;
   ends_at: string;
+};
+
+export type Notification = {
+  id: number;
+  user_id?: number;
+  title?: string;
+  message?: string;
+  content?: string;
+  type?: string;
+  is_read?: boolean;
+  read_at?: string;
+  created_at?: string;
+};
+
+export type Recommendation = {
+  id?: number;
+  user_id?: number;
+  product_id?: number;
+  product?: Product;
+  score?: number;
+  reason?: string;
+  created_at?: string;
+};
+
+export type SettlementSummary = {
+  market_id: number;
+  total_sales_amount?: number;
+  commission_amount?: number;
+  final_settlement_amount?: number;
+  pending_amount?: number;
+  paid_amount?: number;
+  [key: string]: unknown;
+};
+
+export type SettlementLine = {
+  id: number;
+  settlement_id?: number;
+  order_id?: number;
+  order_code?: string;
+  product_name?: string;
+  sales_amount?: number;
+  commission_amount?: number;
+  settlement_amount?: number;
+  status?: string;
+  created_at?: string;
+};
+
+export type SettlementAccount = {
+  market_id: number;
+  bank_name?: string;
+  account_number?: string;
+  account_holder?: string;
+  depositor_name?: string;
+  business_registration_number?: string;
+};
+
+export type SameDayDispatchAvailability = {
+  available: boolean;
+  cutoff_time?: string;
+  expected_shipping_date?: string;
+  reason?: string;
 };

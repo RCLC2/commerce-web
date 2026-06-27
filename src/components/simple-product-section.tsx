@@ -4,18 +4,22 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { ProductCard } from "./product-card";
 
+type ProductSectionKind = "catalog" | "popular" | "promotion" | "recommended";
+
 export function SimpleProductSection({
   title,
   description,
   query,
+  kind = "catalog",
 }: {
   title: string;
   description: string;
   query?: { q?: string; sort?: string };
+  kind?: ProductSectionKind;
 }) {
   const { data: products = [], isLoading } = useQuery({
-    queryKey: ["simple-products", title, query],
-    queryFn: () => api.listProducts(query),
+    queryKey: ["simple-products", kind, title, query],
+    queryFn: () => listSectionProducts(kind, query),
   });
 
   return (
@@ -30,4 +34,17 @@ export function SimpleProductSection({
       </div>
     </main>
   );
+}
+
+function listSectionProducts(kind: ProductSectionKind, query?: { q?: string; sort?: string }) {
+  if (kind === "popular") {
+    return api.listPopularProducts();
+  }
+  if (kind === "promotion") {
+    return api.listPromotionProducts();
+  }
+  if (kind === "recommended") {
+    return api.listRecommendedProducts();
+  }
+  return api.listProducts(query);
 }

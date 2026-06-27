@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { firstOrderItem, orderStatusLabel } from "@/lib/order-utils";
 import { useSessionStore } from "@/lib/session-store";
-import type { OrderResponse, Product, ProductOption } from "@/lib/types";
+import type { CommerceCategory, OrderResponse, Product, ProductOption } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import {
   ConsoleHeader,
@@ -200,12 +200,28 @@ export function SellerProductsPage() {
   const [status, setStatus] = useState("ALL");
   const [shipping, setShipping] = useState("ALL");
   const [managedProducts, setManagedProducts] = useState<Record<number, ProductEditState>>({});
+  const [createForm, setCreateForm] = useState<ProductCreateState>(() => emptyProductCreateForm());
   const { data = [] } = useQuery({ queryKey: ["seller-products", sellerContextMarketID], queryFn: () => api.sellerProducts(token ?? "", sellerContextMarketID), enabled: Boolean(token) });
+  const { data: categories = [] } = useQuery({ queryKey: ["seller-product-categories"], queryFn: api.listCategories, enabled: Boolean(token) });
+  const marketID = sellerContextMarketID ?? data[0]?.market_id;
   const saveProduct = useMutation({
     mutationFn: (product: Product) => api.updateSellerProduct(token ?? "", product),
     onSuccess: () => {
       setManagedProducts({});
       void queryClient.invalidateQueries({ queryKey: ["seller-products", sellerContextMarketID] });
+    },
+  });
+  const createProduct = useMutation({
+    mutationFn: () => {
+      if (!marketID) {
+        throw new Error("Market is required.");
+      }
+      return api.createSellerProduct(token ?? "", productCreatePayload(createForm, marketID, categories));
+    },
+    onSuccess: () => {
+      setCreateForm(emptyProductCreateForm());
+      void queryClient.invalidateQueries({ queryKey: ["seller-products", sellerContextMarketID] });
+      void queryClient.invalidateQueries({ queryKey: ["admin-products"] });
     },
   });
   const sellerName = useSellerContextName() ?? data[0]?.market_name ?? "셀러 마켓";
@@ -223,6 +239,8 @@ export function SellerProductsPage() {
     return matchesQuery && matchesStatus && matchesShipping;
   });
   const totalStock = data.reduce((sum, product) => sum + productStock(product), 0);
+  const categoryOptions = productCategoryOptions(categories);
+  const selectedCategoryID = createForm.categoryID || String(categoryOptions[0]?.id ?? "");
 
   function updateProductEdit(product: Product, patch: Partial<ProductEditState>) {
     setManagedProducts((current) => ({
@@ -257,6 +275,29 @@ export function SellerProductsPage() {
           ]}
         />
       </div>
+      <ConsoleSection className="mt-5" title="New product" description="Register a product through POST /api/v1/products.">
+        <div className="grid gap-3 lg:grid-cols-[1.1fr_0.9fr_120px_120px]">
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none focus:border-foreground" value={createForm.name} onChange={(event) => setCreateForm((current) => ({ ...current, name: event.target.value }))} placeholder="Product name" aria-label="Product name" />
+          <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={selectedCategoryID} onChange={(event) => setCreateForm((current) => ({ ...current, categoryID: event.target.value }))} aria-label="Category">
+            {categoryOptions.map((category) => (<option key={category.id} value={category.id}>{categoryPathLabel(category, categoryOptions)}</option>))}
+          </select>
+          <input type="number" min={0} className="h-11 rounded-md border border-line px-3 text-sm outline-none focus:border-foreground" value={createForm.basePrice} onChange={(event) => setCreateForm((current) => ({ ...current, basePrice: event.target.value }))} placeholder="Price" aria-label="Price" />
+          <input type="number" min={0} className="h-11 rounded-md border border-line px-3 text-sm outline-none focus:border-foreground" value={createForm.optionQuantity} onChange={(event) => setCreateForm((current) => ({ ...current, optionQuantity: event.target.value }))} placeholder="Stock" aria-label="Stock" />
+        </div>
+        <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr_130px_130px]">
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none focus:border-foreground" value={createForm.imageURL} onChange={(event) => setCreateForm((current) => ({ ...current, imageURL: event.target.value }))} placeholder="Image URL" aria-label="Image URL" />
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none focus:border-foreground" value={createForm.optionValue} onChange={(event) => setCreateForm((current) => ({ ...current, optionValue: event.target.value }))} placeholder="Option value" aria-label="Option value" />
+          <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={createForm.shippingType} onChange={(event) => setCreateForm((current) => ({ ...current, shippingType: event.target.value }))} aria-label="Shipping type"><option value="NORMAL">NORMAL</option><option value="FREE">FREE</option></select>
+          <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={createForm.status} onChange={(event) => setCreateForm((current) => ({ ...current, status: event.target.value }))} aria-label="Status"><option value="SELLING">SELLING</option><option value="SOLD_OUT">SOLD_OUT</option></select>
+        </div>
+        <textarea className="mt-3 min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-foreground" value={createForm.description} onChange={(event) => setCreateForm((current) => ({ ...current, description: event.target.value }))} placeholder="Description" aria-label="Description" />
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <Button disabled={!createForm.name.trim() || !selectedCategoryID || !marketID || createProduct.isPending} onClick={() => createProduct.mutate()}>{createProduct.isPending ? "Saving" : "Create product"}</Button>
+          <Button variant="secondary" onClick={() => setCreateForm(emptyProductCreateForm())}>Reset</Button>
+          {createProduct.error ? <p className="text-sm font-bold text-brand">{createProduct.error.message}</p> : null}
+          {createProduct.isSuccess ? <p className="text-sm font-bold text-brand">Created.</p> : null}
+        </div>
+      </ConsoleSection>
       <ConsoleSection
         className="mt-5"
         title="상품 목록"
@@ -820,6 +861,83 @@ type ProductEditState = {
   shippingType: string;
   options: ProductOption[];
 };
+
+type ProductCreateState = {
+  name: string;
+  categoryID: string;
+  basePrice: string;
+  discountPrice: string;
+  shippingType: string;
+  status: string;
+  imageURL: string;
+  description: string;
+  optionName: string;
+  optionValue: string;
+  optionQuantity: string;
+};
+
+function emptyProductCreateForm(): ProductCreateState {
+  return {
+    name: "",
+    categoryID: "",
+    basePrice: "",
+    discountPrice: "0",
+    shippingType: "NORMAL",
+    status: "SELLING",
+    imageURL: "",
+    description: "",
+    optionName: "Default",
+    optionValue: "FREE",
+    optionQuantity: "0",
+  };
+}
+
+function productCreatePayload(form: ProductCreateState, marketID: number, categories: CommerceCategory[]): Product {
+  const categoryID = Number(form.categoryID) || productCategoryOptions(categories)[0]?.id || 0;
+  return {
+    id: 0,
+    market_id: marketID,
+    category_id: categoryID,
+    name: form.name.trim(),
+    description: JSON.stringify({ text: form.description.trim() }),
+    base_price: Math.max(0, Number(form.basePrice) || 0),
+    discount_price: Math.max(0, Number(form.discountPrice) || 0),
+    shipping_type: form.shippingType,
+    popularity_score: 0,
+    status: form.status,
+    image_url: form.imageURL.trim() || undefined,
+    options: [
+      {
+        id: 0,
+        product_id: 0,
+        option_name: form.optionName.trim() || "Default",
+        option_value: form.optionValue.trim() || "FREE",
+        additional_price: 0,
+        quantity: Math.max(0, Number(form.optionQuantity) || 0),
+        is_active: true,
+      },
+    ],
+  };
+}
+
+function productCategoryOptions(categories: CommerceCategory[]) {
+  return [...categories].sort((a, b) => a.level - b.level || a.sort_order - b.sort_order || a.id - b.id);
+}
+
+function categoryPathLabel(category: CommerceCategory, categories: CommerceCategory[]) {
+  const byID = new Map(categories.map((item) => [item.id, item]));
+  const names = [category.name];
+  let parentID = category.parent_id;
+  while (parentID) {
+    const parent = byID.get(parentID);
+    if (!parent) {
+      break;
+    }
+    names.unshift(parent.name);
+    parentID = parent.parent_id;
+  }
+  return names.join(" > ");
+}
 
 function productEditState(product: Product, state?: ProductEditState): ProductEditState {
   return state ?? {
