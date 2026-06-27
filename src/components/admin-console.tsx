@@ -399,12 +399,12 @@ export function AdminOrdersPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("ALL");
   const { data = [] } = useQuery({ queryKey: ["admin-orders"], queryFn: () => api.adminOrders(effectiveToken), enabled: Boolean(token) });
-  const forceCancel = useMutation({
+  const cancelOrder = useMutation({
     mutationFn: () => {
       if (!selectedOrderCode) {
         throw new Error("취소할 주문을 선택해 주세요.");
       }
-      return api.forceCancelOrder(effectiveToken, selectedOrderCode, { reason });
+      return api.cancelOrder(effectiveToken, selectedOrderCode, { reason });
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-orders"] }),
   });
@@ -422,7 +422,7 @@ export function AdminOrdersPage() {
   return (
     <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <ConsoleHeader title="주문 관리" description="주문 상태, 결제 금액, 배송지 정보를 보고 민감 작업은 사유와 함께 기록합니다." />
-      <ConsoleSection className="mt-5" title="주문 강제 취소" description="강제 취소는 감사 로그 대상 작업입니다. 실제 연결 시 주문 선택과 권한 검증이 필요합니다.">
+      <ConsoleSection className="mt-5" title="주문 취소" description="결제/혜택/재고 보상 흐름이 연결된 관리자 주문 취소입니다. 배송 시작 이후 주문은 서버 정책에 따라 차단됩니다.">
         <div className="flex flex-col gap-2 md:flex-row">
           <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={selectedOrderCode} onChange={(event) => setSelectedOrderCode(event.target.value)}>
             <option value="">주문 선택</option>
@@ -432,14 +432,14 @@ export function AdminOrdersPage() {
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             className="h-11 flex-1 rounded-md border border-line px-3 text-sm outline-none"
-            aria-label="주문 강제 취소 사유"
+            aria-label="주문 취소 사유"
           />
-          <Button disabled={!reason || forceCancel.isPending} onClick={() => forceCancel.mutate()}>
-            {forceCancel.isPending ? "처리 중" : "강제 취소 기록"}
+          <Button disabled={!reason || cancelOrder.isPending} onClick={() => cancelOrder.mutate()}>
+            {cancelOrder.isPending ? "처리 중" : "주문 취소"}
           </Button>
         </div>
-        {forceCancel.data ? <p className="mt-3 text-sm font-bold text-brand">감사 로그에 작업을 기록했습니다.</p> : null}
-        {forceCancel.error ? <p className="mt-3 text-sm font-bold text-brand">{forceCancel.error.message}</p> : null}
+        {cancelOrder.data ? <p className="mt-3 text-sm font-bold text-brand">주문 취소를 요청했습니다.</p> : null}
+        {cancelOrder.error ? <p className="mt-3 text-sm font-bold text-brand">{cancelOrder.error.message}</p> : null}
       </ConsoleSection>
       <ConsoleSection className="mt-5" title="주문 목록">
         <FilterPanel>

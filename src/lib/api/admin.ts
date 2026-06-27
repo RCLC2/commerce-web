@@ -3,8 +3,8 @@ import type { AdminDashboard, AuditLog, CMSCarousel, Coupon, Market, MemberProfi
 
 export const adminApi = {
   adminDashboard: (token: string) => request<AdminDashboard>("/api/v1/admin/dashboard", { token }),
-  adminMembers: (token: string) => request<MemberProfile[]>("/api/v1/admin/members", { token }),
-  adminMember: (token: string, memberID: number) => request<MemberProfile>(`/api/v1/admin/members/${memberID}`, { token }),
+  adminMembers: (token: string) => request<unknown[]>("/api/v1/admin/members", { token }).then((items) => items.map(normalizeMember)),
+  adminMember: (token: string, memberID: number) => request<unknown>(`/api/v1/admin/members/${memberID}`, { token }).then(normalizeMember),
   updateMemberStatus: (token: string, memberID: number, payload: { status: string; reason?: string }) =>
     request<{ status: string }>(`/api/v1/admin/members/${memberID}/status`, {
       method: "POST",
@@ -117,3 +117,27 @@ export const adminApi = {
       body: JSON.stringify(payload),
     }),
 };
+
+function normalizeMember(raw: unknown): MemberProfile {
+  const record = typeof raw === "object" && raw !== null ? raw as Record<string, unknown> : {};
+  return {
+    id: numberValue(record.id ?? record.ID),
+    user_name: stringValue(record.user_name ?? record.UserName ?? record.Email),
+    email: stringValue(record.email ?? record.Email),
+    role: stringValue(record.role ?? record.type ?? record.Role ?? record.Type, "MEMBER"),
+    status: stringValue(record.status ?? record.Status, "ACTIVE"),
+    notification_type: stringValue(record.notification_type ?? record.NotificationType, "PUSH"),
+    marketing_consent: Boolean(record.marketing_consent ?? record.MarketingConsent),
+    nighttime_consent: Boolean(record.nighttime_consent ?? record.NighttimeConsent),
+    point_balance: numberValue(record.point_balance ?? record.PointBalance),
+    created_at: stringValue(record.created_at ?? record.CreatedAt, new Date().toISOString()),
+  };
+}
+
+function stringValue(value: unknown, fallback = "") {
+  return typeof value === "string" && value ? value : fallback;
+}
+
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}

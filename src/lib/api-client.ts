@@ -19,19 +19,42 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     headers,
   });
 
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `API request failed: ${response.status}`);
-  }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
   const text = await response.text();
-  if (!text) {
+
+  if (!response.ok) {
+    throw new Error(apiErrorMessage(text) || `API request failed: ${response.status}`);
+  }
+
+  if (response.status === 204 || !text) {
     return undefined as T;
   }
 
-  return JSON.parse(text) as T;
+  return unwrapApiResponse(JSON.parse(text)) as T;
+}
+
+function unwrapApiResponse(value: unknown) {
+  if (!isRecord(value) || typeof value.success !== "boolean") {
+    return value;
+  }
+  if (!value.success) {
+    const error = isRecord(value.error) ? value.error : {};
+    throw new Error(String(error.message ?? error.detail ?? "API request failed"));
+  }
+  return value.data;
+}
+
+function apiErrorMessage(text: string) {
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    if (isRecord(parsed) && isRecord(parsed.error)) {
+      return String(parsed.error.message ?? parsed.error.detail ?? text);
+    }
+  } catch {
+    return text;
+  }
+  return text;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

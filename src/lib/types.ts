@@ -186,7 +186,12 @@ export type Address = {
 export type LoginResponse = {
   memberID: number;
   role: string;
+  type?: string;
   accessToken: string;
+  member?: {
+    role?: string;
+    type?: string;
+  };
 };
 
 export type CartItem = {
