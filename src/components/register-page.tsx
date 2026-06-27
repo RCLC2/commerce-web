@@ -30,7 +30,7 @@ export function RegisterPage() {
     },
   });
   const register = useMutation({
-    mutationFn: api.register,
+    mutationFn: api.signup,
     onSuccess: () => router.push("/login"),
   });
 

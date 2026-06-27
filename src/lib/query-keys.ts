@@ -1,10 +1,11 @@
 export const queryKeys = {
   events: ["events"] as const,
   categories: ["categories"] as const,
+  categoryTree: ["category-tree"] as const,
   products: (params?: { categoryID?: number; sort?: string; q?: string }) => ["products", params] as const,
   product: (id: number) => ["product", id] as const,
   productReviews: (id: number) => ["product-reviews", id] as const,
-  personalizedProducts: ["personalized-products"] as const,
+  personalizedProducts: (params?: { sort?: string }) => ["personalized-products", params] as const,
   me: (token: string) => ["me", token] as const,
   homeMe: (token: string | null | undefined) => ["home-me", token] as const,
   orders: (token: string) => ["orders", token] as const,

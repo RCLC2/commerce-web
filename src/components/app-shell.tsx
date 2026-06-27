@@ -47,6 +47,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isActive = (href: string) => (href === "/" ? pathname === href : pathname.startsWith(href));
   const showSuggestions = searchFocused && suggestions.length > 0;
   const searchPage = pathname.startsWith("/search");
+  const rootCategories = categories.filter((category) => !category.parent_id && category.level === 1);
 
   useEffect(() => {
     hydrateSession();
@@ -167,7 +168,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 상품 카테고리
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
-                {categories.slice(0, 6).map((category) => (
+                {rootCategories.slice(0, 6).map((category) => (
                   <Link
                     key={category.id}
                     href={category.href}

@@ -1,22 +1,28 @@
 import { request } from "../api-client";
 import type { LoginResponse, MemberProfile } from "../types";
 
-export const authApi = {
-  login: (payload: { email: string; password: string }) =>
-    request<LoginResponse>("/api/v1/auth/login", {
+const signIn = (payload: { email: string; password: string }) =>
+    request<LoginResponse>("/api/v1/auth/signin", {
       method: "POST",
       body: JSON.stringify(payload),
-    }),
-  register: (payload: {
+    });
+
+const signUp = (payload: {
     email: string;
     password: string;
     marketingConsent: boolean;
     nighttimeConsent: boolean;
   }) =>
-    request<{ id: number }>("/api/v1/auth/register", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
+  request<{ id: number }>("/api/v1/auth/signup", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const authApi = {
+  signin: signIn,
+  login: signIn,
+  signup: signUp,
+  register: signUp,
   me: (token: string) => request<MemberProfile>("/api/v1/me", { token }),
   updateMe: (
     token: string,

@@ -1,5 +1,5 @@
 import { request } from "../api-client";
-import type { CommerceCategory, CommerceEvent, Market, Product, Review } from "../types";
+import type { CMSCarousel, CommerceCategory, CommerceEvent, Market, Product, Review } from "../types";
 
 type ProductDetailResponse = {
   product?: Product;
@@ -12,6 +12,7 @@ type ProductDetailResponse = {
 export const catalogApi = {
   listMarkets: () => request<Market[]>("/api/v1/markets"),
   listCategories: () => request<CommerceCategory[]>("/api/v1/categories"),
+  listCategoryTree: () => request<CommerceCategory[]>("/api/v1/categories/tree"),
   getMarket: (id: number) => request<Market>(`/api/v1/markets/${id}`),
   listEvents: () => request<CommerceEvent[]>("/api/v1/events"),
   getEvent: (id: number) => request<CommerceEvent>(`/api/v1/events/${id}`),
@@ -29,8 +30,14 @@ export const catalogApi = {
     const query = search.toString();
     return request<Product[]>(`/api/v1/products${query ? `?${query}` : ""}`);
   },
+  listPopularProducts: () => request<Product[]>("/api/v1/products/popular"),
+  listPromotionProducts: () => request<Product[]>("/api/v1/products/promotions"),
+  listRecommendedProducts: () => request<Product[]>("/api/v1/products/recommendations"),
+  listLatestProducts: () => request<Product[]>("/api/v1/products/latest"),
   getProduct: (id: number) => request<Product | ProductDetailResponse>(`/api/v1/products/${id}`).then(normalizeProductDetail),
   getProductReviews: (id: number) => request<Review[]>(`/api/v1/products/${id}/reviews`),
+  listActiveCarousels: () => request<CMSCarousel[]>("/api/v1/carousels/active"),
+  recordCampaignClick: (campaignID: number) => request<{ status: string }>(`/api/v1/cms/campaigns/${campaignID}/click`, { method: "POST" }),
 };
 
 function normalizeProductDetail(payload: Product | ProductDetailResponse): Product {
