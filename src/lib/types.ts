@@ -124,11 +124,43 @@ export type MemberProfile = {
 export type Review = {
   id: number;
   product_id: number;
-  member_id: number;
-  order_id: number;
+  option_id?: number;
+  member_id?: number;
+  order_id?: number;
+  order_line_item_id?: number;
+  rating_x2?: number;
   rating: number;
   content: string;
+  is_photo_review?: boolean;
+  image_count?: number;
+  status?: string;
+  images?: ReviewImage[];
   created_at: string;
+  updated_at?: string;
+};
+
+export type ReviewImage = {
+  id: number;
+  media_asset_id: number;
+  url?: string;
+  detail_url?: string;
+  thumbnail_url?: string;
+  sort_order: number;
+  is_representative: boolean;
+  content_type: string;
+  size_bytes: number;
+};
+
+export type MediaImageDomain = string;
+
+export type MediaImageUpload = {
+  s3_key: string;
+  object_key?: string;
+  upload_url: string;
+  headers: Record<string, string>;
+  expires_at: string;
+  content_type: string;
+  size_bytes: number;
 };
 
 export type Coupon = {
@@ -240,7 +272,11 @@ export type CreateReviewResponse = {
   rating_x2: number;
   rating: number;
   content: string;
+  height_at_time?: number | null;
+  weight_at_time?: number | null;
+  is_photo_review: boolean;
   status: string;
+  images: ReviewImage[];
   created_at: string;
 };
 

@@ -73,6 +73,7 @@ npm run start
 - `/register`: customer/seller registration
 - `/mypage`: profile summary and order history
 - `/mypage/profile`: profile edit UI
+- `/mypage/reviews`: written review management
 
 ## Planned Console Routes
 
@@ -100,6 +101,8 @@ Currently wired in the API client:
 - `GET /api/v1/products`
 - `GET /api/v1/products/:id`
 - `GET /api/v1/products/:id/reviews`
+- `POST /api/v1/media/images/presign`
+- `POST /api/v1/media/images/complete`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/register`
 - `GET /api/v1/me`
@@ -110,6 +113,10 @@ Currently wired in the API client:
 - `POST /api/v1/orders`
 - `GET /api/v1/orders`
 - `GET /api/v1/orders/:orderCode`
+- `POST /api/v1/orders/:orderCode/items/:itemID/reviews`
+- `GET /api/v1/me/reviews`
+- `PATCH /api/v1/reviews/:reviewID`
+- `DELETE /api/v1/reviews/:reviewID`
 - `POST /api/v1/orders/:orderCode/complete-payment`
 - `GET /api/v1/seller/dashboard`
 - `GET /api/v1/seller/products`

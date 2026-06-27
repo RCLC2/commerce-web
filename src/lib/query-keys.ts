@@ -9,6 +9,7 @@ export const queryKeys = {
   me: (token: string) => ["me", token] as const,
   homeMe: (token: string | null | undefined) => ["home-me", token] as const,
   orders: (token: string) => ["orders", token] as const,
+  myReviews: (token: string) => ["my-reviews", token] as const,
   coupons: (token: string) => ["coupons", token] as const,
   issuableCoupons: (token: string) => ["issuable-coupons", token] as const,
   addresses: (token: string) => ["addresses", token] as const,

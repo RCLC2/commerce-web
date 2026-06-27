@@ -1,6 +1,12 @@
 import { request } from "../api-client";
 import type { Address, CartItem, Coupon, CreateReviewResponse, Notification, OrderResponse, Recommendation, Review, SettlementSummary, TrackingInfo } from "../types";
 
+export type CreateOrderLineReviewPayload = {
+  rating_x2: number;
+  content: string;
+  images?: { s3_key?: string; object_key?: string; sort_order: number; is_representative: boolean }[];
+};
+
 export const customerApi = {
   addCartItem: (token: string, payload: { product_id: number; option_id: number; quantity: number }) =>
     request<{ status: string }>("/api/v1/cart/items", {
@@ -34,13 +40,14 @@ export const customerApi = {
     return request<OrderResponse[]>(`/api/v1/orders${suffix}`, { token });
   },
   getOrder: (token: string, orderCode: string) => request<OrderResponse>(`/api/v1/orders/${orderCode}`, { token }),
+  listMyReviews: (token: string) => request<Review[]>("/api/v1/me/reviews", { token }),
   confirmPurchase: (token: string, orderCode: string, itemID: number) =>
     request<OrderResponse>(`/api/v1/orders/${orderCode}/items/${itemID}/confirm-purchase`, { method: "POST", token }),
   createPaymentCheckout: (token: string, orderCode: string) =>
     request<{ checkout_url?: string; url?: string }>(`/api/v1/orders/${orderCode}/payment-checkout`, { method: "POST", token }),
   trackDelivery: (token: string, orderCode: string, deliveryID: number) =>
     request<TrackingInfo>(`/api/v1/orders/${orderCode}/deliveries/${deliveryID}/track`, { method: "POST", token }),
-  createOrderLineReview: (token: string, orderCode: string, itemID: number, payload: { rating_x2: number; content: string }) =>
+  createOrderLineReview: (token: string, orderCode: string, itemID: number, payload: CreateOrderLineReviewPayload) =>
     request<CreateReviewResponse>(`/api/v1/orders/${orderCode}/items/${itemID}/reviews`, {
       method: "POST",
       token,
