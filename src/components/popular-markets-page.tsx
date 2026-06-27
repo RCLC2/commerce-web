@@ -24,7 +24,7 @@ export function PopularMarketsPage() {
             <div className="p-4">
               <h2 className="font-black">{market.name}</h2>
               <p className="mt-1 line-clamp-2 text-sm text-muted">{market.description}</p>
-              <p className="mt-3 text-xs font-bold text-brand">{market.follower_count.toLocaleString("ko-KR")} followers</p>
+              <p className="mt-3 text-xs font-bold text-brand">{market.follower_count?.toLocaleString("ko-KR") ?? "-"} followers</p>
             </div>
           </Link>
         ))}

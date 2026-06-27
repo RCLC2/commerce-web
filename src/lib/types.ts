@@ -5,26 +5,35 @@ export type ProductOption = {
   option_value: string;
   additional_price: number;
   quantity: number;
+  reserved_quantity?: number;
+  safety_quantity?: number;
   is_active: boolean;
 };
 
 export type Market = {
   id: number;
+  member_id?: number;
   name: string;
   description: string;
-  profile_image_url: string;
-  cover_image_url: string;
-  follower_count: number;
+  business_number?: string;
+  profile_image_url?: string;
+  cover_image_url?: string;
+  follower_count?: number;
   status: "ACTIVE" | "PENDING" | "SUSPENDED" | string;
-  tags: string[];
+  tags?: string[];
 };
 
 export type CommerceCategory = {
   id: number;
+  parent_id?: number;
   name: string;
   slug: string;
   href: string;
+  depth: number;
+  level: number;
   sort_order: number;
+  category_ids?: number[];
+  children?: CommerceCategory[];
 };
 
 export type Metric = {
@@ -60,6 +69,9 @@ export type Product = {
   base_price: number;
   discount_price: number;
   shipping_type: "NORMAL" | "FREE" | string;
+  delivery_type?: string;
+  delivery_label?: string;
+  today_shipping_available?: boolean;
   popularity_score: number;
   status: "SELLING" | "SOLD_OUT" | string;
   options?: ProductOption[];
@@ -112,11 +124,43 @@ export type MemberProfile = {
 export type Review = {
   id: number;
   product_id: number;
-  member_id: number;
-  order_id: number;
+  option_id?: number;
+  member_id?: number;
+  order_id?: number;
+  order_line_item_id?: number;
+  rating_x2?: number;
   rating: number;
   content: string;
+  is_photo_review?: boolean;
+  image_count?: number;
+  status?: string;
+  images?: ReviewImage[];
   created_at: string;
+  updated_at?: string;
+};
+
+export type ReviewImage = {
+  id: number;
+  media_asset_id: number;
+  url?: string;
+  detail_url?: string;
+  thumbnail_url?: string;
+  sort_order: number;
+  is_representative: boolean;
+  content_type: string;
+  size_bytes: number;
+};
+
+export type MediaImageDomain = string;
+
+export type MediaImageUpload = {
+  s3_key: string;
+  object_key?: string;
+  upload_url: string;
+  headers: Record<string, string>;
+  expires_at: string;
+  content_type: string;
+  size_bytes: number;
 };
 
 export type Coupon = {
@@ -163,7 +207,6 @@ export type CartItem = {
 export type OrderResponse = {
   id: number;
   order_code: string;
-  orderCode?: string;
   member_id?: number;
   total_order_price: number;
   total_discount_price: number;
@@ -174,15 +217,8 @@ export type OrderResponse = {
   status: string;
   ordered_at?: string;
   shipping_address?: Address;
-  delivery_id?: number;
-  delivery?: {
-    id?: number;
-    carrier?: string;
-    tracking_number?: string;
-  };
-  carrier?: string;
-  tracking_number?: string;
   market_orders?: MarketOrderResponse[];
+  delivery?: Delivery;
 };
 
 export type MarketOrderResponse = {
@@ -194,6 +230,17 @@ export type MarketOrderResponse = {
   line_items: OrderLineItemResponse[];
 };
 
+export type Delivery = {
+  id: number;
+  order_id: number;
+  tracking_number?: string;
+  carrier?: string;
+  status: "PENDING" | "SHIPPING" | "DELIVERED" | "CANCELLED" | string;
+  receiver_name?: string;
+  receiver_phone?: string;
+  address?: string;
+};
+
 export type OrderLineItemResponse = {
   id: number;
   cart_id?: number;
@@ -202,7 +249,40 @@ export type OrderLineItemResponse = {
   quantity: number;
   price: number;
   status: string;
+  reviewable?: boolean;
+  purchase_confirmed_at?: string;
   product?: Product;
+};
+
+export type TrackingInfo = {
+  CarrierCode?: string;
+  carrier_code?: string;
+  Invoice?: string;
+  invoice?: string;
+  Status?: string;
+  status?: string;
+  Location?: string;
+  location?: string;
+  Description?: string;
+  description?: string;
+};
+
+export type CreateReviewResponse = {
+  id: number;
+  product_id: number;
+  option_id: number;
+  member_id: number;
+  order_id: number;
+  order_line_item_id: number;
+  rating_x2: number;
+  rating: number;
+  content: string;
+  height_at_time?: number | null;
+  weight_at_time?: number | null;
+  is_photo_review: boolean;
+  status: string;
+  images: ReviewImage[];
+  created_at: string;
 };
 
 export type InventorySource = {
@@ -210,20 +290,49 @@ export type InventorySource = {
   market_id: number;
   provider: "SHOPIFY" | "CAFE24" | string;
   display_name: string;
-  name?: string;
   shop_name?: string;
-  status: "ACTIVE" | "FAILED" | "PAUSED" | string;
+  status: "ACTIVE" | "FAILED" | "PAUSED" | "INACTIVE" | string;
+  access_token_expires_at?: string;
+  refresh_token_expires_at?: string;
   last_synced_at?: string;
+  updated_at?: string;
+};
+
+export type InventorySourceForm = {
+  market_id: number;
+  provider: "SHOPIFY" | "CAFE24" | string;
+  display_name: string;
+  shop_name: string;
+  access_token: string;
+  refresh_token?: string;
+  client_id?: string;
+  client_secret?: string;
+  webhook_secret?: string;
+};
+
+export type ExternalInventoryMapping = {
+  id: number;
+  inventory_source_id: number;
+  provider: string;
+  product_option_id: number;
+  external_product_id?: string;
+  external_variant_id?: string;
+  external_inventory_item_id?: string;
+  external_location_id?: string;
+  disconnect_if_necessary?: boolean;
+  created_at?: string;
 };
 
 export type InventorySyncLog = {
   id: number;
-  source_id: number;
-  product_id: number;
-  option_id: number;
+  provider?: string;
   product_option_id?: number;
+  external_reference?: string;
+  previous_quantity?: number;
+  new_quantity?: number;
   status: "SUCCESS" | "FAILED" | string;
-  message: string;
+  error_message?: string;
+  message?: string;
   created_at: string;
 };
 
@@ -242,9 +351,10 @@ export type AuditLog = {
   id: number;
   admin_id: number;
   target_type: string;
-  target_id: number;
+  target_id?: number;
+  settlement_id?: number;
   action: string;
-  reason: string;
+  reason?: string;
   created_at: string;
 };
 
@@ -252,6 +362,13 @@ export type CMSCarousel = {
   id: number;
   title: string;
   image_url: string;
+  target_type?: "PRODUCT" | "MARKET" | "URL" | string;
+  target_id?: number;
+  display_order?: number;
+  is_active?: boolean;
+  starts_at?: string;
+  ends_at?: string;
+  created_at?: string;
   link_url: string;
   status: "ACTIVE" | "INACTIVE" | string;
 };
@@ -265,4 +382,65 @@ export type CommerceEvent = {
   status: "ACTIVE" | "ENDED" | string;
   starts_at: string;
   ends_at: string;
+};
+
+export type Notification = {
+  id: number;
+  user_id?: number;
+  title?: string;
+  message?: string;
+  content?: string;
+  type?: string;
+  is_read?: boolean;
+  read_at?: string;
+  created_at?: string;
+};
+
+export type Recommendation = {
+  id?: number;
+  user_id?: number;
+  product_id?: number;
+  product?: Product;
+  score?: number;
+  reason?: string;
+  created_at?: string;
+};
+
+export type SettlementSummary = {
+  market_id: number;
+  total_sales_amount?: number;
+  commission_amount?: number;
+  final_settlement_amount?: number;
+  pending_amount?: number;
+  paid_amount?: number;
+  [key: string]: unknown;
+};
+
+export type SettlementLine = {
+  id: number;
+  settlement_id?: number;
+  order_id?: number;
+  order_code?: string;
+  product_name?: string;
+  sales_amount?: number;
+  commission_amount?: number;
+  settlement_amount?: number;
+  status?: string;
+  created_at?: string;
+};
+
+export type SettlementAccount = {
+  market_id: number;
+  bank_name?: string;
+  account_number?: string;
+  account_holder?: string;
+  depositor_name?: string;
+  business_registration_number?: string;
+};
+
+export type SameDayDispatchAvailability = {
+  available: boolean;
+  cutoff_time?: string;
+  expected_shipping_date?: string;
+  reason?: string;
 };

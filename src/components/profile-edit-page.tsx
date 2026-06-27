@@ -17,7 +17,7 @@ type ProfileForm = {
 export function ProfileEditPage() {
   const queryClient = useQueryClient();
   const token = useSessionStore((state) => state.accessToken);
-  const effectiveToken = token ?? (process.env.NEXT_PUBLIC_API_MOCKING === "enabled" ? "mock-access-token" : "");
+  const effectiveToken = token ?? "";
   const { data: profile } = useQuery({
     queryKey: ["me", effectiveToken],
     queryFn: () => api.me(effectiveToken),
@@ -48,7 +48,7 @@ export function ProfileEditPage() {
     },
   });
 
-  if (!token && process.env.NEXT_PUBLIC_API_MOCKING !== "enabled") {
+  if (!token) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-16">
         <h1 className="text-2xl font-black">로그인이 필요합니다</h1>
@@ -62,7 +62,7 @@ export function ProfileEditPage() {
   return (
     <main className="mx-auto max-w-2xl px-4 pb-24 pt-8">
       <h1 className="text-2xl font-black">내 정보 변경</h1>
-      <p className="mt-1 text-sm text-muted">현재 백엔드에는 프로필 변경 라우트가 없어 MSW 계약으로 먼저 연결했습니다.</p>
+      <p className="mt-1 text-sm text-muted">저장된 회원 정보를 수정합니다.</p>
       <form className="mt-6 rounded-md border border-line bg-white p-5" onSubmit={form.handleSubmit((values) => update.mutate(values))}>
         <label className="block">
           <span className="text-sm font-bold">알림 방식</span>

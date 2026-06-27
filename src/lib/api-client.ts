@@ -19,16 +19,17 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     headers,
   });
 
+  const text = await response.text();
+
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(apiErrorMessage(message) || `API request failed: ${response.status}`);
+    throw new Error(apiErrorMessage(text) || `API request failed: ${response.status}`);
   }
 
-  if (response.status === 204) {
+  if (response.status === 204 || !text) {
     return undefined as T;
   }
 
-  return unwrapApiResponse(await response.json()) as T;
+  return unwrapApiResponse(JSON.parse(text)) as T;
 }
 
 function unwrapApiResponse(value: unknown) {

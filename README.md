@@ -7,7 +7,7 @@ Repository: [RCLC2/commerce-web](https://github.com/RCLC2/commerce-web)
 ## Overview
 
 The app targets an Ably-inspired fashion commerce experience with a customer shopping app first, then seller and admin consoles.
-It is designed for Vercel deployment and can run locally either against the Go backend API or against MSW mock APIs.
+It is designed for Vercel deployment and always reads commerce data from the Go backend API.
 
 ## Stack
 
@@ -17,7 +17,6 @@ It is designed for Vercel deployment and can run locally either against the Go b
 - TanStack Query
 - Zustand
 - React Hook Form + Zod
-- MSW for local mock API
 - Vercel deployment ready
 
 ## Local Setup
@@ -39,20 +38,19 @@ Create `.env.local` from `.env.example`.
 
 ```bash
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
-NEXT_PUBLIC_API_MOCKING=enabled
 ```
 
-When `NEXT_PUBLIC_API_MOCKING=enabled`, MSW serves the same frontend API contracts without the backend server.
-For Vercel or real backend integration, set `NEXT_PUBLIC_API_BASE_URL` to the deployed API host and disable or unset `NEXT_PUBLIC_API_MOCKING`.
+The frontend always reads data from the configured backend API. It does not fall back to mock catalog, order, seller, or admin data.
 
 For production deployments, configure:
 
 ```bash
-NEXT_PUBLIC_API_BASE_URL=
-NEXT_PUBLIC_API_MOCKING=disabled
+NEXT_PUBLIC_API_BASE_URL=same-origin
+BACKEND_API_BASE_URL=http://awseb--AWSEB-25VUEV1O1LDt-1190913415.ap-northeast-2.elb.amazonaws.com
 ```
 
 `NEXT_PUBLIC_API_BASE_URL` may be provided with or without `http://`; the app normalizes it before making requests.
+Use `NEXT_PUBLIC_API_BASE_URL=same-origin` with `BACKEND_API_BASE_URL` when the frontend is served over HTTPS but the Elastic Beanstalk or ELB backend is still HTTP. In that mode, browser requests stay on the HTTPS frontend origin and Next.js rewrites `/api/v1/*` to the configured backend server-side.
 
 ## Scripts
 
@@ -69,12 +67,13 @@ npm run start
 - `/products`: PLP with search and sort controls
 - `/products/[id]`: PDP with image, option selection, reviews, add-to-cart
 - `/cart`: cart summary
-- `/checkout`: order sheet, coupon/point usage, mock payment completion
+- `/checkout`: order sheet, coupon/point usage, payment completion
 - `/orders/[orderCode]`: order detail
 - `/login`: login
 - `/register`: customer/seller registration
 - `/mypage`: profile summary and order history
 - `/mypage/profile`: profile edit UI
+- `/mypage/reviews`: written review management
 
 ## Planned Console Routes
 
@@ -96,12 +95,14 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for the phased pl
 
 ## API Coverage
 
-Currently wired in the API client and MSW:
+Currently wired in the API client:
 
 - `GET /api/v1/markets`
 - `GET /api/v1/products`
 - `GET /api/v1/products/:id`
 - `GET /api/v1/products/:id/reviews`
+- `POST /api/v1/media/images/presign`
+- `POST /api/v1/media/images/complete`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/register`
 - `GET /api/v1/me`
@@ -112,6 +113,10 @@ Currently wired in the API client and MSW:
 - `POST /api/v1/orders`
 - `GET /api/v1/orders`
 - `GET /api/v1/orders/:orderCode`
+- `POST /api/v1/orders/:orderCode/items/:itemID/reviews`
+- `GET /api/v1/me/reviews`
+- `PATCH /api/v1/reviews/:reviewID`
+- `DELETE /api/v1/reviews/:reviewID`
 - `POST /api/v1/orders/:orderCode/complete-payment`
 - `GET /api/v1/seller/dashboard`
 - `GET /api/v1/seller/products`
@@ -133,27 +138,8 @@ Currently wired in the API client and MSW:
 
 Notes:
 
-- `PATCH /api/v1/me` is currently a frontend/MSW contract. The backend route is not connected yet.
-- `GET /api/v1/markets` is currently a frontend/MSW contract for richer UI fixtures.
+- The frontend does not provide mock fallbacks. Empty catalog, category, seller, or admin screens reflect backend/database state.
 - Seller/admin API contracts are planned and documented but not fully implemented.
-- Seller/admin screens are available through MSW contracts first. Replace these contracts with real backend routes as they are connected.
-
-## Mock Data
-
-MSW includes:
-
-- 6 markets
-- 12 fashion products
-- Product options and inventory quantities
-- Reviews
-- Coupons
-- Cart item
-- Order list and order detail
-
-Mock definitions live in:
-
-- `src/mocks/mock-data.ts`
-- `src/mocks/handlers.ts`
 
 ## Backend Relationship
 
@@ -186,12 +172,8 @@ Do not assume the working tree has been committed. This project was intentionall
 Vercel environment variables:
 
 ```bash
-NEXT_PUBLIC_API_BASE_URL=
-NEXT_PUBLIC_API_MOCKING=disabled
+NEXT_PUBLIC_API_BASE_URL=same-origin
+BACKEND_API_BASE_URL=http://awseb--AWSEB-25VUEV1O1LDt-1190913415.ap-northeast-2.elb.amazonaws.com
 ```
 
-For demo deployments without a backend, set:
-
-```bash
-NEXT_PUBLIC_API_MOCKING=enabled
-```
+Demo and production deployments both require a reachable backend API and seeded database records.

@@ -23,13 +23,13 @@ export function LoginPage() {
   const form = useForm<LoginForm>({
     resolver: zodResolver(schema),
     defaultValues: {
-      email: "customer@commerce.test",
-      password: "password",
+      email: "",
+      password: "",
     },
   });
 
   const login = useMutation({
-    mutationFn: api.login,
+    mutationFn: api.signin,
     onSuccess: (data) => {
       setSession({ accessToken: data.accessToken, memberID: data.memberID, role: data.role });
       router.push("/mypage");
@@ -40,7 +40,7 @@ export function LoginPage() {
     <main className="mx-auto flex min-h-[calc(100vh-64px)] max-w-md items-center px-4 pb-24">
       <form className="w-full rounded-md border border-line bg-white p-5" onSubmit={form.handleSubmit((values) => login.mutate(values))}>
         <h1 className="text-2xl font-black">로그인</h1>
-        <p className="mt-2 text-sm text-muted">MSW 모드에서는 기본 계정으로 바로 로그인됩니다.</p>
+        <p className="mt-2 text-sm text-muted">등록된 계정으로 로그인합니다.</p>
         <div className="mt-6 space-y-4">
           <label className="block">
             <span className="text-sm font-bold">이메일</span>

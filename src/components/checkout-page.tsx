@@ -12,14 +12,14 @@ import { Button } from "./ui/button";
 export function CheckoutPage() {
   const router = useRouter();
   const token = useSessionStore((state) => state.accessToken);
-  const effectiveToken = token ?? (process.env.NEXT_PUBLIC_API_MOCKING === "enabled" ? "mock-access-token" : "");
-  const [usedPoint, setUsedPoint] = useState(1000);
-  const [couponID, setCouponID] = useState<number | undefined>(501);
+  const effectiveToken = token ?? "";
+  const [usedPoint, setUsedPoint] = useState(0);
+  const [couponID, setCouponID] = useState<number | undefined>();
   const [address, setAddress] = useState({
-    receiver: "김커머스",
-    phone: "010-1234-5678",
-    line1: "서울특별시 강남구 테헤란로 1",
-    line2: "101동 1001호",
+    receiver: "",
+    phone: "",
+    line1: "",
+    line2: "",
   });
 
   const { data: items = [] } = useQuery({
@@ -59,7 +59,7 @@ export function CheckoutPage() {
     mutationFn: (orderCode: string) =>
       api.completePayment(effectiveToken, orderCode, {
         payment_method: "CARD",
-        payment_key: `mock-${Date.now()}`,
+        payment_key: `frontend-${Date.now()}`,
         amount: payableAmount,
       }),
     onSuccess: (_, orderCode) => router.push(`/orders/${orderCode}`),
@@ -69,7 +69,7 @@ export function CheckoutPage() {
   const submitError = placeOrder.error?.message ?? completePayment.error?.message;
   const canPay = useMemo(() => Boolean(items.length > 0 && address.receiver && address.phone && address.line1), [address, items.length]);
 
-  if (!token && process.env.NEXT_PUBLIC_API_MOCKING !== "enabled") {
+  if (!token) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-16">
         <h1 className="text-2xl font-black">로그인이 필요합니다</h1>

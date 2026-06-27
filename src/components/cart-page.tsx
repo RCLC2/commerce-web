@@ -11,7 +11,7 @@ import { Button } from "./ui/button";
 export function CartPage() {
   const router = useRouter();
   const token = useSessionStore((state) => state.accessToken);
-  const effectiveToken = token ?? (process.env.NEXT_PUBLIC_API_MOCKING === "enabled" ? "mock-access-token" : "");
+  const effectiveToken = token ?? "";
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["cart", effectiveToken],
     queryFn: () => api.listCart(effectiveToken),
@@ -20,7 +20,7 @@ export function CartPage() {
 
   const total = items.reduce((sum, item) => sum + item.price_at_added * item.quantity, 0);
 
-  if (!token && process.env.NEXT_PUBLIC_API_MOCKING !== "enabled") {
+  if (!token) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-16">
         <h1 className="text-2xl font-black">로그인이 필요합니다</h1>

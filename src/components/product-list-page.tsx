@@ -5,7 +5,8 @@ import { Search, SlidersHorizontal, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import type { Product } from "@/lib/types";
+import { queryKeys } from "@/lib/query-keys";
+import type { CommerceCategory, Product } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import { ProductCard } from "./product-card";
 import { Button } from "./ui/button";
@@ -15,16 +16,6 @@ const sorts = [
   { label: "신상품", value: "new" },
   { label: "낮은 가격", value: "price-low" },
   { label: "높은 가격", value: "price-high" },
-];
-
-const categories = [
-  { label: "전체", value: "", ids: [] },
-  { label: "상의", value: "tops", ids: [11, 13] },
-  { label: "팬츠", value: "pants", ids: [12] },
-  { label: "원피스", value: "dress", ids: [15] },
-  { label: "아우터", value: "outer", ids: [16] },
-  { label: "가방", value: "bags", ids: [14] },
-  { label: "스커트", value: "skirts", ids: [17] },
 ];
 
 const priceRanges = [
@@ -40,6 +31,13 @@ function productPrice(product: Product) {
   return product.discount_price || product.base_price;
 }
 
+function categoryFilterIDs(category: CommerceCategory | undefined) {
+  if (!category) {
+    return [];
+  }
+  return category.category_ids?.length ? category.category_ids : [category.id];
+}
+
 export function ProductListPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -53,17 +51,28 @@ export function ProductListPage() {
   const tag = searchParams.get("tag") ?? "";
   const price = searchParams.get("price") ?? "";
   const [filtersOpen, setFiltersOpen] = useState(true);
-  const { data: products = [], isLoading, error } = useQuery({
-    queryKey: ["products", "catalog"],
-    queryFn: () => api.listProducts({ sort: "popular" }),
+  const { data: serverCategories = [] } = useQuery({
+    queryKey: queryKeys.categories,
+    queryFn: api.listCategories,
   });
+  const { data: products = [], isLoading, error } = useQuery({
+    queryKey: queryKeys.products({ sort }),
+    queryFn: () => api.listProducts({ sort }),
+  });
+
+  const categories = useMemo(
+    () => [...serverCategories].sort((a, b) => a.sort_order - b.sort_order),
+    [serverCategories],
+  );
 
   const markets = useMemo(
     () => Array.from(new Set(products.map((product) => product.market_name).filter((item): item is string => Boolean(item)))).sort(),
     [products],
   );
 
-  const selectedCategory = categories.find((item) => item.value === category) ?? categories[0];
+  const rootCategories = useMemo(() => categories.filter((item) => !item.parent_id && item.level === 1), [categories]);
+  const selectedCategory = categories.find((item) => item.slug === category);
+  const selectedCategoryIDs = useMemo(() => categoryFilterIDs(selectedCategory), [selectedCategory]);
   const selectedPrice = priceRanges.find((item) => item.value === price) ?? priceRanges[0];
 
   const filteredProducts = useMemo(() => {
@@ -75,7 +84,7 @@ export function ProductListPage() {
         product.description.toLowerCase().includes(query) ||
         product.tags?.some((item) => item.toLowerCase().includes(query)) ||
         product.market_name?.toLowerCase().includes(query);
-      const matchesCategory = !selectedCategory.ids.length || selectedCategory.ids.includes(product.category_id);
+      const matchesCategory = !selectedCategoryIDs.length || selectedCategoryIDs.includes(product.category_id);
       const matchesShipping = shipping !== "free" || product.shipping_type === "FREE";
       const matchesSale = sale !== "on" || product.discount_price < product.base_price;
       const matchesStock =
@@ -99,7 +108,7 @@ export function ProductListPage() {
       }
       return b.popularity_score - a.popularity_score;
     });
-  }, [market, products, q, sale, selectedCategory.ids, selectedPrice.max, selectedPrice.min, shipping, sort, stock, tag]);
+  }, [market, products, q, sale, selectedCategoryIDs, selectedPrice.max, selectedPrice.min, shipping, sort, stock, tag]);
 
   function updateSearch(next: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -118,7 +127,7 @@ export function ProductListPage() {
   }
 
   const activeFilters = [
-    selectedCategory.value ? `카테고리: ${selectedCategory.label}` : null,
+    selectedCategory ? `카테고리: ${selectedCategory.name}` : null,
     q ? `검색: ${q}` : null,
     market ? `마켓: ${market}` : null,
     selectedPrice.value ? selectedPrice.label : null,
@@ -132,7 +141,7 @@ export function ProductListPage() {
     <main className="mx-auto max-w-6xl px-4 pb-24 pt-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-black">{selectedCategory.value ? `${selectedCategory.label} 상품` : "상품"}</h1>
+          <h1 className="text-2xl font-black">{selectedCategory ? `${selectedCategory.name} 상품` : "상품"}</h1>
           <p className="mt-1 text-sm text-muted">
             {filteredProducts.length.toLocaleString("ko-KR")}개 상품을 필터 조건에 맞춰 보여드립니다.
           </p>
@@ -158,15 +167,23 @@ export function ProductListPage() {
       </div>
 
       <div className="mt-5 flex gap-2 overflow-x-auto border-b border-line pb-4">
-        {categories.map((item) => (
+        <button
+          className={`h-10 shrink-0 rounded-md px-4 text-sm font-bold ${
+            !selectedCategory ? "bg-foreground text-white" : "bg-white"
+          }`}
+          onClick={() => updateSearch({ category: undefined })}
+        >
+          전체
+        </button>
+        {rootCategories.map((item) => (
           <button
-            key={item.value || "all"}
+            key={item.id}
             className={`h-10 shrink-0 rounded-md px-4 text-sm font-bold ${
-              selectedCategory.value === item.value ? "bg-foreground text-white" : "bg-white"
+              selectedCategory?.id === item.id ? "bg-foreground text-white" : "bg-white"
             }`}
-            onClick={() => updateSearch({ category: item.value || undefined })}
+            onClick={() => updateSearch({ category: item.slug })}
           >
-            {item.label}
+            {item.name}
           </button>
         ))}
       </div>

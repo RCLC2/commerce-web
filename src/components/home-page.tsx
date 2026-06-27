@@ -14,7 +14,8 @@ import {
   Footprints,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import type { RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { queryKeys } from "@/lib/query-keys";
@@ -46,6 +47,7 @@ export function HomePage() {
   const [visibleCount, setVisibleCount] = useState(8);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const popularCarouselRef = useRef<HTMLDivElement | null>(null);
+  const promotionCarouselRef = useRef<HTMLDivElement | null>(null);
   const effectiveToken = getEffectiveToken(token);
   const { data: events = [] } = useQuery({
     queryKey: queryKeys.events,
@@ -55,28 +57,25 @@ export function HomePage() {
     queryKey: queryKeys.categories,
     queryFn: api.listCategories,
   });
-  const { data: products = [], isLoading } = useQuery({
-    queryKey: queryKeys.personalizedProducts,
-    queryFn: () => api.listProducts({ sort: "popular" }),
+  const { data: popularProducts = [], isLoading: isPopularLoading } = useQuery({
+    queryKey: queryKeys.products({ sort: "popular" }),
+    queryFn: api.listPopularProducts,
+  });
+  const { data: promotionProducts = [], isLoading: isPromotionLoading } = useQuery({
+    queryKey: queryKeys.products({ sort: "promotion" }),
+    queryFn: api.listPromotionProducts,
+  });
+  const { data: recommendationProducts = [], isLoading: isRecommendationLoading } = useQuery({
+    queryKey: queryKeys.personalizedProducts({ sort: "new" }),
+    queryFn: api.listRecommendedProducts,
   });
   const { data: profile } = useQuery({
     queryKey: queryKeys.homeMe(effectiveToken),
     queryFn: () => api.me(effectiveToken ?? ""),
     enabled: Boolean(effectiveToken),
   });
-  const recommendationProducts = useMemo(() => {
-    if (!products.length) {
-      return [];
-    }
-    return Array.from({ length: 5 }).flatMap(() => products);
-  }, [products]);
-  const popularProducts = useMemo(() => {
-    if (!products.length) {
-      return [];
-    }
-    return Array.from({ length: 20 }, (_, index) => products[index % products.length]);
-  }, [products]);
   const recommendationTitle = `${profile?.user_name ?? "사용자"}님을 위한 추천 상품`;
+  const rootCategories = categories.filter((category) => !category.parent_id && category.level === 1);
 
   useEffect(() => {
     const target = loadMoreRef.current;
@@ -104,8 +103,8 @@ export function HomePage() {
     });
   }
 
-  function slidePopularProducts(direction: "prev" | "next") {
-    popularCarouselRef.current?.scrollBy({
+  function slideCarousel(ref: RefObject<HTMLDivElement | null>, direction: "prev" | "next") {
+    ref.current?.scrollBy({
       left: direction === "prev" ? -640 : 640,
       behavior: "smooth",
     });
@@ -155,7 +154,7 @@ export function HomePage() {
 
       <section className="rounded-md border border-line bg-white p-3">
         <div className="grid grid-cols-5 gap-1 md:grid-cols-10">
-          {categories.map((category) => {
+          {rootCategories.map((category) => {
             const Icon = categoryIcon(category);
             return (
               <Link key={category.href} href={category.href} className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-md p-1 hover:bg-zinc-50">
@@ -169,40 +168,25 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="py-7">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-black">인기 상품</h2>
-            <p className="mt-1 text-sm text-muted">지금 많이 찾는 상품 20개</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="secondary" size="icon" aria-label="인기 상품 이전" onClick={() => slidePopularProducts("prev")}>
-              <ChevronLeft size={18} />
-            </Button>
-            <Button variant="secondary" size="icon" aria-label="인기 상품 다음" onClick={() => slidePopularProducts("next")}>
-              <ChevronRight size={18} />
-            </Button>
-          </div>
-        </div>
-        {isLoading ? (
-          <div className="flex gap-3 overflow-hidden md:gap-4">
-            {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="h-64 w-[42vw] shrink-0 animate-pulse rounded-md bg-zinc-200 sm:w-48 md:w-52" />
-            ))}
-          </div>
-        ) : (
-          <div
-            ref={popularCarouselRef}
-            className="flex snap-x gap-3 overflow-x-auto scroll-smooth pb-2 md:gap-4"
-          >
-            {popularProducts.map((product, index) => (
-              <div key={`${product.id}-popular-${index}`} className="w-[42vw] shrink-0 snap-start sm:w-48 md:w-52">
-                <PopularSquareCard product={product} />
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      <ProductCarouselSection
+        title="인기 상품"
+        description="지금 많이 찾는 상품 20개"
+        products={popularProducts}
+        isLoading={isPopularLoading}
+        carouselRef={popularCarouselRef}
+        onPrev={() => slideCarousel(popularCarouselRef, "prev")}
+        onNext={() => slideCarousel(popularCarouselRef, "next")}
+      />
+
+      <ProductCarouselSection
+        title="프로모션 상품"
+        description="혜택과 함께 둘러보는 추천 프로모션"
+        products={promotionProducts}
+        isLoading={isPromotionLoading}
+        carouselRef={promotionCarouselRef}
+        onPrev={() => slideCarousel(promotionCarouselRef, "prev")}
+        onNext={() => slideCarousel(promotionCarouselRef, "next")}
+      />
 
       <section className="py-7">
         <div className="mb-4 flex items-end justify-between">
@@ -210,7 +194,7 @@ export function HomePage() {
             <h2 className="text-xl font-black">{recommendationTitle}</h2>
           </div>
         </div>
-        {isLoading ? (
+        {isRecommendationLoading ? (
           <div className="grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
             {Array.from({ length: 4 }).map((_, index) => (
               <div key={index} className="aspect-[3/4] animate-pulse rounded-md bg-zinc-200" />
@@ -218,8 +202,8 @@ export function HomePage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
-            {recommendationProducts.slice(0, visibleCount).map((product, index) => (
-              <ProductCard key={`${product.id}-${index}`} product={product} />
+            {recommendationProducts.slice(0, visibleCount).map((product) => (
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
         )}
@@ -229,6 +213,58 @@ export function HomePage() {
         ) : null}
       </section>
     </main>
+  );
+}
+
+function ProductCarouselSection({
+  title,
+  description,
+  products,
+  isLoading,
+  carouselRef,
+  onPrev,
+  onNext,
+}: {
+  title: string;
+  description: string;
+  products: Product[];
+  isLoading: boolean;
+  carouselRef: RefObject<HTMLDivElement | null>;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <section className="py-7">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-black">{title}</h2>
+          <p className="mt-1 text-sm text-muted">{description}</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="icon" aria-label={`${title} 이전`} onClick={onPrev}>
+            <ChevronLeft size={18} />
+          </Button>
+          <Button variant="secondary" size="icon" aria-label={`${title} 다음`} onClick={onNext}>
+            <ChevronRight size={18} />
+          </Button>
+        </div>
+      </div>
+      {isLoading ? (
+        <div className="flex gap-3 overflow-hidden md:gap-4">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index} className="h-64 w-[42vw] shrink-0 animate-pulse rounded-md bg-zinc-200 sm:w-48 md:w-52" />
+          ))}
+        </div>
+      ) : (
+        <div ref={carouselRef} className="no-scrollbar flex snap-x gap-3 overflow-x-auto scroll-smooth pb-1 md:gap-4">
+          {products.map((product) => (
+            <div key={`${product.id}-${title}`} className="w-[42vw] shrink-0 snap-start sm:w-48 md:w-52">
+              <PopularSquareCard product={product} />
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

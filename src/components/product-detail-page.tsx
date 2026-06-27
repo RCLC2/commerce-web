@@ -50,13 +50,14 @@ export function ProductDetailPage({ productId }: { productId: number }) {
   const price = product.discount_price || product.base_price;
   const saleRate = discountRate(product.base_price, product.discount_price);
   const detailHtml = resolveProductDetailHtml(product);
+  const description = product.description || "등록된 상품 설명이 없습니다.";
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-28 pt-5 md:pt-8">
       <div className="grid gap-8 md:grid-cols-[1fr_420px]">
         <section className="space-y-3">
           <div className="relative aspect-[4/5] overflow-hidden rounded-md bg-zinc-100 md:aspect-[5/6]">
-            <SafeImage src={product.image_url} alt={product.name} fill sizes="(max-width: 768px) 100vw, 55vw" className="object-cover" priority />
+            <SafeImage src={product.image_url} alt={product.name} fill sizes="(max-width: 768px) 100vw, 55vw" className="object-cover" />
           </div>
           <div className="grid grid-cols-4 gap-2">
             {Array.from({ length: 4 }).map((_, index) => (
@@ -70,16 +71,44 @@ export function ProductDetailPage({ productId }: { productId: number }) {
             </div>
             <div className="mt-4 space-y-4">
               {reviews.length ? (
-                reviews.map((review) => (
-                  <article key={review.id} className="border-t border-line pt-4 first:border-t-0 first:pt-0">
-                    <div className="flex items-center gap-1 text-sm font-bold text-brand">
-                      {Array.from({ length: review.rating }).map((_, index) => (
-                        <Star key={index} size={14} className="fill-brand" />
-                      ))}
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-zinc-700">{review.content}</p>
-                  </article>
-                ))
+                reviews.map((review) => {
+                  const rating = Math.max(0, Math.min(5, Math.round(review.rating_x2 ? review.rating_x2 / 2 : review.rating)));
+                  const reviewImages = review.images?.filter((image) => getReviewImageUrl(image)) ?? [];
+
+                  return (
+                    <article key={review.id} className="border-t border-line pt-4 first:border-t-0 first:pt-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-1 text-sm font-bold text-brand" aria-label={`평점 ${rating}점`}>
+                          {Array.from({ length: rating }).map((_, index) => (
+                            <Star key={index} size={14} className="fill-brand" />
+                          ))}
+                        </div>
+                        {review.is_photo_review ? (
+                          <span className="rounded bg-zinc-100 px-2 py-0.5 text-[11px] font-bold text-muted">포토리뷰</span>
+                        ) : null}
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-zinc-700">{review.content}</p>
+                      {reviewImages.length ? (
+                        <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
+                          {reviewImages.map((image, index) => {
+                            const imageUrl = getReviewImageUrl(image);
+
+                            return (
+                              <div key={image.id} className="aspect-square overflow-hidden rounded-md border border-line bg-zinc-100">
+                                <div
+                                  className="h-full w-full bg-cover bg-center"
+                                  style={{ backgroundImage: `url(${imageUrl})` }}
+                                  role="img"
+                                  aria-label={`리뷰 이미지 ${index + 1}`}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })
               ) : (
                 <p className="text-sm text-muted">아직 등록된 리뷰가 없습니다.</p>
               )}
@@ -133,7 +162,7 @@ export function ProductDetailPage({ productId }: { productId: number }) {
             </div>
 
             <div className="rounded-md bg-white p-4">
-              <p className="text-sm leading-6 text-zinc-700">{product.description}</p>
+              <p className="text-sm leading-6 text-zinc-700">{description}</p>
             </div>
           </div>
 
@@ -176,4 +205,8 @@ export function ProductDetailPage({ productId }: { productId: number }) {
       </section>
     </main>
   );
+}
+
+function getReviewImageUrl(image: { thumbnail_url?: string; detail_url?: string; url?: string }) {
+  return image.thumbnail_url ?? image.detail_url ?? image.url ?? null;
 }
