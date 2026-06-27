@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Heart, Minus, Plus, ShoppingBag, Star } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -15,6 +15,7 @@ import { Button } from "./ui/button";
 
 export function ProductDetailPage({ productId }: { productId: number }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [quantity, setQuantity] = useState(1);
   const [optionID, setOptionID] = useState<number | null>(null);
   const [liked, setLiked] = useState(false);
@@ -33,6 +34,8 @@ export function ProductDetailPage({ productId }: { productId: number }) {
     () => product?.options?.find((option) => option.id === optionID) ?? product?.options?.[0],
     [optionID, product?.options],
   );
+  const averageRating = reviews.length ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length : 0;
+  const ratingLabel = averageRating ? averageRating.toFixed(1) : "-";
 
   const addCart = useMutation({
     mutationFn: () =>
@@ -41,6 +44,23 @@ export function ProductDetailPage({ productId }: { productId: number }) {
         option_id: selectedOption?.id ?? 0,
         quantity,
       }),
+  });
+
+  const wishlist = useMutation({
+    mutationFn: async () => {
+      if (!effectiveToken) {
+        throw new Error("로그인이 필요합니다.");
+      }
+      if (liked) {
+        await api.removeWishlist(effectiveToken, productId);
+        return;
+      }
+      await api.addWishlist(effectiveToken, productId);
+    },
+    onSuccess: () => {
+      setLiked((value) => !value);
+      void queryClient.invalidateQueries({ queryKey: ["me-wishlist", effectiveToken] });
+    },
   });
 
   if (isLoading || !product) {
@@ -58,11 +78,6 @@ export function ProductDetailPage({ productId }: { productId: number }) {
         <section className="space-y-3">
           <div className="relative aspect-[4/5] overflow-hidden rounded-md bg-zinc-100 md:aspect-[5/6]">
             <SafeImage src={product.image_url} alt={product.name} fill sizes="(max-width: 768px) 100vw, 55vw" className="object-cover" />
-          </div>
-          <div className="grid grid-cols-4 gap-2">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="aspect-square rounded-md bg-zinc-100" />
-            ))}
           </div>
           <section className="rounded-md border border-line bg-white p-4">
             <div className="flex items-center justify-between">
@@ -122,8 +137,8 @@ export function ProductDetailPage({ productId }: { productId: number }) {
             <h1 className="mt-2 text-2xl font-black leading-tight">{product.name}</h1>
             <div className="mt-3 flex items-center gap-1 text-sm text-zinc-600">
               <Star size={16} className="fill-brand text-brand" />
-              <span className="font-bold">4.8</span>
-              <span>리뷰 1,284</span>
+              <span className="font-bold">{ratingLabel}</span>
+              <span>리뷰 {reviews.length.toLocaleString("ko-KR")}</span>
             </div>
             <div className="mt-5 flex items-baseline gap-2">
               {saleRate > 0 ? <span className="text-2xl font-black text-brand">{saleRate}%</span> : null}
@@ -171,7 +186,14 @@ export function ProductDetailPage({ productId }: { productId: number }) {
               variant="secondary"
               size="lg"
               aria-label="찜하기"
-              onClick={() => setLiked((value) => !value)}
+              onClick={() => {
+                if (!effectiveToken) {
+                  router.push("/login");
+                  return;
+                }
+                wishlist.mutate();
+              }}
+              disabled={wishlist.isPending}
               title={liked ? "찜 해제" : "찜하기"}
             >
               <Heart size={20} className={liked ? "fill-brand text-brand" : ""} />

@@ -1,11 +1,12 @@
 import { request } from "../api-client";
-import type { Delivery, ExternalInventoryMapping, InventorySource, InventorySourceForm, InventorySyncLog, OrderResponse, Product, Review, SameDayDispatchAvailability, SellerDashboard, Settlement, SettlementAccount, SettlementLine } from "../types";
+import type { Delivery, DeliveryCarriersResponse, ExternalInventoryMapping, InventorySource, InventorySourceForm, InventorySyncLog, OrderResponse, Product, Review, SameDayDispatchAvailability, SellerContext, SellerDashboard, Settlement, SettlementAccount, SettlementLine } from "../types";
 
 function marketQuery(marketID?: number | null) {
   return marketID ? `?market_id=${marketID}` : "";
 }
 
 export const sellerApi = {
+  sellerContext: (token: string, marketID?: number | null) => request<SellerContext>(`/api/v1/seller/context${marketQuery(marketID)}`, { token }),
   sellerDashboard: (token: string, marketID?: number | null) => request<SellerDashboard>(`/api/v1/seller/dashboard${marketQuery(marketID)}`, { token }),
   sellerProducts: (token: string, marketID?: number | null) => request<Product[]>(`/api/v1/seller/products${marketQuery(marketID)}`, { token }),
   sellerInventorySources: (token: string, marketID?: number | null) => request<InventorySource[]>(`/api/v1/seller/inventory/sources${marketQuery(marketID)}`, { token }),
@@ -88,6 +89,7 @@ export const sellerApi = {
     }),
   retryInventorySyncLog: (token: string, logID: number) =>
     request<{ status: string }>(`/api/v1/fulfillment/sync-logs/${logID}/retry`, { method: "POST", token }),
+  deliveryCarriers: (token: string) => request<DeliveryCarriersResponse>("/api/v1/deliveries/carriers", { token }),
   getDeliveryByOrder: (token: string, orderID: number) => request<Delivery>(`/api/v1/deliveries/by-order/${orderID}`, { token }),
   getDelivery: (token: string, deliveryID: number) => request<Delivery>(`/api/v1/deliveries/${deliveryID}`, { token }),
   registerSellerInvoices: (token: string, payload: { market_id: number; invoices: Array<{ order_id: number; carrier: string; invoice_number: string; is_fake_invoice?: boolean }> }) =>
@@ -114,4 +116,5 @@ export const sellerApi = {
       method: "PUT",
       token,
       body: JSON.stringify(payload),
-    }),};
+    }),
+};

@@ -54,6 +54,10 @@ function useSellerContextMarketID() {
   return useSessionStore((state) => state.sellerContext?.marketID);
 }
 
+function useResolvedSellerContext(token: string | null) {
+  const marketID = useSellerContextMarketID();
+  return useQuery({ queryKey: ["seller-context", marketID], queryFn: () => api.sellerContext(token ?? "", marketID), enabled: Boolean(token) });
+}
 function SellerAuthRequired() {
   return (
     <ConsoleLayout title="Seller" subtitle="마켓 운영 콘솔" links={sellerLinks}>
@@ -89,13 +93,15 @@ function orderPayableAmount(order: OrderResponse) {
 export function SellerHomePage() {
   const token = useSellerToken();
   const sellerContextMarketID = useSellerContextMarketID();
-  const { data: dashboard } = useQuery({ queryKey: ["seller-dashboard", sellerContextMarketID], queryFn: () => api.sellerDashboard(token ?? "", sellerContextMarketID), enabled: Boolean(token) });
-  const { data: products = [] } = useQuery({ queryKey: ["seller-products", sellerContextMarketID], queryFn: () => api.sellerProducts(token ?? "", sellerContextMarketID), enabled: Boolean(token) });
-  const { data: orders = [] } = useQuery({ queryKey: ["seller-orders", sellerContextMarketID], queryFn: () => api.sellerOrders(token ?? "", sellerContextMarketID), enabled: Boolean(token) });
-  const { data: sources = [] } = useQuery({ queryKey: ["seller-inventory-sources", sellerContextMarketID], queryFn: () => api.sellerInventorySources(token ?? "", sellerContextMarketID), enabled: Boolean(token) });
-  const { data: settlements = [] } = useQuery({ queryKey: ["seller-settlements", sellerContextMarketID], queryFn: () => api.sellerSettlements(token ?? "", sellerContextMarketID), enabled: Boolean(token) });
-  const sellerName = useSellerContextName() ?? products[0]?.market_name ?? "셀러 마켓";
-  const marketID = sellerContextMarketID ?? products[0]?.market_id;
+  const { data: sellerContext } = useResolvedSellerContext(token);
+  const resolvedMarketID = sellerContextMarketID ?? sellerContext?.market_id;
+  const { data: dashboard } = useQuery({ queryKey: ["seller-dashboard", sellerContextMarketID], queryFn: () => api.sellerDashboard(token ?? "", resolvedMarketID), enabled: Boolean(token) });
+  const { data: products = [] } = useQuery({ queryKey: ["seller-products", sellerContextMarketID], queryFn: () => api.sellerProducts(token ?? "", resolvedMarketID), enabled: Boolean(token) });
+  const { data: orders = [] } = useQuery({ queryKey: ["seller-orders", sellerContextMarketID], queryFn: () => api.sellerOrders(token ?? "", resolvedMarketID), enabled: Boolean(token) });
+  const { data: sources = [] } = useQuery({ queryKey: ["seller-inventory-sources", sellerContextMarketID], queryFn: () => api.sellerInventorySources(token ?? "", resolvedMarketID), enabled: Boolean(token) });
+  const { data: settlements = [] } = useQuery({ queryKey: ["seller-settlements", sellerContextMarketID], queryFn: () => api.sellerSettlements(token ?? "", resolvedMarketID), enabled: Boolean(token) });
+  const sellerName = useSellerContextName() ?? sellerContext?.market_name ?? products[0]?.market_name ?? "셀러 마켓";
+  const marketID = resolvedMarketID ?? products[0]?.market_id;
   const { data: market } = useQuery({ queryKey: ["seller-market", marketID], queryFn: () => api.getMarket(marketID ?? 0), enabled: Boolean(token && marketID) });
 
   if (!token) {
@@ -196,14 +202,16 @@ export function SellerProductsPage() {
   const token = useSellerToken();
   const queryClient = useQueryClient();
   const sellerContextMarketID = useSellerContextMarketID();
+  const { data: sellerContext } = useResolvedSellerContext(token);
+  const resolvedMarketID = sellerContextMarketID ?? sellerContext?.market_id;
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("ALL");
   const [shipping, setShipping] = useState("ALL");
   const [managedProducts, setManagedProducts] = useState<Record<number, ProductEditState>>({});
   const [createForm, setCreateForm] = useState<ProductCreateState>(() => emptyProductCreateForm());
-  const { data = [] } = useQuery({ queryKey: ["seller-products", sellerContextMarketID], queryFn: () => api.sellerProducts(token ?? "", sellerContextMarketID), enabled: Boolean(token) });
+  const { data = [] } = useQuery({ queryKey: ["seller-products", sellerContextMarketID], queryFn: () => api.sellerProducts(token ?? "", resolvedMarketID), enabled: Boolean(token) });
   const { data: categories = [] } = useQuery({ queryKey: ["seller-product-categories"], queryFn: api.listCategories, enabled: Boolean(token) });
-  const marketID = sellerContextMarketID ?? data[0]?.market_id;
+  const marketID = resolvedMarketID ?? data[0]?.market_id;
   const saveProduct = useMutation({
     mutationFn: (product: Product) => api.updateSellerProduct(token ?? "", product),
     onSuccess: () => {
@@ -224,7 +232,7 @@ export function SellerProductsPage() {
       void queryClient.invalidateQueries({ queryKey: ["admin-products"] });
     },
   });
-  const sellerName = useSellerContextName() ?? data[0]?.market_name ?? "셀러 마켓";
+  const sellerName = useSellerContextName() ?? sellerContext?.market_name ?? data[0]?.market_name ?? "셀러 마켓";
 
   if (!token) {
     return <SellerAuthRequired />;
@@ -284,15 +292,16 @@ export function SellerProductsPage() {
           <input type="number" min={0} className="h-11 rounded-md border border-line px-3 text-sm outline-none focus:border-foreground" value={createForm.basePrice} onChange={(event) => setCreateForm((current) => ({ ...current, basePrice: event.target.value }))} placeholder="Price" aria-label="Price" />
           <input type="number" min={0} className="h-11 rounded-md border border-line px-3 text-sm outline-none focus:border-foreground" value={createForm.optionQuantity} onChange={(event) => setCreateForm((current) => ({ ...current, optionQuantity: event.target.value }))} placeholder="Stock" aria-label="Stock" />
         </div>
-        <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr_130px_130px]">
+        <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_150px_1fr_130px_130px]">
           <input className="h-11 rounded-md border border-line px-3 text-sm outline-none focus:border-foreground" value={createForm.imageURL} onChange={(event) => setCreateForm((current) => ({ ...current, imageURL: event.target.value }))} placeholder="Image URL" aria-label="Image URL" />
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none focus:border-foreground" value={createForm.optionName} onChange={(event) => setCreateForm((current) => ({ ...current, optionName: event.target.value }))} placeholder="Option name" aria-label="Option name" />
           <input className="h-11 rounded-md border border-line px-3 text-sm outline-none focus:border-foreground" value={createForm.optionValue} onChange={(event) => setCreateForm((current) => ({ ...current, optionValue: event.target.value }))} placeholder="Option value" aria-label="Option value" />
           <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={createForm.shippingType} onChange={(event) => setCreateForm((current) => ({ ...current, shippingType: event.target.value }))} aria-label="Shipping type"><option value="NORMAL">NORMAL</option><option value="FREE">FREE</option></select>
           <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={createForm.status} onChange={(event) => setCreateForm((current) => ({ ...current, status: event.target.value }))} aria-label="Status"><option value="SELLING">SELLING</option><option value="SOLD_OUT">SOLD_OUT</option></select>
         </div>
         <textarea className="mt-3 min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-foreground" value={createForm.description} onChange={(event) => setCreateForm((current) => ({ ...current, description: event.target.value }))} placeholder="Description" aria-label="Description" />
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <Button disabled={!createForm.name.trim() || !selectedCategoryID || !marketID || createProduct.isPending} onClick={() => createProduct.mutate()}>{createProduct.isPending ? "Saving" : "Create product"}</Button>
+          <Button disabled={!createForm.name.trim() || !createForm.basePrice || !createForm.optionValue.trim() || !selectedCategoryID || !marketID || createProduct.isPending} onClick={() => createProduct.mutate()}>{createProduct.isPending ? "Saving" : "Create product"}</Button>
           <Button variant="secondary" onClick={() => setCreateForm(emptyProductCreateForm())}>Reset</Button>
           {createProduct.error ? <p className="text-sm font-bold text-brand">{createProduct.error.message}</p> : null}
           {createProduct.isSuccess ? <p className="text-sm font-bold text-brand">Created.</p> : null}
@@ -404,6 +413,8 @@ export function SellerInventoryPage() {
   const token = useSellerToken();
   const effectiveToken = token ?? "";
   const sellerContextMarketID = useSellerContextMarketID();
+  const { data: sellerContext } = useResolvedSellerContext(token);
+  const resolvedMarketID = sellerContextMarketID ?? sellerContext?.market_id;
   const [sourceStatus, setSourceStatus] = useState("ALL");
   const [logStatus, setLogStatus] = useState("FAILED");
   const [logProvider, setLogProvider] = useState("ALL");
@@ -412,10 +423,10 @@ export function SellerInventoryPage() {
   const [mappingForm, setMappingForm] = useState({ inventory_source_id: "", product_option_id: "", external_product_id: "", external_variant_id: "", external_inventory_item_id: "", external_location_id: "", disconnect_if_necessary: false });
   const [stockForm, setStockForm] = useState({ option_id: "", quantity: "" });
   const queryClient = useQueryClient();
-  const { data: sources = [] } = useQuery({ queryKey: ["seller-inventory-sources", sellerContextMarketID], queryFn: () => api.sellerInventorySources(effectiveToken, sellerContextMarketID), enabled: Boolean(token) });
-  const { data: logs = [] } = useQuery({ queryKey: ["seller-inventory-logs", sellerContextMarketID], queryFn: () => api.sellerInventoryLogs(effectiveToken, sellerContextMarketID), enabled: Boolean(token) });
-  const { data: products = [] } = useQuery({ queryKey: ["seller-products", sellerContextMarketID], queryFn: () => api.sellerProducts(effectiveToken, sellerContextMarketID), enabled: Boolean(token) });
-  const marketID = sellerContextMarketID ?? sources[0]?.market_id ?? products[0]?.market_id;
+  const { data: sources = [] } = useQuery({ queryKey: ["seller-inventory-sources", sellerContextMarketID], queryFn: () => api.sellerInventorySources(effectiveToken, resolvedMarketID), enabled: Boolean(token) });
+  const { data: logs = [] } = useQuery({ queryKey: ["seller-inventory-logs", sellerContextMarketID], queryFn: () => api.sellerInventoryLogs(effectiveToken, resolvedMarketID), enabled: Boolean(token) });
+  const { data: products = [] } = useQuery({ queryKey: ["seller-products", sellerContextMarketID], queryFn: () => api.sellerProducts(effectiveToken, resolvedMarketID), enabled: Boolean(token) });
+  const marketID = resolvedMarketID ?? sources[0]?.market_id ?? products[0]?.market_id;
   const register = useMutation({
     mutationFn: () => {
       if (!marketID) {
@@ -491,7 +502,7 @@ export function SellerInventoryPage() {
     mutationFn: (logID: number) => api.retryInventorySyncLog(effectiveToken, logID),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-inventory-logs", sellerContextMarketID] }),
   });
-  const sellerName = useSellerContextName() ?? sources[0]?.display_name?.replace(/ Shopify| Cafe24/g, "") ?? "셀러 마켓";
+  const sellerName = useSellerContextName() ?? sellerContext?.market_name ?? sources[0]?.display_name?.replace(/ Shopify| Cafe24/g, "") ?? "셀러 마켓";
 
   if (!token) {
     return <SellerAuthRequired />;
@@ -562,43 +573,49 @@ export function SellerOrdersPage() {
   const token = useSellerToken();
   const queryClient = useQueryClient();
   const sellerContextMarketID = useSellerContextMarketID();
+  const { data: sellerContext } = useResolvedSellerContext(token);
+  const resolvedMarketID = sellerContextMarketID ?? sellerContext?.market_id;
   const [status, setStatus] = useState("ALL");
   const [query, setQuery] = useState("");
   const [invoiceMap, setInvoiceMap] = useState<Record<string, string>>({});
   const [carrierMap, setCarrierMap] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { data = [] } = useQuery({ queryKey: ["seller-orders", sellerContextMarketID], queryFn: () => api.sellerOrders(token ?? "", sellerContextMarketID), enabled: Boolean(token) });
+  const { data = [] } = useQuery({ queryKey: ["seller-orders", resolvedMarketID], queryFn: () => api.sellerOrders(token ?? "", resolvedMarketID), enabled: Boolean(token) });
+  const { data: carrierData } = useQuery({ queryKey: ["delivery-carriers"], queryFn: () => api.deliveryCarriers(token ?? ""), enabled: Boolean(token) });
+  const carriers = carrierData?.carriers ?? [];
   const shipOrder = useMutation({
     mutationFn: (order: OrderResponse) => {
-      const marketID = sellerContextMarketID ?? order.market_orders?.[0]?.market_id;
+      const marketID = resolvedMarketID ?? order.market_orders?.[0]?.market_id;
       const invoiceNumber = invoiceMap[order.order_code];
-      if (!marketID || !invoiceNumber) {
-        throw new Error("마켓과 송장 번호를 확인해 주세요.");
+      const carrier = carrierMap[order.order_code] || order.delivery?.carrier || "";
+      if (!marketID || !invoiceNumber || !carrier) {
+        throw new Error("마켓, 택배사, 송장 번호를 확인해 주세요.");
       }
-      return api.registerSellerInvoices(token ?? "", { market_id: marketID, invoices: [{ order_id: order.id, carrier: carrierMap[order.order_code] || "CJ", invoice_number: invoiceNumber }] });
+      return api.registerSellerInvoices(token ?? "", { market_id: marketID, invoices: [{ order_id: order.id, carrier, invoice_number: invoiceNumber }] });
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-orders", sellerContextMarketID] }),
   });
   const startOrder = useMutation({
     mutationFn: async (order: OrderResponse) => {
-      const marketID = sellerContextMarketID ?? order.market_orders?.[0]?.market_id;
+      const marketID = resolvedMarketID ?? order.market_orders?.[0]?.market_id;
       const invoiceNumber = invoiceMap[order.order_code] || order.delivery?.tracking_number;
+      const carrier = carrierMap[order.order_code] || order.delivery?.carrier || "";
       const delivery = order.delivery ?? await api.getDeliveryByOrder(token ?? "", order.id);
-      if (!marketID || !invoiceNumber) {
-        throw new Error("마켓과 송장 번호를 확인해 주세요.");
+      if (!marketID || !invoiceNumber || !carrier) {
+        throw new Error("마켓, 택배사, 송장 번호를 확인해 주세요.");
       }
-      return api.startSellerDelivery(token ?? "", marketID, delivery.id, { carrier: carrierMap[order.order_code] || order.delivery?.carrier || "CJ", tracking_number: invoiceNumber });
+      return api.startSellerDelivery(token ?? "", marketID, delivery.id, { carrier, tracking_number: invoiceNumber });
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-orders", sellerContextMarketID] }),
   });
   const submitInvoices = useMutation({
     mutationFn: () => {
-      const marketID = sellerContextMarketID ?? filteredOrders.find((order) => order.market_orders?.[0]?.market_id)?.market_orders?.[0]?.market_id;
+      const marketID = resolvedMarketID ?? filteredOrders.find((order) => order.market_orders?.[0]?.market_id)?.market_orders?.[0]?.market_id;
       const invoices = filteredOrders
         .filter((order) => invoiceMap[order.order_code])
-        .map((order) => ({ order_id: order.id, carrier: carrierMap[order.order_code] || "CJ", invoice_number: invoiceMap[order.order_code] }));
-      if (!marketID || invoices.length === 0) {
-        throw new Error("일괄 등록할 송장이 없습니다.");
+        .map((order) => ({ order_id: order.id, carrier: carrierMap[order.order_code] || order.delivery?.carrier || "", invoice_number: invoiceMap[order.order_code] }));
+      if (!marketID || invoices.length === 0 || invoices.some((invoice) => !invoice.carrier)) {
+        throw new Error("일괄 등록할 송장과 택배사를 확인해 주세요.");
       }
       return api.registerSellerInvoices(token ?? "", { market_id: marketID, invoices });
     },
@@ -606,7 +623,7 @@ export function SellerOrdersPage() {
   });
   const completeOrder = useMutation({
     mutationFn: async (order: OrderResponse) => {
-      const marketID = sellerContextMarketID ?? order.market_orders?.[0]?.market_id;
+      const marketID = resolvedMarketID ?? order.market_orders?.[0]?.market_id;
       if (!marketID) {
         throw new Error("마켓을 확인해 주세요.");
       }
@@ -615,7 +632,7 @@ export function SellerOrdersPage() {
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-orders", sellerContextMarketID] }),
   });
-  const sellerName = useSellerContextName() ?? "셀러 마켓";
+  const sellerName = useSellerContextName() ?? sellerContext?.market_name ?? "셀러 마켓";
 
   if (!token) {
     return <SellerAuthRequired />;
@@ -715,15 +732,14 @@ export function SellerOrdersPage() {
               <div key="invoice" className="grid gap-2">
                 <select
                   className="h-9 rounded-md border border-line bg-white px-2 text-sm font-bold"
-                  value={carrierMap[order.order_code] ?? order.delivery?.carrier ?? "CJ"}
+                  value={carrierMap[order.order_code] ?? order.delivery?.carrier ?? ""}
                   onChange={(event) => setCarrierMap((current) => ({ ...current, [order.order_code]: event.target.value }))}
                   aria-label={`${order.order_code} 택배사`}
                 >
-                  <option value="CJ">CJ대한통운</option>
-                  <option value="HANJIN">한진택배</option>
-                  <option value="LOTTE">롯데택배</option>
-                  <option value="POST">우체국</option>
-                </select>
+                  <option value="">택배사 선택</option>
+                  {carriers.map((carrier) => (
+                    <option key={carrier.code} value={carrier.code}>{carrier.name}</option>
+                  ))}                </select>
                 <input
                   value={invoiceMap[order.order_code] ?? order.delivery?.tracking_number ?? ""}
                   onChange={(event) => setInvoiceMap((current) => ({ ...current, [order.order_code]: event.target.value }))}
@@ -753,9 +769,11 @@ export function SellerOrdersPage() {
 export function SellerSettlementsPage() {
   const token = useSellerToken();
   const sellerContextMarketID = useSellerContextMarketID();
+  const { data: sellerContext } = useResolvedSellerContext(token);
+  const resolvedMarketID = sellerContextMarketID ?? sellerContext?.market_id;
   const [status, setStatus] = useState("ALL");
-  const { data = [] } = useQuery({ queryKey: ["seller-settlements", sellerContextMarketID], queryFn: () => api.sellerSettlements(token ?? "", sellerContextMarketID), enabled: Boolean(token) });
-  const sellerName = useSellerContextName() ?? data[0]?.market_name ?? "셀러 마켓";
+  const { data = [] } = useQuery({ queryKey: ["seller-settlements", resolvedMarketID], queryFn: () => api.sellerSettlements(token ?? "", resolvedMarketID), enabled: Boolean(token) });
+  const sellerName = useSellerContextName() ?? sellerContext?.market_name ?? data[0]?.market_name ?? "셀러 마켓";
 
   if (!token) {
     return <SellerAuthRequired />;
@@ -795,19 +813,22 @@ export function SellerSettlementsPage() {
 export function SellerReviewsPage() {
   const token = useSellerToken();
   const sellerContextMarketID = useSellerContextMarketID();
+  const { data: sellerContext } = useResolvedSellerContext(token);
+  const resolvedMarketID = sellerContextMarketID ?? sellerContext?.market_id;
   const [query, setQuery] = useState("");
   const [rating, setRating] = useState("ALL");
-  const { data = [] } = useQuery({ queryKey: ["seller-reviews", sellerContextMarketID], queryFn: () => api.sellerReviews(token ?? "", sellerContextMarketID), enabled: Boolean(token) });
-  const averageRating = useMemo(() => (data.length ? data.reduce((sum, review) => sum + review.rating, 0) / data.length : 0), [data]);
-  const sellerName = useSellerContextName() ?? "셀러 마켓";
+  const { data = [] } = useQuery({ queryKey: ["seller-reviews", resolvedMarketID], queryFn: () => api.sellerReviews(token ?? "", resolvedMarketID), enabled: Boolean(token) });
+  const averageRating = useMemo(() => (data.length ? data.reduce((sum, review) => sum + reviewRating(review), 0) / data.length : 0), [data]);
+  const sellerName = useSellerContextName() ?? sellerContext?.market_name ?? "셀러 마켓";
 
   if (!token) {
     return <SellerAuthRequired />;
   }
 
   const filteredReviews = data.filter((review) => {
-    const matchesQuery = !query || review.content.toLowerCase().includes(query.toLowerCase()) || String(review.product_id).includes(query);
-    const matchesRating = rating === "ALL" || review.rating === Number(rating);
+    const normalizedQuery = query.toLowerCase();
+    const matchesQuery = !query || review.content.toLowerCase().includes(normalizedQuery) || review.product?.name.toLowerCase().includes(normalizedQuery) || String(review.product_id).includes(query);
+    const matchesRating = rating === "ALL" || reviewRating(review) === Number(rating);
     return matchesQuery && matchesRating;
   });
 
@@ -819,7 +840,7 @@ export function SellerReviewsPage() {
           items={[
             { label: "리뷰 수", value: `${data.length}개` },
             { label: "평균 평점", value: averageRating ? averageRating.toFixed(1) : "-" },
-            { label: "5점 리뷰", value: `${data.filter((review) => review.rating === 5).length}개` },
+            { label: "5점 리뷰", value: `${data.filter((review) => reviewRating(review) === 5).length}개` },
             { label: "최근 리뷰", value: data[0] ? new Date(data[0].created_at).toLocaleDateString("ko-KR") : "-" },
           ]}
         />
@@ -829,7 +850,7 @@ export function SellerReviewsPage() {
         title="리뷰 목록"
         action={
           <div className="flex flex-col gap-2 md:flex-row">
-            <SearchBox value={query} onChange={setQuery} placeholder="리뷰 내용 또는 상품 ID 검색" />
+            <SearchBox value={query} onChange={setQuery} placeholder="리뷰 내용 또는 상품명 검색" />
             <select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={rating} onChange={(event) => setRating(event.target.value)}>
               <option value="ALL">전체 평점</option>
               <option value="5">5점</option>
@@ -844,8 +865,8 @@ export function SellerReviewsPage() {
         <DataTable
           columns={["상품", "평점", "사진", "내용", "작성일"]}
           rows={filteredReviews.map((review) => [
-            `#${review.product_id}`,
-            <span key="rating" className="inline-flex items-center gap-1 font-black text-brand"><Star size={14} className="fill-brand" /> {review.rating}</span>,
+            review.product?.name ?? `#${review.product_id}`,
+            <span key="rating" className="inline-flex items-center gap-1 font-black text-brand"><Star size={14} className="fill-brand" /> {reviewRating(review)}</span>,
             review.images?.length ? `${review.images.length}장` : "-",
             <span key="content" className="line-clamp-2">{review.content}</span>,
             new Date(review.created_at).toLocaleDateString("ko-KR"),
@@ -887,8 +908,8 @@ function emptyProductCreateForm(): ProductCreateState {
     status: "SELLING",
     imageURL: "",
     description: "",
-    optionName: "Default",
-    optionValue: "FREE",
+    optionName: "",
+    optionValue: "",
     optionQuantity: "0",
   };
 }
@@ -911,8 +932,8 @@ function productCreatePayload(form: ProductCreateState, marketID: number, catego
       {
         id: 0,
         product_id: 0,
-        option_name: form.optionName.trim() || "Default",
-        option_value: form.optionValue.trim() || "FREE",
+        option_name: form.optionName.trim(),
+        option_value: form.optionValue.trim(),
         additional_price: 0,
         quantity: Math.max(0, Number(form.optionQuantity) || 0),
         is_active: true,
@@ -977,6 +998,10 @@ function productPayload(product: Product, state: ProductEditState): Product {
     image_url: product.image_url,
     options: state.options.map((option) => ({ ...option, quantity: Math.max(0, option.quantity), additional_price: Math.max(0, option.additional_price) })),
   };
+}
+
+function reviewRating(review: { rating?: number; rating_x2?: number }) {
+  return typeof review.rating === "number" ? review.rating : (review.rating_x2 ?? 0) / 2;
 }
 
 function optionLabel(option: ProductOption) {
