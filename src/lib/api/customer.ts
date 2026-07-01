@@ -1,5 +1,5 @@
 import { request } from "../api-client";
-import type { Address, CartItem, Coupon, CreateReviewResponse, Notification, OrderResponse, Recommendation, Review, SettlementSummary, TrackingInfo } from "../types";
+import type { Address, CartItem, Coupon, CreateReviewResponse, Notification, OrderResponse, Product, Recommendation, Review, SettlementSummary, TrackingInfo } from "../types";
 
 export type CreateOrderLineReviewPayload = {
   rating_x2: number;
@@ -25,6 +25,8 @@ export const customerApi = {
   listAddresses: (token: string) => request<Address[]>("/api/v1/me/addresses", { token }),
   listNotifications: (token: string) => request<Notification[]>("/api/v1/me/notifications", { token }),
   listMyRecommendations: (token: string) => request<Recommendation[]>("/api/v1/me/recommendations", { token }),
+  listWishlistedProducts: (token: string) => request<Product[]>("/api/v1/me/wishlist", { token }),
+  listLikedProducts: (token: string) => request<Product[]>("/api/v1/me/liked-products", { token }),
   placeOrder: (token: string, payload: { cart_item_ids: number[]; used_coupon_id?: number; used_point: number }) =>
     request<{ orderCode: string }>("/api/v1/orders", {
       method: "POST",

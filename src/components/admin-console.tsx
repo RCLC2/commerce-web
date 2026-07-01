@@ -1,13 +1,13 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleDollarSign, ShoppingBag, Store, Users } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { firstOrderItem } from "@/lib/order-utils";
 import { useSessionStore } from "@/lib/session-store";
-import type { Market, MemberProfile, Product } from "@/lib/types";
+import type { Market, MarketPenalty, MemberProfile, Product } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import {
   ConsoleHeader,
@@ -57,6 +57,14 @@ function AdminAuthRequired() {
   );
 }
 
+function marketPenaltyLabel(penalties: MarketPenalty[]) {
+  if (!penalties.length) {
+    return "-";
+  }
+  const totalScore = penalties.reduce((sum, penalty) => sum + penalty.score, 0);
+  const latest = penalties[0];
+  return `${totalScore}점 · ${latest.reason}`;
+}
 function productPrice(product: Product) {
   return product.discount_price || product.base_price;
 }
@@ -212,13 +220,22 @@ export function AdminMembersPage() {
 
 export function AdminMarketsPage() {
   const token = useAdminToken();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("ALL");
   const [selectedMarketID, setSelectedMarketID] = useState<number | null>(null);
   const [penaltyReason, setPenaltyReason] = useState("배송 지연 반복에 따른 페널티 부여");
   const [penaltyScore, setPenaltyScore] = useState(10);
-  const [penaltyRecords, setPenaltyRecords] = useState<Record<number, { score: number; reason: string }>>({});
+
   const { data = [] } = useQuery({ queryKey: ["admin-markets"], queryFn: () => api.adminMarkets(token ?? ""), enabled: Boolean(token) });
+  const penaltyQueries = useQueries({
+    queries: data.map((market) => ({
+      queryKey: ["admin-market-penalties", market.id],
+      queryFn: () => api.adminMarketPenalties(token ?? "", market.id),
+      enabled: Boolean(token),
+    })),
+  });
+  const penaltiesByMarketID = new Map(data.map((market, index) => [market.id, penaltyQueries[index]?.data ?? []]));
   const selectedMarket = data.find((market) => market.id === selectedMarketID) ?? data[0];
   const penaltyMutation = useMutation({
     mutationFn: () =>
@@ -227,12 +244,7 @@ export function AdminMarketsPage() {
         score: penaltyScore,
       }),
     onSuccess: () => {
-      if (selectedMarket) {
-        setPenaltyRecords((current) => ({
-          ...current,
-          [selectedMarket.id]: { score: penaltyScore, reason: penaltyReason },
-        }));
-      }
+      void queryClient.invalidateQueries({ queryKey: ["admin-market-penalties", selectedMarket?.id] });
     },
   });
 
@@ -280,11 +292,6 @@ export function AdminMarketsPage() {
             {penaltyMutation.isPending ? "기록 중" : "페널티 부여"}
           </Button>
         </div>
-        {selectedMarketID && penaltyRecords[selectedMarketID] ? (
-          <p className="mt-3 text-sm font-bold text-brand">
-            {selectedMarket?.name}에 {penaltyRecords[selectedMarketID].score}점 페널티를 기록했습니다.
-          </p>
-        ) : null}
         {penaltyMutation.error ? <p className="mt-3 text-sm font-bold text-brand">{penaltyMutation.error.message}</p> : null}
       </ConsoleSection>
       <ConsoleSection className="mt-5" title="마켓 목록">
@@ -309,7 +316,7 @@ export function AdminMarketsPage() {
             market.follower_count?.toLocaleString("ko-KR") ?? "-",
             <StatusBadge key="status" value={market.status} />,
             market.tags?.join(", ") ?? "-",
-            penaltyRecords[market.id] ? `${penaltyRecords[market.id].score}점 · ${penaltyRecords[market.id].reason}` : "-",
+            marketPenaltyLabel(penaltiesByMarketID.get(market.id) ?? []),
             <Button key="select" variant="secondary" size="sm" onClick={() => setSelectedMarketID(market.id)}>선택</Button>,
           ])}
         />
@@ -556,17 +563,18 @@ export function AdminCouponsPage() {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("ALL");
-  const [issuedCouponIDs, setIssuedCouponIDs] = useState<number[]>([]);
-  const [targetMemberID, setTargetMemberID] = useState(1);
-  const { data = [] } = useQuery({ queryKey: ["admin-coupons"], queryFn: () => api.adminCoupons(token ?? ""), enabled: Boolean(token) });
-  const { data: issuableCoupons = [] } = useQuery({ queryKey: ["admin-issuable-coupons"], queryFn: () => api.listIssuableCoupons(token ?? ""), enabled: Boolean(token) });
+  const [targetMemberID, setTargetMemberID] = useState<number | null>(null);
+  const { data = [] } = useQuery({ queryKey: ["admin-coupons", targetMemberID], queryFn: () => api.adminCoupons(token ?? "", targetMemberID), enabled: Boolean(token) });
   const { data: members = [] } = useQuery({ queryKey: ["admin-members"], queryFn: () => api.adminMembers(token ?? ""), enabled: Boolean(token) });
   const issueCoupon = useMutation({
-    mutationFn: (couponID: number) => api.issueCouponToMember(token ?? "", couponID, targetMemberID),
-    onSuccess: (result) => {
-      setIssuedCouponIDs((current) => [...new Set([...current, result.coupon_id])]);
-      void queryClient.invalidateQueries({ queryKey: ["admin-coupons"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin-issuable-coupons"] });
+    mutationFn: (couponID: number) => {
+      if (!targetMemberID) {
+        throw new Error("쿠폰을 발급할 회원을 선택해 주세요.");
+      }
+      return api.issueCouponToMember(token ?? "", couponID, targetMemberID);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin-coupons", targetMemberID] });
     },
   });
 
@@ -574,11 +582,7 @@ export function AdminCouponsPage() {
     return <AdminAuthRequired />;
   }
 
-  const couponMap = new Map([...data, ...issuableCoupons].map((coupon) => [coupon.id, coupon]));
-  const coupons = Array.from(couponMap.values()).map((coupon) => ({
-    ...coupon,
-    status: issuedCouponIDs.includes(coupon.id) ? "ISSUED" : coupon.status,
-  }));
+  const coupons = data;
   const filteredCoupons = coupons.filter((coupon) => {
     const matchesQuery = !query || coupon.name.toLowerCase().includes(query.toLowerCase()) || coupon.condition_text?.toLowerCase().includes(query.toLowerCase());
     const matchesStatus = status === "ALL" || coupon.status === status;
@@ -599,7 +603,8 @@ export function AdminCouponsPage() {
         />
       </div>
       <ConsoleSection className="mt-5" title="쿠폰 발급 대상" description="발급 버튼을 누르면 선택된 회원에게 발급하는 흐름으로 처리됩니다.">
-        <select className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm font-bold md:w-96" value={targetMemberID} onChange={(event) => setTargetMemberID(Number(event.target.value))}>
+        <select className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm font-bold md:w-96" value={targetMemberID ?? ""} onChange={(event) => setTargetMemberID(Number(event.target.value) || null)}>
+          <option value="">회원 선택</option>
           {members.map((member) => (
             <option key={member.id} value={member.id}>
               #{member.id} {member.user_name ?? member.email} · {member.role}
@@ -636,14 +641,14 @@ export function AdminCouponsPage() {
             formatPrice(coupon.min_order_amount),
             coupon.condition_text ?? "-",
             coupon.expires_at ? new Date(coupon.expires_at).toLocaleDateString("ko-KR") : "-",
-            <StatusBadge key="status" value={coupon.status ?? "ISSUED"} />,
+            <StatusBadge key="status" value={coupon.status ?? "UNKNOWN"} />,
             <Button
               key="issue"
               size="sm"
-              disabled={coupon.status === "ISSUED" || issueCoupon.isPending}
+              disabled={!targetMemberID || coupon.status === "ISSUED" || coupon.status === "USED" || issueCoupon.isPending}
               onClick={() => issueCoupon.mutate(coupon.id)}
             >
-              {coupon.status === "ISSUED" ? "발급됨" : issueCoupon.isPending ? "발급 중" : "발급"}
+              {coupon.status === "ISSUED" ? "발급됨" : coupon.status === "USED" ? "사용됨" : issueCoupon.isPending ? "발급 중" : "발급"}
             </Button>,
           ])}
         />
@@ -735,34 +740,34 @@ export function AdminCMSPage() {
   }
 
   return (
-    <ConsoleLayout title="Admin" subtitle="??? ?? ??" links={adminLinks}>
+    <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <ConsoleHeader
-        title="CMS"
-        description="? ???? ??, ??, ?? ??? ?????."
-        action={<select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">?? ??</option><option value="ACTIVE">??</option><option value="INACTIVE">???</option></select>}
+        title="CMS 캐러셀"
+        description="홈 캐러셀 이미지, 대상, 노출 기간을 관리합니다."
+        action={<select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">전체 상태</option><option value="ACTIVE">활성</option><option value="INACTIVE">비활성</option></select>}
       />
-      <ConsoleSection className="mt-5" title={editingID ? "??? ??" : "??? ??"}>
+      <ConsoleSection className="mt-5" title={editingID ? "캐러셀 수정" : "캐러셀 등록"}>
         <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr_130px_110px]">
-          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="??" aria-label="??? ??" />
-          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.image_url} onChange={(event) => setForm((current) => ({ ...current, image_url: event.target.value }))} placeholder="??? URL" aria-label="??? URL" />
-          <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={form.target_type} onChange={(event) => setForm((current) => ({ ...current, target_type: event.target.value }))} aria-label="?? ??">
-            <option value="PRODUCT">??</option>
-            <option value="MARKET">??</option>
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="제목" aria-label="캐러셀 제목" />
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.image_url} onChange={(event) => setForm((current) => ({ ...current, image_url: event.target.value }))} placeholder="이미지 URL" aria-label="이미지 URL" />
+          <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={form.target_type} onChange={(event) => setForm((current) => ({ ...current, target_type: event.target.value }))} aria-label="대상 유형">
+            <option value="PRODUCT">상품</option>
+            <option value="MARKET">마켓</option>
             <option value="URL">URL</option>
           </select>
-          <input type="number" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.target_id} onChange={(event) => setForm((current) => ({ ...current, target_id: event.target.value }))} placeholder="?? ID" aria-label="?? ID" />
+          <input type="number" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.target_id} onChange={(event) => setForm((current) => ({ ...current, target_id: event.target.value }))} placeholder="대상 ID" aria-label="대상 ID" />
         </div>
         <div className="mt-3 grid gap-3 md:grid-cols-[120px_150px_1fr_1fr_auto]">
-          <input type="number" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.display_order} onChange={(event) => setForm((current) => ({ ...current, display_order: event.target.value }))} placeholder="??" aria-label="?? ??" />
-          <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))} aria-label="?? ??">
-            <option value="ACTIVE">??</option>
-            <option value="INACTIVE">???</option>
+          <input type="number" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.display_order} onChange={(event) => setForm((current) => ({ ...current, display_order: event.target.value }))} placeholder="순서" aria-label="노출 순서" />
+          <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))} aria-label="노출 상태">
+            <option value="ACTIVE">활성</option>
+            <option value="INACTIVE">비활성</option>
           </select>
-          <input type="datetime-local" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.starts_at} onChange={(event) => setForm((current) => ({ ...current, starts_at: event.target.value }))} aria-label="?? ??" />
-          <input type="datetime-local" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.ends_at} onChange={(event) => setForm((current) => ({ ...current, ends_at: event.target.value }))} aria-label="?? ??" />
+          <input type="datetime-local" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.starts_at} onChange={(event) => setForm((current) => ({ ...current, starts_at: event.target.value }))} aria-label="시작 일시" />
+          <input type="datetime-local" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.ends_at} onChange={(event) => setForm((current) => ({ ...current, ends_at: event.target.value }))} aria-label="시작 일시" />
           <div className="flex gap-2">
-            <Button disabled={!form.title || !form.image_url || saveCarousel.isPending} onClick={() => saveCarousel.mutate()}>{saveCarousel.isPending ? "?? ?" : editingID ? "?? ??" : "??"}</Button>
-            {editingID ? <Button variant="secondary" onClick={() => { setEditingID(null); setForm(emptyCMSCarouselForm()); }}>??</Button> : null}
+            <Button disabled={!form.title || !form.image_url || saveCarousel.isPending} onClick={() => saveCarousel.mutate()}>{saveCarousel.isPending ? "저장 중" : editingID ? "수정 저장" : "등록"}</Button>
+            {editingID ? <Button variant="secondary" onClick={() => { setEditingID(null); setForm(emptyCMSCarouselForm()); }}>취소</Button> : null}
           </div>
         </div>
         {saveCarousel.error ? <p className="mt-3 text-sm font-bold text-brand">{saveCarousel.error.message}</p> : null}
@@ -782,8 +787,8 @@ export function AdminCMSPage() {
               <StatusBadge value={carousel.status} />
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="sm" onClick={() => editCarousel(carousel)}>??</Button>
-              <Button size="sm" variant="secondary" disabled={deactivateCarousel.isPending || carousel.status !== "ACTIVE"} onClick={() => deactivateCarousel.mutate(carousel.id)}>????</Button>
+              <Button size="sm" onClick={() => editCarousel(carousel)}>수정</Button>
+              <Button size="sm" variant="secondary" disabled={deactivateCarousel.isPending || carousel.status !== "ACTIVE"} onClick={() => deactivateCarousel.mutate(carousel.id)}>비활성화</Button>
             </div>
           </ConsoleSection>
         ))}
@@ -876,10 +881,10 @@ function toDateTimeLocal(value?: string) {
 
 function cmsScheduleText(startsAt?: string, endsAt?: string) {
   if (!startsAt && !endsAt) {
-    return "?? ??";
+    return "상시 노출";
   }
-  const start = startsAt ? new Date(startsAt).toLocaleString("ko-KR") : "??";
-  const end = endsAt ? new Date(endsAt).toLocaleString("ko-KR") : "?? ??";
+  const start = startsAt ? new Date(startsAt).toLocaleString("ko-KR") : "시작 즉시";
+  const end = endsAt ? new Date(endsAt).toLocaleString("ko-KR") : "종료 없음";
   return `${start} ~ ${end}`;
 }
 

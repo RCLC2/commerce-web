@@ -23,6 +23,13 @@ export type Market = {
   tags?: string[];
 };
 
+export type MarketPenalty = {
+  id: number;
+  market_id: number;
+  score: number;
+  reason: string;
+  created_at: string;
+};
 export type CommerceCategory = {
   id: number;
   parent_id?: number;
@@ -47,6 +54,14 @@ export type ConsoleAlert = {
   title: string;
   description: string;
   severity: "INFO" | "WARNING" | "CRITICAL";
+};
+
+export type SellerContext = {
+  market_id: number;
+  market_name: string;
+  status: string;
+  profile_image_url?: string;
+  permissions: string[];
 };
 
 export type SellerDashboard = {
@@ -121,6 +136,12 @@ export type MemberProfile = {
   created_at: string;
 };
 
+export type ReviewProductSummary = {
+  id: number;
+  name: string;
+  image_url?: string;
+};
+
 export type Review = {
   id: number;
   product_id: number;
@@ -137,6 +158,7 @@ export type Review = {
   images?: ReviewImage[];
   created_at: string;
   updated_at?: string;
+  product?: ReviewProductSummary;
 };
 
 export type ReviewImage = {
@@ -223,6 +245,16 @@ export type MarketOrderResponse = {
   status: string;
   expected_settlement_amount: number;
   line_items: OrderLineItemResponse[];
+};
+
+export type DeliveryCarrier = {
+  code: string;
+  name: string;
+  tracking_key: string;
+};
+
+export type DeliveryCarriersResponse = {
+  carriers: DeliveryCarrier[];
 };
 
 export type Delivery = {
