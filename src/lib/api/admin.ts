@@ -1,5 +1,5 @@
 import { request } from "../api-client";
-import type { AdminDashboard, AuditLog, CMSCarousel, Coupon, Market, MarketPenalty, MemberProfile, Notification, OrderResponse, Product, Recommendation, Settlement, TrackingInfo } from "../types";
+import type { AdminDashboard, AuditLog, CMSCarousel, CMSHomeSection, CommerceCategory, Coupon, Market, MarketPenalty, MemberProfile, Notification, OrderResponse, Product, Recommendation, Settlement, TrackingInfo } from "../types";
 
 export const adminApi = {
   adminDashboard: (token: string) => request<AdminDashboard>("/api/v1/admin/dashboard", { token }),
@@ -29,6 +29,47 @@ export const adminApi = {
   adminCoupons: (token: string, memberID?: number | null) => request<Coupon[]>(`/api/v1/admin/coupons${memberID ? `?member_id=${memberID}` : ""}`, { token }),
   adminAuditLogs: (token: string) => request<AuditLog[]>("/api/v1/admin/audit-logs", { token }),
   adminCarousels: (token: string) => request<CMSCarousel[]>("/api/v1/admin/carousels", { token }),
+  adminEvents: (token: string) => request<CMSCarousel[]>("/api/v1/admin/events", { token }),
+  adminCategories: (token: string) => request<CommerceCategory[]>("/api/v1/admin/categories", { token }),
+  createCategory: (token: string, payload: { parent_id?: number | null; name: string; slug?: string; display_order: number }) =>
+    request<CommerceCategory>("/api/v1/admin/categories", {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    }),
+  updateCategory: (token: string, categoryID: number, payload: { parent_id?: number | null; name: string; slug?: string; display_order: number }) =>
+    request<CommerceCategory>(`/api/v1/admin/categories/${categoryID}`, {
+      method: "PUT",
+      token,
+      body: JSON.stringify(payload),
+    }),
+  deleteCategory: (token: string, categoryID: number) => request<void>(`/api/v1/admin/categories/${categoryID}`, { method: "DELETE", token }),
+  reorderCategories: (token: string, items: { id: number; display_order: number }[]) =>
+    request<CommerceCategory[]>("/api/v1/admin/categories/reorder", {
+      method: "POST",
+      token,
+      body: JSON.stringify({ items }),
+    }),
+  adminHomeSections: (token: string) => request<CMSHomeSection[]>("/api/v1/admin/home-sections", { token }),
+  createHomeSection: (token: string, payload: Partial<CMSHomeSection>) =>
+    request<CMSHomeSection>("/api/v1/admin/home-sections", {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    }),
+  updateHomeSection: (token: string, sectionID: number, payload: Partial<CMSHomeSection>) =>
+    request<CMSHomeSection>(`/api/v1/admin/home-sections/${sectionID}`, {
+      method: "PUT",
+      token,
+      body: JSON.stringify(payload),
+    }),
+  deleteHomeSection: (token: string, sectionID: number) => request<void>(`/api/v1/admin/home-sections/${sectionID}`, { method: "DELETE", token }),
+  reorderHomeSections: (token: string, items: { id: number; sequence: number }[]) =>
+    request<CMSHomeSection[]>("/api/v1/admin/home-sections/reorder", {
+      method: "POST",
+      token,
+      body: JSON.stringify({ items }),
+    }),
   createCarousel: (token: string, payload: Partial<CMSCarousel>) =>
     request<CMSCarousel>("/api/v1/carousels", {
       method: "POST",

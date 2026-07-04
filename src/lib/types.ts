@@ -400,6 +400,17 @@ export type CMSCarousel = {
   status: "ACTIVE" | "INACTIVE" | string;
 };
 
+export type CMSHomeSection = {
+  id: number;
+  sequence: number;
+  title: string;
+  description?: string;
+  subscription?: string;
+  api_url: string;
+  status: "ACTIVE" | "INACTIVE" | string;
+  created_at?: string;
+  updated_at?: string;
+};
 export type CommerceEvent = {
   id: number;
   title: string;

@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { firstOrderItem } from "@/lib/order-utils";
 import { useSessionStore } from "@/lib/session-store";
-import type { Market, MarketPenalty, MemberProfile, Product } from "@/lib/types";
+import type { CMSHomeSection, CommerceCategory, Market, MarketPenalty, MemberProfile, Product } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import {
   ConsoleHeader,
@@ -692,17 +692,16 @@ export function AdminCMSPage() {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState("ALL");
   const [editingID, setEditingID] = useState<number | null>(null);
-  const [form, setForm] = useState({
-    title: "",
-    image_url: "",
-    target_type: "PRODUCT",
-    target_id: "",
-    display_order: "0",
-    status: "ACTIVE",
-    starts_at: "",
-    ends_at: "",
-  });
+  const [categoryEditingID, setCategoryEditingID] = useState<number | null>(null);
+  const [sectionEditingID, setSectionEditingID] = useState<number | null>(null);
+  const [form, setForm] = useState(emptyCMSCarouselForm());
+  const [categoryForm, setCategoryForm] = useState(emptyCategoryForm());
+  const [sectionForm, setSectionForm] = useState(emptyHomeSectionForm());
+
   const { data = [] } = useQuery({ queryKey: ["admin-carousels"], queryFn: () => api.adminCarousels(token ?? ""), enabled: Boolean(token) });
+  const { data: categories = [] } = useQuery({ queryKey: ["admin-categories"], queryFn: () => api.adminCategories(token ?? ""), enabled: Boolean(token) });
+  const { data: homeSections = [] } = useQuery({ queryKey: ["admin-home-sections"], queryFn: () => api.adminHomeSections(token ?? ""), enabled: Boolean(token) });
+
   const saveCarousel = useMutation({
     mutationFn: () => {
       const payload = cmsCarouselPayload(form);
@@ -718,12 +717,52 @@ export function AdminCMSPage() {
     mutationFn: (carouselID: number) => api.deactivateCarousel(token ?? "", carouselID),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-carousels"] }),
   });
+  const saveCategory = useMutation({
+    mutationFn: () => {
+      const payload = categoryPayload(categoryForm);
+      return categoryEditingID ? api.updateCategory(token ?? "", categoryEditingID, payload) : api.createCategory(token ?? "", payload);
+    },
+    onSuccess: () => {
+      setCategoryEditingID(null);
+      setCategoryForm(emptyCategoryForm());
+      void queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
+    },
+  });
+  const deleteCategory = useMutation({
+    mutationFn: (categoryID: number) => api.deleteCategory(token ?? "", categoryID),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-categories"] }),
+  });
+  const reorderCategories = useMutation({
+    mutationFn: (items: { id: number; display_order: number }[]) => api.reorderCategories(token ?? "", items),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-categories"] }),
+  });
+  const saveHomeSection = useMutation({
+    mutationFn: () => {
+      const payload = homeSectionPayload(sectionForm);
+      return sectionEditingID ? api.updateHomeSection(token ?? "", sectionEditingID, payload) : api.createHomeSection(token ?? "", payload);
+    },
+    onSuccess: () => {
+      setSectionEditingID(null);
+      setSectionForm(emptyHomeSectionForm());
+      void queryClient.invalidateQueries({ queryKey: ["admin-home-sections"] });
+    },
+  });
+  const deleteHomeSection = useMutation({
+    mutationFn: (sectionID: number) => api.deleteHomeSection(token ?? "", sectionID),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-home-sections"] }),
+  });
+  const reorderHomeSections = useMutation({
+    mutationFn: (items: { id: number; sequence: number }[]) => api.reorderHomeSections(token ?? "", items),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-home-sections"] }),
+  });
 
   if (!token) {
     return <AdminAuthRequired />;
   }
 
   const filteredCarousels = status === "ALL" ? data : data.filter((carousel) => carousel.status === status);
+  const sortedCategories = [...categories].sort((a, b) => a.level - b.level || a.sort_order - b.sort_order || a.id - b.id);
+  const sortedSections = [...homeSections].sort((a, b) => a.sequence - b.sequence || a.id - b.id);
 
   function editCarousel(carousel: (typeof data)[number]) {
     setEditingID(carousel.id);
@@ -739,64 +778,119 @@ export function AdminCMSPage() {
     });
   }
 
+  function editCategory(category: CommerceCategory) {
+    setCategoryEditingID(category.id);
+    setCategoryForm({ parent_id: category.parent_id ? String(category.parent_id) : "", name: category.name, slug: category.slug, display_order: String(category.sort_order ?? 0) });
+  }
+
+  function editHomeSection(section: CMSHomeSection) {
+    setSectionEditingID(section.id);
+    setSectionForm({ sequence: String(section.sequence ?? 0), title: section.title, subscription: section.subscription ?? section.description ?? "", api_url: section.api_url, status: section.status === "ACTIVE" ? "ACTIVE" : "INACTIVE" });
+  }
+
+  function moveCategory(category: CommerceCategory, direction: -1 | 1) {
+    const siblings = categories.filter((item) => (item.parent_id ?? 0) === (category.parent_id ?? 0)).sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
+    const items = shiftedOrder(siblings, category.id, direction).map((item, index) => ({ id: item.id, display_order: index }));
+    reorderCategories.mutate(items);
+  }
+
+  function moveSection(section: CMSHomeSection, direction: -1 | 1) {
+    const items = shiftedOrder(sortedSections, section.id, direction).map((item, index) => ({ id: item.id, sequence: index }));
+    reorderHomeSections.mutate(items);
+  }
+
   return (
     <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <ConsoleHeader
-        title="CMS 캐러셀"
-        description="홈 캐러셀 이미지, 대상, 노출 기간을 관리합니다."
+        title="CMS 운영"
+        description="홈 구좌, 이벤트 캐러셀, 카테고리 노출 순서를 백엔드 설정 기준으로 관리합니다."
         action={<select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">전체 상태</option><option value="ACTIVE">활성</option><option value="INACTIVE">비활성</option></select>}
       />
-      <ConsoleSection className="mt-5" title={editingID ? "캐러셀 수정" : "캐러셀 등록"}>
+
+      <ConsoleSection className="mt-5" title={sectionEditingID ? "홈 구좌 수정" : "홈 구좌 등록"}>
+        <div className="grid gap-3 lg:grid-cols-[90px_1fr_1.2fr_1.1fr_130px_auto]">
+          <input type="number" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={sectionForm.sequence} onChange={(event) => setSectionForm((current) => ({ ...current, sequence: event.target.value }))} aria-label="구좌 순서" />
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={sectionForm.title} onChange={(event) => setSectionForm((current) => ({ ...current, title: event.target.value }))} placeholder="구좌명" aria-label="구좌명" />
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={sectionForm.subscription} onChange={(event) => setSectionForm((current) => ({ ...current, subscription: event.target.value }))} placeholder="설명" aria-label="구좌 설명" />
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={sectionForm.api_url} onChange={(event) => setSectionForm((current) => ({ ...current, api_url: event.target.value }))} placeholder="/api/v1/products/popular" aria-label="API URL" />
+          <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={sectionForm.status} onChange={(event) => setSectionForm((current) => ({ ...current, status: event.target.value }))} aria-label="구좌 상태"><option value="ACTIVE">활성</option><option value="INACTIVE">비활성</option></select>
+          <div className="flex gap-2">
+            <Button disabled={!sectionForm.title || !sectionForm.api_url || saveHomeSection.isPending} onClick={() => saveHomeSection.mutate()}>{saveHomeSection.isPending ? "저장 중" : sectionEditingID ? "수정" : "등록"}</Button>
+            {sectionEditingID ? <Button variant="secondary" onClick={() => { setSectionEditingID(null); setSectionForm(emptyHomeSectionForm()); }}>취소</Button> : null}
+          </div>
+        </div>
+        {saveHomeSection.error ? <p className="mt-3 text-sm font-bold text-brand">{saveHomeSection.error.message}</p> : null}
+        <div className="mt-4" />
+        <DataTable
+          columns={["순서", "구좌", "API", "상태", "작업"]}
+          rows={sortedSections.map((section) => [
+            section.sequence,
+            <div key="section"><p className="font-bold">{section.title}</p><p className="text-xs text-muted">{section.subscription ?? section.description}</p></div>,
+            section.api_url,
+            <StatusBadge key="status" value={section.status} />,
+            <div key="actions" className="flex flex-wrap gap-2"><Button size="sm" variant="secondary" onClick={() => moveSection(section, -1)}>위</Button><Button size="sm" variant="secondary" onClick={() => moveSection(section, 1)}>아래</Button><Button size="sm" onClick={() => editHomeSection(section)}>수정</Button><Button size="sm" variant="secondary" disabled={deleteHomeSection.isPending} onClick={() => deleteHomeSection.mutate(section.id)}>삭제</Button></div>,
+          ])}
+        />
+      </ConsoleSection>
+
+      <ConsoleSection className="mt-5" title={categoryEditingID ? "카테고리 수정" : "카테고리 등록"}>
+        <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr_100px_auto]">
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={categoryForm.name} onChange={(event) => setCategoryForm((current) => ({ ...current, name: event.target.value }))} placeholder="카테고리명" aria-label="카테고리명" />
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={categoryForm.slug} onChange={(event) => setCategoryForm((current) => ({ ...current, slug: event.target.value }))} placeholder="slug" aria-label="카테고리 slug" />
+          <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={categoryForm.parent_id} onChange={(event) => setCategoryForm((current) => ({ ...current, parent_id: event.target.value }))} aria-label="상위 카테고리">
+            <option value="">최상위</option>
+            {categories.filter((category) => category.level < 3 && category.id !== categoryEditingID).map((category) => <option key={category.id} value={category.id}>{categoryPathLabel(category, categories)}</option>)}
+          </select>
+          <input type="number" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={categoryForm.display_order} onChange={(event) => setCategoryForm((current) => ({ ...current, display_order: event.target.value }))} aria-label="카테고리 순서" />
+          <div className="flex gap-2">
+            <Button disabled={!categoryForm.name || saveCategory.isPending} onClick={() => saveCategory.mutate()}>{saveCategory.isPending ? "저장 중" : categoryEditingID ? "수정" : "등록"}</Button>
+            {categoryEditingID ? <Button variant="secondary" onClick={() => { setCategoryEditingID(null); setCategoryForm(emptyCategoryForm()); }}>취소</Button> : null}
+          </div>
+        </div>
+        {saveCategory.error ? <p className="mt-3 text-sm font-bold text-brand">{saveCategory.error.message}</p> : null}
+        {deleteCategory.error ? <p className="mt-3 text-sm font-bold text-brand">{deleteCategory.error.message}</p> : null}
+        <div className="mt-4" />
+        <DataTable
+          columns={["순서", "카테고리", "slug", "단계", "작업"]}
+          rows={sortedCategories.map((category) => [
+            category.sort_order,
+            <span key="name" className="font-bold">{categoryPathLabel(category, categories)}</span>,
+            category.slug,
+            `${category.level}단계`,
+            <div key="actions" className="flex flex-wrap gap-2"><Button size="sm" variant="secondary" onClick={() => moveCategory(category, -1)}>위</Button><Button size="sm" variant="secondary" onClick={() => moveCategory(category, 1)}>아래</Button><Button size="sm" onClick={() => editCategory(category)}>수정</Button><Button size="sm" variant="secondary" disabled={deleteCategory.isPending || categories.some((item) => item.parent_id === category.id)} onClick={() => deleteCategory.mutate(category.id)}>삭제</Button></div>,
+          ])}
+        />
+      </ConsoleSection>
+
+      <ConsoleSection className="mt-5" title={editingID ? "이벤트 캐러셀 수정" : "이벤트 캐러셀 등록"}>
         <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr_130px_110px]">
           <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="제목" aria-label="캐러셀 제목" />
           <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.image_url} onChange={(event) => setForm((current) => ({ ...current, image_url: event.target.value }))} placeholder="이미지 URL" aria-label="이미지 URL" />
-          <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={form.target_type} onChange={(event) => setForm((current) => ({ ...current, target_type: event.target.value }))} aria-label="대상 유형">
-            <option value="PRODUCT">상품</option>
-            <option value="MARKET">마켓</option>
-            <option value="URL">URL</option>
-          </select>
+          <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={form.target_type} onChange={(event) => setForm((current) => ({ ...current, target_type: event.target.value }))} aria-label="대상 유형"><option value="PRODUCT">상품</option><option value="MARKET">마켓</option><option value="URL">URL</option></select>
           <input type="number" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.target_id} onChange={(event) => setForm((current) => ({ ...current, target_id: event.target.value }))} placeholder="대상 ID" aria-label="대상 ID" />
         </div>
         <div className="mt-3 grid gap-3 md:grid-cols-[120px_150px_1fr_1fr_auto]">
           <input type="number" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.display_order} onChange={(event) => setForm((current) => ({ ...current, display_order: event.target.value }))} placeholder="순서" aria-label="노출 순서" />
-          <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))} aria-label="노출 상태">
-            <option value="ACTIVE">활성</option>
-            <option value="INACTIVE">비활성</option>
-          </select>
+          <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))} aria-label="노출 상태"><option value="ACTIVE">활성</option><option value="INACTIVE">비활성</option></select>
           <input type="datetime-local" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.starts_at} onChange={(event) => setForm((current) => ({ ...current, starts_at: event.target.value }))} aria-label="시작 일시" />
-          <input type="datetime-local" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.ends_at} onChange={(event) => setForm((current) => ({ ...current, ends_at: event.target.value }))} aria-label="시작 일시" />
-          <div className="flex gap-2">
-            <Button disabled={!form.title || !form.image_url || saveCarousel.isPending} onClick={() => saveCarousel.mutate()}>{saveCarousel.isPending ? "저장 중" : editingID ? "수정 저장" : "등록"}</Button>
-            {editingID ? <Button variant="secondary" onClick={() => { setEditingID(null); setForm(emptyCMSCarouselForm()); }}>취소</Button> : null}
-          </div>
+          <input type="datetime-local" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={form.ends_at} onChange={(event) => setForm((current) => ({ ...current, ends_at: event.target.value }))} aria-label="종료 일시" />
+          <div className="flex gap-2"><Button disabled={!form.title || !form.image_url || saveCarousel.isPending} onClick={() => saveCarousel.mutate()}>{saveCarousel.isPending ? "저장 중" : editingID ? "수정 저장" : "등록"}</Button>{editingID ? <Button variant="secondary" onClick={() => { setEditingID(null); setForm(emptyCMSCarouselForm()); }}>취소</Button> : null}</div>
         </div>
         {saveCarousel.error ? <p className="mt-3 text-sm font-bold text-brand">{saveCarousel.error.message}</p> : null}
       </ConsoleSection>
+
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         {filteredCarousels.map((carousel) => (
           <ConsoleSection key={carousel.id}>
-            <div className="relative aspect-[16/7] overflow-hidden rounded-md bg-zinc-100">
-              <SafeImage src={carousel.image_url} alt="" fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" />
-            </div>
-            <div className="mt-3 flex items-start justify-between gap-3">
-              <div>
-                <p className="font-black">{carousel.title}</p>
-                <p className="mt-1 text-xs font-bold text-muted">{carousel.link_url}</p>
-                <p className="mt-1 text-xs font-bold text-muted">{cmsScheduleText(carousel.starts_at, carousel.ends_at)}</p>
-              </div>
-              <StatusBadge value={carousel.status} />
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="sm" onClick={() => editCarousel(carousel)}>수정</Button>
-              <Button size="sm" variant="secondary" disabled={deactivateCarousel.isPending || carousel.status !== "ACTIVE"} onClick={() => deactivateCarousel.mutate(carousel.id)}>비활성화</Button>
-            </div>
+            <div className="relative aspect-[16/7] overflow-hidden rounded-md bg-zinc-100"><SafeImage src={carousel.image_url} alt="" fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" /></div>
+            <div className="mt-3 flex items-start justify-between gap-3"><div><p className="font-black">{carousel.title}</p><p className="mt-1 text-xs font-bold text-muted">순서 {carousel.display_order ?? 0} · {carousel.link_url}</p><p className="mt-1 text-xs font-bold text-muted">{cmsScheduleText(carousel.starts_at, carousel.ends_at)}</p></div><StatusBadge value={carousel.status} /></div>
+            <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" onClick={() => editCarousel(carousel)}>수정</Button><Button size="sm" variant="secondary" disabled={deactivateCarousel.isPending || carousel.status !== "ACTIVE"} onClick={() => deactivateCarousel.mutate(carousel.id)}>비활성화</Button></div>
           </ConsoleSection>
         ))}
       </div>
     </ConsoleLayout>
   );
 }
-
 export function AdminTokenLookupPage() {
   const token = useAdminToken();
   const setSellerContext = useSessionStore((state) => state.setSellerContext);
@@ -854,6 +948,71 @@ function emptyCMSCarouselForm() {
   };
 }
 
+function emptyCategoryForm() {
+  return {
+    parent_id: "",
+    name: "",
+    slug: "",
+    display_order: "0",
+  };
+}
+
+function categoryPayload(form: ReturnType<typeof emptyCategoryForm>) {
+  return {
+    parent_id: form.parent_id ? Number(form.parent_id) : null,
+    name: form.name.trim(),
+    slug: form.slug.trim(),
+    display_order: Number(form.display_order) || 0,
+  };
+}
+
+function emptyHomeSectionForm() {
+  return {
+    sequence: "0",
+    title: "",
+    subscription: "",
+    api_url: "/api/v1/products/popular",
+    status: "ACTIVE",
+  };
+}
+
+function homeSectionPayload(form: ReturnType<typeof emptyHomeSectionForm>) {
+  return {
+    sequence: Number(form.sequence) || 0,
+    title: form.title.trim(),
+    subscription: form.subscription.trim(),
+    description: form.subscription.trim(),
+    api_url: form.api_url.trim(),
+    status: form.status,
+  };
+}
+
+function shiftedOrder<T extends { id: number }>(items: T[], id: number, direction: -1 | 1) {
+  const next = [...items];
+  const index = next.findIndex((item) => item.id === id);
+  const target = index + direction;
+  if (index < 0 || target < 0 || target >= next.length) {
+    return next;
+  }
+  const current = next[index];
+  next[index] = next[target];
+  next[target] = current;
+  return next;
+}
+
+function categoryPathLabel(category: CommerceCategory, categories: CommerceCategory[]) {
+  const names = [category.name];
+  let parentID = category.parent_id;
+  while (parentID) {
+    const parent = categories.find((item) => item.id === parentID);
+    if (!parent) {
+      break;
+    }
+    names.unshift(parent.name);
+    parentID = parent.parent_id;
+  }
+  return names.join(" / ");
+}
 function cmsCarouselPayload(form: ReturnType<typeof emptyCMSCarouselForm>) {
   return {
     title: form.title.trim(),
