@@ -3,7 +3,7 @@ import type { Product } from "@/lib/types";
 import { discountRate, formatPrice } from "@/lib/utils";
 import { SafeImage } from "./safe-image";
 
-export function ProductCard({ product, imageAspect = "aspect-[3/4]" }: { product: Product; imageAspect?: string }) {
+export function ProductCard({ product, imageAspect = "aspect-[4/5]" }: { product: Product; imageAspect?: string }) {
   const saleRate = discountRate(product.base_price, product.discount_price);
   const price = product.discount_price || product.base_price;
   const discountAmount = Math.max(0, product.base_price - price);
