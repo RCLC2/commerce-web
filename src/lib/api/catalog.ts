@@ -1,5 +1,5 @@
 import { request } from "../api-client";
-import type { CMSCarousel, CMSHomeSection, CommerceCategory, CommerceEvent, Market, Product, Review } from "../types";
+import type { CMSCarousel, CMSHomeSection, CommerceCategory, CommerceEvent, Market, Product, Review, TrendPost } from "../types";
 
 type ProductDetailResponse = {
   product?: Product;
@@ -16,6 +16,7 @@ export const catalogApi = {
   getMarket: (id: number) => request<Market>(`/api/v1/markets/${id}`),
   listEvents: () => request<CommerceEvent[]>("/api/v1/events"),
   listHomeSections: () => request<CMSHomeSection[]>("/api/v1/home/sections"),
+  listTrendPosts: () => request<TrendPost[]>("/api/v1/trends/posts"),
   getEvent: (id: number) => request<CommerceEvent>(`/api/v1/events/${id}`),
   listProducts: (params?: { categoryID?: number; sort?: string; q?: string }) => {
     const search = new URLSearchParams();

@@ -411,6 +411,22 @@ export type CMSHomeSection = {
   created_at?: string;
   updated_at?: string;
 };
+
+export type TrendPost = {
+  id: number;
+  member_id: number;
+  order_code: string;
+  product_id?: number;
+  platform: string;
+  sns_url: string;
+  media_url?: string;
+  caption?: string;
+  tags?: string;
+  mention_type: "TAG" | "MENTION" | string;
+  reward_points: number;
+  status: "PENDING" | "APPROVED" | "REJECTED" | string;
+  created_at: string;
+};
 export type CommerceEvent = {
   id: number;
   title: string;
