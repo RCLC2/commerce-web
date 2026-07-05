@@ -35,7 +35,7 @@ export function CategoriesPage() {
           <h1 className="text-2xl font-black">카테고리관</h1>
           <p className="mt-1 text-sm text-muted">어드민이 정한 순서대로 카테고리와 상품 구좌를 보여드립니다.</p>
         </div>
-        <Link href="/products" className="inline-flex h-10 items-center gap-1 rounded-md bg-foreground px-4 text-sm font-bold text-white">
+        <Link href="/products" className="inline-flex h-10 items-center gap-1 rounded-md border border-brand/30 bg-brand/10 px-4 text-sm font-bold text-brand hover:bg-brand/15">
           전체 상품
           <ChevronRight size={16} />
         </Link>
@@ -48,7 +48,7 @@ export function CategoriesPage() {
           {orderedCategories.map((category) => (
             <button
               key={category.id}
-              className={`h-10 shrink-0 rounded-md px-4 text-sm font-black ${selectedCategory?.id === category.id ? "bg-foreground text-white" : "bg-zinc-100 text-zinc-700"}`}
+              className={`h-10 shrink-0 rounded-md px-4 text-sm font-black ${selectedCategory?.id === category.id ? "bg-brand/10 text-brand ring-1 ring-brand/25" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"}`}
               onClick={() => setSelectedSlug(category.slug)}
             >
               {category.name}
@@ -58,15 +58,15 @@ export function CategoriesPage() {
         {selectedCategory ? (
           <div className="grid gap-6 p-4 lg:grid-cols-[280px_1fr]">
             <aside className="space-y-3">
-              <Link href={selectedCategory.href} className="block rounded-md bg-zinc-950 px-4 py-4 text-white">
+              <Link href={selectedCategory.href} className="block rounded-md border border-brand/20 bg-brand/10 px-4 py-4 text-brand">
                 <p className="text-lg font-black">{selectedCategory.name}</p>
-                <p className="mt-1 text-xs font-bold text-white/70">{selectedCategory.category_ids?.length ?? 1}개 카테고리 묶음</p>
+                <p className="mt-1 text-xs font-bold text-brand/70">{selectedCategory.category_ids?.length ?? 1}개 카테고리 묶음</p>
               </Link>
               <div className="flex flex-wrap gap-2 lg:block lg:space-y-2">
                 {filterChips.map((category) => (
                   <button
                     key={category.id}
-                    className={`rounded-md px-3 py-2 text-left text-sm font-bold lg:w-full ${activeFilter?.id === category.id ? "bg-brand text-white" : "bg-zinc-100 text-zinc-700"}`}
+                    className={`rounded-md px-3 py-2 text-left text-sm font-bold lg:w-full ${activeFilter?.id === category.id ? "bg-brand/10 text-brand ring-1 ring-brand/25" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"}`}
                     onClick={() => setSelectedSlug(category.slug)}
                   >
                     {category.name}
