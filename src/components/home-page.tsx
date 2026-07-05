@@ -40,13 +40,6 @@ function compareCategoryOrder(a: CommerceCategory, b: CommerceCategory) {
   return a.sort_order - b.sort_order || a.id - b.id;
 }
 
-function fallbackHomeSections(): CMSHomeSection[] {
-  return [
-    { id: 0, sequence: 0, title: "인기 상품", subscription: "지금 많이 찾는 상품 20개", api_url: "/api/v1/products/popular", status: "ACTIVE" },
-    { id: 1, sequence: 1, title: "프로모션 상품", subscription: "혜택과 함께 둘러보는 추천 프로모션", api_url: "/api/v1/products/promotions", status: "ACTIVE" },
-  ];
-}
-
 function productsForHomeSection(section: CMSHomeSection) {
   if (section.api_url.includes("/products/promotions")) {
     return api.listPromotionProducts();
@@ -91,7 +84,7 @@ export function HomePage() {
   const rootCategories = [...categories]
     .filter((category) => !category.parent_id && category.level === 1)
     .sort(compareCategoryOrder);
-  const displayHomeSections = homeSections.length ? [...homeSections].sort((a, b) => a.sequence - b.sequence || a.id - b.id) : fallbackHomeSections();
+  const displayHomeSections = [...homeSections].sort((a, b) => a.sequence - b.sequence || a.id - b.id);
   const homeSectionQueries = useQueries({
     queries: displayHomeSections.map((section) => ({
       queryKey: ["home-section-products", section.api_url],
@@ -187,7 +180,7 @@ export function HomePage() {
         <ProductCarouselSection
           key={section.id || section.api_url}
           title={section.title}
-          description={section.subscription ?? section.description ?? ""}
+          description={section.description ?? ""}
           products={homeSectionQueries[index]?.data ?? []}
           isLoading={homeSectionQueries[index]?.isLoading ?? false}
         />

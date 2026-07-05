@@ -405,7 +405,6 @@ export type CMSHomeSection = {
   sequence: number;
   title: string;
   description?: string;
-  subscription?: string;
   api_url: string;
   status: "ACTIVE" | "INACTIVE" | string;
   created_at?: string;

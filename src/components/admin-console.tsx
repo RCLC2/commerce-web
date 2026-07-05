@@ -785,7 +785,7 @@ export function AdminCMSPage() {
 
   function editHomeSection(section: CMSHomeSection) {
     setSectionEditingID(section.id);
-    setSectionForm({ sequence: String(section.sequence ?? 0), title: section.title, subscription: section.subscription ?? section.description ?? "", api_url: section.api_url, status: section.status === "ACTIVE" ? "ACTIVE" : "INACTIVE" });
+    setSectionForm({ sequence: String(section.sequence ?? 0), title: section.title, description: section.description ?? "", api_url: section.api_url, status: section.status === "ACTIVE" ? "ACTIVE" : "INACTIVE" });
   }
 
   function moveCategory(category: CommerceCategory, direction: -1 | 1) {
@@ -811,7 +811,7 @@ export function AdminCMSPage() {
         <div className="grid gap-3 lg:grid-cols-[90px_1fr_1.2fr_1.1fr_130px_auto]">
           <input type="number" className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={sectionForm.sequence} onChange={(event) => setSectionForm((current) => ({ ...current, sequence: event.target.value }))} aria-label="구좌 순서" />
           <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={sectionForm.title} onChange={(event) => setSectionForm((current) => ({ ...current, title: event.target.value }))} placeholder="구좌명" aria-label="구좌명" />
-          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={sectionForm.subscription} onChange={(event) => setSectionForm((current) => ({ ...current, subscription: event.target.value }))} placeholder="설명" aria-label="구좌 설명" />
+          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={sectionForm.description} onChange={(event) => setSectionForm((current) => ({ ...current, description: event.target.value }))} placeholder="설명" aria-label="구좌 설명" />
           <input className="h-11 rounded-md border border-line px-3 text-sm outline-none" value={sectionForm.api_url} onChange={(event) => setSectionForm((current) => ({ ...current, api_url: event.target.value }))} placeholder="/api/v1/products/popular" aria-label="API URL" />
           <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={sectionForm.status} onChange={(event) => setSectionForm((current) => ({ ...current, status: event.target.value }))} aria-label="구좌 상태"><option value="ACTIVE">활성</option><option value="INACTIVE">비활성</option></select>
           <div className="flex gap-2">
@@ -825,7 +825,7 @@ export function AdminCMSPage() {
           columns={["순서", "구좌", "API", "상태", "작업"]}
           rows={sortedSections.map((section) => [
             section.sequence,
-            <div key="section"><p className="font-bold">{section.title}</p><p className="text-xs text-muted">{section.subscription ?? section.description}</p></div>,
+            <div key="section"><p className="font-bold">{section.title}</p><p className="text-xs text-muted">{section.description}</p></div>,
             section.api_url,
             <StatusBadge key="status" value={section.status} />,
             <div key="actions" className="flex flex-wrap gap-2"><Button size="sm" variant="secondary" onClick={() => moveSection(section, -1)}>위</Button><Button size="sm" variant="secondary" onClick={() => moveSection(section, 1)}>아래</Button><Button size="sm" onClick={() => editHomeSection(section)}>수정</Button><Button size="sm" variant="secondary" disabled={deleteHomeSection.isPending} onClick={() => deleteHomeSection.mutate(section.id)}>삭제</Button></div>,
@@ -970,7 +970,7 @@ function emptyHomeSectionForm() {
   return {
     sequence: "0",
     title: "",
-    subscription: "",
+    description: "",
     api_url: "/api/v1/products/popular",
     status: "ACTIVE",
   };
@@ -980,8 +980,7 @@ function homeSectionPayload(form: ReturnType<typeof emptyHomeSectionForm>) {
   return {
     sequence: Number(form.sequence) || 0,
     title: form.title.trim(),
-    subscription: form.subscription.trim(),
-    description: form.subscription.trim(),
+    description: form.description.trim(),
     api_url: form.api_url.trim(),
     status: form.status,
   };
