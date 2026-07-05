@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, Gift, Instagram } from "lucide-react";
+import { Camera, ExternalLink, Gift } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import type { TrendPost } from "@/lib/types";
@@ -73,7 +73,7 @@ function TrendCard({ post }: { post: TrendPost }) {
         <div className="relative aspect-[4/5] bg-zinc-100">
           <SafeImage src={post.media_url} alt={post.caption ?? "trend post"} fill sizes="(max-width: 768px) 50vw, 33vw" className="object-cover transition duration-300 group-hover:scale-[1.03]" />
           <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/60 px-3 py-1 text-xs font-black text-white">
-            <Instagram size={14} />
+            <Camera size={14} />
             {post.platform}
           </div>
         </div>
