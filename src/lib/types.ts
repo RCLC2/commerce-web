@@ -412,20 +412,25 @@ export type CMSHomeSection = {
   updated_at?: string;
 };
 
-export type TrendPost = {
-  id: number;
-  member_id: number;
-  order_code: string;
-  product_id?: number;
+export type InstagramTrendItem = {
+  id: string;
   platform: string;
+  content_type: "FEED" | "STORY" | "REEL" | "VIDEO" | "IMAGE" | string;
   sns_url: string;
   media_url?: string;
   caption?: string;
-  tags?: string;
-  mention_type: "TAG" | "MENTION" | string;
-  reward_points: number;
-  status: "PENDING" | "APPROVED" | "REJECTED" | string;
-  created_at: string;
+  tags?: string[];
+  username?: string;
+  timestamp?: string;
+};
+
+export type InstagramTrendPage = {
+  hashtag: string;
+  items: InstagramTrendItem[];
+  paging: {
+    next_cursor?: string;
+    has_next: boolean;
+  };
 };
 export type CommerceEvent = {
   id: number;

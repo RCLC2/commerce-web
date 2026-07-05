@@ -1,5 +1,5 @@
 import { request } from "../api-client";
-import type { CMSCarousel, CMSHomeSection, CommerceCategory, CommerceEvent, Market, Product, Review, TrendPost } from "../types";
+import type { CMSCarousel, CMSHomeSection, CommerceCategory, CommerceEvent, InstagramTrendPage, Market, Product, Review } from "../types";
 
 type ProductDetailResponse = {
   product?: Product;
@@ -16,7 +16,20 @@ export const catalogApi = {
   getMarket: (id: number) => request<Market>(`/api/v1/markets/${id}`),
   listEvents: () => request<CommerceEvent[]>("/api/v1/events"),
   listHomeSections: () => request<CMSHomeSection[]>("/api/v1/home/sections"),
-  listTrendPosts: () => request<TrendPost[]>("/api/v1/trends/posts"),
+  listTrendPosts: (params?: { limit?: number; after?: string; hashtag?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.limit) {
+      search.set("limit", String(params.limit));
+    }
+    if (params?.after) {
+      search.set("after", params.after);
+    }
+    if (params?.hashtag) {
+      search.set("hashtag", params.hashtag);
+    }
+    const query = search.toString();
+    return request<InstagramTrendPage>(`/api/v1/trends/posts${query ? `?${query}` : ""}`);
+  },
   getEvent: (id: number) => request<CommerceEvent>(`/api/v1/events/${id}`),
   listProducts: (params?: { categoryID?: number; sort?: string; q?: string }) => {
     const search = new URLSearchParams();
