@@ -195,7 +195,7 @@ export function HomePage() {
         {isRecommendationLoading ? (
           <div className="grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
             {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="aspect-[3/4] animate-pulse rounded-md bg-zinc-200" />
+              <div key={index} className="aspect-square animate-pulse rounded-md bg-zinc-200" />
             ))}
           </div>
         ) : (

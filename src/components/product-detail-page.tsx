@@ -76,7 +76,7 @@ export function ProductDetailPage({ productId }: { productId: number }) {
     <main className="mx-auto max-w-6xl px-4 pb-28 pt-5 md:pt-8">
       <div className="grid gap-8 md:grid-cols-[1fr_420px]">
         <section className="space-y-3">
-          <div className="relative aspect-[4/5] overflow-hidden rounded-md bg-zinc-100 md:aspect-[5/6]">
+          <div className="relative aspect-square overflow-hidden rounded-md bg-zinc-100">
             <SafeImage src={product.image_url} alt={product.name} fill sizes="(max-width: 768px) 100vw, 55vw" className="object-cover" />
           </div>
           <section className="rounded-md border border-line bg-white p-4">
