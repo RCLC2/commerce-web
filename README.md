@@ -38,6 +38,8 @@ Create `.env.local` from `.env.example`.
 
 ```bash
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+EXPERIMENT_API_BASE_URL=http://localhost:8081
+NEXT_PUBLIC_EXPERIMENT_API_BASE_URL=/experiment-api
 ```
 
 The frontend always reads data from the configured backend API. It does not fall back to mock catalog, order, seller, or admin data.
@@ -50,7 +52,8 @@ BACKEND_API_BASE_URL=http://awseb--AWSEB-25VUEV1O1LDt-1190913415.ap-northeast-2.
 ```
 
 `NEXT_PUBLIC_API_BASE_URL` may be provided with or without `http://`; the app normalizes it before making requests.
-Use `NEXT_PUBLIC_API_BASE_URL=same-origin` with `BACKEND_API_BASE_URL` when the frontend is served over HTTPS but the Elastic Beanstalk or ELB backend is still HTTP. In that mode, browser requests stay on the HTTPS frontend origin and Next.js rewrites `/api/v1/*` to the configured backend server-side.
+Use `NEXT_PUBLIC_API_BASE_URL=same-origin` with `BACKEND_API_BASE_URL` when the frontend is served over HTTPS but the Elastic Beanstalk or ELB backend is still HTTP.
+The experiment admin page calls `NEXT_PUBLIC_EXPERIMENT_API_BASE_URL`, which defaults to `/experiment-api`; Next.js rewrites that path to `EXPERIMENT_API_BASE_URL` server-side so the browser does not need direct CORS access to the experiment API. In that mode, browser requests stay on the HTTPS frontend origin and Next.js rewrites `/api/v1/*` to the configured backend server-side.
 
 ## Scripts
 

@@ -24,7 +24,7 @@ import {
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
-const adminLinks = [
+export const adminLinks = [
   { href: "/admin", label: "홈" },
   { href: "/admin/members", label: "회원" },
   { href: "/admin/markets", label: "마켓" },
@@ -35,9 +35,10 @@ const adminLinks = [
   { href: "/admin/tokens", label: "토큰 조회" },
   { href: "/admin/audit-logs", label: "감사 로그" },
   { href: "/admin/cms", label: "CMS" },
+  { href: "/admin/experiments", label: "실험" },
 ];
 
-function useAdminToken() {
+export function useAdminToken() {
   const token = useSessionStore((state) => state.accessToken);
   const role = useSessionStore((state) => state.role);
   if (role !== "ADMIN") {
@@ -46,7 +47,7 @@ function useAdminToken() {
   return getEffectiveToken(token);
 }
 
-function AdminAuthRequired() {
+export function AdminAuthRequired() {
   return (
     <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <ConsoleSection>
