@@ -2,7 +2,7 @@
 
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleDollarSign, ShoppingBag, Store, Users } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { firstOrderItem } from "@/lib/order-utils";
@@ -41,6 +41,12 @@ export const adminLinks = [
 export function useAdminToken() {
   const token = useSessionStore((state) => state.accessToken);
   const role = useSessionStore((state) => state.role);
+  const hydrate = useSessionStore((state) => state.hydrate);
+
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
+
   if (role !== "ADMIN") {
     return null;
   }

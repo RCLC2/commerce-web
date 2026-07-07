@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Beaker, Play, Pause, RotateCcw, Square, Send, RefreshCw } from "lucide-react";
-import { experimentApi, type CreateExperimentPayload, type Experiment, type ExperimentEventType, type ExperimentStatus, type ExperimentSubjectType } from "@/lib/api/experiment";
+import { experimentApi, type CreateExperimentPayload, type ExperimentEventType, type ExperimentStatus, type ExperimentSubjectType } from "@/lib/api/experiment";
 import { cn } from "@/lib/utils";
 import { AdminAuthRequired, adminLinks, useAdminToken } from "./admin-console";
 import { ConsoleHeader, ConsoleLayout, ConsoleSection, DataTable, FilterField, FilterPanel, StatusBadge, SummaryStrip } from "./console-layout";
@@ -176,20 +176,44 @@ export function AdminExperimentsPage() {
         />
       </div>
 
-      <div className="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+      <div className="mt-5 grid items-start gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
         <ConsoleSection title="실험 목록" action={<StatusBadge value={experimentsQuery.isFetching ? "INFO" : "ACTIVE"} />}>
-          <DataTable
-            columns={["실험", "상태", "대상", "지표", "작업"]}
-            rows={experiments.map((experiment) => [
-              <ExperimentTitle key="title" experiment={experiment} selected={experiment.id === selectedID} />,
-              <StatusBadge key="status" value={experiment.status} />,
-              experiment.include_anonymous ? "회원 + 비회원" : "회원만",
-              experiment.primary_metric,
-              <Button key="select" size="sm" variant={experiment.id === selectedID ? "primary" : "secondary"} onClick={() => setSelectedID(experiment.id)}>선택</Button>,
-            ])}
-          />
+          <div className="max-h-[520px] overflow-y-auto rounded-md border border-line">
+            {experiments.length ? (
+              experiments.map((experiment) => {
+                const selectedExperiment = experiment.id === selected?.id;
+                return (
+                  <button
+                    key={experiment.id}
+                    type="button"
+                    className={cn("block w-full border-b border-line px-3 py-3 text-left transition last:border-b-0 hover:bg-zinc-50", selectedExperiment && "bg-brand/5")}
+                    onClick={() => setSelectedID(experiment.id)}
+                  >
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className={cn("truncate text-sm font-black", selectedExperiment && "text-brand")}>{experiment.name}</p>
+                        <p className="mt-1 truncate text-xs font-bold text-muted">{experiment.key}</p>
+                      </div>
+                      <StatusBadge value={experiment.status} />
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                      <div className="min-w-0 rounded bg-zinc-50 px-2 py-1">
+                        <p className="font-black text-muted">대상</p>
+                        <p className="truncate font-bold text-foreground">{experiment.include_anonymous ? "회원 + 비회원" : "회원만"}</p>
+                      </div>
+                      <div className="min-w-0 rounded bg-zinc-50 px-2 py-1">
+                        <p className="font-black text-muted">지표</p>
+                        <p className="truncate font-bold text-foreground">{experiment.primary_metric}</p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
+            ) : (
+              <div className="px-4 py-10 text-center text-sm font-bold text-muted">{experimentsQuery.isFetching ? "불러오는 중입니다." : "등록된 실험이 없습니다."}</div>
+            )}
+          </div>
         </ConsoleSection>
-
         <ConsoleSection title="실험 생성" action={<Button variant="secondary" onClick={() => setForm(demoForm())}><Beaker size={16} />데모 채우기</Button>}>
           <div className="grid gap-3 md:grid-cols-2">
             <TextField label="키" value={form.key} onChange={(value) => setForm((current) => ({ ...current, key: value }))} />
@@ -206,7 +230,7 @@ export function AdminExperimentsPage() {
           </div>
           <label className="mt-3 grid gap-1 text-xs font-black text-muted">
             variants JSON
-            <textarea className="min-h-44 rounded-md border border-line px-3 py-2 font-mono text-xs outline-none" value={form.variantsJson} onChange={(event) => setForm((current) => ({ ...current, variantsJson: event.target.value }))} />
+            <textarea className="min-h-44 resize-y rounded-md border border-line px-3 py-2 font-mono text-xs leading-5 outline-none" value={form.variantsJson} onChange={(event) => setForm((current) => ({ ...current, variantsJson: event.target.value }))} />
           </label>
           <div className="mt-3 flex justify-end">
             <Button disabled={!experimentAdminToken || createExperiment.isPending} onClick={() => createExperiment.mutate()}>{createExperiment.isPending ? "생성 중" : "실험 생성"}</Button>
@@ -214,7 +238,7 @@ export function AdminExperimentsPage() {
         </ConsoleSection>
       </div>
 
-      <div className="mt-5 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+      <div className="mt-5 grid gap-4">
         <ConsoleSection
           title="선택한 실험"
           description={selected ? `${selected.key} / ${selected.domain}` : "실험을 선택해 주세요."}
@@ -290,15 +314,6 @@ export function AdminExperimentsPage() {
         </ConsoleSection>
       </div>
     </ConsoleLayout>
-  );
-}
-
-function ExperimentTitle({ experiment, selected }: { experiment: Experiment; selected: boolean }) {
-  return (
-    <div>
-      <p className={cn("font-bold", selected && "text-brand")}>{experiment.key}</p>
-      <p className="text-xs text-muted">{experiment.name}</p>
-    </div>
   );
 }
 
