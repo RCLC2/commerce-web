@@ -1,4 +1,4 @@
-﻿const DEFAULT_EXPERIMENT_API_BASE_URL = "/experiment-api";
+const DEFAULT_EXPERIMENT_API_BASE_URL = "/experiment-api";
 
 export type ExperimentStatus = "DRAFT" | "SCHEDULED" | "RUNNING" | "PAUSED" | "ENDED";
 export type ExperimentSubjectType = "MEMBER" | "ANONYMOUS";
@@ -9,7 +9,6 @@ export type ExperimentVariant = {
   key: string;
   name: string;
   traffic_weight: number;
-  config: Record<string, unknown>;
 };
 
 export type Experiment = {
@@ -48,7 +47,6 @@ export type AssignmentResolveResponse = {
     eligible: boolean;
     reason?: string;
     ttl_seconds?: number;
-    config?: Record<string, unknown>;
   }>;
 };
 
@@ -60,7 +58,6 @@ export type ExperimentResult = {
   winner?: {
     variant_key: string;
     reason: string;
-    config: Record<string, unknown>;
   };
   variants: Array<{
     variant_key: string;

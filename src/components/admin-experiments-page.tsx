@@ -19,7 +19,7 @@ type ExperimentForm = {
   endedAt: string;
   primaryMetric: string;
   description: string;
-  variantsJson: string;
+  segmentCount: string;
 };
 
 const defaultBaseUrl = process.env.NEXT_PUBLIC_EXPERIMENT_API_BASE_URL || "/experiment-api";
@@ -222,16 +222,13 @@ export function AdminExperimentsPage() {
             <SelectField label="상태" value={form.status} onChange={(value) => setForm((current) => ({ ...current, status: value as ExperimentStatus }))} options={["DRAFT", "SCHEDULED", "RUNNING", "PAUSED"]} />
             <SelectField label="대상" value={form.includeAnonymous ? "true" : "false"} onChange={(value) => setForm((current) => ({ ...current, includeAnonymous: value === "true" }))} options={["true", "false"]} labels={{ true: "회원 + 비회원", false: "회원만" }} />
             <SelectField label="주 지표" value={form.primaryMetric} onChange={(value) => setForm((current) => ({ ...current, primaryMetric: value }))} options={["purchase_rate", "revenue_per_user", "ctr", "impressions"]} />
+            <TextField label="세그먼트 수" type="number" value={form.segmentCount} onChange={(value) => setForm((current) => ({ ...current, segmentCount: value }))} />
             <TextField label="시작 일시" type="datetime-local" value={form.startedAt} onChange={(value) => setForm((current) => ({ ...current, startedAt: value }))} />
             <TextField label="종료 일시" type="datetime-local" value={form.endedAt} onChange={(value) => setForm((current) => ({ ...current, endedAt: value }))} />
           </div>
           <div className="mt-3">
             <TextField label="설명" value={form.description} onChange={(value) => setForm((current) => ({ ...current, description: value }))} />
           </div>
-          <label className="mt-3 grid gap-1 text-xs font-black text-muted">
-            variants JSON
-            <textarea className="min-h-44 resize-y rounded-md border border-line px-3 py-2 font-mono text-xs leading-5 outline-none" value={form.variantsJson} onChange={(event) => setForm((current) => ({ ...current, variantsJson: event.target.value }))} />
-          </label>
           <div className="mt-3 flex justify-end">
             <Button disabled={!experimentAdminToken || createExperiment.isPending} onClick={() => createExperiment.mutate()}>{createExperiment.isPending ? "생성 중" : "실험 생성"}</Button>
           </div>
@@ -270,11 +267,10 @@ export function AdminExperimentsPage() {
               </div>
               <div className="mt-4">
                 <DataTable
-                  columns={["군", "트래픽", "설정"]}
+                  columns={["세그먼트", "트래픽"]}
                   rows={selected.variants.map((variant) => [
                     <div key="variant"><p className="font-bold">{variant.key}</p><p className="text-xs text-muted">{variant.name}</p></div>,
                     `${variant.traffic_weight}%`,
-                    <code key="config" className="text-xs">{JSON.stringify(variant.config)}</code>,
                   ])}
                 />
               </div>
@@ -362,24 +358,7 @@ function demoForm(): ExperimentForm {
     endedAt: "",
     primaryMetric: "purchase_rate",
     description: "카테고리 조회 API에서 사용자 세그먼트별 a,b,c,d,e 노출 순서를 비교합니다.",
-    variantsJson: JSON.stringify(
-      [
-        {
-          key: "control",
-          name: "기존 순서",
-          traffic_weight: 50,
-          config: { category_order: ["a", "b", "c", "d", "e"] },
-        },
-        {
-          key: "variant_b",
-          name: "역순 노출",
-          traffic_weight: 50,
-          config: { category_order: ["e", "d", "c", "b", "a"] },
-        },
-      ],
-      null,
-      2,
-    ),
+    segmentCount: "2",
   };
 }
 
@@ -394,6 +373,18 @@ function formPayload(form: ExperimentForm): CreateExperimentPayload {
     ended_at: form.endedAt ? new Date(form.endedAt).toISOString() : undefined,
     primary_metric: form.primaryMetric,
     description: form.description.trim(),
-    variants: JSON.parse(form.variantsJson) as CreateExperimentPayload["variants"],
+    variants: segmentVariants(Number(form.segmentCount) || 2),
   };
+}
+
+function segmentVariants(count: number): CreateExperimentPayload["variants"] {
+  const normalized = Math.min(Math.max(Math.trunc(count), 2), 10);
+  const base = Math.floor(100 / normalized);
+  let remainder = 100 - base * normalized;
+  return Array.from({ length: normalized }, (_, index) => {
+    const key = String.fromCharCode(65 + index);
+    const trafficWeight = base + (remainder > 0 ? 1 : 0);
+    remainder -= remainder > 0 ? 1 : 0;
+    return { key, name: `${key}군`, traffic_weight: trafficWeight };
+  });
 }
