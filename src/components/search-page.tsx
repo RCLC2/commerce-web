@@ -10,6 +10,24 @@ import { queryKeys } from "@/lib/query-keys";
 import { ProductCard } from "./product-card";
 import { SafeImage } from "./safe-image";
 
+const relatedPrefixes = ["여름", "나시", "레이어드", "빅사이즈", "반팔", "셔츠", "하객룩"];
+
+function buildRelatedKeywords(query: string) {
+  const normalized = query.trim();
+  if (!normalized) {
+    return [];
+  }
+  const base = relatedPrefixes.reduce((value, prefix) => {
+    if (value === prefix) {
+      return value;
+    }
+    return value.replace(new RegExp(`^${prefix}\\s*`), "");
+  }, normalized).trim() || normalized;
+  return relatedPrefixes
+    .map((prefix) => `${prefix} ${base}`.replace(/\s+/g, " ").trim())
+    .filter((keyword, index, list) => keyword !== normalized && list.indexOf(keyword) === index)
+    .slice(0, 7);
+}
 export function SearchPage() {
   const searchParams = useSearchParams();
   const q = searchParams.get("q") ?? "";
@@ -52,21 +70,16 @@ function SearchExperience({ initialQuery }: { initialQuery: string }) {
       .filter((category) => category.name.includes(committedQuery) || committedQuery.includes(category.name))
       .slice(0, 2);
   }, [categories, committedQuery]);
-  const relatedKeywords = useMemo(() => {
-    if (!committedQuery) {
-      return [];
-    }
-    return [
-      `여름${committedQuery}`,
-      `나시${committedQuery}`,
-      `레이어드 ${committedQuery}`,
-      `빅사이즈 ${committedQuery}`,
-      `반팔${committedQuery}`,
-      `셔츠${committedQuery}`,
-      `하객룩 ${committedQuery}`,
-    ];
-  }, [committedQuery]);
+  const relatedKeywords = useMemo(() => buildRelatedKeywords(committedQuery), [committedQuery]);
 
+  function navigateSearch(keyword: string) {
+    const next = keyword.trim();
+    if (!next || next === committedQuery) {
+      return;
+    }
+    setInput(next);
+    router.push(`/search?q=${encodeURIComponent(next)}`);
+  }
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     router.push(trimmedInput ? `/search?q=${encodeURIComponent(trimmedInput)}` : "/search");
@@ -172,7 +185,7 @@ function SearchExperience({ initialQuery }: { initialQuery: string }) {
             </div>
             {relatedKeywords.length ? <div className="mt-8 border-t border-line pt-3">
               {relatedKeywords.map((keyword) => (
-                <button key={keyword} className="block h-14 text-left text-lg" onClick={() => router.push(`/search?q=${encodeURIComponent(keyword)}`)}>
+                <button key={keyword} className="block h-14 text-left text-lg" onClick={() => navigateSearch(keyword)}>
                   {keyword.includes(committedQuery) ? keyword.split(committedQuery).map((part, index) => (
                     <span key={`${part}-${index}`}>{part}{index < keyword.split(committedQuery).length - 1 ? <strong>{committedQuery}</strong> : null}</span>
                   )) : keyword}

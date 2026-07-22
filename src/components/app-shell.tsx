@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Camera, Grid2X2, Heart, Home, Menu, Search, ShieldCheck, Star, Store, User, X } from "lucide-react";
+import { Flame, Grid2X2, Heart, Home, Menu, Search, ShieldCheck, Star, Store, User, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -13,7 +13,7 @@ import { Button } from "./ui/button";
 
 const nav = [
   { href: "/categories", label: "카테고리", icon: Grid2X2 },
-  { href: "/snapshot", label: "스냅샷", icon: Camera },
+  { href: "/snapshot", label: "트렌드관", icon: Flame },
   { href: "/", label: "홈", icon: Home, primary: true },
   { href: "/likes", label: "좋아요", icon: Heart },
   { href: "/mypage", label: "마이페이지", icon: User },

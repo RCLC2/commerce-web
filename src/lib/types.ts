@@ -400,6 +400,37 @@ export type CMSCarousel = {
   status: "ACTIVE" | "INACTIVE" | string;
 };
 
+export type CMSHomeSection = {
+  id: number;
+  sequence: number;
+  title: string;
+  description?: string;
+  api_url: string;
+  status: "ACTIVE" | "INACTIVE" | string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type InstagramTrendItem = {
+  id: string;
+  platform: string;
+  content_type: "FEED" | "STORY" | "REEL" | "VIDEO" | "IMAGE" | string;
+  sns_url: string;
+  media_url?: string;
+  caption?: string;
+  tags?: string[];
+  username?: string;
+  timestamp?: string;
+};
+
+export type InstagramTrendPage = {
+  hashtag: string;
+  items: InstagramTrendItem[];
+  paging: {
+    next_cursor?: string;
+    has_next: boolean;
+  };
+};
 export type CommerceEvent = {
   id: number;
   title: string;

@@ -27,6 +27,9 @@ const priceRanges = [
 
 const tagFilters = ["오늘출발", "신상", "무료배송", "리뷰많음", "쿠폰가능"];
 
+function compareCategoryOrder(a: CommerceCategory, b: CommerceCategory) {
+  return a.level - b.level || (a.parent_id ?? 0) - (b.parent_id ?? 0) || a.sort_order - b.sort_order || a.id - b.id;
+}
 function productPrice(product: Product) {
   return product.discount_price || product.base_price;
 }
@@ -61,7 +64,7 @@ export function ProductListPage() {
   });
 
   const categories = useMemo(
-    () => [...serverCategories].sort((a, b) => a.sort_order - b.sort_order),
+    () => [...serverCategories].sort(compareCategoryOrder),
     [serverCategories],
   );
 

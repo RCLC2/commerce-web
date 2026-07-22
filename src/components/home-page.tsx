@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import {
   Backpack,
   ChevronLeft,
@@ -14,12 +14,11 @@ import {
   Footprints,
 } from "lucide-react";
 import Link from "next/link";
-import type { RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { queryKeys } from "@/lib/query-keys";
-import type { CommerceCategory, Product } from "@/lib/types";
+import type { CMSHomeSection, CommerceCategory, Product } from "@/lib/types";
 import { useSessionStore } from "@/lib/session-store";
 import { formatPrice } from "@/lib/utils";
 import { ProductCard } from "./product-card";
@@ -37,6 +36,19 @@ const categoryIcons = {
   "free-shipping": Gem,
 };
 
+function compareCategoryOrder(a: CommerceCategory, b: CommerceCategory) {
+  return a.sort_order - b.sort_order || a.id - b.id;
+}
+
+function productsForHomeSection(section: CMSHomeSection) {
+  if (section.api_url.includes("/products/promotions")) {
+    return api.listPromotionProducts();
+  }
+  if (section.api_url.includes("/products/latest") || section.api_url.includes("/products/recommendations")) {
+    return api.listLatestProducts();
+  }
+  return api.listPopularProducts();
+}
 function categoryIcon(category: CommerceCategory) {
   return categoryIcons[category.slug as keyof typeof categoryIcons] ?? Star;
 }
@@ -46,8 +58,6 @@ export function HomePage() {
   const [eventIndex, setEventIndex] = useState(0);
   const [visibleCount, setVisibleCount] = useState(8);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const popularCarouselRef = useRef<HTMLDivElement | null>(null);
-  const promotionCarouselRef = useRef<HTMLDivElement | null>(null);
   const effectiveToken = getEffectiveToken(token);
   const { data: events = [] } = useQuery({
     queryKey: queryKeys.events,
@@ -57,13 +67,9 @@ export function HomePage() {
     queryKey: queryKeys.categories,
     queryFn: api.listCategories,
   });
-  const { data: popularProducts = [], isLoading: isPopularLoading } = useQuery({
-    queryKey: queryKeys.products({ sort: "popular" }),
-    queryFn: api.listPopularProducts,
-  });
-  const { data: promotionProducts = [], isLoading: isPromotionLoading } = useQuery({
-    queryKey: queryKeys.products({ sort: "promotion" }),
-    queryFn: api.listPromotionProducts,
+  const { data: homeSections = [] } = useQuery({
+    queryKey: ["home-sections"],
+    queryFn: api.listHomeSections,
   });
   const { data: recommendationProducts = [], isLoading: isRecommendationLoading } = useQuery({
     queryKey: queryKeys.personalizedProducts({ sort: "new" }),
@@ -75,7 +81,16 @@ export function HomePage() {
     enabled: Boolean(effectiveToken),
   });
   const recommendationTitle = `${profile?.user_name ?? "사용자"}님을 위한 추천 상품`;
-  const rootCategories = categories.filter((category) => !category.parent_id && category.level === 1);
+  const rootCategories = [...categories]
+    .filter((category) => !category.parent_id && category.level === 1)
+    .sort(compareCategoryOrder);
+  const displayHomeSections = [...homeSections].sort((a, b) => a.sequence - b.sequence || a.id - b.id);
+  const homeSectionQueries = useQueries({
+    queries: displayHomeSections.map((section) => ({
+      queryKey: ["home-section-products", section.api_url],
+      queryFn: () => productsForHomeSection(section),
+    })),
+  });
 
   useEffect(() => {
     const target = loadMoreRef.current;
@@ -100,13 +115,6 @@ export function HomePage() {
         return current === 0 ? events.length - 1 : current - 1;
       }
       return current === events.length - 1 ? 0 : current + 1;
-    });
-  }
-
-  function slideCarousel(ref: RefObject<HTMLDivElement | null>, direction: "prev" | "next") {
-    ref.current?.scrollBy({
-      left: direction === "prev" ? -640 : 640,
-      behavior: "smooth",
     });
   }
 
@@ -168,25 +176,15 @@ export function HomePage() {
         </div>
       </section>
 
-      <ProductCarouselSection
-        title="인기 상품"
-        description="지금 많이 찾는 상품 20개"
-        products={popularProducts}
-        isLoading={isPopularLoading}
-        carouselRef={popularCarouselRef}
-        onPrev={() => slideCarousel(popularCarouselRef, "prev")}
-        onNext={() => slideCarousel(popularCarouselRef, "next")}
-      />
-
-      <ProductCarouselSection
-        title="프로모션 상품"
-        description="혜택과 함께 둘러보는 추천 프로모션"
-        products={promotionProducts}
-        isLoading={isPromotionLoading}
-        carouselRef={promotionCarouselRef}
-        onPrev={() => slideCarousel(promotionCarouselRef, "prev")}
-        onNext={() => slideCarousel(promotionCarouselRef, "next")}
-      />
+      {displayHomeSections.map((section, index) => (
+        <ProductCarouselSection
+          key={section.id || section.api_url}
+          title={section.title}
+          description={section.description ?? ""}
+          products={homeSectionQueries[index]?.data ?? []}
+          isLoading={homeSectionQueries[index]?.isLoading ?? false}
+        />
+      ))}
 
       <section className="py-7">
         <div className="mb-4 flex items-end justify-between">
@@ -197,7 +195,7 @@ export function HomePage() {
         {isRecommendationLoading ? (
           <div className="grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
             {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="aspect-[3/4] animate-pulse rounded-md bg-zinc-200" />
+              <div key={index} className="aspect-square animate-pulse rounded-md bg-zinc-200" />
             ))}
           </div>
         ) : (
@@ -221,30 +219,33 @@ function ProductCarouselSection({
   description,
   products,
   isLoading,
-  carouselRef,
-  onPrev,
-  onNext,
 }: {
   title: string;
   description: string;
   products: Product[];
   isLoading: boolean;
-  carouselRef: RefObject<HTMLDivElement | null>;
-  onPrev: () => void;
-  onNext: () => void;
 }) {
+  const carouselRef = useRef<HTMLDivElement | null>(null);
+
+  function slide(direction: "prev" | "next") {
+    carouselRef.current?.scrollBy({
+      left: direction === "prev" ? -640 : 640,
+      behavior: "smooth",
+    });
+  }
+
   return (
     <section className="py-7">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-black">{title}</h2>
-          <p className="mt-1 text-sm text-muted">{description}</p>
+          {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" size="icon" aria-label={`${title} 이전`} onClick={onPrev}>
+          <Button variant="secondary" size="icon" aria-label={`${title} 이전`} onClick={() => slide("prev")}>
             <ChevronLeft size={18} />
           </Button>
-          <Button variant="secondary" size="icon" aria-label={`${title} 다음`} onClick={onNext}>
+          <Button variant="secondary" size="icon" aria-label={`${title} 다음`} onClick={() => slide("next")}>
             <ChevronRight size={18} />
           </Button>
         </div>
@@ -252,7 +253,7 @@ function ProductCarouselSection({
       {isLoading ? (
         <div className="flex gap-3 overflow-hidden md:gap-4">
           {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className="h-64 w-[42vw] shrink-0 animate-pulse rounded-md bg-zinc-200 sm:w-48 md:w-52" />
+            <div key={index} className="h-56 w-[42vw] shrink-0 animate-pulse rounded-md bg-zinc-200 sm:w-48 md:w-52" />
           ))}
         </div>
       ) : (
@@ -267,7 +268,6 @@ function ProductCarouselSection({
     </section>
   );
 }
-
 function PopularSquareCard({ product }: { product: Product }) {
   const price = product.discount_price || product.base_price;
 
