@@ -148,7 +148,7 @@ export function DataTable({
       {rows.length ? (
         <div className="grid divide-y divide-line">
           {rows.map((row, rowIndex) => (
-            <div key={rowIndex} className="grid gap-3 p-4 hover:bg-zinc-50/70 md:grid-cols-2 xl:grid-cols-3">
+            <div key={rowIndex} className="grid gap-3 p-3 hover:bg-zinc-50/70" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
               {row.map((cell, cellIndex) => (
                 <div key={cellIndex} className="min-w-0">
                   <p className="mb-1 text-[11px] font-black text-muted">{columns[cellIndex]}</p>

@@ -1,6 +1,7 @@
-import type { NextConfig } from "next";
+﻿import type { NextConfig } from "next";
 
 const backendApiBaseUrl = process.env.BACKEND_API_BASE_URL?.trim().replace(/\/+$/, "");
+const experimentApiBaseUrl = (process.env.EXPERIMENT_API_BASE_URL?.trim() || "http://localhost:8081").replace(/\/+$/, "");
 
 type RemotePattern = NonNullable<NonNullable<NextConfig["images"]>["remotePatterns"]>[number];
 
@@ -54,16 +55,21 @@ const nextConfig: NextConfig = {
     remotePatterns,
   },
   async rewrites() {
-    if (!backendApiBaseUrl) {
-      return [];
-    }
-
-    return [
+    const rewrites = [
       {
-        source: "/api/v1/:path*",
-        destination: `${backendApiBaseUrl}/api/v1/:path*`,
+        source: "/experiment-api/:path*",
+        destination: `${experimentApiBaseUrl}/:path*`,
       },
     ];
+
+    if (backendApiBaseUrl) {
+      rewrites.push({
+        source: "/api/v1/:path*",
+        destination: `${backendApiBaseUrl}/api/v1/:path*`,
+      });
+    }
+
+    return rewrites;
   },
 };
 
