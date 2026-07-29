@@ -7,7 +7,14 @@ import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { firstOrderItem } from "@/lib/order-utils";
 import { useSessionStore } from "@/lib/session-store";
-import type { CMSHomeSection, CommerceCategory, Market, MarketPenalty, MemberProfile, Product } from "@/lib/types";
+import type {
+  AdminMember,
+  CMSHomeSection,
+  CommerceCategory,
+  Market,
+  MarketPenalty,
+  Product,
+} from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import {
   ConsoleHeader,
@@ -76,12 +83,14 @@ function productPrice(product: Product) {
   return product.discount_price || product.base_price;
 }
 
-function auditTargetID(log: { target_id?: number; settlement_id?: number }) {
-  return log.target_id ?? log.settlement_id ?? "-";
+function auditTargetID(log: { settlement_id?: number; order_id?: number; order_code?: string }) {
+  return log.order_code ?? log.order_id ?? log.settlement_id ?? "-";
 }
 
-function auditReason(log: { reason?: string }) {
-  return log.reason || "-";
+function couponDiscountLabel(coupon: { discount_type: string; discount_value: number }) {
+  return coupon.discount_type === "PERCENT"
+    ? `${coupon.discount_value}%`
+    : formatPrice(coupon.discount_value);
 }
 
 export function AdminHomePage() {
@@ -118,20 +127,19 @@ export function AdminHomePage() {
         <ConsoleSection title="플랫폼 스냅샷">
           <div className="grid gap-3">
             <AdminSignal icon={<Users size={18} />} label="회원" value={`${members.length}명`} />
-            <AdminSignal icon={<Store size={18} />} label="활성 마켓" value={`${markets.filter((market) => market.status === "ACTIVE").length}개`} />
+            <AdminSignal icon={<Store size={18} />} label="운영 마켓" value={`${markets.filter((market) => market.status === "OPEN").length}개`} />
             <AdminSignal icon={<ShoppingBag size={18} />} label="주문" value={`${orders.length}건`} />
             <AdminSignal icon={<CircleDollarSign size={18} />} label="정산 검증" value={`${settlements.filter((item) => item.status !== "PAID").length}건`} />
           </div>
         </ConsoleSection>
       </div>
 
-      <ConsoleSection className="mt-5" title="최근 감사 로그" description="민감 운영 작업은 사유와 함께 남아야 합니다.">
+      <ConsoleSection className="mt-5" title="최근 관리자 작업" description="서버가 제공하는 작업 대상과 시각만 표시합니다.">
         <DataTable
-          columns={["대상", "작업", "사유", "일시"]}
+          columns={["대상", "작업", "일시"]}
           rows={(dashboard?.recent_actions ?? []).map((log) => [
             `${log.target_type} #${auditTargetID(log)}`,
             log.action,
-            auditReason(log),
             new Date(log.created_at).toLocaleString("ko-KR"),
           ])}
         />
@@ -161,7 +169,7 @@ export function AdminMembersPage() {
   }
 
   const filteredMembers = data.filter((member) => {
-    const matchesQuery = !query || member.email.toLowerCase().includes(query.toLowerCase()) || member.user_name?.toLowerCase().includes(query.toLowerCase());
+    const matchesQuery = !query || member.email.toLowerCase().includes(query.toLowerCase());
     const matchesRole = role === "ALL" || member.role === role;
     const matchesStatus = status === "ALL" || member.status === status;
     return matchesQuery && matchesRole && matchesStatus;
@@ -169,12 +177,12 @@ export function AdminMembersPage() {
 
   return (
     <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
-      <ConsoleHeader title="회원 관리" description="회원 권한, 상태, 포인트를 확인하고 고객/셀러/관리자 계정을 구분합니다." />
+      <ConsoleHeader title="회원 관리" description="서버가 제공하는 회원 권한과 상태를 확인합니다. 관리자 회원 응답에는 포인트 잔액이 포함되지 않습니다." />
       <div className="mt-5">
         <SummaryStrip
           items={[
             { label: "전체 회원", value: `${data.length}명` },
-            { label: "고객", value: `${data.filter((member) => member.role === "CUSTOMER").length}명` },
+            { label: "회원", value: `${data.filter((member) => member.role === "MEMBER").length}명` },
             { label: "셀러", value: `${data.filter((member) => member.role === "SELLER").length}명` },
             { label: "어드민", value: `${data.filter((member) => member.role === "ADMIN").length}명` },
           ]}
@@ -183,12 +191,12 @@ export function AdminMembersPage() {
       <ConsoleSection className="mt-5" title="회원 목록">
         <FilterPanel>
           <FilterField label="검색">
-            <SearchBox value={query} onChange={setQuery} placeholder="이메일 또는 이름 검색" />
+            <SearchBox value={query} onChange={setQuery} placeholder="이메일 검색" />
           </FilterField>
           <FilterField label="권한">
             <select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={role} onChange={(event) => setRole(event.target.value)}>
               <option value="ALL">전체 권한</option>
-              <option value="CUSTOMER">CUSTOMER</option>
+              <option value="MEMBER">MEMBER</option>
               <option value="SELLER">SELLER</option>
               <option value="ADMIN">ADMIN</option>
             </select>
@@ -199,18 +207,18 @@ export function AdminMembersPage() {
               <option value="ACTIVE">활성</option>
               <option value="PENDING">대기</option>
               <option value="SUSPENDED">정지</option>
+              <option value="WITHDRAWN">탈퇴</option>
             </select>
           </FilterField>
         </FilterPanel>
         <div className="mt-4" />
         <DataTable
-          columns={["회원", "권한", "상태", "알림", "포인트", "가입일", "작업"]}
+          columns={["회원", "권한", "상태", "알림", "가입일", "작업"]}
           rows={filteredMembers.map((member) => [
             <MemberName key="member" member={member} />,
             member.role,
             <StatusBadge key="status" value={member.status} />,
             member.notification_type,
-            formatPrice(member.point_balance),
             new Date(member.created_at).toLocaleDateString("ko-KR"),
             member.role === "SELLER" ? (
               <div key="actions" className="flex flex-wrap gap-2">
@@ -234,7 +242,7 @@ export function AdminMarketsPage() {
   const [penaltyReason, setPenaltyReason] = useState("배송 지연 반복에 따른 페널티 부여");
   const [penaltyScore, setPenaltyScore] = useState(10);
 
-  const { data = [] } = useQuery({ queryKey: ["admin-markets"], queryFn: () => api.adminMarkets(token ?? ""), enabled: Boolean(token) });
+  const { data = [] } = useQuery({ queryKey: ["admin-markets"], queryFn: () => api.adminMarkets(token ?? ""), enabled: Boolean(token), meta: { consoleDataRole: "primary" } });
   const penaltyQueries = useQueries({
     queries: data.map((market) => ({
       queryKey: ["admin-market-penalties", market.id],
@@ -309,9 +317,10 @@ export function AdminMarketsPage() {
           <FilterField label="상태">
             <select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={status} onChange={(event) => setStatus(event.target.value)}>
               <option value="ALL">전체 상태</option>
-              <option value="ACTIVE">활성</option>
-              <option value="PENDING">대기</option>
-              <option value="SUSPENDED">정지</option>
+              <option value="OPEN">운영중</option>
+              <option value="CLOSED">운영 종료</option>
+              <option value="HIDE">숨김</option>
+              <option value="EXIT">퇴점</option>
             </select>
           </FilterField>
         </FilterPanel>
@@ -337,20 +346,23 @@ export function AdminProductsPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("ALL");
   const [marketID, setMarketID] = useState("ALL");
-  const { data = [] } = useQuery({ queryKey: ["admin-products"], queryFn: () => api.adminProducts(token ?? ""), enabled: Boolean(token) });
+  const { data = [] } = useQuery({ queryKey: ["admin-products"], queryFn: () => api.adminProducts(token ?? ""), enabled: Boolean(token), meta: { consoleDataRole: "primary" } });
+  const { data: markets = [] } = useQuery({ queryKey: ["admin-markets"], queryFn: () => api.adminMarkets(token ?? ""), enabled: Boolean(token) });
 
   if (!token) {
     return <AdminAuthRequired />;
   }
 
-  const marketOptions = Array.from(new Map(data.map((product) => [product.market_id, product.market_name ?? `마켓 ${product.market_id}`])).entries());
-  const filteredProducts = data.filter((product) => {
+  const marketNameByID = new Map(markets.map((market) => [market.id, market.name]));
+  const products = data.map((product) => ({ ...product, market_name: marketNameByID.get(product.market_id) ?? `마켓 #${product.market_id}` }));
+  const marketOptions = Array.from(new Map(products.map((product) => [product.market_id, product.market_name ?? `마켓 #${product.market_id}`])).entries());
+  const filteredProducts = products.filter((product) => {
     const matchesQuery = !query || product.name.toLowerCase().includes(query.toLowerCase()) || product.market_name?.toLowerCase().includes(query.toLowerCase());
     const matchesStatus = status === "ALL" || product.status === status;
     const matchesMarket = marketID === "ALL" || product.market_id === Number(marketID);
     return matchesQuery && matchesStatus && matchesMarket;
   });
-  const expensiveProducts = [...data].sort((a, b) => productPrice(b) - productPrice(a)).slice(0, 3);
+  const expensiveProducts = [...products].sort((a, b) => productPrice(b) - productPrice(a)).slice(0, 3);
 
   return (
     <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
@@ -408,7 +420,6 @@ export function AdminOrdersPage() {
   const token = useAdminToken();
   const queryClient = useQueryClient();
   const effectiveToken = token ?? "";
-  const [reason, setReason] = useState("고객 요청에 따른 운영 취소");
   const [selectedOrderCode, setSelectedOrderCode] = useState("");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("ALL");
@@ -418,7 +429,7 @@ export function AdminOrdersPage() {
       if (!selectedOrderCode) {
         throw new Error("취소할 주문을 선택해 주세요.");
       }
-      return api.forceCancelOrder(effectiveToken, selectedOrderCode, { reason });
+      return api.forceCancelOrder(effectiveToken, selectedOrderCode);
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-orders"] }),
   });
@@ -435,24 +446,18 @@ export function AdminOrdersPage() {
 
   return (
     <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
-      <ConsoleHeader title="주문 관리" description="주문 상태, 결제 금액, 배송지 정보를 보고 민감 작업은 사유와 함께 기록합니다." />
-      <ConsoleSection className="mt-5" title="주문 강제 취소" description="강제 취소는 감사 로그 대상 작업입니다. 실제 연결 시 주문 선택과 권한 검증이 필요합니다.">
+      <ConsoleHeader title="주문 관리" description="주문 상태와 서버 확정 결제 금액을 확인합니다." />
+      <ConsoleSection className="mt-5" title="주문 강제 취소" description="현재 서버는 취소 사유를 저장하지 않으므로 주문 상태 변경만 수행합니다.">
         <div className="flex flex-col gap-2 md:flex-row">
           <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={selectedOrderCode} onChange={(event) => setSelectedOrderCode(event.target.value)}>
             <option value="">주문 선택</option>
             {data.map((order) => <option key={order.order_code} value={order.order_code}>{order.order_code}</option>)}
           </select>
-          <input
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            className="h-11 flex-1 rounded-md border border-line px-3 text-sm outline-none"
-            aria-label="주문 강제 취소 사유"
-          />
-          <Button disabled={!reason || forceCancel.isPending} onClick={() => forceCancel.mutate()}>
-            {forceCancel.isPending ? "처리 중" : "강제 취소 기록"}
+          <Button disabled={!selectedOrderCode || forceCancel.isPending} onClick={() => forceCancel.mutate()}>
+            {forceCancel.isPending ? "처리 중" : "강제 취소"}
           </Button>
         </div>
-        {forceCancel.data ? <p className="mt-3 text-sm font-bold text-brand">감사 로그에 작업을 기록했습니다.</p> : null}
+        {forceCancel.data ? <p className="mt-3 text-sm font-bold text-brand">주문 상태를 취소로 변경했습니다.</p> : null}
         {forceCancel.error ? <p className="mt-3 text-sm font-bold text-brand">{forceCancel.error.message}</p> : null}
       </ConsoleSection>
       <ConsoleSection className="mt-5" title="주문 목록">
@@ -463,23 +468,25 @@ export function AdminOrdersPage() {
           <FilterField label="상태">
             <select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={status} onChange={(event) => setStatus(event.target.value)}>
               <option value="ALL">전체 상태</option>
+              <option value="PAYMENT_PENDING">결제 대기</option>
+              <option value="PAID">결제 완료</option>
               <option value="PLACED">주문 접수</option>
-              <option value="PAYMENT_COMPLETED">결제 완료</option>
-              <option value="SHIPPING">배송중</option>
+              <option value="SHIPPED">배송중</option>
               <option value="DELIVERED">배송 완료</option>
+              <option value="COMPLETED">구매 확정</option>
+              <option value="CANCELLED">취소</option>
             </select>
           </FilterField>
         </FilterPanel>
         <div className="mt-4" />
         <DataTable
-          columns={["주문", "대표 상품", "회원", "배송지", "금액", "상태", "작업"]}
+          columns={["주문", "대표 상품", "회원", "금액", "상태", "작업"]}
           rows={filteredOrders.map((order) => {
             const amount = order.total_order_price - order.total_discount_price - order.used_point;
             return [
               <span key="code" className="text-xs font-black">{order.order_code}</span>,
               firstOrderItem(order)?.product?.name ?? "주문 상품",
               order.member_id ?? "-",
-              order.shipping_address ? `${order.shipping_address.receiver} · ${order.shipping_address.line1}` : "-",
               formatPrice(amount),
               <StatusBadge key="status" value={order.status} />,
               <Button key="select" size="sm" variant="secondary" onClick={() => setSelectedOrderCode(order.order_code)}>선택</Button>,
@@ -495,16 +502,16 @@ export function AdminSettlementsPage() {
   const token = useAdminToken();
   const queryClient = useQueryClient();
   const effectiveToken = token ?? "";
-  const [reason, setReason] = useState("정산 검증 완료 후 지급 처리");
   const [selectedSettlementID, setSelectedSettlementID] = useState<number | null>(null);
   const [status, setStatus] = useState("ALL");
-  const { data = [] } = useQuery({ queryKey: ["admin-settlements"], queryFn: () => api.adminSettlements(effectiveToken), enabled: Boolean(token) });
+  const { data = [] } = useQuery({ queryKey: ["admin-settlements"], queryFn: () => api.adminSettlements(effectiveToken), enabled: Boolean(token), meta: { consoleDataRole: "primary" } });
+  const { data: markets = [] } = useQuery({ queryKey: ["admin-markets"], queryFn: () => api.adminMarkets(effectiveToken), enabled: Boolean(token) });
   const markPaid = useMutation({
     mutationFn: () => {
       if (!selectedSettlementID) {
         throw new Error("지급 처리할 정산 건을 선택해 주세요.");
       }
-      return api.markSettlementPaid(effectiveToken, selectedSettlementID, { reason });
+      return api.markSettlementPaid(effectiveToken, selectedSettlementID);
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-settlements"] }),
   });
@@ -513,41 +520,37 @@ export function AdminSettlementsPage() {
     return <AdminAuthRequired />;
   }
 
-  const filteredSettlements = status === "ALL" ? data : data.filter((item) => item.status === status);
+  const marketNameByID = new Map(markets.map((market) => [market.id, market.name]));
+  const settlements = data.map((item) => ({ ...item, market_name: marketNameByID.get(item.market_id) ?? `마켓 #${item.market_id}` }));
+  const filteredSettlements = status === "ALL" ? settlements : settlements.filter((item) => item.status === status);
 
   return (
     <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
-      <ConsoleHeader title="정산 관리" description="정산 금액, 제외 건, 지급 완료 처리 내역을 운영 사유와 함께 관리합니다." />
+      <ConsoleHeader title="정산 관리" description="정산 금액, 제외 건과 서버가 제공하는 지급 상태를 관리합니다." />
       <div className="mt-5">
         <SummaryStrip
           items={[
-            { label: "정산 대상", value: `${data.length}건` },
-            { label: "지급 대기", value: `${data.filter((item) => item.status === "PREPARED").length}건` },
-            { label: "정산 제외", value: `${data.filter((item) => item.status === "EXCLUDED").length}건` },
-            { label: "총 지급액", value: formatPrice(data.reduce((sum, item) => sum + item.final_settlement_amount, 0)) },
+            { label: "정산 대상", value: `${settlements.length}건` },
+            { label: "지급 대기", value: `${settlements.filter((item) => item.status === "PREPARED").length}건` },
+            { label: "정산 제외", value: `${settlements.filter((item) => item.status === "EXCLUDED").length}건` },
+            { label: "총 지급액", value: formatPrice(settlements.reduce((sum, item) => sum + item.final_settlement_amount, 0)) },
           ]}
         />
       </div>
-      <ConsoleSection className="mt-5" title="지급 완료 처리" description="지급 처리와 정산 제외는 사유가 필요한 민감 작업입니다.">
+      <ConsoleSection className="mt-5" title="지급 완료 처리" description="서버가 제공하는 정산 상태 변경만 수행합니다. 사유 저장은 지원되지 않습니다.">
         <div className="flex flex-col gap-2 md:flex-row">
           <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={selectedSettlementID ?? ""} onChange={(event) => setSelectedSettlementID(Number(event.target.value) || null)}>
             <option value="">정산 선택</option>
-            {data.map((item) => <option key={item.id} value={item.id}>{item.market_name} · {item.target_month}</option>)}
+            {settlements.map((item) => <option key={item.id} value={item.id}>{item.market_name} · {item.target_month}</option>)}
           </select>
-          <input
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            className="h-11 flex-1 rounded-md border border-line px-3 text-sm outline-none"
-            aria-label="정산 지급 처리 사유"
-          />
-          <Button disabled={!reason || markPaid.isPending} onClick={() => markPaid.mutate()}>
-            {markPaid.isPending ? "처리 중" : "지급 완료 기록"}
+          <Button disabled={!selectedSettlementID || markPaid.isPending} onClick={() => markPaid.mutate()}>
+            {markPaid.isPending ? "처리 중" : "지급 완료"}
           </Button>
         </div>
-        {markPaid.data ? <p className="mt-3 text-sm font-bold text-brand">정산 작업을 감사 로그에 기록했습니다.</p> : null}
+        {markPaid.data ? <p className="mt-3 text-sm font-bold text-brand">정산 상태를 지급 완료로 변경했습니다.</p> : null}
         {markPaid.error ? <p className="mt-3 text-sm font-bold text-brand">{markPaid.error.message}</p> : null}
       </ConsoleSection>
-      <ConsoleSection className="mt-5" title="정산 목록" action={<select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">전체 상태</option><option value="PREPARED">지급 대기</option><option value="PAID">지급 완료</option><option value="EXCLUDED">정산 제외</option></select>}>
+      <ConsoleSection className="mt-5" title="정산 목록" action={<select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">전체 상태</option><option value="PREPARED">지급 대기</option><option value="CONFIRMED">지급 확정</option><option value="PAID">지급 완료</option><option value="EXCLUDED">정산 제외</option></select>}>
         <DataTable
           columns={["마켓", "월", "매출", "수수료", "지급액", "상태", "작업"]}
           rows={filteredSettlements.map((item) => [
@@ -571,7 +574,7 @@ export function AdminCouponsPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("ALL");
   const [targetMemberID, setTargetMemberID] = useState<number | null>(null);
-  const { data = [] } = useQuery({ queryKey: ["admin-coupons", targetMemberID], queryFn: () => api.adminCoupons(token ?? "", targetMemberID), enabled: Boolean(token) });
+  const { data = [] } = useQuery({ queryKey: ["admin-coupons", targetMemberID], queryFn: () => api.adminCoupons(token ?? "", targetMemberID), enabled: Boolean(token), meta: { consoleDataRole: "primary" } });
   const { data: members = [] } = useQuery({ queryKey: ["admin-members"], queryFn: () => api.adminMembers(token ?? ""), enabled: Boolean(token) });
   const issueCoupon = useMutation({
     mutationFn: (couponID: number) => {
@@ -592,7 +595,7 @@ export function AdminCouponsPage() {
   const coupons = data;
   const filteredCoupons = coupons.filter((coupon) => {
     const matchesQuery = !query || coupon.name.toLowerCase().includes(query.toLowerCase()) || coupon.condition_text?.toLowerCase().includes(query.toLowerCase());
-    const matchesStatus = status === "ALL" || coupon.status === status;
+    const matchesStatus = status === "ALL" || coupon.issuance_status === status || coupon.user_coupon_status === status || coupon.status === status;
     return matchesQuery && matchesStatus;
   });
 
@@ -603,9 +606,9 @@ export function AdminCouponsPage() {
         <SummaryStrip
           items={[
             { label: "쿠폰 수", value: `${coupons.length}개` },
-            { label: "발급됨", value: `${coupons.filter((coupon) => coupon.status === "ISSUED").length}개` },
-            { label: "발급 가능", value: `${coupons.filter((coupon) => coupon.status === "ISSUABLE").length}개` },
-            { label: "총 할인액", value: formatPrice(coupons.reduce((sum, coupon) => sum + coupon.discount_amount, 0)) },
+            { label: "사용 가능 보유", value: `${coupons.filter((coupon) => coupon.user_coupon_status === "AVAILABLE").length}개` },
+            { label: "발급 가능", value: `${coupons.filter((coupon) => coupon.issuance_status === "ISSUABLE").length}개` },
+            { label: "정의 활성", value: `${coupons.filter((coupon) => coupon.status === "ACTIVE").length}개` },
           ]}
         />
       </div>
@@ -634,8 +637,12 @@ export function AdminCouponsPage() {
             <select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={status} onChange={(event) => setStatus(event.target.value)}>
               <option value="ALL">전체 상태</option>
               <option value="ISSUABLE">발급 가능</option>
-              <option value="ISSUED">발급됨</option>
-              <option value="USED">사용됨</option>
+              <option value="SCHEDULED">발급 예정</option>
+              <option value="ENDED">발급 종료</option>
+              <option value="SOLD_OUT">소진</option>
+              <option value="AVAILABLE">보유·사용 가능</option>
+              <option value="USED">보유·사용됨</option>
+              <option value="EXPIRED">보유·만료</option>
             </select>
           </FilterField>
         </FilterPanel>
@@ -644,18 +651,18 @@ export function AdminCouponsPage() {
           columns={["쿠폰", "할인", "최소 주문", "조건", "만료", "상태", "작업"]}
           rows={filteredCoupons.map((coupon) => [
             coupon.name,
-            formatPrice(coupon.discount_amount),
+            couponDiscountLabel(coupon),
             formatPrice(coupon.min_order_amount),
             coupon.condition_text ?? "-",
             coupon.expires_at ? new Date(coupon.expires_at).toLocaleDateString("ko-KR") : "-",
-            <StatusBadge key="status" value={coupon.status ?? "UNKNOWN"} />,
+            <div key="status" className="flex flex-wrap gap-1"><StatusBadge value={coupon.status} /><StatusBadge value={coupon.issuance_status} />{coupon.user_coupon_status ? <StatusBadge value={coupon.user_coupon_status} /> : null}</div>,
             <Button
               key="issue"
               size="sm"
-              disabled={!targetMemberID || coupon.status === "ISSUED" || coupon.status === "USED" || issueCoupon.isPending}
+              disabled={!targetMemberID || coupon.issuance_status !== "ISSUABLE" || Boolean(coupon.user_coupon_status) || issueCoupon.isPending}
               onClick={() => issueCoupon.mutate(coupon.id)}
             >
-              {coupon.status === "ISSUED" ? "발급됨" : coupon.status === "USED" ? "사용됨" : issueCoupon.isPending ? "발급 중" : "발급"}
+              {coupon.user_coupon_status ? "발급됨" : issueCoupon.isPending ? "발급 중" : "발급"}
             </Button>,
           ])}
         />
@@ -673,19 +680,18 @@ export function AdminAuditLogsPage() {
     return <AdminAuthRequired />;
   }
 
-  const filteredLogs = data.filter((log) => !query || `${log.target_type} ${log.action} ${auditReason(log)}`.toLowerCase().includes(query.toLowerCase()));
+  const filteredLogs = data.filter((log) => !query || `${log.target_type} ${log.action} ${log.settlement_id ?? ""}`.toLowerCase().includes(query.toLowerCase()));
 
   return (
     <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
-      <ConsoleHeader title="감사 로그" description="어드민 민감 작업의 대상, 작업, 사유, 일시를 추적합니다." />
-      <ConsoleSection className="mt-5" action={<SearchBox value={query} onChange={setQuery} placeholder="대상, 작업, 사유 검색" />}>
+      <ConsoleHeader title="감사 로그" description="서버가 제공하는 정산 관리자 작업 필드만 표시합니다." />
+      <ConsoleSection className="mt-5" action={<SearchBox value={query} onChange={setQuery} placeholder="대상 또는 작업 검색" />}>
         <DataTable
-          columns={["관리자", "대상", "작업", "사유", "일시"]}
+          columns={["관리자", "대상", "작업", "일시"]}
           rows={filteredLogs.map((log) => [
             `#${log.admin_id}`,
             `${log.target_type} #${auditTargetID(log)}`,
             log.action,
-            auditReason(log),
             new Date(log.created_at).toLocaleString("ko-KR"),
           ])}
         />
@@ -710,9 +716,13 @@ export function AdminCMSPage() {
   const { data: homeSections = [] } = useQuery({ queryKey: ["admin-home-sections"], queryFn: () => api.adminHomeSections(token ?? ""), enabled: Boolean(token) });
 
   const saveCarousel = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const payload = cmsCarouselPayload(form);
-      return editingID ? api.updateCarousel(token ?? "", editingID, payload) : api.createCarousel(token ?? "", payload);
+      if (editingID) {
+        await api.updateCarousel(token ?? "", editingID, payload);
+      } else {
+        await api.createCarousel(token ?? "", payload);
+      }
     },
     onSuccess: () => {
       setEditingID(null);
@@ -1066,10 +1076,10 @@ function AdminSignal({ icon, label, value }: { icon: React.ReactNode; label: str
   );
 }
 
-function MemberName({ member }: { member: MemberProfile }) {
+function MemberName({ member }: { member: AdminMember }) {
   return (
     <div>
-      <p className="font-bold">{member.user_name ?? "이름 없음"}</p>
+      <p className="font-bold">회원 #{member.id}</p>
       <p className="text-xs text-muted">{member.email}</p>
     </div>
   );

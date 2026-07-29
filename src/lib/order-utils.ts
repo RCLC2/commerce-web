@@ -1,11 +1,12 @@
 import type { OrderResponse } from "./types";
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
+  PAYMENT_PENDING: "결제 대기",
+  PAID: "결제 완료",
   PLACED: "주문 접수",
-  PAYMENT_COMPLETED: "결제 완료",
-  READY_TO_SHIP: "배송 준비중",
-  SHIPPING: "배송중",
+  SHIPPED: "배송중",
   DELIVERED: "배송 완료",
+  COMPLETED: "구매 확정",
   CANCELLED: "주문 취소",
 };
 

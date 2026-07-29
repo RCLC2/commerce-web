@@ -19,7 +19,7 @@ export type Market = {
   profile_image_url?: string;
   cover_image_url?: string;
   follower_count?: number;
-  status: "ACTIVE" | "PENDING" | "SUSPENDED" | string;
+  status: "OPEN" | "CLOSED" | "HIDE" | "EXIT" | string;
   tags?: string[];
 };
 
@@ -81,6 +81,8 @@ export type Product = {
   category_id: number;
   name: string;
   description: string;
+  /** Opaque seller API value retained for lossless updates. */
+  description_source?: string;
   base_price: number;
   discount_price: number;
   shipping_type: "NORMAL" | "FREE" | string;
@@ -136,6 +138,8 @@ export type MemberProfile = {
   created_at: string;
 };
 
+export type AdminMember = Omit<MemberProfile, "point_balance">;
+
 export type ReviewProductSummary = {
   id: number;
   name: string;
@@ -185,15 +189,43 @@ export type MediaImageUpload = {
   size_bytes: number;
 };
 
-export type Coupon = {
+export type CouponDefinition = {
   id: number;
+  code: string;
   name: string;
+  discount_type: "PERCENT" | "AMOUNT" | string;
+  discount_value: number;
   discount_amount: number;
+  max_discount: number;
   min_order_amount: number;
   expires_at?: string;
-  status?: "ISSUED" | "ISSUABLE" | "USED" | string;
+  status: "ACTIVE" | "INACTIVE" | string;
   condition_text?: string;
 };
+
+export type OwnedCoupon = {
+  id: number;
+  coupon_id: number;
+  expires_at: string;
+  status: "AVAILABLE" | "USED" | "EXPIRED";
+  coupon: CouponDefinition;
+};
+
+export type IssuableCouponQuote = {
+  coupon: CouponDefinition;
+  discount_amount: number;
+  discounted_amount: number;
+};
+
+export type AdminCoupon = CouponDefinition & {
+  issuance_status: "ISSUABLE" | "SCHEDULED" | "ENDED" | "SOLD_OUT" | string;
+  user_coupon_status?: "AVAILABLE" | "USED" | "EXPIRED" | string;
+  user_coupon_id?: number;
+  member_id?: number;
+};
+
+/** @deprecated Use CouponDefinition, OwnedCoupon, or AdminCoupon at the API boundary. */
+export type Coupon = CouponDefinition;
 
 export type Address = {
   id: number;
@@ -231,9 +263,8 @@ export type OrderResponse = {
   used_coupon_id?: number;
   payment_method?: string;
   payment_key?: string;
-  status: string;
+  status: "PAYMENT_PENDING" | "PAID" | "PLACED" | "SHIPPED" | "DELIVERED" | "COMPLETED" | "CANCELLED";
   ordered_at?: string;
-  shipping_address?: Address;
   market_orders?: MarketOrderResponse[];
   delivery?: Delivery;
 };
@@ -371,17 +402,17 @@ export type Settlement = {
   total_sales_amount: number;
   commission_amount: number;
   final_settlement_amount: number;
-  status: "PREPARED" | "PAID" | "EXCLUDED" | string;
+  status: "PREPARED" | "CONFIRMED" | "PAID" | "EXCLUDED" | string;
 };
 
 export type AuditLog = {
   id: number;
   admin_id: number;
   target_type: string;
-  target_id?: number;
   settlement_id?: number;
+  order_id?: number;
+  order_code?: string;
   action: string;
-  reason?: string;
   created_at: string;
 };
 

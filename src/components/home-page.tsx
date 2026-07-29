@@ -80,7 +80,7 @@ export function HomePage() {
     queryFn: () => api.me(effectiveToken ?? ""),
     enabled: Boolean(effectiveToken),
   });
-  const recommendationTitle = `${profile?.user_name ?? "사용자"}님을 위한 추천 상품`;
+  const recommendationTitle = `${profile?.email?.split("@")[0] ?? "사용자"}님을 위한 추천 상품`;
   const rootCategories = [...categories]
     .filter((category) => !category.parent_id && category.level === 1)
     .sort(compareCategoryOrder);

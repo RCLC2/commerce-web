@@ -1,19 +1,39 @@
-import { request } from "../api-client";
-import type { LoginResponse, MemberProfile } from "../types";
+import { z } from "zod";
+import { requestParsed } from "../api-client";
+
+const loginResponseSchema = z.object({
+  memberID: z.number().int().positive(),
+  role: z.string(),
+  accessToken: z.string().min(1),
+});
+
+const signupResponseSchema = z.object({ id: z.number().int().positive() });
+
+const memberProfileSchema = z.object({
+  id: z.number().int().positive(),
+  email: z.string(),
+  role: z.string(),
+  status: z.string(),
+  notification_type: z.string(),
+  marketing_consent: z.boolean(),
+  nighttime_consent: z.boolean(),
+  point_balance: z.number().int().nonnegative(),
+  created_at: z.string(),
+});
 
 const signIn = (payload: { email: string; password: string }) =>
-    request<LoginResponse>("/api/v1/auth/signin", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+  requestParsed(loginResponseSchema, "/api/v1/auth/signin", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 
 const signUp = (payload: {
-    email: string;
-    password: string;
-    marketingConsent: boolean;
-    nighttimeConsent: boolean;
-  }) =>
-  request<{ id: number }>("/api/v1/auth/signup", {
+  email: string;
+  password: string;
+  marketingConsent: boolean;
+  nighttimeConsent: boolean;
+}) =>
+  requestParsed(signupResponseSchema, "/api/v1/auth/signup", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -23,14 +43,5 @@ export const authApi = {
   login: signIn,
   signup: signUp,
   register: signUp,
-  me: (token: string) => request<MemberProfile>("/api/v1/me", { token }),
-  updateMe: (
-    token: string,
-    payload: Pick<MemberProfile, "notification_type" | "marketing_consent" | "nighttime_consent">,
-  ) =>
-    request<MemberProfile>("/api/v1/me", {
-      method: "PATCH",
-      token,
-      body: JSON.stringify(payload),
-    }),
+  me: (token: string) => requestParsed(memberProfileSchema, "/api/v1/me", { token }),
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/lib/api";
@@ -13,14 +13,13 @@ import { ReviewWritePanel } from "./review-write-panel";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
-const statusSteps = ["PAYMENT_PENDING", "PAID", "SHIPPED", "DELIVERED", "COMPLETED"];
+const statusSteps = ["PAYMENT_PENDING", "PAID", "PLACED", "SHIPPED", "DELIVERED", "COMPLETED"];
 
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
     PAYMENT_PENDING: "Payment pending",
     PAID: "Paid",
     PLACED: "Placed",
-    READY_TO_SHIP: "Preparing",
     SHIPPED: "Shipping",
     SHIPPING: "Shipping",
     DELIVERED: "Delivered",
@@ -39,16 +38,28 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   const [trackingInfo, setTrackingInfo] = useState<TrackingInfo | null>(null);
   const [reviewingLineItemID, setReviewingLineItemID] = useState<number | null>(null);
 
-  const { data: order, isLoading, error } = useQuery({
+  const { data: order, isLoading, error, refetch } = useQuery({
     queryKey: ["order", orderCode],
     queryFn: () => api.getOrder(effectiveToken, orderCode),
     enabled: Boolean(effectiveToken),
   });
-  const { data: myReviews = [] } = useQuery({
+  const myReviewsQuery = useQuery({
     queryKey: queryKeys.myReviews(effectiveToken),
     queryFn: () => api.listMyReviews(effectiveToken),
     enabled: Boolean(effectiveToken),
   });
+  const myReviews = myReviewsQuery.data ?? [];
+  const productIDs = [...new Set(order?.market_orders?.flatMap((marketOrder) =>
+    marketOrder.line_items.map((item) => item.product_id)) ?? [])];
+  const productQueries = useQueries({
+    queries: productIDs.map((id) => ({
+      queryKey: queryKeys.product(id),
+      queryFn: () => api.getProduct(id),
+      staleTime: 5 * 60 * 1000,
+    })),
+  });
+  const productByID = new Map(productQueries.flatMap((query, index) =>
+    query.data ? [[productIDs[index], query.data] as const] : []));
 
   const confirmPurchase = useMutation({
     mutationFn: (itemID: number) => api.confirmPurchase(effectiveToken, orderCode, itemID),
@@ -83,7 +94,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   }
 
   if (error || !order) {
-    return <main className="mx-auto max-w-4xl px-4 py-8 text-sm text-brand">Could not load order.</main>;
+    return <main className="mx-auto max-w-4xl px-4 py-8 text-sm text-brand"><p>Could not load order.</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void refetch()}>Retry</Button></main>;
   }
 
   const amount = order.total_order_price - order.total_discount_price - order.used_point;
@@ -135,22 +146,16 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
 
       <section className="mt-6 rounded-md border border-line bg-white p-5">
         <h2 className="text-lg font-black">Address</h2>
-        {order.shipping_address ? (
-          <div className="mt-3 text-sm leading-7">
-            <p className="font-bold">
-              {order.shipping_address.receiver} / {order.shipping_address.phone}
-            </p>
-            <p className="text-muted">
-              ({order.shipping_address.zip_code}) {order.shipping_address.line1} {order.shipping_address.line2}
-            </p>
-          </div>
-        ) : (
-          <p className="mt-3 text-sm text-muted">No shipping address.</p>
-        )}
+        <p className="mt-3 text-sm text-muted">This order API does not store or return a shipping address.</p>
       </section>
 
       <section className="mt-6 space-y-4">
         <h2 className="text-lg font-black">Items</h2>
+        {myReviewsQuery.error ? (
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+            Review history could not be loaded. Review actions are disabled to prevent duplicate submissions.
+          </div>
+        ) : null}
         {order.market_orders?.map((marketOrder) => (
           <div key={marketOrder.id} className="rounded-md border border-line bg-white p-4">
             <div className="flex justify-between text-sm">
@@ -159,21 +164,23 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
             </div>
             <div className="mt-4 space-y-4">
               {marketOrder.line_items.map((item) => {
+                const product = item.product ?? productByID.get(item.product_id);
                 const writtenReview = myReviews.find((review) => review.order_line_item_id === item.id);
                 const completed = item.status === "COMPLETED" || Boolean(item.purchase_confirmed_at);
-                const canWriteReview = (item.reviewable ?? completed) && !writtenReview;
+                const canWriteReview =
+                  !myReviewsQuery.error && (item.reviewable ?? completed) && !writtenReview;
                 const isReviewing = reviewingLineItemID === item.id;
 
                 return (
                   <div key={item.id} className="border-t border-line pt-4 first:border-t-0 first:pt-0">
                     <div className="flex gap-3 text-sm">
                       <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-zinc-100">
-                        <SafeImage src={item.product?.image_url} alt="" fill sizes="80px" className="object-cover" />
+                        <SafeImage src={product?.image_url} alt="" fill sizes="80px" className="object-cover" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex justify-between gap-3">
                           <Link href={`/products/${item.product_id}`} className="font-bold hover:underline">
-                            {item.product?.name ?? `Product ${item.product_id}`}
+                            {product?.name ?? `Product ${item.product_id}`}
                           </Link>
                           <p className="font-black">{formatPrice(item.price * item.quantity)}</p>
                         </div>
@@ -227,9 +234,16 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
 }
 
 function OrderProgress({ status }: { status: string }) {
-  const activeIndex = Math.max(0, statusSteps.indexOf(status));
+  if (status === "CANCELLED") {
+    return (
+      <div className="mt-5 rounded-md bg-red-50 px-3 py-2 text-xs font-black text-brand">
+        {statusLabel(status)}
+      </div>
+    );
+  }
+  const activeIndex = statusSteps.indexOf(status);
   return (
-    <div className="mt-5 grid gap-2 md:grid-cols-5">
+    <div className="mt-5 grid gap-2 md:grid-cols-6">
       {statusSteps.map((step, index) => (
         <div key={step} className={`rounded-md px-3 py-2 text-xs font-black ${index <= activeIndex ? "bg-zinc-900 text-white" : "bg-zinc-100 text-muted"}`}>
           {statusLabel(step)}

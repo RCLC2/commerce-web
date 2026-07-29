@@ -1,98 +1,185 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
+import {
+  CheckoutOrderStateError,
+  submitServerAuthoritativeCheckout,
+} from "@/lib/queries/checkout";
 import { useSessionStore } from "@/lib/session-store";
+import type { OrderResponse } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import { Button } from "./ui/button";
+
+const CHECKOUT_RETRY_STORAGE_KEY = "commerce.checkout.retry";
 
 export function CheckoutPage() {
   const router = useRouter();
   const token = useSessionStore((state) => state.accessToken);
+  const memberID = useSessionStore((state) => state.memberID);
   const effectiveToken = token ?? "";
   const [usedPoint, setUsedPoint] = useState(0);
-  const [couponID, setCouponID] = useState<number | undefined>();
-  const [address, setAddress] = useState({
-    receiver: "",
-    phone: "",
-    line1: "",
-    line2: "",
-  });
+  const [couponID, setCouponID] = useState<number>();
+  const [createdOrderCode, setCreatedOrderCode] = useState<string>();
+  const [confirmedOrder, setConfirmedOrder] = useState<OrderResponse>();
+  const [retryStateReady, setRetryStateReady] = useState(false);
 
-  const { data: items = [] } = useQuery({
+  const cart = useQuery({
     queryKey: ["cart", effectiveToken],
     queryFn: () => api.listCart(effectiveToken),
     enabled: Boolean(effectiveToken),
   });
-  const { data: coupons = [] } = useQuery({
-    queryKey: ["coupons", effectiveToken],
+  const coupons = useQuery({
+    queryKey: queryKeys.coupons(effectiveToken),
     queryFn: () => api.listCoupons(effectiveToken),
     enabled: Boolean(effectiveToken),
   });
-  const { data: profile } = useQuery({
-    queryKey: ["checkout-me", effectiveToken],
+  const profile = useQuery({
+    queryKey: queryKeys.me(effectiveToken),
     queryFn: () => api.me(effectiveToken),
     enabled: Boolean(effectiveToken),
   });
-
-  const selectedCoupon = coupons.find((coupon) => coupon.id === couponID);
+  const addresses = useQuery({
+    queryKey: queryKeys.addresses(effectiveToken),
+    queryFn: () => api.listAddresses(effectiveToken),
+    enabled: Boolean(effectiveToken),
+  });
+  const productIDs = [...new Set((cart.data ?? []).map((item) => item.product_id))];
+  const products = useQueries({
+    queries: productIDs.map((id) => ({
+      queryKey: queryKeys.product(id),
+      queryFn: () => api.getProduct(id),
+      staleTime: 5 * 60 * 1000,
+    })),
+  });
+  const productByID = new Map(products.flatMap((query, index) =>
+    query.data ? [[productIDs[index], query.data] as const] : []));
+  const items = (cart.data ?? []).map((item) => ({ ...item, product: productByID.get(item.product_id) }));
+  const cartFingerprint = [...items.map((item) => item.id)].sort((a, b) => a - b).join(",");
+  const ownedCoupons = (coupons.data ?? []).filter((coupon) => coupon.status === "AVAILABLE");
+  const selectedCoupon = ownedCoupons.find((coupon) => coupon.id === couponID);
+  const defaultAddress = (addresses.data ?? []).find((address) => address.is_default) ?? addresses.data?.[0];
   const productTotal = items.reduce((sum, item) => sum + item.price_at_added * item.quantity, 0);
-  const discount = selectedCoupon && productTotal >= selectedCoupon.min_order_amount ? selectedCoupon.discount_amount : 0;
-  const activeCouponID = discount > 0 ? couponID : undefined;
-  const availablePoint = profile?.point_balance ?? usedPoint;
-  const maxUsablePoint = Math.max(0, productTotal - discount);
-  const appliedPoint = Math.min(usedPoint, availablePoint, maxUsablePoint);
-  const payableAmount = Math.max(0, productTotal - discount - appliedPoint);
+  const availablePoint = profile.data?.point_balance ?? 0;
+  const appliedPoint = Math.min(Math.max(0, usedPoint), availablePoint, productTotal);
+  const serverAmount = confirmedOrder
+    ? Math.max(0, confirmedOrder.total_order_price - confirmedOrder.total_discount_price - confirmedOrder.used_point)
+    : undefined;
 
-  const placeOrder = useMutation({
+  useEffect(() => {
+    if (!cart.isSuccess || memberID === null) {
+      return;
+    }
+    const restoreTimer = window.setTimeout(() => {
+      try {
+        const stored = JSON.parse(
+          window.sessionStorage.getItem(CHECKOUT_RETRY_STORAGE_KEY) ?? "null",
+        ) as { memberID?: unknown; cartFingerprint?: unknown; orderCode?: unknown } | null;
+        if (
+          stored?.memberID === memberID
+          && stored.cartFingerprint === cartFingerprint
+          && typeof stored.orderCode === "string"
+          && stored.orderCode
+        ) {
+          setCreatedOrderCode(stored.orderCode);
+        } else {
+          window.sessionStorage.removeItem(CHECKOUT_RETRY_STORAGE_KEY);
+          setCreatedOrderCode(undefined);
+        }
+      } catch {
+        window.sessionStorage.removeItem(CHECKOUT_RETRY_STORAGE_KEY);
+        setCreatedOrderCode(undefined);
+      }
+      setRetryStateReady(true);
+    }, 0);
+    return () => window.clearTimeout(restoreTimer);
+  }, [cart.isSuccess, cartFingerprint, memberID]);
+
+  const checkout = useMutation({
     mutationFn: () =>
-      api.placeOrder(effectiveToken, {
-        cart_item_ids: items.map((item) => item.id),
-        used_coupon_id: activeCouponID,
-        used_point: appliedPoint,
+      submitServerAuthoritativeCheckout({
+        existingOrderCode: createdOrderCode,
+        orderInput: {
+          cart_item_ids: items.map((item) => item.id),
+          used_coupon_id: selectedCoupon?.id,
+          used_point: appliedPoint,
+        },
+        placeOrder: (input) => api.placeOrder(effectiveToken, input),
+        getOrder: (orderCode) => api.getOrder(effectiveToken, orderCode),
+        completePayment: (orderCode, amount) => api.completePayment(effectiveToken, orderCode, {
+          payment_method: "CARD",
+          payment_key: `frontend-${orderCode}`,
+          amount,
+        }),
+        onOrderCreated: (orderCode) => {
+          setCreatedOrderCode(orderCode);
+          window.sessionStorage.setItem(CHECKOUT_RETRY_STORAGE_KEY, JSON.stringify({
+            memberID,
+            cartFingerprint,
+            orderCode,
+          }));
+        },
+        onOrderConfirmed: setConfirmedOrder,
       }),
+    onSuccess: ({ orderCode }) => {
+      window.sessionStorage.removeItem(CHECKOUT_RETRY_STORAGE_KEY);
+      router.push(`/orders/${orderCode}`);
+    },
+    onError: (error) => {
+      if (error instanceof CheckoutOrderStateError && error.discardOrder) {
+        window.sessionStorage.removeItem(CHECKOUT_RETRY_STORAGE_KEY);
+        setCreatedOrderCode(undefined);
+        setConfirmedOrder(undefined);
+      }
+    },
   });
-  const completePayment = useMutation({
-    mutationFn: (orderCode: string) =>
-      api.completePayment(effectiveToken, orderCode, {
-        payment_method: "CARD",
-        payment_key: `frontend-${Date.now()}`,
-        amount: payableAmount,
-      }),
-    onSuccess: (_, orderCode) => router.push(`/orders/${orderCode}`),
-  });
-
-  const isSubmitting = placeOrder.isPending || completePayment.isPending;
-  const submitError = placeOrder.error?.message ?? completePayment.error?.message;
-  const canPay = useMemo(() => Boolean(items.length > 0 && address.receiver && address.phone && address.line1), [address, items.length]);
 
   if (!token) {
-    return (
-      <main className="mx-auto max-w-3xl px-4 py-16">
-        <h1 className="text-2xl font-black">로그인이 필요합니다</h1>
-        <Link href="/login">
-          <Button className="mt-5">로그인하기</Button>
-        </Link>
-      </main>
-    );
+    return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-black">로그인이 필요합니다</h1><Link href="/login"><Button className="mt-5">로그인하기</Button></Link></main>;
   }
+
+  const blockingError = cart.error;
+  const supportingError = coupons.error ?? profile.error ?? addresses.error;
 
   return (
     <main className="mx-auto max-w-5xl px-4 pb-28 pt-8">
       <h1 className="text-2xl font-black">주문서</h1>
+      {blockingError ? (
+        <div className="mt-5 rounded-md border border-brand/30 bg-red-50 p-4 text-sm">
+          <p className="font-bold text-brand">{apiErrorMessage(blockingError)}</p>
+          <Button className="mt-3" size="sm" variant="secondary" onClick={() => {
+            void cart.refetch(); void coupons.refetch(); void profile.refetch(); void addresses.refetch();
+          }}>다시 시도</Button>
+        </div>
+      ) : null}
+      {supportingError ? (
+        <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm">
+          <p className="font-bold text-amber-900">
+            쿠폰·포인트·참고용 배송지 일부를 불러오지 못했습니다. 할인 없이 주문은 계속할 수 있습니다.
+          </p>
+          <Button className="mt-3" size="sm" variant="secondary" onClick={() => {
+            void coupons.refetch(); void profile.refetch(); void addresses.refetch();
+          }}>부가 정보 다시 시도</Button>
+        </div>
+      ) : null}
       <div className="mt-6 grid gap-6 md:grid-cols-[1fr_340px]">
         <section className="space-y-5">
           <div className="rounded-md border border-line bg-white p-4">
-            <h2 className="font-black">배송지</h2>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <input className="h-11 rounded-md border border-line px-3 outline-none" value={address.receiver} onChange={(e) => setAddress({ ...address, receiver: e.target.value })} aria-label="받는 사람" />
-              <input className="h-11 rounded-md border border-line px-3 outline-none" value={address.phone} onChange={(e) => setAddress({ ...address, phone: e.target.value })} aria-label="연락처" />
-              <input className="h-11 rounded-md border border-line px-3 outline-none md:col-span-2" value={address.line1} onChange={(e) => setAddress({ ...address, line1: e.target.value })} aria-label="기본 주소" />
-              <input className="h-11 rounded-md border border-line px-3 outline-none md:col-span-2" value={address.line2} onChange={(e) => setAddress({ ...address, line2: e.target.value })} aria-label="상세 주소" />
-            </div>
+            <h2 className="font-black">기본 배송지</h2>
+            {defaultAddress ? (
+              <div className="mt-3 text-sm leading-6">
+                <p className="font-bold">{defaultAddress.receiver} / {defaultAddress.phone}</p>
+                <p className="text-muted">({defaultAddress.zip_code}) {defaultAddress.line1} {defaultAddress.line2}</p>
+              </div>
+            ) : <p className="mt-3 text-sm text-muted">등록된 기본 배송지가 없습니다.</p>}
+            <p className="mt-3 rounded-md bg-amber-50 p-3 text-xs font-bold text-amber-800">
+              현재 주문 API는 배송지를 주문에 연결하지 않습니다. 위 주소는 계정의 기본 배송지를 참고용으로만 표시합니다.
+            </p>
           </div>
 
           <div className="rounded-md border border-line bg-white p-4">
@@ -100,10 +187,7 @@ export function CheckoutPage() {
             <div className="mt-4 space-y-3">
               {items.map((item) => (
                 <div key={item.id} className="flex justify-between gap-4 text-sm">
-                  <div>
-                    <p className="font-bold">{item.product?.name ?? `상품 ${item.product_id}`}</p>
-                    <p className="mt-1 text-muted">옵션 #{item.option_id} · {item.quantity}개</p>
-                  </div>
+                  <div><p className="font-bold">{item.product?.name ?? `상품 #${item.product_id}`}</p><p className="mt-1 text-muted">옵션 #{item.option_id} · {item.quantity}개</p></div>
                   <p className="font-black">{formatPrice(item.price_at_added * item.quantity)}</p>
                 </div>
               ))}
@@ -111,60 +195,36 @@ export function CheckoutPage() {
           </div>
 
           <div className="rounded-md border border-line bg-white p-4">
-            <h2 className="font-black">할인</h2>
+            <h2 className="font-black">할인 요청</h2>
             <label className="mt-4 block">
-              <span className="text-sm font-bold">쿠폰</span>
-              <select className="mt-2 h-11 w-full rounded-md border border-line px-3 outline-none" value={couponID ?? ""} onChange={(e) => setCouponID(Number(e.target.value) || undefined)}>
+              <span className="text-sm font-bold">보유 쿠폰</span>
+              <select className="mt-2 h-11 w-full rounded-md border border-line px-3 outline-none" value={couponID ?? ""} disabled={Boolean(createdOrderCode)} onChange={(event) => setCouponID(Number(event.target.value) || undefined)}>
                 <option value="">사용 안 함</option>
-                {coupons.map((coupon) => (
-                  <option key={coupon.id} value={coupon.id}>
-                    {coupon.name} ({formatPrice(coupon.discount_amount)})
-                  </option>
-                ))}
+                {ownedCoupons.map((owned) => <option key={owned.id} value={owned.id}>{owned.coupon.name}</option>)}
               </select>
+              <span className="mt-1 block text-xs text-muted">주문에는 쿠폰 정의 ID가 아닌 보유 쿠폰 ID가 전송됩니다.</span>
             </label>
             <label className="mt-4 block">
               <span className="text-sm font-bold">포인트 사용</span>
-              <input
-                type="number"
-                min={0}
-                max={Math.min(availablePoint, maxUsablePoint)}
-                className="mt-2 h-11 w-full rounded-md border border-line px-3 outline-none"
-                value={usedPoint}
-                onChange={(event) => setUsedPoint(Math.max(0, Number(event.target.value)))}
-              />
-              <span className="mt-1 block text-xs text-muted">
-                적용 포인트 {formatPrice(appliedPoint)} · 사용 가능 {formatPrice(availablePoint)}
-              </span>
+              <input type="number" min={0} max={Math.min(availablePoint, productTotal)} disabled={Boolean(createdOrderCode)} className="mt-2 h-11 w-full rounded-md border border-line px-3 outline-none" value={usedPoint} onChange={(event) => setUsedPoint(Math.max(0, Number(event.target.value) || 0))} />
+              <span className="mt-1 block text-xs text-muted">요청 {formatPrice(appliedPoint)} · 사용 가능 {formatPrice(availablePoint)}</span>
             </label>
           </div>
         </section>
 
         <aside className="h-fit rounded-md border border-line bg-white p-4">
-          <h2 className="font-black">결제 금액</h2>
+          <h2 className="font-black">{confirmedOrder ? "서버 확정 결제 금액" : "주문 전 예상 금액"}</h2>
           <div className="mt-4 space-y-3 text-sm">
-            <div className="flex justify-between"><span>상품 금액</span><strong>{formatPrice(productTotal)}</strong></div>
-            <div className="flex justify-between"><span>쿠폰 할인</span><strong>-{formatPrice(discount)}</strong></div>
-            <div className="flex justify-between"><span>포인트 사용</span><strong>-{formatPrice(appliedPoint)}</strong></div>
+            <div className="flex justify-between"><span>상품 금액</span><strong>{formatPrice(confirmedOrder?.total_order_price ?? productTotal)}</strong></div>
+            <div className="flex justify-between"><span>서버 할인</span><strong>{confirmedOrder ? `-${formatPrice(confirmedOrder.total_discount_price)}` : "주문 후 확정"}</strong></div>
+            <div className="flex justify-between"><span>포인트</span><strong>-{formatPrice(confirmedOrder?.used_point ?? appliedPoint)}</strong></div>
           </div>
-          <div className="mt-4 border-t border-line pt-4">
-            <div className="flex justify-between">
-              <span className="font-bold">최종 결제</span>
-              <strong className="text-xl">{formatPrice(payableAmount)}</strong>
-            </div>
-          </div>
-          <Button
-            className="mt-5 w-full"
-            size="lg"
-            disabled={!canPay || isSubmitting}
-            onClick={async () => {
-              const order = await placeOrder.mutateAsync();
-              await completePayment.mutateAsync(order.orderCode);
-            }}
-          >
-            {isSubmitting ? "결제 처리 중" : "결제하기"}
+          <div className="mt-4 border-t border-line pt-4"><div className="flex justify-between"><span className="font-bold">결제 금액</span><strong className="text-xl">{serverAmount === undefined ? "주문 후 확정" : formatPrice(serverAmount)}</strong></div></div>
+          <Button className="mt-5 w-full" size="lg" disabled={!retryStateReady || !items.length || Boolean(blockingError) || checkout.isPending} onClick={() => checkout.mutate()}>
+            {checkout.isPending ? "처리 중" : createdOrderCode ? "같은 주문 결제 재시도" : "주문 생성 후 결제"}
           </Button>
-          {submitError ? <p className="mt-3 text-sm font-bold text-brand">{submitError}</p> : null}
+          {createdOrderCode ? <p className="mt-3 text-xs text-muted">생성된 주문: {createdOrderCode}. 재시도해도 주문은 다시 생성하지 않습니다.</p> : null}
+          {checkout.error ? <p className="mt-3 text-sm font-bold text-brand">{apiErrorMessage(checkout.error)}</p> : null}
         </aside>
       </div>
     </main>
