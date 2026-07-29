@@ -102,6 +102,64 @@ test.describe("admin console against backend origin/main", () => {
     await expect(page.getByText("토큰 필요", { exact: true })).toBeVisible();
     await expect(page.getByText("데이터를 불러오지 못했습니다.", { exact: true })).toHaveCount(0);
   });
+
+  test("admin creates, updates, and deactivates a CMS carousel through the UI", async ({ page, request }, testInfo) => {
+    const session = await signIn(request, seedAccounts.admin);
+    await installSession(page, session);
+    await page.goto("/admin/cms");
+    await expect(page.getByRole("heading", { name: "CMS 운영", exact: true })).toBeVisible();
+
+    const title = `Playwright 캐러셀 ${Date.now()}-${testInfo.retry}`;
+    const updatedTitle = `${title} 수정`;
+    const carouselForm = page.locator("section").filter({
+      has: page.getByRole("heading", { name: "이벤트 캐러셀 등록", exact: true }),
+    }).last();
+    await carouselForm.getByLabel("캐러셀 제목").fill(title);
+    await carouselForm.getByLabel("이미지 URL").fill("https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=1200&auto=format&fit=crop");
+    await carouselForm.getByLabel("대상 유형").selectOption("PRODUCT");
+    await carouselForm.getByLabel("대상 ID").fill("1");
+    await carouselForm.getByLabel("노출 순서").fill("99");
+    await carouselForm.getByLabel("노출 상태").selectOption("ACTIVE");
+    await carouselForm.getByLabel("시작 일시").fill(
+      new Date(Date.now() - 60 * 60 * 1000).toISOString().slice(0, 16),
+    );
+    await carouselForm.getByLabel("종료 일시").fill(
+      new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+    );
+
+    const createResponse = page.waitForResponse((response) =>
+      response.url().endsWith("/api/v1/carousels")
+      && response.request().method() === "POST");
+    await carouselForm.getByRole("button", { name: "등록", exact: true }).click();
+    expect((await createResponse).ok()).toBeTruthy();
+    await expect(page.getByText(title, { exact: true })).toBeVisible();
+
+    const createdCard = page.locator("section").filter({
+      has: page.getByText(title, { exact: true }),
+    }).last();
+    await createdCard.getByRole("button", { name: "수정", exact: true }).click();
+    const editForm = page.locator("section").filter({
+      has: page.getByRole("heading", { name: "이벤트 캐러셀 수정", exact: true }),
+    }).last();
+    await editForm.getByLabel("캐러셀 제목").fill(updatedTitle);
+
+    const updateResponse = page.waitForResponse((response) =>
+      /\/api\/v1\/carousels\/\d+$/.test(response.url())
+      && response.request().method() === "PUT");
+    await editForm.getByRole("button", { name: "수정 저장", exact: true }).click();
+    expect((await updateResponse).ok()).toBeTruthy();
+    await expect(page.getByText(updatedTitle, { exact: true })).toBeVisible();
+
+    const updatedCard = page.locator("section").filter({
+      has: page.getByText(updatedTitle, { exact: true }),
+    }).last();
+    const deactivateResponse = page.waitForResponse((response) =>
+      /\/api\/v1\/carousels\/\d+$/.test(response.url())
+      && response.request().method() === "DELETE");
+    await updatedCard.getByRole("button", { name: "비활성화", exact: true }).click();
+    expect((await deactivateResponse).ok()).toBeTruthy();
+    await expect(updatedCard.getByText("비활성", { exact: true })).toBeVisible();
+  });
 });
 
 test.describe("seller console against backend origin/main", () => {
@@ -125,7 +183,7 @@ test.describe("seller console against backend origin/main", () => {
     });
   }
 
-  test("seller creates a product through the UI and sees it in the live list", async ({ page, request }, testInfo) => {
+  test("seller creates and updates a product while exposing the base-price migration blocker", async ({ page, request }, testInfo) => {
     const session = await signIn(request, seedAccounts.seller);
     await installSession(page, session);
     await page.goto("/seller/products");
@@ -148,5 +206,35 @@ test.describe("seller console against backend origin/main", () => {
     await expect(page.getByText("Created.", { exact: true })).toBeVisible();
     await flushReact(page);
     await expect(page.getByText(productName, { exact: true })).toBeVisible();
+
+    const statusSelect = page.getByLabel(`${productName} 상태`);
+    await expect(statusSelect).toBeVisible();
+    await statusSelect.selectOption("SOLD_OUT");
+    const productRow = statusSelect.locator(
+      "xpath=ancestor::div[contains(@style, 'grid-template-columns')][1]",
+    );
+    const updateResponsePromise = page.waitForResponse((response) =>
+      /\/api\/v1\/products\/\d+$/.test(response.url())
+      && response.request().method() === "PUT");
+    await productRow.getByRole("button", { name: "변경 저장", exact: true }).click();
+    const updateResponse = await updateResponsePromise;
+    expect(updateResponse.ok(), await updateResponse.text()).toBeTruthy();
+    await flushReact(page);
+    await expect(page.getByLabel(`${productName} 상태`)).toHaveValue("SOLD_OUT");
+
+    const priceInput = page.getByLabel(`${productName} 판매가`);
+    await priceInput.fill("21000");
+    const refreshedProductRow = priceInput.locator(
+      "xpath=ancestor::div[contains(@style, 'grid-template-columns')][1]",
+    );
+    const blockedPriceResponsePromise = page.waitForResponse((response) =>
+      /\/api\/v1\/products\/\d+$/.test(response.url())
+      && response.request().method() === "PUT");
+    await refreshedProductRow.getByRole("button", { name: "변경 저장", exact: true }).click();
+    const blockedPriceResponse = await blockedPriceResponsePromise;
+    expect(blockedPriceResponse.status()).toBe(500);
+    expect(await blockedPriceResponse.text()).toContain("수정 실패");
+    await expect(page.getByText("작업을 완료하지 못했습니다.", { exact: true })).toBeVisible();
+    await expect(page.getByText("수정 실패", { exact: true })).toBeVisible();
   });
 });

@@ -1,0 +1,251 @@
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type TestInfo,
+} from "@playwright/test";
+import {
+  backendBaseURL,
+  installSession,
+  seedAccounts,
+  signIn,
+} from "../support/live-backend";
+
+async function createMember(
+  request: APIRequestContext,
+  testInfo: TestInfo,
+  prefix: string,
+) {
+  const email = `${prefix}-${Date.now()}-${testInfo.retry}@test.com`;
+  const password = "password123";
+  const signup = await request.post(`${backendBaseURL}/api/v1/auth/signup`, {
+    data: {
+      email,
+      password,
+      marketingConsent: false,
+      nighttimeConsent: false,
+    },
+  });
+  expect(signup.status(), await signup.text()).toBe(201);
+
+  return {
+    email,
+    session: await signIn(request, { email, password }),
+  };
+}
+
+test.describe("remaining public catalog routes against backend origin/main", () => {
+  for (const target of [
+    {
+      route: "/popular-markets",
+      endpoint: "/api/v1/markets",
+      heading: "인기 마켓",
+      sentinel: "mood studio",
+    },
+    {
+      route: "/popular-products",
+      endpoint: "/api/v1/products/popular",
+      heading: "인기 상품",
+      sentinel: "스냅 코튼 크롭 셔츠",
+    },
+    {
+      route: "/recommendations",
+      endpoint: "/api/v1/products/recommendations",
+      heading: "추천 상품",
+      sentinel: "스냅 코튼 크롭 셔츠",
+    },
+  ] as const) {
+    test(`${target.route} renders its live collection`, async ({ page }) => {
+      const responsePromise = page.waitForResponse((response) =>
+        response.url().includes(target.endpoint));
+
+      await page.goto(target.route);
+      const response = await responsePromise;
+      expect(response.ok(), `${target.endpoint}: ${response.status()}`).toBeTruthy();
+      await response.finished();
+
+      await expect(page.getByRole("heading", {
+        name: target.heading,
+        exact: true,
+      })).toBeVisible();
+      await expect(
+        page.getByText(target.sentinel, { exact: true }).and(page.locator(":visible")).first(),
+      ).toBeVisible();
+    });
+  }
+
+  test("category hub filters the live catalog and links to products", async ({ page }) => {
+    const categoriesResponse = page.waitForResponse((response) =>
+      response.url().includes("/api/v1/categories/tree"));
+    await page.goto("/categories");
+    expect((await categoriesResponse).ok()).toBeTruthy();
+
+    await expect(page.getByRole("heading", { name: "카테고리관", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "상의", exact: true }).first().click();
+    await expect(page.getByRole("heading", { name: "상의 실시간 상품", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: /스냅 코튼 크롭 셔츠/ }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "전체 상품", exact: true })).toHaveAttribute("href", "/products");
+  });
+
+  test("event detail renders the selected live event and products", async ({ page, request }) => {
+    const eventsResponse = await request.get(`${backendBaseURL}/api/v1/events`);
+    expect(eventsResponse.ok(), await eventsResponse.text()).toBeTruthy();
+    const events = await eventsResponse.json() as Array<{ id: number; title: string }>;
+    expect(events.length).toBeGreaterThan(0);
+    const event = events[0];
+
+    const detailResponse = page.waitForResponse((response) =>
+      response.url().includes(`/api/v1/events/${event.id}`));
+    await page.goto(`/events/${event.id}`);
+    expect((await detailResponse).ok()).toBeTruthy();
+
+    await expect(page.getByRole("heading", { name: event.title, exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "이벤트 상품", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: /스냅 코튼 크롭 셔츠/ }).first()).toBeVisible();
+  });
+
+  test("market detail renders its live market and products", async ({ page }) => {
+    const marketResponse = page.waitForResponse((response) =>
+      response.url().includes("/api/v1/markets/1"));
+    await page.goto("/markets/1");
+    expect((await marketResponse).ok()).toBeTruthy();
+
+    await expect(page.getByRole("heading", { name: "mood studio", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "마켓 상품", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: /스냅 코튼 크롭 셔츠/ }).first()).toBeVisible();
+  });
+
+  test("product catalog applies search and sort filters through the URL", async ({ page }) => {
+    const productsResponse = page.waitForResponse((response) =>
+      response.url().includes("/api/v1/products"));
+    await page.goto("/products?sort=popular");
+    expect((await productsResponse).ok()).toBeTruthy();
+
+    await expect(page.getByRole("heading", { name: "상품", exact: true })).toBeVisible();
+    await page.getByLabel("상품 검색").fill("스냅");
+    await page.getByLabel("상품 검색").press("Enter");
+    await expect(page).toHaveURL(/\/products\?.*q=%EC%8A%A4%EB%83%85/);
+    await expect(page.getByRole("link", { name: /스냅 코튼 크롭 셔츠/ }).first()).toBeVisible();
+
+    await page.getByRole("button", { name: "낮은 가격", exact: true }).click();
+    await expect(page).toHaveURL(/\/products\?.*sort=price-low/);
+    await expect(page.getByText("낮은 가격", { exact: true })).toBeVisible();
+  });
+
+  test("integrated search transitions from trends to live results", async ({ page }) => {
+    const trendingResponse = page.waitForResponse((response) =>
+      response.url().includes("/api/v1/search/trending"));
+    await page.goto("/search");
+    expect((await trendingResponse).ok()).toBeTruthy();
+    await expect(page.getByRole("heading", { name: "인기 검색어", exact: true })).toBeVisible();
+
+    const searchResponse = page.waitForResponse((response) =>
+      response.url().includes("/api/v1/search?q="));
+    await page.getByLabel("검색어 입력").fill("스냅");
+    await page.getByLabel("검색어 입력").press("Enter");
+    expect((await searchResponse).ok()).toBeTruthy();
+
+    await expect(page).toHaveURL(/\/search\?q=%EC%8A%A4%EB%83%85/);
+    await expect(page.getByRole("heading", { name: "상품", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: /스냅 코튼 크롭 셔츠/ }).first()).toBeVisible();
+  });
+
+  test("snapshot keeps the route stable while origin/main lacks the trends endpoint", async ({ page }) => {
+    const trendsResponse = page.waitForResponse((response) =>
+      response.url().includes("/api/v1/trends/posts"));
+    await page.goto("/snapshot");
+    const response = await trendsResponse;
+    expect(response.status()).toBe(404);
+
+    await expect(page.getByRole("heading", { name: "트렌드관", exact: true })).toBeVisible();
+    await expect(page.getByText("404 page not found", { exact: true })).toBeVisible();
+  });
+});
+
+test.describe("remaining customer account routes against backend origin/main", () => {
+  test("wishlist add, remove, and collection rendering work through the UI", async ({ page, request }, testInfo) => {
+    const account = await createMember(request, testInfo, "e2e-wishlist");
+    await installSession(page, account.session);
+    await page.goto("/products/1");
+
+    const wishlistButton = page.getByRole("button", { name: "찜하기", exact: true });
+    const addResponse = page.waitForResponse((response) =>
+      response.url().endsWith("/api/v1/products/1/wishlist")
+      && response.request().method() === "POST");
+    await wishlistButton.click();
+    expect((await addResponse).ok()).toBeTruthy();
+    await expect(wishlistButton).toHaveAttribute("title", "찜 해제");
+
+    const removeResponse = page.waitForResponse((response) =>
+      response.url().endsWith("/api/v1/products/1/wishlist")
+      && response.request().method() === "DELETE");
+    await wishlistButton.click();
+    expect((await removeResponse).ok()).toBeTruthy();
+    await expect(wishlistButton).toHaveAttribute("title", "찜하기");
+
+    const readdResponse = page.waitForResponse((response) =>
+      response.url().endsWith("/api/v1/products/1/wishlist")
+      && response.request().method() === "POST");
+    await wishlistButton.click();
+    expect((await readdResponse).ok()).toBeTruthy();
+
+    const collectionResponse = page.waitForResponse((response) =>
+      response.url().includes("/api/v1/me/wishlist"));
+    await page.goto("/likes");
+    expect((await collectionResponse).ok()).toBeTruthy();
+
+    await expect(page.getByRole("heading", { name: "좋아요", exact: true })).toBeVisible();
+    await expect(page.getByText("스냅 코튼 크롭 셔츠", { exact: true })).toBeVisible();
+  });
+
+  test("profile exposes the live account as a truthful read-only view", async ({ page, request }) => {
+    const session = await signIn(request, seedAccounts.member);
+    await installSession(page, session);
+    const profileResponse = page.waitForResponse((response) =>
+      response.url().endsWith("/api/v1/me"));
+    await page.goto("/mypage/profile");
+    expect((await profileResponse).ok()).toBeTruthy();
+
+    await expect(page.getByRole("heading", { name: "프로필", exact: true })).toBeVisible();
+    await expect(page.getByText(seedAccounts.member.email, { exact: true })).toBeVisible();
+    await expect(page.getByText(
+      "프로필 수정 API가 구현되면 편집 기능을 제공할 예정입니다.",
+      { exact: true },
+    )).toBeVisible();
+  });
+
+  test("pending order detail renders the server-authoritative order", async ({ page, request }, testInfo) => {
+    const account = await createMember(request, testInfo, "e2e-order-detail");
+    const authHeaders = { Authorization: `Bearer ${account.session.accessToken}` };
+
+    const addCart = await request.post(`${backendBaseURL}/api/v1/cart/items`, {
+      headers: authHeaders,
+      data: { product_id: 1, option_id: 1, quantity: 1 },
+    });
+    expect(addCart.status(), await addCart.text()).toBe(201);
+    const cartResponse = await request.get(`${backendBaseURL}/api/v1/cart`, {
+      headers: authHeaders,
+    });
+    expect(cartResponse.ok(), await cartResponse.text()).toBeTruthy();
+    const cart = await cartResponse.json() as Array<{ ID: number }>;
+    expect(cart.length).toBe(1);
+
+    const orderResponse = await request.post(`${backendBaseURL}/api/v1/orders`, {
+      headers: authHeaders,
+      data: { cart_item_ids: [cart[0].ID], used_point: 0 },
+    });
+    expect(orderResponse.status(), await orderResponse.text()).toBe(201);
+    const { orderCode } = await orderResponse.json() as { orderCode: string };
+
+    await installSession(page, account.session);
+    const detailResponse = page.waitForResponse((response) =>
+      response.url().endsWith(`/api/v1/orders/${orderCode}`));
+    await page.goto(`/orders/${orderCode}`);
+    expect((await detailResponse).ok()).toBeTruthy();
+
+    await expect(page.getByRole("heading", { name: orderCode, exact: true })).toBeVisible();
+    await expect(page.getByText("Payment pending", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("스냅 코튼 크롭 셔츠", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Payment", exact: true })).toBeVisible();
+  });
+});
