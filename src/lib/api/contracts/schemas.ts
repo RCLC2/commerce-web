@@ -140,7 +140,7 @@ export const reviewSchema = z.object({
   image_count: nonNegativeIntSchema.optional(),
   status: z.string().optional(),
   images: z.array(reviewImageSchema).optional(),
-  created_at: dateStringSchema,
+  created_at: dateStringSchema.optional(),
   updated_at: dateStringSchema.optional(),
   product: z.object({ id: identifierSchema, name: z.string(), image_url: z.string().optional() }).optional(),
 });
@@ -232,18 +232,6 @@ export const issuableCouponQuoteSchema = z.object({
   discounted_amount: nonNegativeIntSchema,
 });
 
-export const notificationSchema = z.looseObject({
-  id: identifierSchema,
-  user_id: identifierSchema.optional(),
-  title: z.string().optional(),
-  message: z.string().optional(),
-  content: z.string().optional(),
-  type: z.string().optional(),
-  is_read: z.boolean().optional(),
-  read_at: dateStringSchema.optional(),
-  created_at: dateStringSchema.optional(),
-});
-
 export const recommendationSchema = z.looseObject({
   id: identifierSchema.optional(),
   user_id: identifierSchema.optional(),
@@ -259,7 +247,7 @@ export const carouselSchema = z.object({
   title: z.string(),
   image_url: z.string(),
   target_type: z.string().optional(),
-  target_id: identifierSchema.optional(),
+  target_id: nonNegativeIntSchema.optional(),
   display_order: z.number().int().optional(),
   is_active: z.boolean().optional(),
   starts_at: dateStringSchema.optional(),
@@ -319,17 +307,4 @@ export const inventorySyncLogSchema = z.looseObject({
   error_message: z.string().optional(),
   message: z.string().optional(),
   created_at: dateStringSchema,
-});
-
-export const externalInventoryMappingSchema = z.looseObject({
-  id: identifierSchema,
-  inventory_source_id: identifierSchema,
-  provider: z.string(),
-  product_option_id: identifierSchema,
-  external_product_id: z.string().optional(),
-  external_variant_id: z.string().optional(),
-  external_inventory_item_id: z.string().optional(),
-  external_location_id: z.string().optional(),
-  disconnect_if_necessary: z.boolean().optional(),
-  created_at: dateStringSchema.optional(),
 });

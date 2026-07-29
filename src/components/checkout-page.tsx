@@ -5,10 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { apiErrorMessage } from "@/lib/api-client";
+import { ApiHttpError, apiErrorMessage } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import {
   CheckoutOrderStateError,
+  estimatedCouponDiscount,
+  maxApplicablePoints,
+  normalizeRequestedPoints,
+  shouldDiscardCheckoutRestoreStatus,
   submitServerAuthoritativeCheckout,
 } from "@/lib/queries/checkout";
 import { useSessionStore } from "@/lib/session-store";
@@ -24,10 +28,14 @@ export function CheckoutPage() {
   const memberID = useSessionStore((state) => state.memberID);
   const effectiveToken = token ?? "";
   const [usedPoint, setUsedPoint] = useState(0);
-  const [couponID, setCouponID] = useState<number>();
+  const [couponSelection, setCouponSelection] = useState<{
+    id: number;
+    cartUpdatedAt: number;
+  }>();
   const [createdOrderCode, setCreatedOrderCode] = useState<string>();
   const [confirmedOrder, setConfirmedOrder] = useState<OrderResponse>();
   const [retryStateReady, setRetryStateReady] = useState(false);
+  const [restoreError, setRestoreError] = useState<string>();
 
   const cart = useQuery({
     queryKey: ["cart", effectiveToken],
@@ -60,45 +68,94 @@ export function CheckoutPage() {
   const productByID = new Map(products.flatMap((query, index) =>
     query.data ? [[productIDs[index], query.data] as const] : []));
   const items = (cart.data ?? []).map((item) => ({ ...item, product: productByID.get(item.product_id) }));
-  const cartFingerprint = [...items.map((item) => item.id)].sort((a, b) => a - b).join(",");
   const ownedCoupons = (coupons.data ?? []).filter((coupon) => coupon.status === "AVAILABLE");
+  const couponID = couponSelection?.cartUpdatedAt === cart.dataUpdatedAt
+    ? couponSelection.id
+    : undefined;
   const selectedCoupon = ownedCoupons.find((coupon) => coupon.id === couponID);
   const defaultAddress = (addresses.data ?? []).find((address) => address.is_default) ?? addresses.data?.[0];
   const productTotal = items.reduce((sum, item) => sum + item.price_at_added * item.quantity, 0);
   const availablePoint = profile.data?.point_balance ?? 0;
-  const appliedPoint = Math.min(Math.max(0, usedPoint), availablePoint, productTotal);
+  const eligibleSelectedCoupon = selectedCoupon
+    && productTotal >= selectedCoupon.coupon.min_order_amount
+    ? selectedCoupon
+    : undefined;
+  const selectedCouponDiscount = estimatedCouponDiscount(eligibleSelectedCoupon?.coupon, productTotal);
+  const pointLimit = maxApplicablePoints(productTotal, selectedCouponDiscount, availablePoint);
+  const appliedPoint = Math.min(normalizeRequestedPoints(usedPoint), pointLimit);
+  const expectedAmount = productTotal - selectedCouponDiscount - appliedPoint;
   const serverAmount = confirmedOrder
     ? Math.max(0, confirmedOrder.total_order_price - confirmedOrder.total_discount_price - confirmedOrder.used_point)
     : undefined;
 
   useEffect(() => {
-    if (!cart.isSuccess || memberID === null) {
+    if (!effectiveToken || memberID === null) {
       return;
     }
-    const restoreTimer = window.setTimeout(() => {
+    let cancelled = false;
+
+    const clearStoredOrder = () => {
+      window.sessionStorage.removeItem(CHECKOUT_RETRY_STORAGE_KEY);
+      setCreatedOrderCode(undefined);
+      setConfirmedOrder(undefined);
+    };
+
+    const restore = async () => {
+      setRetryStateReady(false);
+      setRestoreError(undefined);
+      let stored: { memberID?: unknown; orderCode?: unknown } | null;
       try {
-        const stored = JSON.parse(
+        stored = JSON.parse(
           window.sessionStorage.getItem(CHECKOUT_RETRY_STORAGE_KEY) ?? "null",
-        ) as { memberID?: unknown; cartFingerprint?: unknown; orderCode?: unknown } | null;
-        if (
-          stored?.memberID === memberID
-          && stored.cartFingerprint === cartFingerprint
-          && typeof stored.orderCode === "string"
-          && stored.orderCode
-        ) {
-          setCreatedOrderCode(stored.orderCode);
-        } else {
-          window.sessionStorage.removeItem(CHECKOUT_RETRY_STORAGE_KEY);
-          setCreatedOrderCode(undefined);
-        }
+        ) as { memberID?: unknown; orderCode?: unknown } | null;
       } catch {
-        window.sessionStorage.removeItem(CHECKOUT_RETRY_STORAGE_KEY);
-        setCreatedOrderCode(undefined);
+        clearStoredOrder();
+        setRetryStateReady(true);
+        return;
       }
-      setRetryStateReady(true);
-    }, 0);
-    return () => window.clearTimeout(restoreTimer);
-  }, [cart.isSuccess, cartFingerprint, memberID]);
+
+      if (
+        stored?.memberID !== memberID
+        || typeof stored.orderCode !== "string"
+        || !stored.orderCode.trim()
+      ) {
+        clearStoredOrder();
+        setRetryStateReady(true);
+        return;
+      }
+
+      const orderCode = stored.orderCode.trim();
+      setCreatedOrderCode(orderCode);
+      try {
+        const order = await api.getOrder(effectiveToken, orderCode);
+        if (cancelled) return;
+        if (order.order_code !== orderCode || order.status === "CANCELLED") {
+          clearStoredOrder();
+        } else {
+          setConfirmedOrder(order);
+        }
+      } catch (error) {
+        if (cancelled) return;
+        if (
+          error instanceof ApiHttpError
+          && shouldDiscardCheckoutRestoreStatus(error.status)
+        ) {
+          clearStoredOrder();
+        } else {
+          setRestoreError("기존 주문을 확인하지 못했습니다. 주문 코드는 보존했으며 다시 시도할 수 있습니다.");
+        }
+      } finally {
+        if (!cancelled) {
+          setRetryStateReady(true);
+        }
+      }
+    };
+
+    void restore();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveToken, memberID]);
 
   const checkout = useMutation({
     mutationFn: () =>
@@ -106,27 +163,26 @@ export function CheckoutPage() {
         existingOrderCode: createdOrderCode,
         orderInput: {
           cart_item_ids: items.map((item) => item.id),
-          used_coupon_id: selectedCoupon?.id,
+          used_coupon_id: eligibleSelectedCoupon?.id,
           used_point: appliedPoint,
         },
         placeOrder: (input) => api.placeOrder(effectiveToken, input),
         getOrder: (orderCode) => api.getOrder(effectiveToken, orderCode),
-        completePayment: (orderCode, amount) => api.completePayment(effectiveToken, orderCode, {
-          payment_method: "CARD",
-          payment_key: `frontend-${orderCode}`,
-          amount,
-        }),
+        createPaymentCheckout: (orderCode) => api.createPaymentCheckout(effectiveToken, orderCode),
         onOrderCreated: (orderCode) => {
           setCreatedOrderCode(orderCode);
           window.sessionStorage.setItem(CHECKOUT_RETRY_STORAGE_KEY, JSON.stringify({
             memberID,
-            cartFingerprint,
             orderCode,
           }));
         },
         onOrderConfirmed: setConfirmedOrder,
       }),
-    onSuccess: ({ orderCode }) => {
+    onSuccess: ({ orderCode, checkoutUrl }) => {
+      if (checkoutUrl) {
+        window.location.assign(checkoutUrl);
+        return;
+      }
       window.sessionStorage.removeItem(CHECKOUT_RETRY_STORAGE_KEY);
       router.push(`/orders/${orderCode}`);
     },
@@ -198,16 +254,31 @@ export function CheckoutPage() {
             <h2 className="font-black">할인 요청</h2>
             <label className="mt-4 block">
               <span className="text-sm font-bold">보유 쿠폰</span>
-              <select className="mt-2 h-11 w-full rounded-md border border-line px-3 outline-none" value={couponID ?? ""} disabled={Boolean(createdOrderCode)} onChange={(event) => setCouponID(Number(event.target.value) || undefined)}>
+              <select
+                className="mt-2 h-11 w-full rounded-md border border-line px-3 outline-none"
+                value={eligibleSelectedCoupon?.id ?? ""}
+                disabled={Boolean(createdOrderCode)}
+                onChange={(event) => {
+                  const id = Number(event.target.value);
+                  setCouponSelection(id ? { id, cartUpdatedAt: cart.dataUpdatedAt } : undefined);
+                }}
+              >
                 <option value="">사용 안 함</option>
-                {ownedCoupons.map((owned) => <option key={owned.id} value={owned.id}>{owned.coupon.name}</option>)}
+                {ownedCoupons.map((owned) => {
+                  const eligible = productTotal >= owned.coupon.min_order_amount;
+                  return (
+                    <option key={owned.id} value={owned.id} disabled={!eligible}>
+                      {owned.coupon.name}{eligible ? "" : ` (${formatPrice(owned.coupon.min_order_amount)} 이상)`}
+                    </option>
+                  );
+                })}
               </select>
               <span className="mt-1 block text-xs text-muted">주문에는 쿠폰 정의 ID가 아닌 보유 쿠폰 ID가 전송됩니다.</span>
             </label>
             <label className="mt-4 block">
               <span className="text-sm font-bold">포인트 사용</span>
-              <input type="number" min={0} max={Math.min(availablePoint, productTotal)} disabled={Boolean(createdOrderCode)} className="mt-2 h-11 w-full rounded-md border border-line px-3 outline-none" value={usedPoint} onChange={(event) => setUsedPoint(Math.max(0, Number(event.target.value) || 0))} />
-              <span className="mt-1 block text-xs text-muted">요청 {formatPrice(appliedPoint)} · 사용 가능 {formatPrice(availablePoint)}</span>
+              <input type="number" min={0} max={pointLimit} step={1} disabled={Boolean(createdOrderCode)} className="mt-2 h-11 w-full rounded-md border border-line px-3 outline-none" value={usedPoint} onChange={(event) => setUsedPoint(normalizeRequestedPoints(Number(event.target.value)))} />
+              <span className="mt-1 block text-xs text-muted">요청 {formatPrice(appliedPoint)} · 최대 사용 {formatPrice(pointLimit)} · 보유 {formatPrice(availablePoint)}</span>
             </label>
           </div>
         </section>
@@ -220,10 +291,28 @@ export function CheckoutPage() {
             <div className="flex justify-between"><span>포인트</span><strong>-{formatPrice(confirmedOrder?.used_point ?? appliedPoint)}</strong></div>
           </div>
           <div className="mt-4 border-t border-line pt-4"><div className="flex justify-between"><span className="font-bold">결제 금액</span><strong className="text-xl">{serverAmount === undefined ? "주문 후 확정" : formatPrice(serverAmount)}</strong></div></div>
-          <Button className="mt-5 w-full" size="lg" disabled={!retryStateReady || !items.length || Boolean(blockingError) || checkout.isPending} onClick={() => checkout.mutate()}>
+          <Button
+            className="mt-5 w-full"
+            size="lg"
+            disabled={
+              !retryStateReady
+              || (!createdOrderCode && (
+                !items.length
+                || !Number.isSafeInteger(expectedAmount)
+                || expectedAmount <= 0
+              ))
+              || Boolean(blockingError && !createdOrderCode)
+              || checkout.isPending
+            }
+            onClick={() => checkout.mutate()}
+          >
             {checkout.isPending ? "처리 중" : createdOrderCode ? "같은 주문 결제 재시도" : "주문 생성 후 결제"}
           </Button>
           {createdOrderCode ? <p className="mt-3 text-xs text-muted">생성된 주문: {createdOrderCode}. 재시도해도 주문은 다시 생성하지 않습니다.</p> : null}
+          {!createdOrderCode && items.length > 0 && expectedAmount <= 0 ? (
+            <p className="mt-3 text-xs font-bold text-brand">최소 결제 금액은 1원입니다. 쿠폰 또는 포인트 사용액을 조정해주세요.</p>
+          ) : null}
+          {restoreError ? <p className="mt-3 text-xs font-bold text-amber-800">{restoreError}</p> : null}
           {checkout.error ? <p className="mt-3 text-sm font-bold text-brand">{apiErrorMessage(checkout.error)}</p> : null}
         </aside>
       </div>

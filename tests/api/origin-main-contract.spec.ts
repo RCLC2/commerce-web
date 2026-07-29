@@ -140,10 +140,10 @@ test.describe("backend origin/main live API contract", () => {
   test("admin resources use the collection contract consumed by the console", async ({ request }) => {
     const session = await signIn(request, seedAccounts.admin);
     for (const endpoint of [
-      "/api/v1/admin/members",
-      "/api/v1/admin/markets",
+      "/api/v1/admin/members?limit=100&offset=0",
+      "/api/v1/admin/markets?limit=100&offset=0",
       "/api/v1/admin/products",
-      "/api/v1/admin/orders",
+      "/api/v1/admin/orders?limit=100&offset=0",
       "/api/v1/admin/settlements",
       "/api/v1/admin/coupons",
     ]) {
@@ -154,5 +154,22 @@ test.describe("backend origin/main live API contract", () => {
         endpoint,
       ).toBeTruthy();
     }
+
+    const members = unwrapFrontendEnvelope(
+      await getJSON(request, "/api/v1/admin/members?limit=100&offset=0", session.accessToken),
+    ) as Array<Record<string, unknown>>;
+    const markets = unwrapFrontendEnvelope(
+      await getJSON(request, "/api/v1/admin/markets?limit=100&offset=0", session.accessToken),
+    ) as Array<Record<string, unknown>>;
+    expect(members.length).toBeGreaterThan(0);
+    expect(members[0]).toEqual(expect.objectContaining({
+      ID: expect.any(Number),
+      Email: expect.any(String),
+    }));
+    expect(markets.length).toBeGreaterThan(0);
+    expect(markets[0]).toEqual(expect.objectContaining({
+      id: expect.any(Number),
+      name: expect.any(String),
+    }));
   });
 });

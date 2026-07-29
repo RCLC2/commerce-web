@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ImagePlus, Loader2, Star, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -70,7 +71,6 @@ export function ReviewWritePanel({ token, orderCode, lineItemID, productID, onSu
       setRatingX2(10);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["order", orderCode] }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.myReviews(token) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.productReviews(productID) }),
       ]);
       onSubmitted?.();
@@ -237,7 +237,7 @@ export function ReviewWritePanel({ token, orderCode, lineItemID, productID, onSu
       </div>
 
       {uploadError ? <p className="mt-2 text-xs font-bold text-brand">{uploadError}</p> : null}
-      {createReview.isError ? <p className="mt-2 text-xs font-bold text-brand">리뷰 등록에 실패했습니다.</p> : null}
+      {createReview.isError ? <p className="mt-2 text-xs font-bold text-brand">{apiErrorMessage(createReview.error)}</p> : null}
       {createReview.isSuccess ? <p className="mt-2 text-xs font-bold text-foreground">리뷰가 등록되었습니다.</p> : null}
     </form>
   );

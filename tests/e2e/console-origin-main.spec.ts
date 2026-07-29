@@ -17,7 +17,7 @@ const adminPages = [
   { route: "/admin/settlements", heading: "정산 관리", endpoint: "/api/v1/admin/settlements" },
   { route: "/admin/coupons", heading: "쿠폰 관리", endpoint: "/api/v1/admin/coupons", sentinel: "신규 회원 10% 쿠폰" },
   { route: "/admin/audit-logs", heading: "감사 로그", endpoint: "/api/v1/admin/audit-logs" },
-  { route: "/admin/cms", heading: "CMS 캐러셀", endpoint: "/api/v1/admin/carousels" },
+  { route: "/admin/cms", heading: "CMS 운영", endpoint: "/api/v1/admin/carousels" },
   { route: "/admin/tokens", heading: "셀러 화면 진입", endpoint: "/api/v1/admin/markets", sentinel: "mood studio" },
 ] as const;
 
@@ -91,6 +91,17 @@ test.describe("admin console against backend origin/main", () => {
       }
     });
   }
+
+  test("latest main experiment console renders its connection blocker", async ({ page, request }) => {
+    const session = await signIn(request, seedAccounts.admin);
+    await installSession(page, session);
+
+    await page.goto("/admin/experiments");
+
+    await expect(page.getByRole("heading", { name: "실험 관리", exact: true })).toBeVisible();
+    await expect(page.getByText("토큰 필요", { exact: true })).toBeVisible();
+    await expect(page.getByText("데이터를 불러오지 못했습니다.", { exact: true })).toHaveCount(0);
+  });
 });
 
 test.describe("seller console against backend origin/main", () => {

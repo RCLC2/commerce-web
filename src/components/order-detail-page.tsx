@@ -37,18 +37,13 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   const queryClient = useQueryClient();
   const [trackingInfo, setTrackingInfo] = useState<TrackingInfo | null>(null);
   const [reviewingLineItemID, setReviewingLineItemID] = useState<number | null>(null);
+  const [submittedLineItemIDs, setSubmittedLineItemIDs] = useState<Set<number>>(() => new Set());
 
   const { data: order, isLoading, error, refetch } = useQuery({
     queryKey: ["order", orderCode],
     queryFn: () => api.getOrder(effectiveToken, orderCode),
     enabled: Boolean(effectiveToken),
   });
-  const myReviewsQuery = useQuery({
-    queryKey: queryKeys.myReviews(effectiveToken),
-    queryFn: () => api.listMyReviews(effectiveToken),
-    enabled: Boolean(effectiveToken),
-  });
-  const myReviews = myReviewsQuery.data ?? [];
   const productIDs = [...new Set(order?.market_orders?.flatMap((marketOrder) =>
     marketOrder.line_items.map((item) => item.product_id)) ?? [])];
   const productQueries = useQueries({
@@ -151,11 +146,9 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
 
       <section className="mt-6 space-y-4">
         <h2 className="text-lg font-black">Items</h2>
-        {myReviewsQuery.error ? (
-          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">
-            Review history could not be loaded. Review actions are disabled to prevent duplicate submissions.
-          </div>
-        ) : null}
+        <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-900">
+          서버에 내 리뷰 목록 API가 없어 새로고침 뒤 중복 작성 여부는 제출 시 서버가 최종 확인합니다.
+        </p>
         {order.market_orders?.map((marketOrder) => (
           <div key={marketOrder.id} className="rounded-md border border-line bg-white p-4">
             <div className="flex justify-between text-sm">
@@ -165,10 +158,9 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
             <div className="mt-4 space-y-4">
               {marketOrder.line_items.map((item) => {
                 const product = item.product ?? productByID.get(item.product_id);
-                const writtenReview = myReviews.find((review) => review.order_line_item_id === item.id);
                 const completed = item.status === "COMPLETED" || Boolean(item.purchase_confirmed_at);
                 const canWriteReview =
-                  !myReviewsQuery.error && (item.reviewable ?? completed) && !writtenReview;
+                  (item.reviewable ?? completed) && !submittedLineItemIDs.has(item.id);
                 const isReviewing = reviewingLineItemID === item.id;
 
                 return (
@@ -191,7 +183,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
                           item={item}
                           busy={confirmPurchase.isPending}
                           completed={completed}
-                          writtenReviewID={writtenReview?.id}
+                          reviewSubmitted={submittedLineItemIDs.has(item.id)}
                           canWriteReview={canWriteReview}
                           reviewOpen={isReviewing}
                           onConfirm={() => confirmPurchase.mutate(item.id)}
@@ -205,7 +197,10 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
                         orderCode={order.order_code}
                         lineItemID={item.id}
                         productID={item.product_id}
-                        onSubmitted={() => setReviewingLineItemID(null)}
+                        onSubmitted={() => {
+                          setSubmittedLineItemIDs((current) => new Set(current).add(item.id));
+                          setReviewingLineItemID(null);
+                        }}
                       />
                     ) : null}
                   </div>
@@ -257,7 +252,7 @@ function OrderItemActions({
   item,
   busy,
   completed,
-  writtenReviewID,
+  reviewSubmitted,
   canWriteReview,
   reviewOpen,
   onConfirm,
@@ -266,7 +261,7 @@ function OrderItemActions({
   item: OrderLineItemResponse;
   busy: boolean;
   completed: boolean;
-  writtenReviewID?: number;
+  reviewSubmitted: boolean;
   canWriteReview: boolean;
   reviewOpen: boolean;
   onConfirm: () => void;
@@ -281,14 +276,7 @@ function OrderItemActions({
           Confirm purchase
         </Button>
       ) : null}
-      {writtenReviewID ? (
-        <>
-          <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-black text-muted">Reviewed</span>
-          <Link href="/mypage/reviews" className="text-xs font-bold text-foreground underline">
-            Manage review
-          </Link>
-        </>
-      ) : null}
+      {reviewSubmitted ? <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-black text-muted">Reviewed</span> : null}
       {canWriteReview ? (
         <Button size="sm" variant="secondary" disabled={busy} onClick={onToggleReview}>
           {reviewOpen ? "Close review" : "Write review"}

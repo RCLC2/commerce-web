@@ -7,7 +7,6 @@ import {
   eventSchema,
   homeSectionSchema,
   marketSchema,
-  notificationSchema,
   orderSchema,
   productSchema,
   recommendationSchema,
@@ -19,6 +18,7 @@ import {
   rawAdminCouponSchema,
   rawAdminMemberSchema,
   rawAuditLogSchema,
+  rawNotificationSchema,
   rawSettlementSchema,
 } from "./contracts/raw";
 import {
@@ -26,8 +26,10 @@ import {
   normalizeAdminCoupon,
   normalizeAdminMember,
   normalizeAuditLog,
+  normalizeNotification,
   normalizeSettlement,
 } from "./normalizers/contracts";
+import { collectAllUniquePages } from "./pagination";
 
 const penaltySchema = z.object({
   id: z.number().int().positive(),
@@ -49,12 +51,20 @@ const dailyAccrualSchema = z.object({
   updated_settlements: z.number().int().nonnegative(),
 });
 const paidCountSchema = z.object({ paid_count: z.number().int().nonnegative() });
+const settlementActionLogsSchema = z.object({ items: z.array(rawAuditLogSchema) });
 
 export const adminApi = {
   adminDashboard: async (token: string) =>
     normalizeAdminDashboard(await requestParsed(adminDashboardRawSchema, "/api/v1/admin/dashboard", { token })),
   adminMembers: async (token: string) =>
-    (await requestParsed(z.array(rawAdminMemberSchema), "/api/v1/admin/members", { token }))
+    (await collectAllUniquePages(
+      (limit, offset) => requestParsed(
+        z.array(rawAdminMemberSchema),
+        `/api/v1/admin/members?limit=${limit}&offset=${offset}`,
+        { token },
+      ),
+      (member) => member.ID,
+    ))
       .map(normalizeAdminMember),
   adminMember: async (token: string, memberID: number) =>
     normalizeAdminMember(await requestParsed(rawAdminMemberSchema, `/api/v1/admin/members/${memberID}`, { token })),
@@ -62,21 +72,51 @@ export const adminApi = {
     requestVoid(`/api/v1/admin/members/${memberID}/status`, { method: "POST", token, body: JSON.stringify(payload) }),
   updateMemberRole: (token: string, memberID: number, payload: { role: string }) =>
     requestVoid(`/api/v1/admin/members/${memberID}/role`, { method: "POST", token, body: JSON.stringify(payload) }),
-  adminMarkets: (token: string) => requestParsed(z.array(marketSchema), "/api/v1/admin/markets", { token }),
+  adminMarkets: (token: string) =>
+    collectAllUniquePages(
+      (limit, offset) => requestParsed(
+        z.array(marketSchema),
+        `/api/v1/admin/markets?limit=${limit}&offset=${offset}`,
+        { token },
+      ),
+      (market) => market.id,
+    ),
   adminMarket: (token: string, marketID: number) => requestParsed(marketSchema, `/api/v1/admin/markets/${marketID}`, { token }),
   adminMarketPenalties: (token: string, marketID: number) =>
     requestParsed(z.array(penaltySchema), `/api/v1/admin/markets/${marketID}/penalties`, { token }),
   adminProducts: (token: string) => requestParsed(z.array(productSchema), "/api/v1/admin/products", { token }),
-  adminOrders: (token: string) => requestParsed(z.array(orderSchema), "/api/v1/admin/orders", { token }),
+  adminOrders: (token: string) =>
+    collectAllUniquePages(
+      (limit, offset) => requestParsed(
+        z.array(orderSchema),
+        `/api/v1/admin/orders?limit=${limit}&offset=${offset}`,
+        { token },
+      ),
+      (order) => order.id,
+    ),
   adminOrder: (token: string, orderCode: string) => requestParsed(orderSchema, `/api/v1/admin/orders/${orderCode}`, { token }),
   adminOrderActionLogs: async (token: string) =>
-    (await requestParsed(z.array(rawAuditLogSchema), "/api/v1/admin/orders/action-logs", { token }))
+    (await collectAllUniquePages(
+      (limit, offset) => requestParsed(
+        z.array(rawAuditLogSchema),
+        `/api/v1/admin/orders/action-logs?limit=${limit}&offset=${offset}`,
+        { token },
+      ),
+      (log) => log.ID,
+    ))
       .map(normalizeAuditLog),
   adminSettlements: async (token: string) =>
     (await requestParsed(z.array(rawSettlementSchema), "/api/v1/admin/settlements", { token }))
       .map(normalizeSettlement),
   adminSettlementActionLogs: async (token: string) =>
-    (await requestParsed(z.array(rawAuditLogSchema), "/api/v1/admin/settlements/action-logs", { token }))
+    (await collectAllUniquePages(
+      async (limit, offset) => (await requestParsed(
+        settlementActionLogsSchema,
+        `/api/v1/admin/settlements/action-logs?limit=${limit}&offset=${offset}`,
+        { token },
+      )).items,
+      (log) => log.ID,
+    ))
       .map(normalizeAuditLog),
   adminCoupons: async (token: string, memberID?: number | null) =>
     (await requestParsed(
@@ -85,7 +125,14 @@ export const adminApi = {
       { token },
     )).map(normalizeAdminCoupon),
   adminAuditLogs: async (token: string) =>
-    (await requestParsed(z.array(rawAuditLogSchema), "/api/v1/admin/audit-logs", { token }))
+    (await collectAllUniquePages(
+      (limit, offset) => requestParsed(
+        z.array(rawAuditLogSchema),
+        `/api/v1/admin/audit-logs?limit=${limit}&offset=${offset}`,
+        { token },
+      ),
+      (log) => log.ID,
+    ))
       .map(normalizeAuditLog),
   adminCarousels: (token: string) => requestParsed(z.array(carouselSchema), "/api/v1/admin/carousels", { token }),
   adminEvents: (token: string) =>
@@ -184,7 +231,8 @@ export const adminApi = {
   refreshDeliveryTracking: (token: string, deliveryID: number) =>
     requestParsed(trackingInfoSchema, `/api/v1/deliveries/${deliveryID}/refresh-tracking`, { method: "POST", token }),
   getUserNotifications: (token: string, userID: number) =>
-    requestParsed(z.array(notificationSchema), `/api/v1/users/${userID}/notifications`, { token }),
+    requestParsed(z.array(rawNotificationSchema), `/api/v1/users/${userID}/notifications`, { token })
+      .then((notifications) => notifications.map(normalizeNotification)),
   getUserRecommendations: (token: string, userID: number) =>
     requestParsed(z.array(recommendationSchema), `/api/v1/users/${userID}/recommendations`, { token }),
   createMarket: (token: string, payload: Partial<Market>) =>

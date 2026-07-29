@@ -1,11 +1,9 @@
 import { z } from "zod";
 import { requestParsed, requestVoid } from "../api-client";
 import {
-  notificationSchema,
   orderSchema,
   productSchema,
   recommendationSchema,
-  reviewImageSchema,
   reviewSchema,
   statusResponseSchema,
   trackingInfoSchema,
@@ -15,14 +13,18 @@ import {
   rawCartSchema,
   rawCouponDefinitionSchema,
   rawIssuableCouponQuoteSchema,
+  rawNotificationSchema,
   rawOwnedCouponSchema,
+  rawSettlementSummarySchema,
 } from "./contracts/raw";
 import {
   normalizeAddress,
   normalizeCartItem,
   normalizeCouponDefinition,
   normalizeIssuableCouponQuote,
+  normalizeNotification,
   normalizeOwnedCoupon,
+  normalizeSettlementSummary,
 } from "./normalizers/contracts";
 
 export type CreateOrderLineReviewPayload = {
@@ -53,32 +55,19 @@ async function listAllOrders(token: string) {
   }
 }
 
-const createReviewResponseSchema = z.object({
-  id: z.number().int().positive(),
-  product_id: z.number().int().positive(),
-  option_id: z.number().int().positive(),
-  member_id: z.number().int().positive(),
-  order_id: z.number().int().positive(),
-  order_line_item_id: z.number().int().positive(),
-  rating_x2: z.number().int(),
-  rating: z.number(),
-  content: z.string(),
-  height_at_time: z.number().nullable().optional(),
-  weight_at_time: z.number().nullable().optional(),
-  is_photo_review: z.boolean(),
-  status: z.string(),
-  images: z.array(reviewImageSchema),
-  created_at: z.string(),
+const paymentCheckoutSchema = z.object({
+  order_code: z.string().min(1),
+  checkout_url: z.string().min(1),
+  amount: z.number().int().positive(),
 });
 
-const settlementSummarySchema = z.looseObject({
-  market_id: z.number().int().positive(),
-  total_sales_amount: z.number().optional(),
-  commission_amount: z.number().optional(),
-  final_settlement_amount: z.number().optional(),
-  pending_amount: z.number().optional(),
-  paid_amount: z.number().optional(),
-});
+export function normalizeCouponQuoteOrderAmount(orderAmount: number): number {
+  const normalized = Math.floor(orderAmount);
+  if (!Number.isFinite(orderAmount) || !Number.isSafeInteger(normalized) || normalized < 0) {
+    throw new RangeError("쿠폰 견적 주문 금액은 0 이상의 안전한 유한 정수여야 합니다.");
+  }
+  return normalized;
+}
 
 export const customerApi = {
   addCartItem: (token: string, payload: { product_id: number; option_id: number; quantity: number }) =>
@@ -95,17 +84,21 @@ export const customerApi = {
   listIssuableCoupons: async (token: string) =>
     (await requestParsed(z.array(rawCouponDefinitionSchema), "/api/v1/coupons/issuable", { token }))
       .map(normalizeCouponDefinition),
-  listIssuableCouponQuotes: async (token: string, orderAmount: number) =>
-    (await requestParsed(
+  listIssuableCouponQuotes: async (token: string, orderAmount: number) => {
+    const normalizedOrderAmount = normalizeCouponQuoteOrderAmount(orderAmount);
+    return (await requestParsed(
       z.array(rawIssuableCouponQuoteSchema),
-      `/api/v1/coupons/issuable?order_amount=${Math.max(0, Math.floor(orderAmount))}`,
+      `/api/v1/coupons/issuable?order_amount=${normalizedOrderAmount}`,
       { token },
-    )).map(normalizeIssuableCouponQuote),
+    )).map(normalizeIssuableCouponQuote);
+  },
   issueCoupon: (token: string, couponID: number) =>
     requestVoid(`/api/v1/coupons/${couponID}/issue`, { method: "POST", token }),
   listAddresses: async (token: string) =>
     (await requestParsed(z.array(rawAddressSchema), "/api/v1/me/addresses", { token })).map(normalizeAddress),
-  listNotifications: (token: string) => requestParsed(z.array(notificationSchema), "/api/v1/me/notifications", { token }),
+  listNotifications: async (token: string) =>
+    (await requestParsed(z.array(rawNotificationSchema), "/api/v1/me/notifications", { token }))
+      .map(normalizeNotification),
   listMyRecommendations: (token: string) => requestParsed(z.array(recommendationSchema), "/api/v1/me/recommendations", { token }),
   listWishlistedProducts: (token: string) => requestParsed(z.array(productSchema), "/api/v1/me/wishlist", { token }),
   listLikedProducts: (token: string) => requestParsed(z.array(productSchema), "/api/v1/me/liked-products", { token }),
@@ -126,19 +119,17 @@ export const customerApi = {
   listAllOrders,
   getOrder: (token: string, orderCode: string) =>
     requestParsed(orderSchema, `/api/v1/orders/${orderCode}`, { token }),
-  listMyReviews: (token: string) => requestParsed(z.array(reviewSchema), "/api/v1/me/reviews", { token }),
   confirmPurchase: (token: string, orderCode: string, itemID: number) =>
     requestParsed(orderSchema, `/api/v1/orders/${orderCode}/items/${itemID}/confirm-purchase`, { method: "POST", token }),
   createPaymentCheckout: (token: string, orderCode: string) =>
-    requestParsed(
-      z.object({ checkout_url: z.string().optional(), url: z.string().optional() }),
-      `/api/v1/orders/${orderCode}/payment-checkout`,
-      { method: "POST", token },
-    ),
+    requestParsed(paymentCheckoutSchema, `/api/v1/orders/${orderCode}/payment-checkout`, {
+      method: "POST",
+      token,
+    }),
   trackDelivery: (token: string, orderCode: string, deliveryID: number) =>
     requestParsed(trackingInfoSchema, `/api/v1/orders/${orderCode}/deliveries/${deliveryID}/track`, { method: "POST", token }),
   createOrderLineReview: (token: string, orderCode: string, itemID: number, payload: CreateOrderLineReviewPayload) =>
-    requestParsed(createReviewResponseSchema, `/api/v1/orders/${orderCode}/items/${itemID}/reviews`, {
+    requestParsed(reviewSchema, `/api/v1/orders/${orderCode}/items/${itemID}/reviews`, {
       method: "POST",
       token,
       body: JSON.stringify(payload),
@@ -162,15 +153,6 @@ export const customerApi = {
   markNotificationRead: (token: string, notificationID: number) =>
     requestVoid(`/api/v1/notifications/${notificationID}/read`, { method: "POST", token }),
   getSettlementSummary: (token: string, marketID: number) =>
-    requestParsed(settlementSummarySchema, `/api/v1/settlements/${marketID}/summary`, { token }),
-  completePayment: (
-    token: string,
-    orderCode: string,
-    payload: { payment_method: string; payment_key: string; amount: number },
-  ) =>
-    requestParsed(
-      z.object({ orderCode: z.string(), status: z.string() }),
-      `/api/v1/orders/${orderCode}/complete-payment`,
-      { method: "POST", token, body: JSON.stringify(payload) },
-    ),
+    requestParsed(rawSettlementSummarySchema, `/api/v1/settlements/${marketID}/summary`, { token })
+      .then(normalizeSettlementSummary),
 };

@@ -6,10 +6,19 @@ import type {
   AuditLog,
   CartItem,
   CouponDefinition,
+  ExternalInventoryMapping,
+  InventoryDetail,
+  InventoryLocation,
   IssuableCouponQuote,
+  Notification,
   OwnedCoupon,
   Product,
+  SellerSettlementDashboard,
   Settlement,
+  SettlementAccount,
+  SettlementLine,
+  SettlementSummary,
+  SuppliedProductOption,
 } from "../../types";
 import type { z } from "zod";
 import type {
@@ -20,10 +29,19 @@ import type {
   rawAuditLogSchema,
   rawCartSchema,
   rawCouponDefinitionSchema,
+  rawExternalInventoryMappingSchema,
+  rawInventoryDetailSchema,
+  rawInventoryLocationSchema,
   rawIssuableCouponQuoteSchema,
+  rawNotificationSchema,
   rawOwnedCouponSchema,
+  rawSellerSettlementDashboardSchema,
   rawSellerProductSchema,
+  rawSettlementAccountSchema,
+  rawSettlementLineSchema,
   rawSettlementSchema,
+  rawSettlementSummarySchema,
+  rawSuppliedProductOptionSchema,
 } from "../contracts/raw";
 
 export function normalizeCartItem(raw: z.infer<typeof rawCartSchema>): CartItem {
@@ -120,6 +138,131 @@ export function normalizeSettlement(raw: z.infer<typeof rawSettlementSchema>): S
     commission_amount: raw.CommissionAmount,
     final_settlement_amount: raw.FinalSettlementAmount,
     status: raw.Status,
+  };
+}
+
+export function normalizeSellerSettlementDashboard(
+  raw: z.infer<typeof rawSellerSettlementDashboardSchema>,
+): SellerSettlementDashboard {
+  return {
+    ...raw,
+    settlements: raw.settlements.map(normalizeSettlement),
+  };
+}
+
+export function normalizeSettlementSummary(
+  raw: z.infer<typeof rawSettlementSummarySchema>,
+): SettlementSummary {
+  return {
+    settlements: raw.settlements.map(normalizeSettlement),
+  };
+}
+
+export function normalizeSettlementLine(
+  raw: z.infer<typeof rawSettlementLineSchema>,
+): SettlementLine {
+  return raw;
+}
+
+export function normalizeSettlementAccount(
+  raw: z.infer<typeof rawSettlementAccountSchema>,
+): SettlementAccount {
+  return {
+    id: raw.ID,
+    market_id: raw.MarketID,
+    bank_code: raw.BankCode,
+    account_number: raw.AccountNumber,
+    account_holder: raw.AccountHolder,
+    created_at: raw.CreatedAt,
+    updated_at: raw.UpdatedAt,
+  };
+}
+
+export function encodeSettlementAccount(payload: {
+  bank_code: string;
+  account_number: string;
+  account_holder: string;
+}): Record<string, string> {
+  return {
+    BankCode: payload.bank_code,
+    AccountNumber: payload.account_number,
+    AccountHolder: payload.account_holder,
+  };
+}
+
+export function normalizeNotification(
+  raw: z.infer<typeof rawNotificationSchema>,
+): Notification {
+  return {
+    id: raw.ID,
+    user_id: raw.UserID,
+    title: raw.Title,
+    message: raw.Message,
+    is_read: raw.IsRead,
+    created_at: raw.CreatedAt,
+  };
+}
+
+export function normalizeExternalInventoryMapping(
+  raw: z.infer<typeof rawExternalInventoryMappingSchema>,
+): ExternalInventoryMapping {
+  return {
+    id: raw.ID,
+    inventory_source_id: raw.inventory_source_id,
+    provider: raw.provider,
+    product_option_id: raw.product_option_id,
+    external_product_id: raw.external_product_id || undefined,
+    external_variant_id: raw.external_variant_id || undefined,
+    external_inventory_item_id: raw.external_inventory_item_id || undefined,
+    external_location_id: raw.external_location_id || undefined,
+    last_synced_quantity: raw.last_synced_quantity ?? undefined,
+    disconnect_if_necessary: raw.disconnect_if_necessary,
+    created_at: raw.CreatedAt,
+    updated_at: raw.UpdatedAt,
+  };
+}
+
+export function normalizeSuppliedProductOption(
+  raw: z.infer<typeof rawSuppliedProductOptionSchema>,
+): SuppliedProductOption {
+  return {
+    id: raw.ID,
+    product_option_id: raw.ProductOptionID,
+    provider: raw.Provider,
+    sku_code: raw.SKUCode,
+    supplier_code: raw.SupplierCode,
+    created_at: raw.CreatedAt,
+    updated_at: raw.UpdatedAt,
+  };
+}
+
+export function normalizeInventoryLocation(
+  raw: z.infer<typeof rawInventoryLocationSchema>,
+): InventoryLocation {
+  return {
+    id: raw.ID,
+    location_id: raw.LocationID,
+    name: raw.Name,
+    channel_type: raw.ChannelType,
+    is_virtual: raw.IsVirtual,
+    created_at: raw.CreatedAt,
+    updated_at: raw.UpdatedAt,
+  };
+}
+
+export function normalizeInventoryDetail(
+  raw: z.infer<typeof rawInventoryDetailSchema>,
+): InventoryDetail {
+  return {
+    id: raw.ID,
+    product_option_id: raw.ProductOptionID,
+    supplied_option_id: raw.SuppliedOptionID ?? undefined,
+    location_id: raw.LocationID,
+    inbound_reference: raw.InboundReference,
+    available_quantity: raw.AvailableQuantity,
+    allocated_quantity: raw.AllocatedQuantity,
+    created_at: raw.CreatedAt,
+    updated_at: raw.UpdatedAt,
   };
 }
 

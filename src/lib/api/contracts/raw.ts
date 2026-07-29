@@ -160,6 +160,140 @@ export const rawAuditLogSchema = z.looseObject({
   CreatedAt: dateStringSchema,
 });
 
+export const rawNotificationSchema = z.looseObject({
+  ID: identifierSchema,
+  UserID: identifierSchema,
+  Title: z.string(),
+  Message: z.string(),
+  IsRead: z.boolean(),
+  CreatedAt: dateStringSchema,
+});
+
+export const rawExternalInventoryMappingSchema = z.looseObject({
+  ID: identifierSchema,
+  inventory_source_id: identifierSchema,
+  provider: z.string(),
+  product_option_id: identifierSchema,
+  external_product_id: z.string().optional(),
+  external_variant_id: z.string().optional(),
+  external_inventory_item_id: z.string().optional(),
+  external_location_id: z.string().optional(),
+  last_synced_quantity: z.number().int().nullable().optional(),
+  disconnect_if_necessary: z.boolean().optional(),
+  CreatedAt: dateStringSchema.optional(),
+  UpdatedAt: dateStringSchema.optional(),
+});
+
+export const rawSuppliedProductOptionSchema = z.looseObject({
+  ID: identifierSchema,
+  ProductOptionID: identifierSchema,
+  Provider: z.string(),
+  SKUCode: z.string(),
+  SupplierCode: z.string(),
+  CreatedAt: dateStringSchema.optional(),
+  UpdatedAt: dateStringSchema.optional(),
+});
+
+export const rawInventoryLocationSchema = z.looseObject({
+  ID: identifierSchema,
+  LocationID: identifierSchema,
+  Name: z.string(),
+  ChannelType: z.string(),
+  IsVirtual: z.boolean(),
+  CreatedAt: dateStringSchema.optional(),
+  UpdatedAt: dateStringSchema.optional(),
+});
+
+export const rawInventoryDetailSchema = z.looseObject({
+  ID: identifierSchema,
+  ProductOptionID: identifierSchema,
+  SuppliedOptionID: identifierSchema.nullable().optional(),
+  LocationID: identifierSchema,
+  InboundReference: z.string(),
+  AvailableQuantity: z.number().int(),
+  AllocatedQuantity: z.number().int(),
+  CreatedAt: dateStringSchema.optional(),
+  UpdatedAt: dateStringSchema.optional(),
+});
+
+const settlementMetricsSchema = z.object({
+  line_count: nonNegativeIntSchema,
+  gross_sales_amount: z.number().int(),
+  platform_coupon_amount: z.number().int(),
+  market_coupon_amount: z.number().int(),
+  point_discount_amount: z.number().int(),
+  promotion_amount: z.number().int(),
+  customer_payment_amount: z.number().int(),
+  commission_amount: z.number().int(),
+  return_shipping_fee: z.number().int(),
+  final_settlement_amount: z.number().int(),
+});
+
+export const rawSellerSettlementDashboardSchema = z.object({
+  market_id: identifierSchema,
+  from: dateStringSchema.optional(),
+  to: dateStringSchema.optional(),
+  settlements: z.array(rawSettlementSchema),
+  line_count: nonNegativeIntSchema,
+  gross_sales_amount: z.number().int(),
+  platform_coupon_amount: z.number().int(),
+  market_coupon_amount: z.number().int(),
+  point_discount_amount: z.number().int(),
+  promotion_amount: z.number().int(),
+  customer_payment_amount: z.number().int(),
+  commission_amount: z.number().int(),
+  return_shipping_fee: z.number().int(),
+  final_settlement_amount: z.number().int(),
+  paid_amount: z.number().int(),
+  pending_amount: z.number().int(),
+  status_breakdown: z.record(z.string(), z.number().int()),
+  monthly: z.record(z.string(), settlementMetricsSchema),
+});
+
+export const rawSettlementSummarySchema = z.object({
+  settlements: z.array(rawSettlementSchema),
+});
+
+export const rawSettlementLineSchema = z.object({
+  id: identifierSchema,
+  settlement_id: identifierSchema.optional(),
+  market_id: identifierSchema,
+  order_id: identifierSchema,
+  order_code: z.string().min(1),
+  market_order_id: identifierSchema,
+  order_line_item_id: identifierSchema,
+  target_month: z.string().min(1),
+  line_type: z.string().min(1),
+  status: z.string().min(1),
+  purchase_confirmed_at: dateStringSchema,
+  settlement_eligible_at: dateStringSchema,
+  product_id: identifierSchema,
+  option_id: identifierSchema,
+  quantity: z.number().int().positive(),
+  unit_price: nonNegativeIntSchema,
+  gross_amount: z.number().int(),
+  platform_coupon_amount: z.number().int(),
+  market_coupon_amount: z.number().int(),
+  point_discount_amount: z.number().int(),
+  promotion_amount: z.number().int(),
+  customer_payment_amount: z.number().int(),
+  commission_amount: z.number().int(),
+  return_shipping_fee: z.number().int(),
+  final_settlement_amount: z.number().int(),
+  created_at: dateStringSchema,
+  updated_at: dateStringSchema,
+});
+
+export const rawSettlementAccountSchema = z.looseObject({
+  ID: identifierSchema,
+  MarketID: identifierSchema,
+  BankCode: z.string().min(1),
+  AccountNumber: z.string().min(1),
+  AccountHolder: z.string().min(1),
+  CreatedAt: dateStringSchema.optional(),
+  UpdatedAt: dateStringSchema.optional(),
+});
+
 export const sellerContextSchema = z.object({
   market_id: identifierSchema,
   market_name: z.string(),

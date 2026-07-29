@@ -1,4 +1,4 @@
-import type { OrderResponse } from "../types";
+import type { CouponDefinition, OrderResponse } from "../types";
 
 export type CheckoutOrderInput = {
   cart_item_ids: number[];
@@ -13,12 +13,71 @@ export class CheckoutOrderStateError extends Error {
   }
 }
 
+export type HostedPaymentCheckout = {
+  order_code: string;
+  checkout_url: string;
+  amount: number;
+};
+
+export function estimatedCouponDiscount(
+  coupon: CouponDefinition | undefined,
+  orderAmount: number,
+): number {
+  if (!coupon || orderAmount < coupon.min_order_amount) {
+    return 0;
+  }
+  const rawDiscount = coupon.discount_type === "PERCENT"
+    ? Math.floor(orderAmount * coupon.discount_value / 100)
+    : coupon.discount_value;
+  const cappedDiscount = coupon.max_discount > 0
+    ? Math.min(rawDiscount, coupon.max_discount)
+    : rawDiscount;
+  return Math.min(orderAmount, Math.max(0, cappedDiscount));
+}
+
+export function maxApplicablePoints(
+  orderAmount: number,
+  couponDiscount: number,
+  availablePoint: number,
+): number {
+  return Math.max(0, Math.min(availablePoint, orderAmount - couponDiscount - 1));
+}
+
+export function normalizeRequestedPoints(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  const normalized = Math.floor(value);
+  return Number.isSafeInteger(normalized) ? Math.max(0, normalized) : 0;
+}
+
+export function shouldDiscardCheckoutRestoreStatus(status: number | undefined): boolean {
+  return status !== undefined && [400, 403, 404, 410, 422].includes(status);
+}
+
+export function safeHostedCheckoutURL(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new CheckoutOrderStateError("결제 이동 주소가 올바르지 않습니다.");
+  }
+  if (
+    (url.protocol !== "https:" && url.protocol !== "http:")
+    || url.username
+    || url.password
+  ) {
+    throw new CheckoutOrderStateError("안전하지 않은 결제 이동 주소를 차단했습니다.");
+  }
+  return url.toString();
+}
+
 export async function submitServerAuthoritativeCheckout({
   existingOrderCode,
   orderInput,
   placeOrder,
   getOrder,
-  completePayment,
+  createPaymentCheckout,
   onOrderCreated,
   onOrderConfirmed,
 }: {
@@ -26,7 +85,7 @@ export async function submitServerAuthoritativeCheckout({
   orderInput: CheckoutOrderInput;
   placeOrder: (input: CheckoutOrderInput) => Promise<{ orderCode: string }>;
   getOrder: (orderCode: string) => Promise<OrderResponse>;
-  completePayment: (orderCode: string, amount: number) => Promise<unknown>;
+  createPaymentCheckout: (orderCode: string) => Promise<HostedPaymentCheckout>;
   onOrderCreated: (orderCode: string) => void;
   onOrderConfirmed: (order: OrderResponse) => void;
 }) {
@@ -54,8 +113,15 @@ export async function submitServerAuthoritativeCheckout({
   }
 
   if (!Number.isSafeInteger(amount) || amount <= 0) {
-    throw new Error("0원 이하 주문의 결제 완료는 현재 서버에서 지원되지 않습니다.");
+    throw new Error("0원 이하 주문의 hosted checkout은 현재 서버에서 지원되지 않습니다.");
   }
-  await completePayment(orderCode, amount);
-  return { orderCode, order, amount, paymentSkipped: false };
+  const checkout = await createPaymentCheckout(orderCode);
+  if (checkout.order_code !== orderCode) {
+    throw new CheckoutOrderStateError("결제 체크아웃의 주문 코드가 조회한 주문과 일치하지 않습니다.");
+  }
+  if (checkout.amount !== amount) {
+    throw new CheckoutOrderStateError("결제 체크아웃 금액이 서버 주문 금액과 일치하지 않습니다.");
+  }
+  const checkoutUrl = safeHostedCheckoutURL(checkout.checkout_url);
+  return { orderCode, order, amount, checkoutUrl, paymentSkipped: false };
 }
