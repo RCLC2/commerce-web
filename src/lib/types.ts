@@ -213,13 +213,19 @@ export type OwnedCoupon = {
 
 export type IssuableCouponQuote = {
   coupon: CouponDefinition;
+  max_discount: number;
   discount_amount: number;
+  platform_coupon_amount: number;
+  market_coupon_amount: number;
+  market_coupon_rate: number;
   discounted_amount: number;
 };
 
-export type AdminCoupon = CouponDefinition & {
-  issuance_status: "ISSUABLE" | "SCHEDULED" | "ENDED" | "SOLD_OUT" | string;
-  user_coupon_status?: "AVAILABLE" | "USED" | "EXPIRED" | string;
+export type AdminCoupon = Omit<CouponDefinition, "status" | "max_discount"> & {
+  max_discount?: number;
+  definition_status?: "ACTIVE" | "INACTIVE";
+  issuance_status?: "ISSUABLE" | "SCHEDULED" | "ENDED" | "SOLD_OUT" | "INACTIVE";
+  user_coupon_status?: "ISSUED" | "USED";
   user_coupon_id?: number;
   member_id?: number;
 };

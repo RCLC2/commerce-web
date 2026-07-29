@@ -2,7 +2,6 @@ import { z } from "zod";
 import { requestParsed, requestVoid } from "../api-client";
 import type { CMSCarousel, CMSHomeSection, Market } from "../types";
 import {
-  adminCouponSchema,
   carouselSchema,
   categorySchema,
   eventSchema,
@@ -17,15 +16,16 @@ import {
 } from "./contracts/schemas";
 import {
   adminDashboardRawSchema,
+  rawAdminCouponSchema,
   rawAdminMemberSchema,
   rawAuditLogSchema,
   rawSettlementSchema,
 } from "./contracts/raw";
 import {
   normalizeAdminDashboard,
+  normalizeAdminCoupon,
   normalizeAdminMember,
   normalizeAuditLog,
-  normalizeCouponDefinition,
   normalizeSettlement,
 } from "./normalizers/contracts";
 
@@ -80,10 +80,10 @@ export const adminApi = {
       .map(normalizeAuditLog),
   adminCoupons: async (token: string, memberID?: number | null) =>
     (await requestParsed(
-      z.array(adminCouponSchema),
+      z.array(rawAdminCouponSchema),
       `/api/v1/admin/coupons${memberID ? `?member_id=${memberID}` : ""}`,
       { token },
-    )).map((coupon) => ({ ...normalizeCouponDefinition(coupon), ...coupon })),
+    )).map(normalizeAdminCoupon),
   adminAuditLogs: async (token: string) =>
     (await requestParsed(z.array(rawAuditLogSchema), "/api/v1/admin/audit-logs", { token }))
       .map(normalizeAuditLog),

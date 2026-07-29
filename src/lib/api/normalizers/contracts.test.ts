@@ -1,22 +1,43 @@
 import { describe, expect, it } from "vitest";
 import { parseContract } from "../../api-client";
+import { productSchema } from "../contracts/schemas";
 import {
   rawAddressSchema,
+  rawAdminCouponSchema,
   rawAdminMemberSchema,
   rawAuditLogSchema,
   rawCartSchema,
+  rawCouponDefinitionSchema,
+  rawIssuableCouponQuoteSchema,
+  rawOwnedCouponSchema,
   rawSellerProductSchema,
   rawSettlementSchema,
 } from "../contracts/raw";
 import {
   encodeSellerProduct,
   normalizeAddress,
+  normalizeAdminCoupon,
   normalizeAdminMember,
   normalizeAuditLog,
   normalizeCartItem,
+  normalizeCouponDefinition,
+  normalizeIssuableCouponQuote,
+  normalizeOwnedCoupon,
   normalizeSellerProduct,
   normalizeSettlement,
 } from "./contracts";
+
+const rawCouponPayload = {
+  ID: 7,
+  Code: "WELCOME10",
+  Name: "신규 회원 10% 쿠폰",
+  DiscountType: "PERCENT",
+  DiscountValue: 10,
+  MaxDiscount: 5000,
+  MinOrderAmount: 10000,
+  ExpiresAt: null,
+  Status: "ACTIVE",
+};
 
 describe("contract normalizers", () => {
   it("normalizes PascalCase cart and address responses", () => {
@@ -91,5 +112,202 @@ describe("contract normalizers", () => {
       order_code: "ORDER-9",
       settlement_id: undefined,
     });
+  });
+
+  it("accepts only the product statuses returned by the product API", () => {
+    const product = {
+      id: 1,
+      market_id: 2,
+      category_id: 3,
+      name: "상품",
+      description: "설명",
+      base_price: 10000,
+      discount_price: 9000,
+      shipping_type: "NORMAL",
+      popularity_score: 1,
+    };
+
+    expect(parseContract(productSchema, { ...product, status: "SELLING" }, "/products").status)
+      .toBe("SELLING");
+    expect(parseContract(productSchema, { ...product, status: "SOLD_OUT" }, "/products").status)
+      .toBe("SOLD_OUT");
+    expect(() => parseContract(productSchema, { ...product, status: "OPEN" }, "/products"))
+      .toThrow();
+  });
+
+  it("normalizes PascalCase coupon definitions and nullable expiry", () => {
+    const raw = parseContract(rawCouponDefinitionSchema, rawCouponPayload, "/coupons/issuable");
+
+    expect(normalizeCouponDefinition(raw)).toEqual({
+      id: 7,
+      code: "WELCOME10",
+      name: "신규 회원 10% 쿠폰",
+      discount_type: "PERCENT",
+      discount_value: 10,
+      discount_amount: 5000,
+      max_discount: 5000,
+      min_order_amount: 10000,
+      expires_at: undefined,
+      status: "ACTIVE",
+      condition_text: "10,000원 이상",
+    });
+  });
+
+  it("normalizes a quote with a nested PascalCase coupon without dropping amounts", () => {
+    const raw = parseContract(rawIssuableCouponQuoteSchema, {
+      coupon: rawCouponPayload,
+      max_discount: 5000,
+      discount_amount: 3000,
+      platform_coupon_amount: 2250,
+      market_coupon_amount: 750,
+      market_coupon_rate: 25,
+      discounted_amount: 27000,
+    }, "/coupons/issuable?order_amount=30000");
+
+    expect(normalizeIssuableCouponQuote(raw)).toMatchObject({
+      coupon: { id: 7, name: "신규 회원 10% 쿠폰" },
+      max_discount: 5000,
+      discount_amount: 3000,
+      platform_coupon_amount: 2250,
+      market_coupon_amount: 750,
+      market_coupon_rate: 25,
+      discounted_amount: 27000,
+    });
+  });
+
+  it.each([
+    {
+      market_coupon_rate: 101,
+      platform_coupon_amount: 2250,
+      market_coupon_amount: 750,
+    },
+    {
+      market_coupon_rate: 25,
+      platform_coupon_amount: 2000,
+      market_coupon_amount: 750,
+    },
+  ])("rejects a contradictory coupon quote: %#", (overrides) => {
+    expect(() => parseContract(rawIssuableCouponQuoteSchema, {
+      coupon: rawCouponPayload,
+      max_discount: 5000,
+      discount_amount: 3000,
+      platform_coupon_amount: overrides.platform_coupon_amount,
+      market_coupon_amount: overrides.market_coupon_amount,
+      market_coupon_rate: overrides.market_coupon_rate,
+      discounted_amount: 27000,
+    }, "/coupons/issuable?order_amount=30000")).toThrow();
+  });
+
+  it.each([
+    { UsedAt: null, ExpiresAt: "2026-07-27T00:00:00Z", expected: "AVAILABLE" },
+    { UsedAt: "2026-07-25T00:00:00Z", ExpiresAt: "2026-07-27T00:00:00Z", expected: "USED" },
+    { UsedAt: null, ExpiresAt: "2026-07-25T00:00:00Z", expected: "EXPIRED" },
+  ] as const)("derives owned coupon state only from UsedAt and ExpiresAt: $expected", ({
+    UsedAt,
+    ExpiresAt,
+    expected,
+  }) => {
+    const raw = parseContract(rawOwnedCouponSchema, {
+      ID: 11,
+      UserID: 12,
+      CouponID: 7,
+      ExpiresAt,
+      OrderID: UsedAt ? 13 : null,
+      UsedAt,
+      CreatedAt: "2026-07-24T00:00:00Z",
+      Coupon: rawCouponPayload,
+    }, "/coupons");
+
+    expect(normalizeOwnedCoupon(raw, new Date("2026-07-26T00:00:00Z"))).toMatchObject({
+      id: 11,
+      coupon_id: 7,
+      expires_at: ExpiresAt,
+      status: expected,
+      coupon: { id: 7 },
+    });
+  });
+
+  it.each([
+    { status: "ISSUABLE", issuance_status: "ISSUABLE", user_coupon_status: undefined },
+    { status: "SCHEDULED", issuance_status: "SCHEDULED", user_coupon_status: undefined },
+    { status: "ENDED", issuance_status: "ENDED", user_coupon_status: undefined },
+    { status: "SOLD_OUT", issuance_status: "SOLD_OUT", user_coupon_status: undefined },
+    { status: "INACTIVE", issuance_status: "INACTIVE", user_coupon_status: undefined },
+    { status: "ISSUED", issuance_status: undefined, user_coupon_status: "ISSUED" },
+    { status: "USED", issuance_status: undefined, user_coupon_status: "USED" },
+  ] as const)("separates the admin combined $status status without inferring definition state", ({
+    status,
+    issuance_status,
+    user_coupon_status,
+  }) => {
+    const raw = parseContract(rawAdminCouponSchema, {
+      id: 7,
+      code: "WELCOME10",
+      name: "신규 회원 10% 쿠폰",
+      discount_type: "PERCENT",
+      discount_value: 10,
+      discount_amount: 10,
+      min_order_amount: 10000,
+      status,
+      condition_text: "PERCENT 10 / 최소 주문 10000원",
+      user_coupon_id: user_coupon_status ? 20 : undefined,
+      member_id: user_coupon_status ? 12 : undefined,
+    }, "/admin/coupons");
+
+    expect(normalizeAdminCoupon(raw)).toMatchObject({
+      definition_status: undefined,
+      issuance_status,
+      user_coupon_status,
+    });
+  });
+
+  it("rejects an unknown combined admin coupon status", () => {
+    expect(() => parseContract(rawAdminCouponSchema, {
+      id: 7,
+      code: "WELCOME10",
+      name: "신규 회원 10% 쿠폰",
+      discount_type: "PERCENT",
+      discount_value: 10,
+      discount_amount: 10,
+      min_order_amount: 10000,
+      status: "ACTIVE",
+    }, "/admin/coupons")).toThrow();
+  });
+
+  it("keeps the selected member on a still-issuable admin coupon", () => {
+    const raw = parseContract(rawAdminCouponSchema, {
+      id: 7,
+      code: "WELCOME10",
+      name: "신규 회원 10% 쿠폰",
+      discount_type: "PERCENT",
+      discount_value: 10,
+      discount_amount: 10,
+      min_order_amount: 10000,
+      status: "ISSUABLE",
+      member_id: 12,
+    }, "/admin/coupons?member_id=12");
+
+    expect(normalizeAdminCoupon(raw)).toMatchObject({
+      member_id: 12,
+      issuance_status: "ISSUABLE",
+      user_coupon_status: undefined,
+    });
+  });
+
+  it.each([
+    { status: "ISSUED", member_id: 12 },
+    { status: "USED", user_coupon_id: 20 },
+    { status: "ISSUABLE", member_id: 12, user_coupon_id: 20 },
+  ])("rejects an inconsistent admin ownership response: %#", (ownership) => {
+    expect(() => parseContract(rawAdminCouponSchema, {
+      id: 7,
+      code: "WELCOME10",
+      name: "신규 회원 10% 쿠폰",
+      discount_type: "PERCENT",
+      discount_value: 10,
+      discount_amount: 10,
+      min_order_amount: 10000,
+      ...ownership,
+    }, "/admin/coupons")).toThrow();
   });
 });

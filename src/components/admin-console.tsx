@@ -595,20 +595,23 @@ export function AdminCouponsPage() {
   const coupons = data;
   const filteredCoupons = coupons.filter((coupon) => {
     const matchesQuery = !query || coupon.name.toLowerCase().includes(query.toLowerCase()) || coupon.condition_text?.toLowerCase().includes(query.toLowerCase());
-    const matchesStatus = status === "ALL" || coupon.issuance_status === status || coupon.user_coupon_status === status || coupon.status === status;
+    const matchesStatus = status === "ALL"
+      || coupon.definition_status === status
+      || coupon.issuance_status === status
+      || coupon.user_coupon_status === status;
     return matchesQuery && matchesStatus;
   });
 
   return (
     <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
-      <ConsoleHeader title="쿠폰 관리" description="발급 가능한 쿠폰을 조회하고 회원을 선택해 발급 처리합니다." />
+      <ConsoleHeader title="쿠폰 관리" description="발급 가능한 쿠폰을 조회하고 회원을 선택해 발급 처리합니다. 정의 활성 상태는 현재 서버에서 제공하지 않습니다." />
       <div className="mt-5">
         <SummaryStrip
           items={[
             { label: "쿠폰 수", value: `${coupons.length}개` },
-            { label: "사용 가능 보유", value: `${coupons.filter((coupon) => coupon.user_coupon_status === "AVAILABLE").length}개` },
+            { label: "회원 발급됨", value: `${coupons.filter((coupon) => coupon.user_coupon_status === "ISSUED").length}개` },
             { label: "발급 가능", value: `${coupons.filter((coupon) => coupon.issuance_status === "ISSUABLE").length}개` },
-            { label: "정의 활성", value: `${coupons.filter((coupon) => coupon.status === "ACTIVE").length}개` },
+            { label: "정의 상태", value: "서버 미제공" },
           ]}
         />
       </div>
@@ -640,9 +643,9 @@ export function AdminCouponsPage() {
               <option value="SCHEDULED">발급 예정</option>
               <option value="ENDED">발급 종료</option>
               <option value="SOLD_OUT">소진</option>
-              <option value="AVAILABLE">보유·사용 가능</option>
+              <option value="INACTIVE">발급 비활성</option>
+              <option value="ISSUED">회원 발급됨</option>
               <option value="USED">보유·사용됨</option>
-              <option value="EXPIRED">보유·만료</option>
             </select>
           </FilterField>
         </FilterPanel>
@@ -655,7 +658,13 @@ export function AdminCouponsPage() {
             formatPrice(coupon.min_order_amount),
             coupon.condition_text ?? "-",
             coupon.expires_at ? new Date(coupon.expires_at).toLocaleDateString("ko-KR") : "-",
-            <div key="status" className="flex flex-wrap gap-1"><StatusBadge value={coupon.status} /><StatusBadge value={coupon.issuance_status} />{coupon.user_coupon_status ? <StatusBadge value={coupon.user_coupon_status} /> : null}</div>,
+            <div key="status" className="flex flex-wrap items-center gap-1">
+              {coupon.definition_status
+                ? <StatusBadge value={coupon.definition_status} />
+                : <span className="rounded-full bg-zinc-100 px-2 py-1 text-xs font-bold text-muted">정의 상태: 서버 미제공</span>}
+              {coupon.issuance_status ? <StatusBadge value={coupon.issuance_status} /> : null}
+              {coupon.user_coupon_status ? <StatusBadge value={coupon.user_coupon_status} /> : null}
+            </div>,
             <Button
               key="issue"
               size="sm"

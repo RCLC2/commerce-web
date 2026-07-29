@@ -46,7 +46,7 @@ export const productSchema = z.object({
   delivery_label: z.string().optional(),
   today_shipping_available: z.boolean().optional(),
   popularity_score: z.number().default(0),
-  status: z.enum(["OPEN", "CLOSED", "HIDE", "EXIT"]),
+  status: z.enum(["SELLING", "SOLD_OUT"]),
   options: z.array(productOptionSchema).optional(),
   image_url: z.string().optional(),
   detail_html: z.string().optional(),
@@ -230,14 +230,6 @@ export const issuableCouponQuoteSchema = z.object({
   coupon: couponDefinitionSchema,
   discount_amount: nonNegativeIntSchema,
   discounted_amount: nonNegativeIntSchema,
-});
-
-export const adminCouponSchema = couponDefinitionSchema.extend({
-  discount_amount: nonNegativeIntSchema,
-  issuance_status: z.string(),
-  user_coupon_status: z.string().optional(),
-  user_coupon_id: identifierSchema.optional(),
-  member_id: identifierSchema.optional(),
 });
 
 export const notificationSchema = z.looseObject({

@@ -1,11 +1,8 @@
 import { z } from "zod";
 import { requestParsed, requestVoid } from "../api-client";
 import {
-  couponDefinitionSchema,
-  issuableCouponQuoteSchema,
   notificationSchema,
   orderSchema,
-  ownedCouponSchema,
   productSchema,
   recommendationSchema,
   reviewImageSchema,
@@ -13,8 +10,20 @@ import {
   statusResponseSchema,
   trackingInfoSchema,
 } from "./contracts/schemas";
-import { rawAddressSchema, rawCartSchema } from "./contracts/raw";
-import { normalizeAddress, normalizeCartItem, normalizeCouponDefinition } from "./normalizers/contracts";
+import {
+  rawAddressSchema,
+  rawCartSchema,
+  rawCouponDefinitionSchema,
+  rawIssuableCouponQuoteSchema,
+  rawOwnedCouponSchema,
+} from "./contracts/raw";
+import {
+  normalizeAddress,
+  normalizeCartItem,
+  normalizeCouponDefinition,
+  normalizeIssuableCouponQuote,
+  normalizeOwnedCoupon,
+} from "./normalizers/contracts";
 
 export type CreateOrderLineReviewPayload = {
   rating_x2: number;
@@ -81,19 +90,17 @@ export const customerApi = {
   listCart: async (token: string) =>
     (await requestParsed(z.array(rawCartSchema), "/api/v1/cart", { token })).map(normalizeCartItem),
   listCoupons: async (token: string) =>
-    (await requestParsed(z.array(ownedCouponSchema), "/api/v1/coupons", { token })).map((owned) => ({
-      ...owned,
-      coupon: normalizeCouponDefinition(owned.coupon),
-    })),
+    (await requestParsed(z.array(rawOwnedCouponSchema), "/api/v1/coupons", { token }))
+      .map((coupon) => normalizeOwnedCoupon(coupon)),
   listIssuableCoupons: async (token: string) =>
-    (await requestParsed(z.array(couponDefinitionSchema), "/api/v1/coupons/issuable", { token }))
+    (await requestParsed(z.array(rawCouponDefinitionSchema), "/api/v1/coupons/issuable", { token }))
       .map(normalizeCouponDefinition),
   listIssuableCouponQuotes: async (token: string, orderAmount: number) =>
     (await requestParsed(
-      z.array(issuableCouponQuoteSchema),
+      z.array(rawIssuableCouponQuoteSchema),
       `/api/v1/coupons/issuable?order_amount=${Math.max(0, Math.floor(orderAmount))}`,
       { token },
-    )).map((quote) => ({ ...quote, coupon: normalizeCouponDefinition(quote.coupon) })),
+    )).map(normalizeIssuableCouponQuote),
   issueCoupon: (token: string, couponID: number) =>
     requestVoid(`/api/v1/coupons/${couponID}/issue`, { method: "POST", token }),
   listAddresses: async (token: string) =>

@@ -1,10 +1,13 @@
 import type {
   Address,
+  AdminCoupon,
   AdminDashboard,
   AdminMember,
   AuditLog,
   CartItem,
   CouponDefinition,
+  IssuableCouponQuote,
+  OwnedCoupon,
   Product,
   Settlement,
 } from "../../types";
@@ -12,9 +15,13 @@ import type { z } from "zod";
 import type {
   adminDashboardRawSchema,
   rawAddressSchema,
+  rawAdminCouponSchema,
   rawAdminMemberSchema,
   rawAuditLogSchema,
   rawCartSchema,
+  rawCouponDefinitionSchema,
+  rawIssuableCouponQuoteSchema,
+  rawOwnedCouponSchema,
   rawSellerProductSchema,
   rawSettlementSchema,
 } from "../contracts/raw";
@@ -168,15 +175,88 @@ export function normalizeDescription(value: string): string {
 }
 
 export function normalizeCouponDefinition(
-  coupon: Omit<CouponDefinition, "discount_amount">,
+  raw: z.infer<typeof rawCouponDefinitionSchema>,
 ): CouponDefinition {
-  const discountAmount = coupon.discount_type === "AMOUNT"
-    ? coupon.discount_value
-    : coupon.max_discount;
+  const discountAmount = raw.DiscountType === "AMOUNT"
+    ? raw.DiscountValue
+    : raw.MaxDiscount;
+  return {
+    id: raw.ID,
+    code: raw.Code,
+    name: raw.Name,
+    discount_type: raw.DiscountType,
+    discount_value: raw.DiscountValue,
+    discount_amount: discountAmount,
+    max_discount: raw.MaxDiscount,
+    min_order_amount: raw.MinOrderAmount,
+    expires_at: raw.ExpiresAt ?? undefined,
+    status: raw.Status,
+    condition_text: `${raw.MinOrderAmount.toLocaleString("ko-KR")}원 이상`,
+  };
+}
+
+export function normalizeOwnedCoupon(
+  raw: z.infer<typeof rawOwnedCouponSchema>,
+  now: Date = new Date(),
+): OwnedCoupon {
+  const status = raw.UsedAt
+    ? "USED"
+    : new Date(raw.ExpiresAt).getTime() <= now.getTime()
+      ? "EXPIRED"
+      : "AVAILABLE";
+
+  return {
+    id: raw.ID,
+    coupon_id: raw.CouponID,
+    expires_at: raw.ExpiresAt,
+    status,
+    coupon: normalizeCouponDefinition(raw.Coupon),
+  };
+}
+
+export function normalizeIssuableCouponQuote(
+  raw: z.infer<typeof rawIssuableCouponQuoteSchema>,
+): IssuableCouponQuote {
+  return {
+    coupon: normalizeCouponDefinition(raw.coupon),
+    max_discount: raw.max_discount,
+    discount_amount: raw.discount_amount,
+    platform_coupon_amount: raw.platform_coupon_amount,
+    market_coupon_amount: raw.market_coupon_amount,
+    market_coupon_rate: raw.market_coupon_rate,
+    discounted_amount: raw.discounted_amount,
+  };
+}
+
+export function normalizeAdminCoupon(
+  raw: z.infer<typeof rawAdminCouponSchema>,
+): AdminCoupon {
+  const coupon = {
+    id: raw.id,
+    code: raw.code,
+    name: raw.name,
+    discount_type: raw.discount_type,
+    discount_value: raw.discount_value,
+    discount_amount: raw.discount_amount,
+    min_order_amount: raw.min_order_amount,
+    expires_at: raw.expires_at ?? undefined,
+    condition_text: raw.condition_text,
+    definition_status: undefined,
+    user_coupon_id: raw.user_coupon_id,
+    member_id: raw.member_id,
+  };
+
+  if (raw.status === "ISSUED" || raw.status === "USED") {
+    return {
+      ...coupon,
+      issuance_status: undefined,
+      user_coupon_status: raw.status,
+    };
+  }
+
   return {
     ...coupon,
-    discount_amount: discountAmount,
-    condition_text: coupon.condition_text
-      ?? `${coupon.min_order_amount.toLocaleString("ko-KR")}원 이상`,
+    issuance_status: raw.status,
+    user_coupon_status: undefined,
   };
 }
