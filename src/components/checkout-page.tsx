@@ -8,19 +8,21 @@ import { api } from "@/lib/api";
 import { ApiHttpError, apiErrorMessage } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import {
+  cartBoundCouponID,
+  clearCheckoutRetryState,
   CheckoutOrderStateError,
   estimatedCouponDiscount,
   maxApplicablePoints,
   normalizeRequestedPoints,
+  readCheckoutRetryState,
+  saveCheckoutRetryState,
   shouldDiscardCheckoutRestoreStatus,
   submitServerAuthoritativeCheckout,
 } from "@/lib/queries/checkout";
 import { useSessionStore } from "@/lib/session-store";
-import type { OrderResponse } from "@/lib/types";
+import type { CartItem, OrderResponse } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import { Button } from "./ui/button";
-
-const CHECKOUT_RETRY_STORAGE_KEY = "commerce.checkout.retry";
 
 export function CheckoutPage() {
   const router = useRouter();
@@ -30,12 +32,13 @@ export function CheckoutPage() {
   const [usedPoint, setUsedPoint] = useState(0);
   const [couponSelection, setCouponSelection] = useState<{
     id: number;
-    cartUpdatedAt: number;
+    cartSnapshot: readonly CartItem[] | undefined;
   }>();
   const [createdOrderCode, setCreatedOrderCode] = useState<string>();
   const [confirmedOrder, setConfirmedOrder] = useState<OrderResponse>();
   const [retryStateReady, setRetryStateReady] = useState(false);
   const [restoreError, setRestoreError] = useState<string>();
+  const [mockCheckoutUrl, setMockCheckoutUrl] = useState<string>();
 
   const cart = useQuery({
     queryKey: ["cart", effectiveToken],
@@ -57,7 +60,12 @@ export function CheckoutPage() {
     queryFn: () => api.listAddresses(effectiveToken),
     enabled: Boolean(effectiveToken),
   });
-  const productIDs = [...new Set((cart.data ?? []).map((item) => item.product_id))];
+  const confirmedLineItems = confirmedOrder?.market_orders?.flatMap((marketOrder) =>
+    marketOrder.line_items) ?? [];
+  const productIDs = [...new Set([
+    ...(cart.data ?? []).map((item) => item.product_id),
+    ...confirmedLineItems.map((item) => item.product_id),
+  ])];
   const products = useQueries({
     queries: productIDs.map((id) => ({
       queryKey: queryKeys.product(id),
@@ -68,10 +76,25 @@ export function CheckoutPage() {
   const productByID = new Map(products.flatMap((query, index) =>
     query.data ? [[productIDs[index], query.data] as const] : []));
   const items = (cart.data ?? []).map((item) => ({ ...item, product: productByID.get(item.product_id) }));
+  const displayItems = createdOrderCode
+    ? confirmedLineItems.map((item) => ({
+      id: item.id,
+      product_id: item.product_id,
+      option_id: item.option_id,
+      quantity: item.quantity,
+      price: item.price,
+      product: item.product ?? productByID.get(item.product_id),
+    }))
+    : items.map((item) => ({
+      id: item.id,
+      product_id: item.product_id,
+      option_id: item.option_id,
+      quantity: item.quantity,
+      price: item.price_at_added,
+      product: item.product,
+    }));
   const ownedCoupons = (coupons.data ?? []).filter((coupon) => coupon.status === "AVAILABLE");
-  const couponID = couponSelection?.cartUpdatedAt === cart.dataUpdatedAt
-    ? couponSelection.id
-    : undefined;
+  const couponID = cartBoundCouponID(couponSelection, cart.data);
   const selectedCoupon = ownedCoupons.find((coupon) => coupon.id === couponID);
   const defaultAddress = (addresses.data ?? []).find((address) => address.is_default) ?? addresses.data?.[0];
   const productTotal = items.reduce((sum, item) => sum + item.price_at_added * item.quantity, 0);
@@ -95,7 +118,7 @@ export function CheckoutPage() {
     let cancelled = false;
 
     const clearStoredOrder = () => {
-      window.sessionStorage.removeItem(CHECKOUT_RETRY_STORAGE_KEY);
+      clearCheckoutRetryState(() => window.sessionStorage);
       setCreatedOrderCode(undefined);
       setConfirmedOrder(undefined);
     };
@@ -103,16 +126,7 @@ export function CheckoutPage() {
     const restore = async () => {
       setRetryStateReady(false);
       setRestoreError(undefined);
-      let stored: { memberID?: unknown; orderCode?: unknown } | null;
-      try {
-        stored = JSON.parse(
-          window.sessionStorage.getItem(CHECKOUT_RETRY_STORAGE_KEY) ?? "null",
-        ) as { memberID?: unknown; orderCode?: unknown } | null;
-      } catch {
-        clearStoredOrder();
-        setRetryStateReady(true);
-        return;
-      }
+      const stored = readCheckoutRetryState(() => window.sessionStorage);
 
       if (
         stored?.memberID !== memberID
@@ -158,6 +172,7 @@ export function CheckoutPage() {
   }, [effectiveToken, memberID]);
 
   const checkout = useMutation({
+    onMutate: () => setMockCheckoutUrl(undefined),
     mutationFn: () =>
       submitServerAuthoritativeCheckout({
         existingOrderCode: createdOrderCode,
@@ -171,24 +186,35 @@ export function CheckoutPage() {
         createPaymentCheckout: (orderCode) => api.createPaymentCheckout(effectiveToken, orderCode),
         onOrderCreated: (orderCode) => {
           setCreatedOrderCode(orderCode);
-          window.sessionStorage.setItem(CHECKOUT_RETRY_STORAGE_KEY, JSON.stringify({
+          if (memberID === null) {
+            setRestoreError("회원 정보를 확인하지 못해 주문 복구 상태를 저장할 수 없습니다. 페이지를 새로고침하지 말고 결제를 계속해주세요.");
+            return;
+          }
+          const saved = saveCheckoutRetryState(() => window.sessionStorage, {
             memberID,
             orderCode,
-          }));
+          });
+          if (!saved) {
+            setRestoreError("이 브라우저에서는 주문 복구 저장소를 사용할 수 없습니다. 페이지를 새로고침하지 말고 결제를 계속해주세요.");
+          }
         },
         onOrderConfirmed: setConfirmedOrder,
       }),
-    onSuccess: ({ orderCode, checkoutUrl }) => {
+    onSuccess: ({ orderCode, checkoutUrl, checkoutMode }) => {
       if (checkoutUrl) {
+        if (checkoutMode === "loopback-mock") {
+          setMockCheckoutUrl(checkoutUrl);
+          return;
+        }
         window.location.assign(checkoutUrl);
         return;
       }
-      window.sessionStorage.removeItem(CHECKOUT_RETRY_STORAGE_KEY);
+      clearCheckoutRetryState(() => window.sessionStorage);
       router.push(`/orders/${orderCode}`);
     },
     onError: (error) => {
       if (error instanceof CheckoutOrderStateError && error.discardOrder) {
-        window.sessionStorage.removeItem(CHECKOUT_RETRY_STORAGE_KEY);
+        clearCheckoutRetryState(() => window.sessionStorage);
         setCreatedOrderCode(undefined);
         setConfirmedOrder(undefined);
       }
@@ -240,13 +266,24 @@ export function CheckoutPage() {
 
           <div className="rounded-md border border-line bg-white p-4">
             <h2 className="font-black">주문 상품</h2>
+            {createdOrderCode ? (
+              <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3">
+                <p className="text-sm font-black text-amber-950">복구한 주문은 현재 장바구니와 별개입니다</p>
+                <p className="mt-1 text-xs leading-5 text-amber-900">
+                  아래에는 서버에서 확인한 기존 주문 상품만 표시합니다. 현재 장바구니 변경사항은 이 결제에 포함되지 않습니다.
+                </p>
+              </div>
+            ) : null}
             <div className="mt-4 space-y-3">
-              {items.map((item) => (
+              {displayItems.map((item) => (
                 <div key={item.id} className="flex justify-between gap-4 text-sm">
                   <div><p className="font-bold">{item.product?.name ?? `상품 #${item.product_id}`}</p><p className="mt-1 text-muted">옵션 #{item.option_id} · {item.quantity}개</p></div>
-                  <p className="font-black">{formatPrice(item.price_at_added * item.quantity)}</p>
+                  <p className="font-black">{formatPrice(item.price * item.quantity)}</p>
                 </div>
               ))}
+              {createdOrderCode && confirmedOrder && displayItems.length === 0 ? (
+                <p className="text-sm text-muted">서버 주문에 표시할 상품 상세가 없습니다. 결제 금액은 서버 확정값을 사용합니다.</p>
+              ) : null}
             </div>
           </div>
 
@@ -260,7 +297,7 @@ export function CheckoutPage() {
                 disabled={Boolean(createdOrderCode)}
                 onChange={(event) => {
                   const id = Number(event.target.value);
-                  setCouponSelection(id ? { id, cartUpdatedAt: cart.dataUpdatedAt } : undefined);
+                  setCouponSelection(id ? { id, cartSnapshot: cart.data } : undefined);
                 }}
               >
                 <option value="">사용 안 함</option>
@@ -314,6 +351,22 @@ export function CheckoutPage() {
           ) : null}
           {restoreError ? <p className="mt-3 text-xs font-bold text-amber-800">{restoreError}</p> : null}
           {checkout.error ? <p className="mt-3 text-sm font-bold text-brand">{apiErrorMessage(checkout.error)}</p> : null}
+          {mockCheckoutUrl ? (
+            <section className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-4">
+              <h3 className="font-black text-amber-950">실제 결제 완료는 지원하지 않습니다</h3>
+              <p className="mt-2 text-xs leading-5 text-amber-900">
+                로컬 결제 mock에는 checkout 페이지와 webhook이 없습니다. 다음 이동은 hosted handoff 주소만 확인합니다.
+              </p>
+              <Button
+                className="mt-3"
+                size="sm"
+                variant="secondary"
+                onClick={() => window.location.assign(mockCheckoutUrl)}
+              >
+                mock handoff 주소 열기
+              </Button>
+            </section>
+          ) : null}
         </aside>
       </div>
     </main>

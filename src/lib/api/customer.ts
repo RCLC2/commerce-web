@@ -4,7 +4,6 @@ import {
   orderSchema,
   productSchema,
   recommendationSchema,
-  reviewSchema,
   statusResponseSchema,
   trackingInfoSchema,
 } from "./contracts/schemas";
@@ -15,6 +14,8 @@ import {
   rawIssuableCouponQuoteSchema,
   rawNotificationSchema,
   rawOwnedCouponSchema,
+  rawPaymentCheckoutSchema,
+  rawReviewMutationSchema,
   rawSettlementSummarySchema,
 } from "./contracts/raw";
 import {
@@ -24,6 +25,8 @@ import {
   normalizeIssuableCouponQuote,
   normalizeNotification,
   normalizeOwnedCoupon,
+  normalizePaymentCheckout,
+  normalizeReviewMutation,
   normalizeSettlementSummary,
 } from "./normalizers/contracts";
 
@@ -54,12 +57,6 @@ async function listAllOrders(token: string) {
     }
   }
 }
-
-const paymentCheckoutSchema = z.object({
-  order_code: z.string().min(1),
-  checkout_url: z.string().min(1),
-  amount: z.number().int().positive(),
-});
 
 export function normalizeCouponQuoteOrderAmount(orderAmount: number): number {
   const normalized = Math.floor(orderAmount);
@@ -121,25 +118,37 @@ export const customerApi = {
     requestParsed(orderSchema, `/api/v1/orders/${orderCode}`, { token }),
   confirmPurchase: (token: string, orderCode: string, itemID: number) =>
     requestParsed(orderSchema, `/api/v1/orders/${orderCode}/items/${itemID}/confirm-purchase`, { method: "POST", token }),
-  createPaymentCheckout: (token: string, orderCode: string) =>
-    requestParsed(paymentCheckoutSchema, `/api/v1/orders/${orderCode}/payment-checkout`, {
-      method: "POST",
-      token,
-    }),
+  createPaymentCheckout: async (token: string, orderCode: string) =>
+    normalizePaymentCheckout(await requestParsed(
+      rawPaymentCheckoutSchema,
+      `/api/v1/orders/${orderCode}/payment-checkout`,
+      {
+        method: "POST",
+        token,
+      },
+    )),
   trackDelivery: (token: string, orderCode: string, deliveryID: number) =>
     requestParsed(trackingInfoSchema, `/api/v1/orders/${orderCode}/deliveries/${deliveryID}/track`, { method: "POST", token }),
-  createOrderLineReview: (token: string, orderCode: string, itemID: number, payload: CreateOrderLineReviewPayload) =>
-    requestParsed(reviewSchema, `/api/v1/orders/${orderCode}/items/${itemID}/reviews`, {
-      method: "POST",
-      token,
-      body: JSON.stringify(payload),
-    }),
-  updateReview: (token: string, reviewID: number, payload: { rating_x2?: number; content?: string }) =>
-    requestParsed(reviewSchema, `/api/v1/reviews/${reviewID}`, {
-      method: "PATCH",
-      token,
-      body: JSON.stringify(payload),
-    }),
+  createOrderLineReview: async (token: string, orderCode: string, itemID: number, payload: CreateOrderLineReviewPayload) =>
+    normalizeReviewMutation(await requestParsed(
+      rawReviewMutationSchema,
+      `/api/v1/orders/${orderCode}/items/${itemID}/reviews`,
+      {
+        method: "POST",
+        token,
+        body: JSON.stringify(payload),
+      },
+    )),
+  updateReview: async (token: string, reviewID: number, payload: { rating_x2?: number; content?: string }) =>
+    normalizeReviewMutation(await requestParsed(
+      rawReviewMutationSchema,
+      `/api/v1/reviews/${reviewID}`,
+      {
+        method: "PATCH",
+        token,
+        body: JSON.stringify(payload),
+      },
+    )),
   deleteReview: (token: string, reviewID: number) =>
     requestVoid(`/api/v1/reviews/${reviewID}`, { method: "DELETE", token }),
   addWishlist: (token: string, productID: number) =>

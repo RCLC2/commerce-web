@@ -207,6 +207,20 @@ describe("origin/main mixed contract regressions", () => {
     }]);
   });
 
+  it("rejects a truncated review mutation response before reporting success", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      id: 5,
+      product_id: 1,
+      rating: 5,
+      content: "필수 주문 연결 필드가 없습니다",
+    }), { status: 201 })));
+
+    await expect(customerApi.createOrderLineReview("token", "ORDER-1", 6, {
+      rating_x2: 10,
+      content: "좋아요",
+    })).rejects.toThrow("서버 응답 계약");
+  });
+
   it("normalizes a successful inventory mapping response with an uppercase ID", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
       ID: 12,

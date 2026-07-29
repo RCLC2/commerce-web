@@ -275,6 +275,12 @@ export type OrderResponse = {
   delivery?: Delivery;
 };
 
+export type PaymentCheckout = {
+  order_code: string;
+  checkout_url: string;
+  amount: number;
+};
+
 export type MarketOrderResponse = {
   id: number;
   market_id: number;

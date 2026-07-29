@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { consoleAlertSchema, dateStringSchema, identifierSchema, metricSchema, nonNegativeIntSchema } from "./schemas";
+import {
+  consoleAlertSchema,
+  dateStringSchema,
+  identifierSchema,
+  metricSchema,
+  nonNegativeIntSchema,
+  reviewImageSchema,
+} from "./schemas";
 
 export const rawCartSchema = z.object({
   ID: identifierSchema,
@@ -167,6 +174,29 @@ export const rawNotificationSchema = z.looseObject({
   Message: z.string(),
   IsRead: z.boolean(),
   CreatedAt: dateStringSchema,
+});
+
+export const rawPaymentCheckoutSchema = z.object({
+  order_code: z.string().min(1),
+  checkout_url: z.string().min(1),
+  amount: z.number().int().positive(),
+});
+
+export const rawReviewMutationSchema = z.object({
+  id: identifierSchema,
+  product_id: identifierSchema,
+  option_id: identifierSchema,
+  member_id: identifierSchema,
+  order_id: identifierSchema,
+  order_line_item_id: identifierSchema,
+  rating_x2: z.number().int().min(1).max(10),
+  rating: z.number().min(0.5).max(5),
+  content: z.string(),
+  is_photo_review: z.boolean(),
+  status: z.string().min(1),
+  images: z.array(reviewImageSchema),
+  created_at: dateStringSchema.optional(),
+  updated_at: dateStringSchema.optional(),
 });
 
 export const rawExternalInventoryMappingSchema = z.looseObject({

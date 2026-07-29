@@ -121,10 +121,19 @@ test.describe("public and customer journeys against backend origin/main", () => 
     await expect(page.getByText(/temporary checkout failure/)).toBeVisible();
     expect(orderCreateRequests).toBe(1);
 
+    const replacementCart = await request.post(`${backendBaseURL}/api/v1/cart/items`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      data: { product_id: 1, option_id: 1, quantity: 2 },
+    });
+    expect(replacementCart.status(), await replacementCart.text()).toBe(201);
+
     await page.reload();
     await expect(page.getByRole("heading", { name: "주문서" })).toBeVisible();
     await expect(retryButton).toBeEnabled();
     await expect(page.getByText(/생성된 주문:/)).toBeVisible();
+    await expect(page.getByText("복구한 주문은 현재 장바구니와 별개입니다", { exact: true })).toBeVisible();
+    await expect(page.getByText("옵션 #1 · 1개", { exact: true })).toBeVisible();
+    await expect(page.getByText("옵션 #1 · 2개", { exact: true })).toHaveCount(0);
 
     await page.unroute(checkoutPattern);
     const checkoutResponsePromise = page.waitForResponse((response) =>
@@ -133,6 +142,9 @@ test.describe("public and customer journeys against backend origin/main", () => 
     await retryButton.click();
     const checkoutResponse = await checkoutResponsePromise;
     expect(checkoutResponse.ok()).toBeTruthy();
+    await expect(page.getByRole("heading", { name: "실제 결제 완료는 지원하지 않습니다" })).toBeVisible();
+    await expect(page).toHaveURL(/\/checkout$/);
+    await page.getByRole("button", { name: "mock handoff 주소 열기" }).click();
     await expect(page).toHaveURL(/^http:\/\/localhost:8090\/mock-checkout\/[^/]+$/);
     expect(orderCreateRequests).toBe(1);
   });

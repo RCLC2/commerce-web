@@ -6,6 +6,16 @@ export type CheckoutOrderInput = {
   used_point: number;
 };
 
+export const CHECKOUT_RETRY_STORAGE_KEY = "commerce.checkout.retry";
+
+export type CheckoutRetryState = {
+  memberID?: unknown;
+  orderCode?: unknown;
+};
+
+type CheckoutRetryStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+type CheckoutRetryStorageAccess = () => CheckoutRetryStorage;
+
 export class CheckoutOrderStateError extends Error {
   constructor(message: string, readonly discardOrder = false) {
     super(message);
@@ -51,6 +61,54 @@ export function normalizeRequestedPoints(value: number): number {
   return Number.isSafeInteger(normalized) ? Math.max(0, normalized) : 0;
 }
 
+export function cartBoundCouponID<T>(
+  selection: { id: number; cartSnapshot: readonly T[] | undefined } | undefined,
+  currentCart: readonly T[] | undefined,
+): number | undefined {
+  if (!selection || selection.cartSnapshot !== currentCart) {
+    return undefined;
+  }
+  return selection.id;
+}
+
+export function readCheckoutRetryState(
+  storageAccess: CheckoutRetryStorageAccess,
+): CheckoutRetryState | null {
+  try {
+    const parsed: unknown = JSON.parse(
+      storageAccess().getItem(CHECKOUT_RETRY_STORAGE_KEY) ?? "null",
+    );
+    return parsed && typeof parsed === "object"
+      ? parsed as CheckoutRetryState
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveCheckoutRetryState(
+  storageAccess: CheckoutRetryStorageAccess,
+  state: { memberID: number; orderCode: string },
+): boolean {
+  try {
+    storageAccess().setItem(CHECKOUT_RETRY_STORAGE_KEY, JSON.stringify(state));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function clearCheckoutRetryState(
+  storageAccess: CheckoutRetryStorageAccess,
+): boolean {
+  try {
+    storageAccess().removeItem(CHECKOUT_RETRY_STORAGE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function shouldDiscardCheckoutRestoreStatus(status: number | undefined): boolean {
   return status !== undefined && [400, 403, 404, 410, 422].includes(status);
 }
@@ -63,7 +121,13 @@ export function safeHostedCheckoutURL(value: string): string {
     throw new CheckoutOrderStateError("결제 이동 주소가 올바르지 않습니다.");
   }
   if (
-    (url.protocol !== "https:" && url.protocol !== "http:")
+    (
+      url.protocol !== "https:"
+      && !(
+        url.protocol === "http:"
+        && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
+      )
+    )
     || url.username
     || url.password
   ) {
@@ -123,5 +187,8 @@ export async function submitServerAuthoritativeCheckout({
     throw new CheckoutOrderStateError("결제 체크아웃 금액이 서버 주문 금액과 일치하지 않습니다.");
   }
   const checkoutUrl = safeHostedCheckoutURL(checkout.checkout_url);
-  return { orderCode, order, amount, checkoutUrl, paymentSkipped: false };
+  const checkoutMode = new URL(checkoutUrl).protocol === "http:"
+    ? "loopback-mock" as const
+    : "external" as const;
+  return { orderCode, order, amount, checkoutUrl, checkoutMode, paymentSkipped: false };
 }

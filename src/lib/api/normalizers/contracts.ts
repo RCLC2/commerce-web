@@ -12,7 +12,9 @@ import type {
   IssuableCouponQuote,
   Notification,
   OwnedCoupon,
+  PaymentCheckout,
   Product,
+  Review,
   SellerSettlementDashboard,
   Settlement,
   SettlementAccount,
@@ -35,6 +37,8 @@ import type {
   rawIssuableCouponQuoteSchema,
   rawNotificationSchema,
   rawOwnedCouponSchema,
+  rawPaymentCheckoutSchema,
+  rawReviewMutationSchema,
   rawSellerSettlementDashboardSchema,
   rawSellerProductSchema,
   rawSettlementAccountSchema,
@@ -200,6 +204,37 @@ export function normalizeNotification(
     message: raw.Message,
     is_read: raw.IsRead,
     created_at: raw.CreatedAt,
+  };
+}
+
+export function normalizePaymentCheckout(
+  raw: z.infer<typeof rawPaymentCheckoutSchema>,
+): PaymentCheckout {
+  return {
+    order_code: raw.order_code,
+    checkout_url: raw.checkout_url,
+    amount: raw.amount,
+  };
+}
+
+export function normalizeReviewMutation(
+  raw: z.infer<typeof rawReviewMutationSchema>,
+): Review {
+  return {
+    id: raw.id,
+    product_id: raw.product_id,
+    option_id: raw.option_id,
+    member_id: raw.member_id,
+    order_id: raw.order_id,
+    order_line_item_id: raw.order_line_item_id,
+    rating_x2: raw.rating_x2,
+    rating: raw.rating,
+    content: raw.content,
+    is_photo_review: raw.is_photo_review,
+    status: raw.status,
+    images: raw.images,
+    ...(raw.created_at ? { created_at: raw.created_at } : {}),
+    ...(raw.updated_at ? { updated_at: raw.updated_at } : {}),
   };
 }
 

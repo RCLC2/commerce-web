@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import type { OrderResponse } from "../types";
 import {
+  cartBoundCouponID,
   CheckoutOrderStateError,
   estimatedCouponDiscount,
   maxApplicablePoints,
   normalizeRequestedPoints,
+  readCheckoutRetryState,
   safeHostedCheckoutURL,
+  saveCheckoutRetryState,
+  clearCheckoutRetryState,
   shouldDiscardCheckoutRestoreStatus,
   submitServerAuthoritativeCheckout,
 } from "./checkout";
@@ -52,6 +56,7 @@ describe("submitServerAuthoritativeCheckout", () => {
       orderCode: "ORDER-1",
       amount: 40000,
       checkoutUrl: "https://pay.example.test/checkout/1",
+      checkoutMode: "external",
     });
 
     expect(placeOrder).toHaveBeenCalledTimes(1);
@@ -137,9 +142,32 @@ describe("submitServerAuthoritativeCheckout", () => {
     "javascript:alert(1)",
     "data:text/html,boom",
     "https://user:secret@pay.example.test/checkout",
+    "http://pay.example.test/checkout",
     "/relative-checkout",
   ])("blocks unsafe hosted checkout URL %s", (url) => {
     expect(() => safeHostedCheckoutURL(url)).toThrow(CheckoutOrderStateError);
+  });
+
+  it.each([
+    "http://localhost:8090/mock-checkout/ORDER-1",
+    "http://127.0.0.1:8090/mock-checkout/ORDER-1",
+    "http://[::1]:8090/mock-checkout/ORDER-1",
+  ])("accepts an explicit loopback mock URL %s", async (checkoutURL) => {
+    await expect(submitServerAuthoritativeCheckout({
+      existingOrderCode: "ORDER-1",
+      orderInput: { cart_item_ids: [11], used_point: 0 },
+      placeOrder: vi.fn(),
+      getOrder: vi.fn().mockResolvedValue(serverOrder),
+      createPaymentCheckout: vi.fn().mockResolvedValue(hostedCheckout(
+        "ORDER-1",
+        40000,
+        checkoutURL,
+      )),
+      onOrderCreated: vi.fn(),
+      onOrderConfirmed: vi.fn(),
+    })).resolves.toMatchObject({
+      checkoutMode: "loopback-mock",
+    });
   });
 });
 
@@ -193,5 +221,50 @@ describe("checkout discount boundaries", () => {
     expect(shouldDiscardCheckoutRestoreStatus(408)).toBe(false);
     expect(shouldDiscardCheckoutRestoreStatus(429)).toBe(false);
     expect(shouldDiscardCheckoutRestoreStatus(500)).toBe(false);
+  });
+
+  it("keeps a coupon across an unchanged structural-shared cart refetch", () => {
+    const cartSnapshot = [{ id: 1, quantity: 1 }];
+    const selection = { id: 7, cartSnapshot };
+
+    expect(cartBoundCouponID(undefined, undefined)).toBeUndefined();
+    expect(cartBoundCouponID(selection, cartSnapshot)).toBe(7);
+    expect(cartBoundCouponID(selection, [{ id: 1, quantity: 2 }])).toBeUndefined();
+    expect(cartBoundCouponID(selection, [{ id: 1, quantity: 1 }])).toBeUndefined();
+  });
+});
+
+describe("checkout retry storage", () => {
+  it("degrades safely when browser storage access is blocked", () => {
+    const blockedStorage = () => {
+      throw new DOMException("blocked", "SecurityError");
+    };
+
+    expect(readCheckoutRetryState(blockedStorage)).toBeNull();
+    expect(saveCheckoutRetryState(blockedStorage, {
+      memberID: 1,
+      orderCode: "ORDER-1",
+    })).toBe(false);
+    expect(clearCheckoutRetryState(blockedStorage)).toBe(false);
+  });
+
+  it("round-trips a retry state through the storage seam", () => {
+    let stored: string | null = null;
+    const storage = () => ({
+      getItem: () => stored,
+      setItem: (_key: string, value: string) => { stored = value; },
+      removeItem: () => { stored = null; },
+    });
+
+    expect(saveCheckoutRetryState(storage, {
+      memberID: 1,
+      orderCode: "ORDER-1",
+    })).toBe(true);
+    expect(readCheckoutRetryState(storage)).toEqual({
+      memberID: 1,
+      orderCode: "ORDER-1",
+    });
+    expect(clearCheckoutRetryState(storage)).toBe(true);
+    expect(readCheckoutRetryState(storage)).toBeNull();
   });
 });
