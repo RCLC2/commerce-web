@@ -150,7 +150,13 @@ test.describe("remaining public catalog routes against backend origin/main", () 
     await expect(page.getByRole("link", { name: /스냅 코튼 크롭 셔츠/ }).first()).toBeVisible();
   });
 
-  test("snapshot keeps the route stable while origin/main lacks the trends endpoint", async ({ page }) => {
+  test("snapshot keeps its UI while origin/main cannot provide trend data", async ({ page }) => {
+    let trendsRequestCount = 0;
+    page.on("request", (request) => {
+      if (request.url().includes("/api/v1/trends/posts")) {
+        trendsRequestCount += 1;
+      }
+    });
     const trendsResponse = page.waitForResponse((response) =>
       response.url().includes("/api/v1/trends/posts"));
     await page.goto("/snapshot");
@@ -158,7 +164,17 @@ test.describe("remaining public catalog routes against backend origin/main", () 
     expect(response.status()).toBe(404);
 
     await expect(page.getByRole("heading", { name: "트렌드관", exact: true })).toBeVisible();
-    await expect(page.getByText("404 page not found", { exact: true })).toBeVisible();
+    await expect(page.getByRole("status")).toContainText("현재 트렌드 데이터를 불러올 수 없습니다.");
+    await expect(page.getByText(
+      "데이터 제공이 시작되면 이 화면에 콘텐츠가 표시됩니다.",
+      { exact: true },
+    )).toBeVisible();
+    await expect(page.getByText("404 page not found", { exact: true })).toHaveCount(0);
+    await expect(page.getByText(
+      "아직 노출할 인스타그램 콘텐츠가 없습니다.",
+      { exact: true },
+    )).toHaveCount(0);
+    expect(trendsRequestCount).toBe(1);
   });
 });
 

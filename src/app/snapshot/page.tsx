@@ -5,6 +5,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { Camera, ExternalLink, Hash } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { ApiHttpError, apiErrorMessage } from "@/lib/api-client";
 import type { InstagramTrendItem } from "@/lib/types";
 import { SafeImage } from "@/components/safe-image";
 
@@ -18,8 +19,15 @@ export default function Snapshot() {
     initialPageParam: "",
     queryFn: ({ pageParam }) => api.listTrendPosts({ hashtag: HASHTAG, limit: PAGE_SIZE, after: pageParam || undefined }),
     getNextPageParam: (lastPage) => (lastPage.paging.has_next ? lastPage.paging.next_cursor ?? "" : undefined),
+    retry: (failureCount, queryError) =>
+      !(queryError instanceof ApiHttpError && queryError.status === 404)
+      && failureCount < 1,
   });
   const items = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data]);
+  const isInitialQueryError = Boolean(error) && data === undefined;
+  const isDataUnavailable = isInitialQueryError
+    && error instanceof ApiHttpError
+    && error.status === 404;
 
   useEffect(() => {
     const node = sentinelRef.current;
@@ -46,9 +54,30 @@ export default function Snapshot() {
         </div>
       </div>
 
-      {error ? <p className="mt-6 rounded-md border border-line bg-white p-4 text-sm text-brand">{error.message}</p> : null}
+      {isInitialQueryError ? (
+        <div
+          className="mt-6 rounded-md border border-line bg-white p-4 text-sm"
+          role="status"
+        >
+          <p className="font-bold text-brand">
+            {isDataUnavailable
+              ? "현재 트렌드 데이터를 불러올 수 없습니다."
+              : apiErrorMessage(error)}
+          </p>
+          {isDataUnavailable ? (
+            <p className="mt-1 text-muted">
+              데이터 제공이 시작되면 이 화면에 콘텐츠가 표시됩니다.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {error && !isInitialQueryError ? (
+        <p className="mt-4 text-center text-sm font-bold text-brand" role="status">
+          다음 트렌드 콘텐츠를 불러오지 못했습니다.
+        </p>
+      ) : null}
       {isLoading ? <p className="mt-6 text-sm text-muted">인스타그램 트렌드를 불러오는 중입니다.</p> : null}
-      {!isLoading && !items.length ? <div className="mt-6 rounded-md border border-line bg-white p-8 text-center text-sm font-bold text-muted">아직 노출할 인스타그램 콘텐츠가 없습니다.</div> : null}
+      {!isLoading && !error && !items.length ? <div className="mt-6 rounded-md border border-line bg-white p-8 text-center text-sm font-bold text-muted">아직 노출할 인스타그램 콘텐츠가 없습니다.</div> : null}
 
       <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((item) => <TrendCard key={item.id} item={item} />)}
