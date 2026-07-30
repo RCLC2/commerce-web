@@ -1,7 +1,10 @@
 "use client";
 
+import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { apiErrorMessage } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 type ConsoleLink = {
@@ -25,6 +28,36 @@ export function ConsoleLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState<unknown>();
+  useEffect(() => {
+    const clearTimer = window.setTimeout(() => setMutationError(undefined), 0);
+    const unsubscribe = queryClient.getMutationCache().subscribe((event) => {
+      if (event.mutation?.state.status === "error") {
+        setMutationError(event.mutation.state.error);
+      }
+    });
+    return () => {
+      window.clearTimeout(clearTimer);
+      unsubscribe();
+    };
+  }, [pathname, queryClient]);
+  useIsFetching();
+  const activeQueries = queryClient.getQueryCache().getAll().filter(
+    (query) => query.getObserversCount() > 0,
+  );
+  const activeQueryErrors = activeQueries.filter((query) => query.state.status === "error");
+  const activePendingQueries = activeQueries.filter(
+    (query) => query.state.status === "pending" && query.state.fetchStatus === "fetching",
+  );
+  const primaryQueries = activeQueries.filter(
+    (query) => query.meta?.consoleDataRole === "primary",
+  );
+  const hasResolvedData = activeQueries.some((query) => query.state.data !== undefined);
+  const hasResolvedPrimaryData = primaryQueries.some((query) => query.state.data !== undefined);
+  const canRenderChildren = primaryQueries.length
+    ? hasResolvedPrimaryData
+    : activeQueries.length === 0 || hasResolvedData;
 
   return (
     <main className="mx-auto grid max-w-7xl gap-5 px-4 pb-24 pt-5 md:grid-cols-[228px_1fr]">
@@ -53,7 +86,27 @@ export function ConsoleLayout({
         </nav>
         {sidebarFooter ? <div className="mt-4 border-t border-line pt-4">{sidebarFooter}</div> : null}
       </aside>
-      <section className="min-w-0">{children}</section>
+      <section className="min-w-0">
+        {activeQueryErrors.length ? (
+          <div className="mb-4 rounded-md border border-brand/30 bg-red-50 p-4 text-sm">
+            <p className="font-black text-brand">데이터를 불러오지 못했습니다.</p>
+            <p className="mt-1 text-xs text-red-800">{apiErrorMessage(activeQueryErrors[0].state.error)}</p>
+            <button className="mt-3 rounded-md border border-line bg-white px-3 py-2 text-xs font-black" onClick={() => void queryClient.refetchQueries({ type: "active" })}>다시 시도</button>
+          </div>
+        ) : null}
+        {mutationError ? (
+          <div className="mb-4 rounded-md border border-brand/30 bg-red-50 p-4 text-sm">
+            <p className="font-black text-brand">작업을 완료하지 못했습니다.</p>
+            <p className="mt-1 text-xs text-red-800">{apiErrorMessage(mutationError)}</p>
+          </div>
+        ) : null}
+        {!canRenderChildren && activePendingQueries.length ? (
+          <div className="rounded-md border border-line bg-white p-8 text-center text-sm font-bold text-muted">
+            데이터를 불러오는 중입니다.
+          </div>
+        ) : null}
+        {canRenderChildren ? children : null}
+      </section>
     </main>
   );
 }
@@ -207,18 +260,25 @@ export function SearchBox({
 function statusMeta(value: string) {
   const labels: Record<string, string> = {
     ACTIVE: "활성",
+    OPEN: "운영중",
+    CLOSED: "운영 종료",
+    HIDE: "숨김",
+    EXIT: "퇴점",
+    WITHDRAWN: "탈퇴",
     PENDING: "대기",
     SUSPENDED: "정지",
     SELLING: "판매중",
-    SOLD_OUT: "품절",
+    SOLD_OUT: "품절/소진",
     PLACED: "주문 접수",
-    PAYMENT_COMPLETED: "결제 완료",
-    READY_TO_SHIP: "배송 준비중",
+    PAYMENT_PENDING: "결제 대기",
+    SHIPPED: "배송중",
     SHIPPING: "배송중",
     DELIVERED: "배송 완료",
+    COMPLETED: "구매 확정",
     CANCELLED: "취소",
     PREPARED: "지급 대기",
     PAID: "지급 완료",
+    CONFIRMED: "지급 확정",
     EXCLUDED: "정산 제외",
     SUCCESS: "성공",
     FAILED: "실패",
@@ -227,21 +287,25 @@ function statusMeta(value: string) {
     WARNING: "주의",
     CRITICAL: "긴급",
     INACTIVE: "비활성",
-    ISSUED: "발급됨",
     ISSUABLE: "발급 가능",
+    ISSUED: "발급됨",
+    SCHEDULED: "발급 예정",
+    ENDED: "발급 종료",
+    AVAILABLE: "사용 가능",
+    EXPIRED: "만료",
     USED: "사용됨",
     PENALTY: "페널티",
     IMPERSONATING: "대리 접속",
   };
   const tone: Record<string, string> = {
     ACTIVE: "bg-emerald-50 text-emerald-700",
+    OPEN: "bg-emerald-50 text-emerald-700",
     SELLING: "bg-emerald-50 text-emerald-700",
     SUCCESS: "bg-emerald-50 text-emerald-700",
     PAID: "bg-emerald-50 text-emerald-700",
     DELIVERED: "bg-emerald-50 text-emerald-700",
-    PAYMENT_COMPLETED: "bg-emerald-50 text-emerald-700",
     WARNING: "bg-amber-50 text-amber-700",
-    READY_TO_SHIP: "bg-amber-50 text-amber-700",
+    PAYMENT_PENDING: "bg-amber-50 text-amber-700",
     PREPARED: "bg-amber-50 text-amber-700",
     PENDING: "bg-amber-50 text-amber-700",
     CRITICAL: "bg-red-50 text-red-700",
@@ -251,8 +315,10 @@ function statusMeta(value: string) {
     SOLD_OUT: "bg-red-50 text-red-700",
     CANCELLED: "bg-red-50 text-red-700",
     INFO: "bg-sky-50 text-sky-700",
+    SHIPPED: "bg-sky-50 text-sky-700",
     SHIPPING: "bg-sky-50 text-sky-700",
     ISSUABLE: "bg-sky-50 text-sky-700",
+    ISSUED: "bg-sky-50 text-sky-700",
     INACTIVE: "bg-zinc-100 text-zinc-600",
     PAUSED: "bg-zinc-100 text-zinc-600",
     PENALTY: "bg-red-50 text-red-700",

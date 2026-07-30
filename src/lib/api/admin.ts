@@ -1,161 +1,244 @@
-import { request } from "../api-client";
-import type { AdminDashboard, AuditLog, CMSCarousel, CMSHomeSection, CommerceCategory, Coupon, Market, MarketPenalty, MemberProfile, Notification, OrderResponse, Product, Recommendation, Settlement, TrackingInfo } from "../types";
+import { z } from "zod";
+import { requestParsed, requestVoid } from "../api-client";
+import type { CMSCarousel, CMSHomeSection, Market } from "../types";
+import {
+  carouselSchema,
+  categorySchema,
+  eventSchema,
+  homeSectionSchema,
+  marketSchema,
+  orderSchema,
+  productSchema,
+  recommendationSchema,
+  statusResponseSchema,
+  trackingInfoSchema,
+} from "./contracts/schemas";
+import {
+  adminDashboardRawSchema,
+  rawAdminCouponSchema,
+  rawAdminMemberSchema,
+  rawAuditLogSchema,
+  rawNotificationSchema,
+  rawSettlementSchema,
+} from "./contracts/raw";
+import {
+  normalizeAdminDashboard,
+  normalizeAdminCoupon,
+  normalizeAdminMember,
+  normalizeAuditLog,
+  normalizeNotification,
+  normalizeSettlement,
+} from "./normalizers/contracts";
+import { collectAllUniquePages } from "./pagination";
+
+const penaltySchema = z.object({
+  id: z.number().int().positive(),
+  market_id: z.number().int().positive(),
+  score: z.number().int(),
+  reason: z.string(),
+  created_at: z.string(),
+});
+const impersonationSchema = z.object({
+  access_token: z.string().min(1),
+  token_type: z.string(),
+  expires_at: z.string(),
+  market_id: z.number().int().positive(),
+  market_name: z.string(),
+  issued_for: z.string(),
+});
+const dailyAccrualSchema = z.object({
+  accrued_lines: z.number().int().nonnegative(),
+  updated_settlements: z.number().int().nonnegative(),
+});
+const paidCountSchema = z.object({ paid_count: z.number().int().nonnegative() });
+const settlementActionLogsSchema = z.object({ items: z.array(rawAuditLogSchema) });
 
 export const adminApi = {
-  adminDashboard: (token: string) => request<AdminDashboard>("/api/v1/admin/dashboard", { token }),
-  adminMembers: (token: string) => request<MemberProfile[]>("/api/v1/admin/members", { token }),
-  adminMember: (token: string, memberID: number) => request<MemberProfile>(`/api/v1/admin/members/${memberID}`, { token }),
-  updateMemberStatus: (token: string, memberID: number, payload: { status: string; reason?: string }) =>
-    request<{ status: string }>(`/api/v1/admin/members/${memberID}/status`, {
+  adminDashboard: async (token: string) =>
+    normalizeAdminDashboard(await requestParsed(adminDashboardRawSchema, "/api/v1/admin/dashboard", { token })),
+  adminMembers: async (token: string) =>
+    (await collectAllUniquePages(
+      (limit, offset) => requestParsed(
+        z.array(rawAdminMemberSchema),
+        `/api/v1/admin/members?limit=${limit}&offset=${offset}`,
+        { token },
+      ),
+      (member) => member.ID,
+    ))
+      .map(normalizeAdminMember),
+  adminMember: async (token: string, memberID: number) =>
+    normalizeAdminMember(await requestParsed(rawAdminMemberSchema, `/api/v1/admin/members/${memberID}`, { token })),
+  updateMemberStatus: (token: string, memberID: number, payload: { status: string }) =>
+    requestVoid(`/api/v1/admin/members/${memberID}/status`, { method: "POST", token, body: JSON.stringify(payload) }),
+  updateMemberRole: (token: string, memberID: number, payload: { role: string }) =>
+    requestVoid(`/api/v1/admin/members/${memberID}/role`, { method: "POST", token, body: JSON.stringify(payload) }),
+  adminMarkets: (token: string) =>
+    collectAllUniquePages(
+      (limit, offset) => requestParsed(
+        z.array(marketSchema),
+        `/api/v1/admin/markets?limit=${limit}&offset=${offset}`,
+        { token },
+      ),
+      (market) => market.id,
+    ),
+  adminMarket: (token: string, marketID: number) => requestParsed(marketSchema, `/api/v1/admin/markets/${marketID}`, { token }),
+  adminMarketPenalties: (token: string, marketID: number) =>
+    requestParsed(z.array(penaltySchema), `/api/v1/admin/markets/${marketID}/penalties`, { token }),
+  adminProducts: (token: string) => requestParsed(z.array(productSchema), "/api/v1/admin/products", { token }),
+  adminOrders: (token: string) =>
+    collectAllUniquePages(
+      (limit, offset) => requestParsed(
+        z.array(orderSchema),
+        `/api/v1/admin/orders?limit=${limit}&offset=${offset}`,
+        { token },
+      ),
+      (order) => order.id,
+    ),
+  adminOrder: (token: string, orderCode: string) => requestParsed(orderSchema, `/api/v1/admin/orders/${orderCode}`, { token }),
+  adminOrderActionLogs: async (token: string) =>
+    (await collectAllUniquePages(
+      (limit, offset) => requestParsed(
+        z.array(rawAuditLogSchema),
+        `/api/v1/admin/orders/action-logs?limit=${limit}&offset=${offset}`,
+        { token },
+      ),
+      (log) => log.ID,
+    ))
+      .map(normalizeAuditLog),
+  adminSettlements: async (token: string) =>
+    (await requestParsed(z.array(rawSettlementSchema), "/api/v1/admin/settlements", { token }))
+      .map(normalizeSettlement),
+  adminSettlementActionLogs: async (token: string) =>
+    (await collectAllUniquePages(
+      async (limit, offset) => (await requestParsed(
+        settlementActionLogsSchema,
+        `/api/v1/admin/settlements/action-logs?limit=${limit}&offset=${offset}`,
+        { token },
+      )).items,
+      (log) => log.ID,
+    ))
+      .map(normalizeAuditLog),
+  adminCoupons: async (token: string, memberID?: number | null) =>
+    (await requestParsed(
+      z.array(rawAdminCouponSchema),
+      `/api/v1/admin/coupons${memberID ? `?member_id=${memberID}` : ""}`,
+      { token },
+    )).map(normalizeAdminCoupon),
+  adminAuditLogs: async (token: string) =>
+    (await collectAllUniquePages(
+      (limit, offset) => requestParsed(
+        z.array(rawAuditLogSchema),
+        `/api/v1/admin/audit-logs?limit=${limit}&offset=${offset}`,
+        { token },
+      ),
+      (log) => log.ID,
+    ))
+      .map(normalizeAuditLog),
+  adminCarousels: (token: string) => requestParsed(z.array(carouselSchema), "/api/v1/admin/carousels", { token }),
+  adminEvents: (token: string) =>
+    requestParsed(z.array(eventSchema), "/api/v1/admin/events", { token }),
+  adminCategories: (token: string) =>
+    requestParsed(z.array(categorySchema), "/api/v1/admin/categories", { token }),
+  createCategory: (
+    token: string,
+    payload: { parent_id?: number | null; name: string; slug?: string; display_order: number },
+  ) =>
+    requestParsed(categorySchema, "/api/v1/admin/categories", {
       method: "POST",
       token,
       body: JSON.stringify(payload),
     }),
-  updateMemberRole: (token: string, memberID: number, payload: { role: string; reason?: string }) =>
-    request<{ status: string }>(`/api/v1/admin/members/${memberID}/role`, {
-      method: "POST",
-      token,
-      body: JSON.stringify(payload),
-    }),
-  adminMarkets: (token: string) => request<Market[]>("/api/v1/admin/markets", { token }),
-  adminMarket: (token: string, marketID: number) => request<Market>(`/api/v1/admin/markets/${marketID}`, { token }),
-  adminMarketPenalties: (token: string, marketID: number) => request<MarketPenalty[]>(`/api/v1/admin/markets/${marketID}/penalties`, { token }),
-  adminProducts: (token: string) => request<Product[]>("/api/v1/admin/products", { token }),
-  adminOrders: (token: string) => request<OrderResponse[]>("/api/v1/admin/orders", { token }),
-  adminOrder: (token: string, orderCode: string) => request<OrderResponse>(`/api/v1/admin/orders/${orderCode}`, { token }),
-  adminOrderActionLogs: (token: string) => request<AuditLog[]>("/api/v1/admin/orders/action-logs", { token }),
-  adminSettlements: (token: string) => request<Settlement[]>("/api/v1/admin/settlements", { token }),
-  adminSettlementActionLogs: (token: string) => request<AuditLog[]>("/api/v1/admin/settlements/action-logs", { token }),
-  adminCoupons: (token: string, memberID?: number | null) => request<Coupon[]>(`/api/v1/admin/coupons${memberID ? `?member_id=${memberID}` : ""}`, { token }),
-  adminAuditLogs: (token: string) => request<AuditLog[]>("/api/v1/admin/audit-logs", { token }),
-  adminCarousels: (token: string) => request<CMSCarousel[]>("/api/v1/admin/carousels", { token }),
-  adminEvents: (token: string) => request<CMSCarousel[]>("/api/v1/admin/events", { token }),
-  adminCategories: (token: string) => request<CommerceCategory[]>("/api/v1/admin/categories", { token }),
-  createCategory: (token: string, payload: { parent_id?: number | null; name: string; slug?: string; display_order: number }) =>
-    request<CommerceCategory>("/api/v1/admin/categories", {
-      method: "POST",
-      token,
-      body: JSON.stringify(payload),
-    }),
-  updateCategory: (token: string, categoryID: number, payload: { parent_id?: number | null; name: string; slug?: string; display_order: number }) =>
-    request<CommerceCategory>(`/api/v1/admin/categories/${categoryID}`, {
+  updateCategory: (
+    token: string,
+    categoryID: number,
+    payload: { parent_id?: number | null; name: string; slug?: string; display_order: number },
+  ) =>
+    requestParsed(categorySchema, `/api/v1/admin/categories/${categoryID}`, {
       method: "PUT",
       token,
       body: JSON.stringify(payload),
     }),
-  deleteCategory: (token: string, categoryID: number) => request<void>(`/api/v1/admin/categories/${categoryID}`, { method: "DELETE", token }),
+  deleteCategory: (token: string, categoryID: number) =>
+    requestVoid(`/api/v1/admin/categories/${categoryID}`, { method: "DELETE", token }),
   reorderCategories: (token: string, items: { id: number; display_order: number }[]) =>
-    request<CommerceCategory[]>("/api/v1/admin/categories/reorder", {
+    requestParsed(z.array(categorySchema), "/api/v1/admin/categories/reorder", {
       method: "POST",
       token,
       body: JSON.stringify({ items }),
     }),
-  adminHomeSections: (token: string) => request<CMSHomeSection[]>("/api/v1/admin/home-sections", { token }),
+  adminHomeSections: (token: string) =>
+    requestParsed(z.array(homeSectionSchema), "/api/v1/admin/home-sections", { token }),
   createHomeSection: (token: string, payload: Partial<CMSHomeSection>) =>
-    request<CMSHomeSection>("/api/v1/admin/home-sections", {
+    requestParsed(homeSectionSchema, "/api/v1/admin/home-sections", {
       method: "POST",
       token,
       body: JSON.stringify(payload),
     }),
   updateHomeSection: (token: string, sectionID: number, payload: Partial<CMSHomeSection>) =>
-    request<CMSHomeSection>(`/api/v1/admin/home-sections/${sectionID}`, {
+    requestParsed(homeSectionSchema, `/api/v1/admin/home-sections/${sectionID}`, {
       method: "PUT",
       token,
       body: JSON.stringify(payload),
     }),
-  deleteHomeSection: (token: string, sectionID: number) => request<void>(`/api/v1/admin/home-sections/${sectionID}`, { method: "DELETE", token }),
+  deleteHomeSection: (token: string, sectionID: number) =>
+    requestVoid(`/api/v1/admin/home-sections/${sectionID}`, { method: "DELETE", token }),
   reorderHomeSections: (token: string, items: { id: number; sequence: number }[]) =>
-    request<CMSHomeSection[]>("/api/v1/admin/home-sections/reorder", {
+    requestParsed(z.array(homeSectionSchema), "/api/v1/admin/home-sections/reorder", {
       method: "POST",
       token,
       body: JSON.stringify({ items }),
     }),
   createCarousel: (token: string, payload: Partial<CMSCarousel>) =>
-    request<CMSCarousel>("/api/v1/carousels", {
-      method: "POST",
-      token,
-      body: JSON.stringify(payload),
-    }),
+    requestVoid("/api/v1/carousels", { method: "POST", token, body: JSON.stringify(payload) }),
   createSellerImpersonationToken: (token: string, marketID: number) =>
-    request<{ access_token: string; token_type: string; expires_at: string; market_id: number; market_name: string; issued_for: string }>(`/api/v1/admin/markets/${marketID}/impersonation-token`, { method: "POST", token }),
+    requestParsed(impersonationSchema, `/api/v1/admin/markets/${marketID}/impersonation-token`, { method: "POST", token }),
   approveSeller: (token: string, memberID: number) =>
-    request<void>(`/api/v1/admin/members/${memberID}/approve-seller`, { method: "POST", token }),
+    requestVoid(`/api/v1/admin/members/${memberID}/approve-seller`, { method: "POST", token }),
   rejectSeller: (token: string, memberID: number) =>
-    request<void>(`/api/v1/admin/members/${memberID}/reject-seller`, { method: "POST", token }),
-  cancelOrder: (token: string, orderCode: string, payload: { reason: string }) =>
-    request<{ status: string }>(`/api/v1/admin/orders/${orderCode}/cancel`, {
-      method: "POST",
-      token,
-      body: JSON.stringify(payload),
-    }),
-  forceCancelOrder: (token: string, orderCode: string, payload: { reason: string }) =>
-    request<{ status: string }>(`/api/v1/admin/orders/${orderCode}/force-cancel`, {
-      method: "POST",
-      token,
-      body: JSON.stringify(payload),
-    }),
-  markSettlementPaid: (token: string, settlementID: number, payload: { reason: string }) =>
-    request<{ status: string }>(`/api/v1/admin/settlements/${settlementID}/mark-paid`, {
-      method: "POST",
-      token,
-      body: JSON.stringify(payload),
-    }),
-  accrueDailySettlements: (token: string) => request<{ status: string }>("/api/v1/admin/settlements/accrue-daily", { method: "POST", token }),
-  payDueSettlements: (token: string) => request<{ status: string }>("/api/v1/admin/settlements/pay-due", { method: "POST", token }),
-  confirmSettlement: (token: string, settlementID: number, payload: { reason?: string }) =>
-    request<{ status: string }>(`/api/v1/admin/settlements/${settlementID}/confirm`, {
-      method: "POST",
-      token,
-      body: JSON.stringify(payload),
-    }),
-  paySettlement: (token: string, settlementID: number, payload: { reason?: string }) =>
-    request<{ status: string }>(`/api/v1/admin/settlements/${settlementID}/pay`, {
-      method: "POST",
-      token,
-      body: JSON.stringify(payload),
-    }),
+    requestVoid(`/api/v1/admin/members/${memberID}/reject-seller`, { method: "POST", token }),
+  cancelOrder: (token: string, orderCode: string) =>
+    requestParsed(statusResponseSchema, `/api/v1/admin/orders/${orderCode}/cancel`, { method: "POST", token }),
+  forceCancelOrder: (token: string, orderCode: string) =>
+    requestParsed(statusResponseSchema, `/api/v1/admin/orders/${orderCode}/force-cancel`, { method: "POST", token }),
+  markSettlementPaid: (token: string, settlementID: number) =>
+    requestParsed(statusResponseSchema, `/api/v1/admin/settlements/${settlementID}/mark-paid`, { method: "POST", token }),
+  accrueDailySettlements: (token: string) =>
+    requestParsed(dailyAccrualSchema, "/api/v1/admin/settlements/accrue-daily", { method: "POST", token }),
+  payDueSettlements: (token: string) =>
+    requestParsed(paidCountSchema, "/api/v1/admin/settlements/pay-due", { method: "POST", token }),
+  confirmSettlement: (token: string, settlementID: number) =>
+    requestVoid(`/api/v1/admin/settlements/${settlementID}/confirm`, { method: "POST", token }),
+  paySettlement: async (token: string, settlementID: number) =>
+    normalizeSettlement(await requestParsed(
+      rawSettlementSchema,
+      `/api/v1/admin/settlements/${settlementID}/pay`,
+      { method: "POST", token },
+    )),
   issueCouponToMember: (token: string, couponID: number, memberID: number) =>
-    request<{ status: string; coupon_id: number; member_id: number }>(`/api/v1/admin/coupons/${couponID}/issue`, {
-      method: "POST",
-      token,
-      body: JSON.stringify({ member_id: memberID }),
-    }),
+    requestParsed(
+      z.object({ status: z.string(), coupon_id: z.number().int().positive(), member_id: z.number().int().positive() }),
+      `/api/v1/admin/coupons/${couponID}/issue`,
+      { method: "POST", token, body: JSON.stringify({ member_id: memberID }) },
+    ),
   updateCarousel: (token: string, carouselID: number, payload: Partial<CMSCarousel>) =>
-    request<CMSCarousel>(`/api/v1/carousels/${carouselID}`, {
-      method: "PUT",
-      token,
-      body: JSON.stringify(payload),
-    }),
+    requestParsed(carouselSchema, `/api/v1/carousels/${carouselID}`, { method: "PUT", token, body: JSON.stringify(payload) }),
   deactivateCarousel: (token: string, carouselID: number) =>
-    request<void>(`/api/v1/carousels/${carouselID}`, { method: "DELETE", token }),
+    requestVoid(`/api/v1/carousels/${carouselID}`, { method: "DELETE", token }),
   startDelivery: (token: string, deliveryID: number, payload: { carrier: string; tracking_number: string }) =>
-    request<void>(`/api/v1/deliveries/${deliveryID}/start`, {
-      method: "POST",
-      token,
-      body: JSON.stringify(payload),
-    }),
+    requestVoid(`/api/v1/deliveries/${deliveryID}/start`, { method: "POST", token, body: JSON.stringify(payload) }),
   completeDelivery: (token: string, deliveryID: number) =>
-    request<void>(`/api/v1/deliveries/${deliveryID}/complete`, { method: "POST", token }),
+    requestVoid(`/api/v1/deliveries/${deliveryID}/complete`, { method: "POST", token }),
   refreshDeliveryTracking: (token: string, deliveryID: number) =>
-    request<TrackingInfo>(`/api/v1/deliveries/${deliveryID}/refresh-tracking`, { method: "POST", token }),
-  getUserNotifications: (token: string, userID: number) => request<Notification[]>(`/api/v1/users/${userID}/notifications`, { token }),
-  getUserRecommendations: (token: string, userID: number) => request<Recommendation[]>(`/api/v1/users/${userID}/recommendations`, { token }),
+    requestParsed(trackingInfoSchema, `/api/v1/deliveries/${deliveryID}/refresh-tracking`, { method: "POST", token }),
+  getUserNotifications: (token: string, userID: number) =>
+    requestParsed(z.array(rawNotificationSchema), `/api/v1/users/${userID}/notifications`, { token })
+      .then((notifications) => notifications.map(normalizeNotification)),
+  getUserRecommendations: (token: string, userID: number) =>
+    requestParsed(z.array(recommendationSchema), `/api/v1/users/${userID}/recommendations`, { token }),
   createMarket: (token: string, payload: Partial<Market>) =>
-    request<Market>("/api/v1/markets", {
-      method: "POST",
-      token,
-      body: JSON.stringify(payload),
-    }),
-  changeMarketStatus: (token: string, marketID: number, payload: { status: string; reason?: string }) =>
-    request<{ status: string }>(`/api/v1/markets/${marketID}/status`, {
-      method: "POST",
-      token,
-      body: JSON.stringify(payload),
-    }),
-  adminMutation: (token: string, path: string, payload: { reason: string; [key: string]: unknown }) =>
-    request<{ status: string }>(path, {
-      method: "POST",
-      token,
-      body: JSON.stringify(payload),
-    }),
+    requestVoid("/api/v1/markets", { method: "POST", token, body: JSON.stringify(payload) }),
+  changeMarketStatus: (token: string, marketID: number, payload: { status: string }) =>
+    requestVoid(`/api/v1/markets/${marketID}/status`, { method: "POST", token, body: JSON.stringify(payload) }),
+  adminMutation: (token: string, path: string, payload: Record<string, unknown>) =>
+    requestParsed(statusResponseSchema, path, { method: "POST", token, body: JSON.stringify(payload) }),
 };

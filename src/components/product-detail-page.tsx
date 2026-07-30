@@ -24,10 +24,11 @@ export function ProductDetailPage({ productId }: { productId: number }) {
     queryKey: queryKeys.product(productId),
     queryFn: () => api.getProduct(productId),
   });
-  const { data: reviews = [] } = useQuery({
+  const reviewsQuery = useQuery({
     queryKey: queryKeys.productReviews(productId),
     queryFn: () => api.getProductReviews(productId),
   });
+  const reviews = reviewsQuery.data ?? [];
 
   const effectiveToken = getEffectiveToken(token);
   const selectedOption = useMemo(
@@ -82,10 +83,19 @@ export function ProductDetailPage({ productId }: { productId: number }) {
           <section className="rounded-md border border-line bg-white p-4">
             <div className="flex items-center justify-between">
               <h2 className="font-black">리뷰</h2>
-              <span className="text-sm font-bold text-muted">{reviews.length}개</span>
+              <span className="text-sm font-bold text-muted">{reviewsQuery.isError ? "-" : `${reviews.length}개`}</span>
             </div>
             <div className="mt-4 space-y-4">
-              {reviews.length ? (
+              {reviewsQuery.isLoading ? (
+                <p className="text-sm text-muted">리뷰를 불러오는 중입니다.</p>
+              ) : reviewsQuery.isError ? (
+                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm">
+                  <p className="font-bold text-brand">리뷰를 불러오지 못했습니다.</p>
+                  <Button className="mt-2" size="sm" variant="secondary" onClick={() => void reviewsQuery.refetch()}>
+                    다시 시도
+                  </Button>
+                </div>
+              ) : reviews.length ? (
                 reviews.map((review) => {
                   const rating = Math.max(0, Math.min(5, Math.round(review.rating_x2 ? review.rating_x2 / 2 : review.rating)));
                   const reviewImages = review.images?.filter((image) => getReviewImageUrl(image)) ?? [];
@@ -138,7 +148,7 @@ export function ProductDetailPage({ productId }: { productId: number }) {
             <div className="mt-3 flex items-center gap-1 text-sm text-zinc-600">
               <Star size={16} className="fill-brand text-brand" />
               <span className="font-bold">{ratingLabel}</span>
-              <span>리뷰 {reviews.length.toLocaleString("ko-KR")}</span>
+              <span>리뷰 {reviewsQuery.isError ? "-" : reviews.length.toLocaleString("ko-KR")}</span>
             </div>
             <div className="mt-5 flex items-baseline gap-2">
               {saleRate > 0 ? <span className="text-2xl font-black text-brand">{saleRate}%</span> : null}

@@ -1,24 +1,30 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, ChevronRight, Gift, ShieldCheck, Truck } from "lucide-react";
+import { CalendarDays, ChevronRight, ShieldCheck, Truck } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/api-client";
 import { ProductCard } from "./product-card";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
 export function EventDetailPage({ eventId }: { eventId: number }) {
-  const { data: event, isLoading } = useQuery({
+  const eventQuery = useQuery({
     queryKey: ["event", eventId],
     queryFn: () => api.getEvent(eventId),
   });
-  const { data: products = [] } = useQuery({
+  const productsQuery = useQuery({
     queryKey: ["event-products", eventId],
     queryFn: () => api.listProducts({ sort: "popular" }),
   });
+  const event = eventQuery.data;
+  const products = productsQuery.data ?? [];
 
-  if (isLoading || !event) {
+  if (eventQuery.isError) {
+    return <main className="mx-auto max-w-6xl px-4 py-8 text-sm"><p className="font-bold text-brand">{apiErrorMessage(eventQuery.error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void eventQuery.refetch()}>다시 시도</Button></main>;
+  }
+  if (eventQuery.isLoading || !event) {
     return <main className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted">이벤트를 불러오는 중입니다.</main>;
   }
 
@@ -36,7 +42,6 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
           <p className="mt-4 max-w-xl text-sm leading-6 text-white/90 md:text-base">{event.subtitle}</p>
           <div className="mt-6 flex flex-wrap gap-2 text-sm font-bold">
             <span className="rounded-md bg-white/15 px-3 py-2 backdrop-blur">{startsAt} - {endsAt}</span>
-            <span className="rounded-md bg-white/15 px-3 py-2 backdrop-blur">선착순 혜택</span>
           </div>
         </div>
       </section>
@@ -44,7 +49,7 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
       <div className="mx-auto max-w-6xl px-4">
         <section className="grid gap-3 py-6 md:grid-cols-3">
           {[
-            { icon: Gift, title: "전용 쿠폰", body: "이벤트 상품 5만원 이상 구매 시 즉시 할인" },
+            { icon: CalendarDays, title: "기간 안내", body: "표시된 이벤트 기간과 상품 정보를 확인하세요." },
             { icon: Truck, title: "빠른 출고", body: "오늘출발 태그 상품은 평일 기준 당일 출고" },
             { icon: ShieldCheck, title: "안심 구매", body: "마켓별 주문 상태와 정산 기준을 투명하게 표시" },
           ].map((item) => {
@@ -79,6 +84,8 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
 
         <section className="py-8">
           <h2 className="text-xl font-black">이벤트 상품</h2>
+          {productsQuery.isError ? <div className="mt-4 rounded-md bg-red-50 p-3 text-sm"><p className="font-bold text-brand">{apiErrorMessage(productsQuery.error)}</p><Button className="mt-2" size="sm" variant="secondary" onClick={() => void productsQuery.refetch()}>상품 다시 불러오기</Button></div> : null}
+          {productsQuery.isSuccess && !products.length ? <p className="mt-4 text-sm text-muted">표시할 상품이 없습니다.</p> : null}
           <div className="mt-5 grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
             {products.slice(0, 12).map((product) => (
               <ProductCard key={product.id} product={product} />
@@ -89,9 +96,9 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
         <section className="rounded-md border border-line bg-white p-5 text-sm leading-7 text-muted">
           <h2 className="text-base font-black text-foreground">유의사항</h2>
           <ul className="mt-3 list-disc space-y-1 pl-5">
-            <li>쿠폰과 포인트는 주문서에서 사용 조건을 만족할 때 적용됩니다.</li>
+            <li>쿠폰과 포인트는 보유 상태와 서버 정책에 따라 주문 생성 시 확정됩니다.</li>
             <li>상품별 재고와 배송 일정은 마켓 사정에 따라 변경될 수 있습니다.</li>
-            <li>이벤트 종료 후에는 일부 혜택이 자동으로 비활성화됩니다.</li>
+            <li>이벤트 노출 여부와 기간은 서버가 제공하는 상태를 따릅니다.</li>
           </ul>
         </section>
       </div>

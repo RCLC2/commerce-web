@@ -11,7 +11,10 @@ import { Button } from "./ui/button";
 
 const schema = z.object({
   email: z.string().email("이메일을 확인해주세요."),
-  password: z.string().min(6, "비밀번호는 6자 이상이어야 합니다."),
+  password: z.string().refine((value) => {
+    const bytes = new TextEncoder().encode(value).byteLength;
+    return bytes >= 8 && bytes <= 72;
+  }, "비밀번호는 UTF-8 기준 8~72바이트여야 합니다."),
   marketingConsent: z.boolean(),
   nighttimeConsent: z.boolean(),
 });

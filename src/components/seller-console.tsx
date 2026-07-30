@@ -5,7 +5,10 @@ import { Boxes, CircleDollarSign, RefreshCw, Star, Store, Truck } from "lucide-r
 import { useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
+import { inventorySourceValidationError } from "@/lib/inventory-source-validation";
+import { createInvoiceTemplateCsv, parseInvoiceCsv } from "@/lib/invoice-csv";
 import { firstOrderItem, orderStatusLabel } from "@/lib/order-utils";
+import { applySellerProductEdits } from "@/lib/seller-product-edits";
 import { useSessionStore } from "@/lib/session-store";
 import type { CommerceCategory, OrderResponse, Product, ProductOption } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
@@ -95,11 +98,11 @@ export function SellerHomePage() {
   const sellerContextMarketID = useSellerContextMarketID();
   const { data: sellerContext } = useResolvedSellerContext(token);
   const resolvedMarketID = sellerContextMarketID ?? sellerContext?.market_id;
-  const { data: dashboard } = useQuery({ queryKey: ["seller-dashboard", sellerContextMarketID], queryFn: () => api.sellerDashboard(token ?? "", resolvedMarketID), enabled: Boolean(token) });
-  const { data: products = [] } = useQuery({ queryKey: ["seller-products", sellerContextMarketID], queryFn: () => api.sellerProducts(token ?? "", resolvedMarketID), enabled: Boolean(token) });
-  const { data: orders = [] } = useQuery({ queryKey: ["seller-orders", sellerContextMarketID], queryFn: () => api.sellerOrders(token ?? "", resolvedMarketID), enabled: Boolean(token) });
-  const { data: sources = [] } = useQuery({ queryKey: ["seller-inventory-sources", sellerContextMarketID], queryFn: () => api.sellerInventorySources(token ?? "", resolvedMarketID), enabled: Boolean(token) });
-  const { data: settlements = [] } = useQuery({ queryKey: ["seller-settlements", sellerContextMarketID], queryFn: () => api.sellerSettlements(token ?? "", resolvedMarketID), enabled: Boolean(token) });
+  const { data: dashboard } = useQuery({ queryKey: ["seller-dashboard", resolvedMarketID], queryFn: () => api.sellerDashboard(token ?? "", resolvedMarketID), enabled: Boolean(token && resolvedMarketID) });
+  const { data: products = [] } = useQuery({ queryKey: ["seller-products", resolvedMarketID], queryFn: () => api.sellerProducts(token ?? "", resolvedMarketID), enabled: Boolean(token && resolvedMarketID) });
+  const { data: orders = [] } = useQuery({ queryKey: ["seller-orders", resolvedMarketID], queryFn: () => api.sellerOrders(token ?? "", resolvedMarketID), enabled: Boolean(token && resolvedMarketID) });
+  const { data: sources = [] } = useQuery({ queryKey: ["seller-inventory-sources", resolvedMarketID], queryFn: () => api.sellerInventorySources(token ?? "", resolvedMarketID), enabled: Boolean(token && resolvedMarketID) });
+  const { data: settlements = [] } = useQuery({ queryKey: ["seller-settlements", resolvedMarketID], queryFn: () => api.sellerSettlements(token ?? "", resolvedMarketID), enabled: Boolean(token && resolvedMarketID) });
   const sellerName = useSellerContextName() ?? sellerContext?.market_name ?? products[0]?.market_name ?? "셀러 마켓";
   const marketID = resolvedMarketID ?? products[0]?.market_id;
   const { data: market } = useQuery({ queryKey: ["seller-market", marketID], queryFn: () => api.getMarket(marketID ?? 0), enabled: Boolean(token && marketID) });
@@ -109,7 +112,7 @@ export function SellerHomePage() {
   }
 
   const lowStockProducts = products.filter((product) => productStock(product) <= 10).slice(0, 5);
-  const readyOrders = orders.filter((order) => order.market_orders?.some((marketOrder) => marketOrder.status === "READY_TO_SHIP"));
+  const readyOrders = orders.filter((order) => order.market_orders?.some((marketOrder) => marketOrder.status === "PAID"));
   const failedSources = sources.filter((source) => source.status === "FAILED");
 
   return (
@@ -209,14 +212,14 @@ export function SellerProductsPage() {
   const [shipping, setShipping] = useState("ALL");
   const [managedProducts, setManagedProducts] = useState<Record<number, ProductEditState>>({});
   const [createForm, setCreateForm] = useState<ProductCreateState>(() => emptyProductCreateForm());
-  const { data = [] } = useQuery({ queryKey: ["seller-products", sellerContextMarketID], queryFn: () => api.sellerProducts(token ?? "", resolvedMarketID), enabled: Boolean(token) });
+  const { data = [] } = useQuery({ queryKey: ["seller-products", resolvedMarketID], queryFn: () => api.sellerProducts(token ?? "", resolvedMarketID), enabled: Boolean(token && resolvedMarketID), meta: { consoleDataRole: "primary" } });
   const { data: categories = [] } = useQuery({ queryKey: ["seller-product-categories"], queryFn: api.listCategories, enabled: Boolean(token) });
   const marketID = resolvedMarketID ?? data[0]?.market_id;
   const saveProduct = useMutation({
     mutationFn: (product: Product) => api.updateSellerProduct(token ?? "", product),
     onSuccess: () => {
       setManagedProducts({});
-      void queryClient.invalidateQueries({ queryKey: ["seller-products", sellerContextMarketID] });
+      void queryClient.invalidateQueries({ queryKey: ["seller-products", resolvedMarketID] });
     },
   });
   const createProduct = useMutation({
@@ -228,7 +231,7 @@ export function SellerProductsPage() {
     },
     onSuccess: () => {
       setCreateForm(emptyProductCreateForm());
-      void queryClient.invalidateQueries({ queryKey: ["seller-products", sellerContextMarketID] });
+      void queryClient.invalidateQueries({ queryKey: ["seller-products", resolvedMarketID] });
       void queryClient.invalidateQueries({ queryKey: ["admin-products"] });
     },
   });
@@ -397,7 +400,7 @@ export function SellerProductsPage() {
                 key="save"
                 size="sm"
                 disabled={!managedProducts[product.id] || saveProduct.isPending}
-                onClick={() => saveProduct.mutate(productPayload(product, state))}
+                onClick={() => saveProduct.mutate(applySellerProductEdits(product, state))}
               >
                 {saveProduct.isPending ? "저장 중" : "변경 저장"}
               </Button>,
@@ -423,14 +426,18 @@ export function SellerInventoryPage() {
   const [mappingForm, setMappingForm] = useState({ inventory_source_id: "", product_option_id: "", external_product_id: "", external_variant_id: "", external_inventory_item_id: "", external_location_id: "", disconnect_if_necessary: false });
   const [stockForm, setStockForm] = useState({ option_id: "", quantity: "" });
   const queryClient = useQueryClient();
-  const { data: sources = [] } = useQuery({ queryKey: ["seller-inventory-sources", sellerContextMarketID], queryFn: () => api.sellerInventorySources(effectiveToken, resolvedMarketID), enabled: Boolean(token) });
-  const { data: logs = [] } = useQuery({ queryKey: ["seller-inventory-logs", sellerContextMarketID], queryFn: () => api.sellerInventoryLogs(effectiveToken, resolvedMarketID), enabled: Boolean(token) });
-  const { data: products = [] } = useQuery({ queryKey: ["seller-products", sellerContextMarketID], queryFn: () => api.sellerProducts(effectiveToken, resolvedMarketID), enabled: Boolean(token) });
+  const { data: sources = [] } = useQuery({ queryKey: ["seller-inventory-sources", resolvedMarketID], queryFn: () => api.sellerInventorySources(effectiveToken, resolvedMarketID), enabled: Boolean(token && resolvedMarketID) });
+  const { data: logs = [] } = useQuery({ queryKey: ["seller-inventory-logs", resolvedMarketID], queryFn: () => api.sellerInventoryLogs(effectiveToken, resolvedMarketID), enabled: Boolean(token && resolvedMarketID) });
+  const { data: products = [] } = useQuery({ queryKey: ["seller-products", resolvedMarketID], queryFn: () => api.sellerProducts(effectiveToken, resolvedMarketID), enabled: Boolean(token && resolvedMarketID) });
   const marketID = resolvedMarketID ?? sources[0]?.market_id ?? products[0]?.market_id;
   const register = useMutation({
     mutationFn: () => {
       if (!marketID) {
         throw new Error("등록할 마켓을 먼저 확인해 주세요.");
+      }
+      const validationError = inventorySourceValidationError(sourceForm);
+      if (validationError) {
+        throw new Error(validationError);
       }
       return api.registerInventorySource(effectiveToken, {
         market_id: marketID,
@@ -446,7 +453,7 @@ export function SellerInventoryPage() {
     },
     onSuccess: () => {
       setSourceForm({ provider: "SHOPIFY", display_name: "", shop_name: "", access_token: "", webhook_secret: "", refresh_token: "", client_id: "", client_secret: "" });
-      void queryClient.invalidateQueries({ queryKey: ["seller-inventory-sources", sellerContextMarketID] });
+      void queryClient.invalidateQueries({ queryKey: ["seller-inventory-sources", resolvedMarketID] });
     },
   });
   const replaceTokens = useMutation({
@@ -464,12 +471,12 @@ export function SellerInventoryPage() {
     },
     onSuccess: () => {
       setTokenForm({});
-      void queryClient.invalidateQueries({ queryKey: ["seller-inventory-sources", sellerContextMarketID] });
+      void queryClient.invalidateQueries({ queryKey: ["seller-inventory-sources", resolvedMarketID] });
     },
   });
   const deactivateSource = useMutation({
     mutationFn: (sourceID: number) => api.deactivateInventorySource(effectiveToken, sourceID),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-inventory-sources", sellerContextMarketID] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-inventory-sources", resolvedMarketID] }),
   });
   const registerMapping = useMutation({
     mutationFn: () => api.registerInventoryMapping(effectiveToken, {
@@ -483,24 +490,24 @@ export function SellerInventoryPage() {
     }),
     onSuccess: () => {
       setMappingForm({ inventory_source_id: "", product_option_id: "", external_product_id: "", external_variant_id: "", external_inventory_item_id: "", external_location_id: "", disconnect_if_necessary: false });
-      void queryClient.invalidateQueries({ queryKey: ["seller-inventory-logs", sellerContextMarketID] });
+      void queryClient.invalidateQueries({ queryKey: ["seller-inventory-logs", resolvedMarketID] });
     },
   });
   const pullStock = useMutation({
     mutationFn: () => api.pullInventoryOptionStock(effectiveToken, Number(stockForm.option_id)),
     onSuccess: (result) => {
       setStockForm((current) => ({ ...current, quantity: String(result.quantity) }));
-      void queryClient.invalidateQueries({ queryKey: ["seller-products", sellerContextMarketID] });
-      void queryClient.invalidateQueries({ queryKey: ["seller-inventory-logs", sellerContextMarketID] });
+      void queryClient.invalidateQueries({ queryKey: ["seller-products", resolvedMarketID] });
+      void queryClient.invalidateQueries({ queryKey: ["seller-inventory-logs", resolvedMarketID] });
     },
   });
   const pushStock = useMutation({
     mutationFn: () => api.pushInventoryOptionStock(effectiveToken, Number(stockForm.option_id), Number(stockForm.quantity)),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-inventory-logs", sellerContextMarketID] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-inventory-logs", resolvedMarketID] }),
   });
   const retryLog = useMutation({
     mutationFn: (logID: number) => api.retryInventorySyncLog(effectiveToken, logID),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-inventory-logs", sellerContextMarketID] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-inventory-logs", resolvedMarketID] }),
   });
   const sellerName = useSellerContextName() ?? sellerContext?.market_name ?? sources[0]?.display_name?.replace(/ Shopify| Cafe24/g, "") ?? "셀러 마켓";
 
@@ -511,6 +518,7 @@ export function SellerInventoryPage() {
   const options = products.flatMap((product) => (product.options ?? []).map((option) => ({ ...option, productName: product.name })));
   const filteredSources = sourceStatus === "ALL" ? sources : sources.filter((source) => source.status === sourceStatus);
   const filteredLogs = logs.filter((log) => (logStatus === "ALL" || log.status === logStatus) && (logProvider === "ALL" || log.provider === logProvider));
+  const sourceValidationError = inventorySourceValidationError(sourceForm);
 
   function updateTokenForm(sourceID: number, key: "access_token" | "webhook_secret" | "refresh_token" | "client_secret", value: string) {
     setTokenForm((current) => {
@@ -536,7 +544,10 @@ export function SellerInventoryPage() {
           <InventoryInput label="Client ID" value={sourceForm.client_id} onChange={(value) => setSourceForm((current) => ({ ...current, client_id: value }))} />
           <InventoryInput label="Client Secret" type="password" value={sourceForm.client_secret} onChange={(value) => setSourceForm((current) => ({ ...current, client_secret: value }))} />
         </div>
-        <div className="mt-3 flex justify-end"><Button onClick={() => register.mutate()} disabled={!marketID || !sourceForm.display_name || !sourceForm.shop_name || !sourceForm.access_token || register.isPending}>{register.isPending ? "등록 중" : "소스 등록"}</Button></div>
+        <div className="mt-3 flex flex-col items-end gap-2">
+          {sourceValidationError ? <p className="text-xs font-bold text-amber-800">{sourceValidationError}</p> : null}
+          <Button onClick={() => register.mutate()} disabled={!marketID || Boolean(sourceValidationError) || register.isPending}>{register.isPending ? "등록 중" : "소스 등록"}</Button>
+        </div>
       </ConsoleSection>
       <ConsoleSection className="mt-5" title="연동 소스" action={<StatusFilter value={sourceStatus} onChange={setSourceStatus} options={["ALL", "ACTIVE", "FAILED", "INACTIVE"]} />}>
         <DataTable columns={["소스", "Shop/Mall", "상태", "토큰 교체", "관리"]} rows={filteredSources.map((source) => [
@@ -593,7 +604,7 @@ export function SellerOrdersPage() {
       }
       return api.registerSellerInvoices(token ?? "", { market_id: marketID, invoices: [{ order_id: order.id, carrier, invoice_number: invoiceNumber }] });
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-orders", sellerContextMarketID] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-orders", resolvedMarketID] }),
   });
   const startOrder = useMutation({
     mutationFn: async (order: OrderResponse) => {
@@ -606,7 +617,7 @@ export function SellerOrdersPage() {
       }
       return api.startSellerDelivery(token ?? "", marketID, delivery.id, { carrier, tracking_number: invoiceNumber });
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-orders", sellerContextMarketID] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-orders", resolvedMarketID] }),
   });
   const submitInvoices = useMutation({
     mutationFn: () => {
@@ -619,7 +630,7 @@ export function SellerOrdersPage() {
       }
       return api.registerSellerInvoices(token ?? "", { market_id: marketID, invoices });
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-orders", sellerContextMarketID] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-orders", resolvedMarketID] }),
   });
   const completeOrder = useMutation({
     mutationFn: async (order: OrderResponse) => {
@@ -630,7 +641,7 @@ export function SellerOrdersPage() {
       const delivery = order.delivery ?? await api.getDeliveryByOrder(token ?? "", order.id);
       return api.completeSellerDelivery(token ?? "", marketID, delivery.id);
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-orders", sellerContextMarketID] }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-orders", resolvedMarketID] }),
   });
   const sellerName = useSellerContextName() ?? sellerContext?.market_name ?? "셀러 마켓";
 
@@ -643,8 +654,7 @@ export function SellerOrdersPage() {
     const matchesQuery =
       !query ||
       order.order_code.toLowerCase().includes(query.toLowerCase()) ||
-      firstOrderItem(order)?.product?.name.toLowerCase().includes(query.toLowerCase()) ||
-      order.shipping_address?.receiver.toLowerCase().includes(query.toLowerCase());
+      firstOrderItem(order)?.product?.name.toLowerCase().includes(query.toLowerCase());
     return matchesStatus && matchesQuery;
   });
 
@@ -671,8 +681,8 @@ export function SellerOrdersPage() {
         <SummaryStrip
           items={[
             { label: "전체 주문", value: `${data.length}건` },
-            { label: "출고 대기", value: `${data.filter((order) => order.market_orders?.some((marketOrder) => marketOrder.status === "READY_TO_SHIP")).length}건` },
-            { label: "배송중", value: `${data.filter((order) => order.status === "SHIPPING").length}건` },
+            { label: "출고 대기", value: `${data.filter((order) => order.market_orders?.some((marketOrder) => marketOrder.status === "PAID")).length}건` },
+            { label: "배송중", value: `${data.filter((order) => order.status === "SHIPPED").length}건` },
             { label: "주문 금액", value: formatPrice(data.reduce((sum, order) => sum + orderPayableAmount(order), 0)) },
           ]}
         />
@@ -716,18 +726,17 @@ export function SellerOrdersPage() {
         title="주문 목록"
         action={
           <div className="flex flex-col gap-2 md:flex-row">
-            <SearchBox value={query} onChange={setQuery} placeholder="주문번호, 상품, 수령인 검색" />
-            <StatusFilter value={status} onChange={setStatus} options={["ALL", "PLACED", "READY_TO_SHIP", "SHIPPING", "DELIVERED"]} />
+            <SearchBox value={query} onChange={setQuery} placeholder="주문번호 또는 상품 검색" />
+            <StatusFilter value={status} onChange={setStatus} options={["ALL", "PAYMENT_PENDING", "PAID", "PLACED", "SHIPPED", "DELIVERED", "COMPLETED", "CANCELLED"]} />
           </div>
         }
       >
         <DataTable
-          columns={["주문", "대표 상품", "배송지", "결제 금액", "택배/송장", "상태", "처리"]}
+          columns={["주문", "대표 상품", "결제 금액", "택배/송장", "상태", "처리"]}
           rows={filteredOrders.map((order) => {
             return [
               <span key="code" className="text-xs font-black">{order.order_code}</span>,
               <OrderProduct key="product" order={order} />,
-              order.shipping_address ? `${order.shipping_address.receiver} · ${order.shipping_address.line1}` : "-",
               formatPrice(orderPayableAmount(order)),
               <div key="invoice" className="grid gap-2">
                 <select
@@ -794,7 +803,7 @@ export function SellerSettlementsPage() {
           ]}
         />
       </div>
-      <ConsoleSection className="mt-5" title="정산 내역" action={<StatusFilter value={status} onChange={setStatus} options={["ALL", "PREPARED", "PAID", "EXCLUDED"]} />}>
+      <ConsoleSection className="mt-5" title="정산 내역" action={<StatusFilter value={status} onChange={setStatus} options={["ALL", "PREPARED", "CONFIRMED", "PAID", "EXCLUDED"]} />}>
         <DataTable
           columns={["월", "매출", "수수료", "지급액", "상태"]}
           rows={filteredSettlements.map((item) => [
@@ -983,23 +992,6 @@ function InventoryInput({ label, value, onChange, type = "text" }: { label: stri
   );
 }
 
-function productPayload(product: Product, state: ProductEditState): Product {
-  return {
-    id: product.id,
-    market_id: product.market_id,
-    category_id: product.category_id,
-    name: product.name,
-    description: "",
-    base_price: state.price,
-    discount_price: 0,
-    shipping_type: state.shippingType,
-    popularity_score: product.popularity_score,
-    status: state.status,
-    image_url: product.image_url,
-    options: state.options.map((option) => ({ ...option, quantity: Math.max(0, option.quantity), additional_price: Math.max(0, option.additional_price) })),
-  };
-}
-
 function reviewRating(review: { rating?: number; rating_x2?: number }) {
   return typeof review.rating === "number" ? review.rating : (review.rating_x2 ?? 0) / 2;
 }
@@ -1111,67 +1103,4 @@ function StatusFilter({ value, onChange, options }: { value: string; onChange: (
       ))}
     </select>
   );
-}
-
-function createInvoiceTemplateCsv(orders: OrderResponse[]) {
-  const headers = ["order_code", "product_name", "receiver", "phone", "address", "invoice_number"];
-  const rows = orders.map((order) => {
-    const item = firstOrderItem(order);
-    const address = order.shipping_address;
-    return [
-      order.order_code,
-      item?.product?.name ?? "주문 상품",
-      address?.receiver ?? "",
-      address?.phone ?? "",
-      address ? `(${address.zip_code}) ${address.line1} ${address.line2}` : "",
-      "",
-    ];
-  });
-
-  return [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
-}
-
-function parseInvoiceCsv(text: string) {
-  const lines = text.split(/\r?\n/).filter(Boolean);
-  const result: Record<string, string> = {};
-  const [, ...rows] = lines;
-
-  rows.forEach((line) => {
-    const cells = parseCsvLine(line);
-    const orderCode = cells[0]?.trim();
-    const invoiceNumber = cells[5]?.trim();
-    if (orderCode && invoiceNumber) {
-      result[orderCode] = invoiceNumber;
-    }
-  });
-
-  return result;
-}
-
-function csvCell(value: string) {
-  return `"${value.replaceAll('"', '""')}"`;
-}
-
-function parseCsvLine(line: string) {
-  const cells: string[] = [];
-  let current = "";
-  let quoted = false;
-
-  for (let index = 0; index < line.length; index += 1) {
-    const char = line[index];
-    const next = line[index + 1];
-    if (char === '"' && quoted && next === '"') {
-      current += '"';
-      index += 1;
-    } else if (char === '"') {
-      quoted = !quoted;
-    } else if (char === "," && !quoted) {
-      cells.push(current);
-      current = "";
-    } else {
-      current += char;
-    }
-  }
-  cells.push(current);
-  return cells;
 }

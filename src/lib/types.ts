@@ -19,7 +19,7 @@ export type Market = {
   profile_image_url?: string;
   cover_image_url?: string;
   follower_count?: number;
-  status: "ACTIVE" | "PENDING" | "SUSPENDED" | string;
+  status: "OPEN" | "CLOSED" | "HIDE" | "EXIT" | string;
   tags?: string[];
 };
 
@@ -81,6 +81,8 @@ export type Product = {
   category_id: number;
   name: string;
   description: string;
+  /** Opaque seller API value retained for lossless updates. */
+  description_source?: string;
   base_price: number;
   discount_price: number;
   shipping_type: "NORMAL" | "FREE" | string;
@@ -136,6 +138,8 @@ export type MemberProfile = {
   created_at: string;
 };
 
+export type AdminMember = Omit<MemberProfile, "point_balance">;
+
 export type ReviewProductSummary = {
   id: number;
   name: string;
@@ -156,7 +160,7 @@ export type Review = {
   image_count?: number;
   status?: string;
   images?: ReviewImage[];
-  created_at: string;
+  created_at?: string;
   updated_at?: string;
   product?: ReviewProductSummary;
 };
@@ -185,15 +189,49 @@ export type MediaImageUpload = {
   size_bytes: number;
 };
 
-export type Coupon = {
+export type CouponDefinition = {
   id: number;
+  code: string;
   name: string;
+  discount_type: "PERCENT" | "AMOUNT" | string;
+  discount_value: number;
   discount_amount: number;
+  max_discount: number;
   min_order_amount: number;
   expires_at?: string;
-  status?: "ISSUED" | "ISSUABLE" | "USED" | string;
+  status: "ACTIVE" | "INACTIVE" | string;
   condition_text?: string;
 };
+
+export type OwnedCoupon = {
+  id: number;
+  coupon_id: number;
+  expires_at: string;
+  status: "AVAILABLE" | "USED" | "EXPIRED";
+  coupon: CouponDefinition;
+};
+
+export type IssuableCouponQuote = {
+  coupon: CouponDefinition;
+  max_discount: number;
+  discount_amount: number;
+  platform_coupon_amount: number;
+  market_coupon_amount: number;
+  market_coupon_rate: number;
+  discounted_amount: number;
+};
+
+export type AdminCoupon = Omit<CouponDefinition, "status" | "max_discount"> & {
+  max_discount?: number;
+  definition_status?: "ACTIVE" | "INACTIVE";
+  issuance_status?: "ISSUABLE" | "SCHEDULED" | "ENDED" | "SOLD_OUT" | "INACTIVE";
+  user_coupon_status?: "ISSUED" | "USED";
+  user_coupon_id?: number;
+  member_id?: number;
+};
+
+/** @deprecated Use CouponDefinition, OwnedCoupon, or AdminCoupon at the API boundary. */
+export type Coupon = CouponDefinition;
 
 export type Address = {
   id: number;
@@ -231,11 +269,16 @@ export type OrderResponse = {
   used_coupon_id?: number;
   payment_method?: string;
   payment_key?: string;
-  status: string;
+  status: "PAYMENT_PENDING" | "PAID" | "PLACED" | "SHIPPED" | "DELIVERED" | "COMPLETED" | "CANCELLED";
   ordered_at?: string;
-  shipping_address?: Address;
   market_orders?: MarketOrderResponse[];
   delivery?: Delivery;
+};
+
+export type PaymentCheckout = {
+  order_code: string;
+  checkout_url: string;
+  amount: number;
 };
 
 export type MarketOrderResponse = {
@@ -309,7 +352,7 @@ export type CreateReviewResponse = {
   is_photo_review: boolean;
   status: string;
   images: ReviewImage[];
-  created_at: string;
+  created_at?: string;
 };
 
 export type InventorySource = {
@@ -346,8 +389,47 @@ export type ExternalInventoryMapping = {
   external_variant_id?: string;
   external_inventory_item_id?: string;
   external_location_id?: string;
+  last_synced_quantity?: number;
   disconnect_if_necessary?: boolean;
   created_at?: string;
+  updated_at?: string;
+};
+
+export type SuppliedProductOption = {
+  id: number;
+  product_option_id: number;
+  provider: string;
+  sku_code: string;
+  supplier_code: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type InventoryLocation = {
+  id: number;
+  location_id: number;
+  name: string;
+  channel_type: string;
+  is_virtual: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type InventoryDetail = {
+  id: number;
+  product_option_id: number;
+  supplied_option_id?: number;
+  location_id: number;
+  inbound_reference: string;
+  available_quantity: number;
+  allocated_quantity: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ExternalOrderResult = {
+  external_order_id: string;
+  external_name?: string;
 };
 
 export type InventorySyncLog = {
@@ -371,17 +453,49 @@ export type Settlement = {
   total_sales_amount: number;
   commission_amount: number;
   final_settlement_amount: number;
-  status: "PREPARED" | "PAID" | "EXCLUDED" | string;
+  status: "PREPARED" | "CONFIRMED" | "PAID" | "EXCLUDED" | string;
+};
+
+export type SellerSettlementDashboard = {
+  market_id: number;
+  from?: string;
+  to?: string;
+  settlements: Settlement[];
+  line_count: number;
+  gross_sales_amount: number;
+  platform_coupon_amount: number;
+  market_coupon_amount: number;
+  point_discount_amount: number;
+  promotion_amount: number;
+  customer_payment_amount: number;
+  commission_amount: number;
+  return_shipping_fee: number;
+  final_settlement_amount: number;
+  paid_amount: number;
+  pending_amount: number;
+  status_breakdown: Record<string, number>;
+  monthly: Record<string, {
+    line_count: number;
+    gross_sales_amount: number;
+    platform_coupon_amount: number;
+    market_coupon_amount: number;
+    point_discount_amount: number;
+    promotion_amount: number;
+    customer_payment_amount: number;
+    commission_amount: number;
+    return_shipping_fee: number;
+    final_settlement_amount: number;
+  }>;
 };
 
 export type AuditLog = {
   id: number;
   admin_id: number;
   target_type: string;
-  target_id?: number;
   settlement_id?: number;
+  order_id?: number;
+  order_code?: string;
   action: string;
-  reason?: string;
   created_at: string;
 };
 
@@ -465,36 +579,53 @@ export type Recommendation = {
 };
 
 export type SettlementSummary = {
-  market_id: number;
-  total_sales_amount?: number;
-  commission_amount?: number;
-  final_settlement_amount?: number;
-  pending_amount?: number;
-  paid_amount?: number;
-  [key: string]: unknown;
+  settlements: Settlement[];
 };
 
 export type SettlementLine = {
   id: number;
   settlement_id?: number;
-  order_id?: number;
-  order_code?: string;
-  product_name?: string;
-  sales_amount?: number;
-  commission_amount?: number;
-  settlement_amount?: number;
-  status?: string;
-  created_at?: string;
+  market_id: number;
+  order_id: number;
+  order_code: string;
+  market_order_id: number;
+  order_line_item_id: number;
+  target_month: string;
+  line_type: string;
+  status: string;
+  purchase_confirmed_at: string;
+  settlement_eligible_at: string;
+  product_id: number;
+  option_id: number;
+  quantity: number;
+  unit_price: number;
+  gross_amount: number;
+  platform_coupon_amount: number;
+  market_coupon_amount: number;
+  point_discount_amount: number;
+  promotion_amount: number;
+  customer_payment_amount: number;
+  commission_amount: number;
+  return_shipping_fee: number;
+  final_settlement_amount: number;
+  created_at: string;
+  updated_at: string;
 };
 
 export type SettlementAccount = {
+  id: number;
   market_id: number;
-  bank_name?: string;
-  account_number?: string;
-  account_holder?: string;
-  depositor_name?: string;
-  business_registration_number?: string;
+  bank_code: string;
+  account_number: string;
+  account_holder: string;
+  created_at?: string;
+  updated_at?: string;
 };
+
+export type SettlementAccountInput = Pick<
+  SettlementAccount,
+  "bank_code" | "account_number" | "account_holder"
+>;
 
 export type SameDayDispatchAvailability = {
   available: boolean;
