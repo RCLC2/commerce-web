@@ -119,13 +119,21 @@ const rawSellerOptionSchema = z.looseObject({
   IsActive: z.boolean(),
 });
 
+const rawSellerImageSchema = z.looseObject({
+  ID: nonNegativeIntSchema.default(0),
+  URL: z.string().min(1),
+  AltText: z.string().default(""),
+  SortOrder: nonNegativeIntSchema,
+});
 export const rawSellerProductSchema = z.looseObject({
   ID: identifierSchema,
   MarketID: identifierSchema,
   CategoryID: identifierSchema,
   Name: z.string(),
   Description: z.string(),
+  SummaryDescription: z.string().default(""),
   ImageURL: z.string().default(""),
+  Images: z.array(rawSellerImageSchema).max(5).default([]),
   Tags: z.string().default(""),
   BasePrice: nonNegativeIntSchema,
   DiscountPrice: nonNegativeIntSchema.default(0),

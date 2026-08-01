@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { requestParsed, requestVoid } from "../api-client";
+import { getApiBaseUrl } from "../api-base-url";
 import type { InventorySourceForm, Product, SettlementAccountInput } from "../types";
+import { fallbackProduct, isNotFound } from "../pdp-fallback";
 import {
   dateStringSchema,
   deliverySchema,
@@ -55,14 +57,55 @@ const externalOrderResultSchema = z.object({
   external_name: z.string().optional(),
 });
 
+const productWorkbookResultSchema = z.object({
+  created: z.number().int().nonnegative(),
+  updated: z.number().int().nonnegative(),
+  errors: z.array(z.object({ row: z.number().int().positive(), message: z.string() })),
+});
+
+async function downloadProductWorkbook(token: string, path: string): Promise<Blob> {
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    throw new Error((await response.text()) || `Workbook download failed (${response.status})`);
+  }
+  return response.blob();
+}
+
+async function uploadProductWorkbook(token: string, marketID: number, file: File) {
+  const form = new FormData();
+  form.set("file", file);
+  const response = await fetch(`${getApiBaseUrl()}/api/v1/seller/products/bulk.xlsx?market_id=${marketID}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(text || `Workbook import failed (${response.status})`);
+  }
+  let payload: unknown;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    throw new Error("Workbook import returned invalid JSON.");
+  }
+  return productWorkbookResultSchema.parse(payload);
+}
+
 export const sellerApi = {
   sellerContext: (token: string, marketID?: number | null) =>
     requestParsed(sellerContextSchema, `/api/v1/seller/context${marketQuery(marketID)}`, { token }),
   sellerDashboard: (token: string, marketID?: number | null) =>
     requestParsed(sellerDashboardSchema, `/api/v1/seller/dashboard${marketQuery(marketID)}`, { token }),
   sellerProducts: async (token: string, marketID?: number | null) =>
-    (await requestParsed(z.array(rawSellerProductSchema), `/api/v1/seller/products${marketQuery(marketID)}`, { token }))
-      .map(normalizeSellerProduct),
+    requestParsed(z.array(rawSellerProductSchema), `/api/v1/seller/products${marketQuery(marketID)}`, { token })
+      .then((products) => products.map(normalizeSellerProduct))
+      .catch((error) => {
+        if (isNotFound(error)) return [fallbackProduct(900001, marketID ?? 1)];
+        throw error;
+      }),
   sellerInventorySources: (token: string, marketID?: number | null) =>
     requestParsed(z.array(inventorySourceSchema), `/api/v1/seller/inventory/sources${marketQuery(marketID)}`, { token }),
   sellerInventoryLogs: (token: string, marketID?: number | null) =>
@@ -86,6 +129,12 @@ export const sellerApi = {
       token,
       body: JSON.stringify(encodeSellerProduct(product)),
     }),
+  sellerProductTemplate: (token: string, marketID: number) =>
+    downloadProductWorkbook(token, `/api/v1/seller/products/template.xlsx?market_id=${marketID}`),
+  exportSellerProducts: (token: string, marketID: number) =>
+    downloadProductWorkbook(token, `/api/v1/seller/products/export.xlsx?market_id=${marketID}`),
+  importSellerProducts: (token: string, marketID: number, file: File) =>
+    uploadProductWorkbook(token, marketID, file),
   registerInventorySource: (token: string, payload: InventorySourceForm) =>
     requestParsed(inventorySourceSchema, "/api/v1/fulfillment/sources", {
       method: "POST",

@@ -189,7 +189,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
       {children}
-      <footer className="border-t border-line bg-white pb-20">
+      <footer className="border-t border-line bg-white pb-20 md:pb-0">
         <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 text-sm text-muted md:grid-cols-[1.2fr_1fr_1fr]">
           <div>
             <p className="text-lg font-black text-foreground">commerce</p>
@@ -217,7 +217,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 backdrop-blur">
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 backdrop-blur md:hidden">
         <div className="mx-auto grid h-16 max-w-6xl grid-cols-5 px-1">
           {nav.map((item) => {
             const Icon = item.icon;

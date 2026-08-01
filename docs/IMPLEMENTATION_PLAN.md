@@ -319,8 +319,12 @@ Define these contracts before building final seller/admin screens:
 - Seller pages: operational, compact, table-heavy, task-first.
 - Admin pages: dense back-office console with clear filters, audit reasons, and irreversible-state warnings.
 - Avoid marketing-style hero sections in seller/admin areas.
+## 10. PDP and Seller Product Authoring Contract
 
-## 10. PLP 상품 유비쿼터스 용어
+The normative PDP, seller authoring, server Excel, and HTTP 404 preview behavior is documented in [PDP_AND_SELLER_PRODUCTS.md](PDP_AND_SELLER_PRODUCTS.md). New UI and API work must use its ubiquitous language.
+
+## 11. PLP 상품 유비쿼터스 용어
+
 
 상품 목록(Product Listing Page)의 각 상품 영역은 **PLP 상품**으로 명명하며 프론트 타입은 `PLPProduct`, API 응답 모델은 `PLPProductResponse`를 사용합니다.
 
@@ -330,7 +334,7 @@ Define these contracts before building final seller/admin screens:
 - 마켓 페이지의 상품은 `GET /api/v1/products?marketID={marketId}`로 조회합니다.
 - 마켓 및 마켓 상품 API가 HTTP 404인 로컬 검수 환경에서만 데모 정보를 사용하며 다른 오류는 숨기지 않습니다.
 
-## 11. CategoryInformation 유비쿼터스 용어와 `/categories` 계약
+## 12. CategoryInformation 유비쿼터스 용어와 `/categories` 계약
 
 카테고리관(`/categories`)의 서버 주도 화면 계약은 **CategoryInformation**으로 부릅니다. 프론트와 백엔드, 기획 문서에서 아래 이름을 동일하게 사용합니다.
 

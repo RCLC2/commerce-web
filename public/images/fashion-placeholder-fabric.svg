@@ -1,0 +1,10 @@
+<svg width="1200" height="1600" viewBox="0 0 1200 1600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="1600" fill="#F4F4F5"/>
+  <rect x="120" y="120" width="960" height="1280" rx="18" fill="#FFFFFF"/>
+  <rect x="220" y="250" width="760" height="940" rx="100" fill="#FFE1E7"/>
+  <path d="M220 520C400 410 570 420 740 520C860 590 930 690 980 800V1190H220V520Z" fill="#E4E4E7"/>
+  <path d="M220 760C400 650 590 670 760 770C860 830 930 910 980 1010V1190H220V760Z" fill="#FF516D" fill-opacity="0.16"/>
+  <path d="M300 360L900 1080M210 560L760 1220M470 250L980 860" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" opacity="0.72"/>
+  <circle cx="810" cy="410" r="52" fill="#FFFFFF"/>
+  <text x="600" y="1465" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="700" fill="#71717A">fabric detail</text>
+</svg>
