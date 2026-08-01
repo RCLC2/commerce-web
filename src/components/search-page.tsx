@@ -137,7 +137,7 @@ function SearchExperience({
           </div>
         </section>
       ) : (
-        <>
+        <div className="mx-auto max-w-4xl">
           <ResultListHeader title="상품" total={results?.products.total ?? 0} />
           <div className="space-y-7">
             {productSections.map((section) => <SearchCarousel key={section.id} section={section} setRef={(node) => { if (node) carouselRefs.current.set(section.id, node); else carouselRefs.current.delete(section.id); }} onSlide={(direction) => slide(section.id, direction)} />)}
@@ -148,16 +148,16 @@ function SearchExperience({
           {results?.products.items.length ? <div className="mt-7 grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">{results.products.items.map((product) => <ProductCard key={product.id} product={product} />)}</div> : null}
           {results ? <Pagination page={results.products.page} totalPages={results.products.total_pages} onChange={(page) => changePage("product", page)} label="상품" /> : null}
 
-          <div className="mx-auto mt-12 max-w-4xl border-t border-line pt-2">
+          <div className="mt-12 border-t border-line pt-2">
             <ResultListHeader title="마켓" total={results?.markets.total ?? 0} />
             <div className="space-y-7">
               {marketSections.map((section) => <SearchCarousel key={section.id} section={section} setRef={(node) => { if (node) carouselRefs.current.set(section.id, node); else carouselRefs.current.delete(section.id); }} onSlide={(direction) => slide(section.id, direction)} />)}
             </div>
           </div>
-          {!isLoading && !error && !results?.markets.items.length ? <div className="mx-auto max-w-4xl"><EmptyBox message="검색된 마켓이 없습니다." /></div> : null}
-          {results?.markets.items.length ? <div className="mx-auto mt-7 max-w-4xl space-y-4">{results.markets.items.map((market) => <MarketCard key={market.id} market={market} />)}</div> : null}
-          {results ? <div className="mx-auto max-w-4xl"><Pagination page={results.markets.page} totalPages={results.markets.total_pages} onChange={(page) => changePage("market", page)} label="마켓" /></div> : null}
-        </>
+          {!isLoading && !error && !results?.markets.items.length ? <EmptyBox message="검색된 마켓이 없습니다." /> : null}
+          {results?.markets.items.length ? <div className="mt-7 space-y-4">{results.markets.items.map((market) => <MarketCard key={market.id} market={market} />)}</div> : null}
+          {results ? <Pagination page={results.markets.page} totalPages={results.markets.total_pages} onChange={(page) => changePage("market", page)} label="마켓" /> : null}
+        </div>
       )}
     </main>
   );
