@@ -3,6 +3,8 @@ export const queryKeys = {
   categories: ["categories"] as const,
   categoryTree: ["category-tree"] as const,
   products: (params?: { categoryID?: number; sort?: string; q?: string }) => ["products", params] as const,
+  plpInformation: ["plp-information"] as const,
+  plpProducts: (params?: unknown) => ["plp-products", params] as const,
   product: (id: number) => ["product", id] as const,
   productReviews: (id: number) => ["product-reviews", id] as const,
   personalizedProducts: (params?: { sort?: string }) => ["personalized-products", params] as const,

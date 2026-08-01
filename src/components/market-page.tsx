@@ -12,16 +12,16 @@ export function MarketPage({ marketId }: { marketId: number }) {
     queryKey: ["market", marketId],
     queryFn: () => api.getMarket(marketId),
   });
-  const { data: products = [] } = useQuery({
+  const { data: productPage } = useQuery({
     queryKey: ["market-products", marketId],
-    queryFn: () => api.listProducts(),
+    queryFn: () => api.listPLPProducts({ marketId, pageSize: 24 }),
   });
 
   if (isLoading || !market) {
     return <main className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted">마켓을 불러오는 중입니다.</main>;
   }
 
-  const marketProducts = products.filter((product) => product.market_id === market.id);
+  const marketProducts = productPage?.items ?? [];
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24">
