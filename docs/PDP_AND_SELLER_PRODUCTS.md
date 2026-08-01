@@ -27,14 +27,9 @@ This document uses the normative terms defined by the server PDP and seller prod
 - Template download, all-products export, and Bulk Upsert use the server Seller Product Workbook endpoints.
 - Bulk import results display created, updated, and error counts; product queries are invalidated after a successful response.
 
-## 404 Preview Policy
+## API Error Policy
 
-For UI review while backend work is incomplete:
-
-- Product detail, reviews, Review Summary, and seller product list may use Fallback Preview Data only for HTTP 404.
-- The page displays a visible preview-data notice.
-- Authentication errors, 5xx responses, network failures, parse failures, and contract failures stay visible as errors.
-- Fallback Preview Data is never submitted as real product data unless the user explicitly edits and saves it.
+Product detail, reviews, Review Summary, merchandising, and seller product-list failures remain visible as errors. The client does not replace HTTP 404 or other failures with preview product data.
 
 ## Acceptance Criteria
 
@@ -47,8 +42,7 @@ For UI review while backend work is incomplete:
 7. Quick Purchase Modal is reachable while deep in long-form content.
 8. Seller can import HTML, preview it, manage image order, and save the product.
 9. Seller can download the Workbook Template, bulk upload `.xlsx`, and download the full seller catalog.
-10. Server 404 responses produce visibly labeled preview data during frontend review.
-11. Non-404 errors are not replaced with preview data.
+10. API errors and empty responses are not replaced with preview data.
 12. PDP Merchandising markup is present in the server-rendered response.
 13. Null paid-placement values do not create empty PDP sections.
 14. Product shelves are horizontal carousels with hidden scrollbars and direction controls.
