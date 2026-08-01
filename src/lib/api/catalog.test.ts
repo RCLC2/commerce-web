@@ -17,6 +17,7 @@ describe("category information fallback", () => {
     expect(information.selected_category.slug).toBe("outer");
     expect(information.bundle_label).toBe("3개 카테고리 묶음");
     expect(information.realtime_popular_carousel.products.length).toBeGreaterThan(0);
+    expect(information.realtime_popular_carousel.products[0].realtime_popularity_score).toBeTypeOf("number");
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 

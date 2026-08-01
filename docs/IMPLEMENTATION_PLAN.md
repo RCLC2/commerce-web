@@ -329,6 +329,8 @@ Define these contracts before building final seller/admin screens:
 - `RealtimePopularCarousel`: 선택 카테고리와 하위 카테고리 범위의 실시간 인기 상품 구좌
 - `insert_after`: 상품 대제목 바로 아래, 일반 상품 목록보다 먼저 배치하는 서버 결정값 `0`
 - `captured_at`: 실시간 인기 순위의 집계 기준 시각
+- `realtime_popularity_score`: 최근 24시간 클릭·좋아요·찜·구매확정 신호에 6시간 반감기를 적용한 서버 점수
+- 동일 점수는 기존 `popularity_score`, 상품 ID 순으로 안정 정렬하며 삭제된 마켓 상품은 PLP에서 제외합니다.
 - `pagination`: `page`, `page_size`, `has_next`로 구성하는 서버 페이지네이션 정보
 
 API:

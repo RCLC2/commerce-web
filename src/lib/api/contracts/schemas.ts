@@ -58,6 +58,7 @@ export const productSchema = z.object({
   delivery_label: z.string().optional(),
   today_shipping_available: z.boolean().optional(),
   popularity_score: z.number().default(0),
+  realtime_popularity_score: z.number().nonnegative().optional(),
   status: z.enum(["SELLING", "SOLD_OUT"]),
   options: z.array(productOptionSchema).optional(),
   image_url: z.string().optional(),

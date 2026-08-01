@@ -45,6 +45,7 @@ const demoProducts: Product[] = productNames.map((name, index) => ({
   discount_price: 49000 + (index % 4) * 10000,
   shipping_type: index % 3 === 0 ? "FREE" : "NORMAL",
   popularity_score: 100 - index,
+  realtime_popularity_score: 100 - index,
   status: "SELLING",
   tags: index % 2 === 0 ? ["오늘출발", "신상"] : ["쿠폰가능", "리뷰많음"],
   tag_chips: [
@@ -72,7 +73,9 @@ export function demoCategoryInformation(categorySlug: string, page: number, page
       description: "지금 이 카테고리에서 반응이 빠르게 오르는 상품입니다.",
       insert_after: 0,
       captured_at: new Date().toISOString(),
-      products: [...categoryProducts].sort((a, b) => b.popularity_score - a.popularity_score).slice(0, 8),
+      products: [...categoryProducts]
+        .sort((a, b) => (b.realtime_popularity_score ?? b.popularity_score) - (a.realtime_popularity_score ?? a.popularity_score))
+        .slice(0, 8),
     },
     is_demo: true,
   };

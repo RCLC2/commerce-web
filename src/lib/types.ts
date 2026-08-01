@@ -102,6 +102,7 @@ export type Product = {
   delivery_label?: string;
   today_shipping_available?: boolean;
   popularity_score: number;
+  realtime_popularity_score?: number;
   status: "SELLING" | "SOLD_OUT" | string;
   options?: ProductOption[];
   image_url?: string;
