@@ -2,7 +2,6 @@ import { z } from "zod";
 import { requestParsed, requestVoid } from "../api-client";
 import { getApiBaseUrl } from "../api-base-url";
 import type { InventorySourceForm, Product, SettlementAccountInput } from "../types";
-import { fallbackProduct, isNotFound } from "../pdp-fallback";
 import {
   dateStringSchema,
   deliverySchema,
@@ -101,11 +100,7 @@ export const sellerApi = {
     requestParsed(sellerDashboardSchema, `/api/v1/seller/dashboard${marketQuery(marketID)}`, { token }),
   sellerProducts: async (token: string, marketID?: number | null) =>
     requestParsed(z.array(rawSellerProductSchema), `/api/v1/seller/products${marketQuery(marketID)}`, { token })
-      .then((products) => products.map(normalizeSellerProduct))
-      .catch((error) => {
-        if (isNotFound(error)) return [fallbackProduct(900001, marketID ?? 1)];
-        throw error;
-      }),
+      .then((products) => products.map(normalizeSellerProduct)),
   sellerInventorySources: (token: string, marketID?: number | null) =>
     requestParsed(z.array(inventorySourceSchema), `/api/v1/seller/inventory/sources${marketQuery(marketID)}`, { token }),
   sellerInventoryLogs: (token: string, marketID?: number | null) =>

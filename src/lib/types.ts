@@ -120,7 +120,6 @@ export type Product = {
   options?: ProductOption[];
   image_url?: string;
   images?: ProductImage[];
-  is_fallback?: boolean;
   detail_html?: string;
   market_name?: string;
   market_profile_image_url?: string;
@@ -150,8 +149,6 @@ export type CategoryInformation = {
     captured_at: string;
     products: Product[];
   };
-  /** 프론트 화면 검수용 404 fallback에서만 설정됩니다. */
-  is_demo?: boolean;
 };
 
 
@@ -161,7 +158,6 @@ export type PLPProductPage = {
   page_size: number;
   total: number;
   total_pages: number;
-  is_dummy?: boolean;
 };
 
 export type PLPInformation = {
@@ -171,7 +167,6 @@ export type PLPInformation = {
   sort_options: Array<{ code: "popular" | "new" | "price-low" | "price-high"; label: string }>;
   default_sort: "popular" | "new" | "price-low" | "price-high";
   tag_chips: PLPTagChip[];
-  is_dummy?: boolean;
 };
 
 export type PLPProductParams = {
@@ -207,7 +202,6 @@ export type PdpMerchandising = {
   also_viewed: Product[];
   card_ad: PdpCardAd | null;
   sponsored_market: SponsoredMarketShelf | null;
-  is_fallback?: boolean;
 };
 
 export type SearchSuggestion = {
@@ -308,7 +302,6 @@ export type ReviewSummary = {
   photo_review_count?: number;
   rating_distribution?: Record<string, number>;
   latest_review_at?: string;
-  is_fallback?: boolean;
 };
 
 export type ReviewImage = {
@@ -653,8 +646,8 @@ export type CMSCarousel = {
   target_id?: number;
   display_order?: number;
   is_active?: boolean;
-  starts_at?: string;
-  ends_at?: string;
+  starts_at?: string | null;
+  ends_at?: string | null;
   created_at?: string;
   link_url: string;
   status: "ACTIVE" | "INACTIVE" | string;
@@ -713,8 +706,8 @@ export type CommerceEvent = {
   image_url: string;
   link_url: string;
   status: "ACTIVE" | "ENDED" | string;
-  starts_at: string;
-  ends_at: string;
+  starts_at: string | null;
+  ends_at: string | null;
 };
 
 export type Notification = {

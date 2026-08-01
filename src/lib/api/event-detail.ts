@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { ApiHttpError, requestParsed } from "../api-client";
-import { fallbackEventDetails, fallbackEventProductPage } from "../event-detail-fallback";
+import { requestParsed } from "../api-client";
 import type { EventProduct, EventSort } from "../event-detail-types";
 import { productSchema } from "./contracts/schemas";
 import { normalizePublicProduct } from "./normalizers/contracts";
@@ -25,8 +24,8 @@ const eventDetailSchema = z.object({
   image_url: z.string(),
   link_url: z.string(),
   status: z.string(),
-  starts_at: z.string(),
-  ends_at: z.string(),
+  starts_at: z.string().nullable(),
+  ends_at: z.string().nullable(),
   design_variant: z.string(),
   product_display: z.object({
     enabled: z.boolean(),
@@ -55,15 +54,7 @@ const eventRewardClaimSchema = z.object({
 });
 
 export const eventDetailApi = {
-  getEvent: async (eventID: number) => {
-    try {
-      return await requestParsed(eventDetailSchema, `/api/v1/events/${eventID}`);
-    } catch (error) {
-      const fallback = fallbackEventDetails[eventID];
-      if (error instanceof ApiHttpError && error.status === 404 && fallback) return fallback;
-      throw error;
-    }
-  },
+  getEvent: (eventID: number) => requestParsed(eventDetailSchema, `/api/v1/events/${eventID}`),
   listEventProducts: async (params: {
     eventID: number; limit: number; offset: number; sort: EventSort; marketID?: number; categoryID?: number;
   }) => {
@@ -72,15 +63,8 @@ export const eventDetailApi = {
     });
     if (params.marketID) search.set("market_id", String(params.marketID));
     if (params.categoryID) search.set("category_id", String(params.categoryID));
-    try {
-      const page = await requestParsed(eventProductPageSchema, `/api/v1/events/${params.eventID}/products?${search}`);
-      return { ...page, items: page.items.map((product) => normalizePublicProduct(product) as EventProduct) };
-    } catch (error) {
-      if (error instanceof ApiHttpError && error.status === 404 && fallbackEventDetails[params.eventID]) {
-        return fallbackEventProductPage(params);
-      }
-      throw error;
-    }
+    const page = await requestParsed(eventProductPageSchema, `/api/v1/events/${params.eventID}/products?${search}`);
+    return { ...page, items: page.items.map((product) => normalizePublicProduct(product) as EventProduct) };
   },
   claimEventReward: (token: string, eventID: number, rewardRowID: number) =>
     requestParsed(eventRewardClaimSchema, `/api/v1/events/${eventID}/rewards/${rewardRowID}/claim`, { method: "POST", token }),

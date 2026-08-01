@@ -65,12 +65,6 @@ export function CategoryInformationPage() {
         <span className="text-sm font-bold text-muted">{information.bundle_label}</span>
       </div>
 
-      {information.is_demo ? (
-        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-900">
-          서버의 CategoryInformation API가 아직 404를 반환해 화면 검수용 데모 데이터를 표시하고 있습니다.
-        </div>
-      ) : null}
-
       <nav className="no-scrollbar mt-6 flex gap-2 overflow-x-auto rounded-md border border-line bg-white p-3" aria-label="대분류">
         {roots.map((category) => (
           <button

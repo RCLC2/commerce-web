@@ -89,8 +89,13 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
     return <main className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted">이벤트를 불러오는 중입니다.</main>;
   }
 
-  const startsAt = new Date(event.starts_at).toLocaleDateString("ko-KR");
-  const endsAt = new Date(event.ends_at).toLocaleDateString("ko-KR");
+  const schedule = event.starts_at && event.ends_at
+    ? `${new Date(event.starts_at).toLocaleDateString("ko-KR")} - ${new Date(event.ends_at).toLocaleDateString("ko-KR")}`
+    : event.starts_at
+      ? `${new Date(event.starts_at).toLocaleDateString("ko-KR")}부터`
+      : event.ends_at
+        ? `${new Date(event.ends_at).toLocaleDateString("ko-KR")}까지`
+        : "상시 진행";
   const heroTone = event.design_variant === "BENEFIT_FOCUS"
     ? "from-violet-950/80 via-fuchsia-900/30"
     : event.design_variant === "MARKET_STORY"
@@ -107,7 +112,7 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
             <p className="text-sm font-black">진행중 이벤트</p>
             <h1 className="mt-3 text-4xl font-black md:text-6xl">{event.title}</h1>
             <p className="mt-3 text-base text-white/90 md:text-lg">{event.subtitle}</p>
-            <p className="mt-5 text-sm font-bold text-white/80">{startsAt} - {endsAt}</p>
+            <p className="mt-5 text-sm font-bold text-white/80">{schedule}</p>
           </div>
         </div>
       </section>
