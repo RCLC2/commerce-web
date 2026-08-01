@@ -309,3 +309,44 @@ Define these contracts before building final seller/admin screens:
 - Seller pages: operational, compact, table-heavy, task-first.
 - Admin pages: dense back-office console with clear filters, audit reasons, and irreversible-state warnings.
 - Avoid marketing-style hero sections in seller/admin areas.
+
+## 10. PLP 상품 유비쿼터스 용어
+
+상품 목록(Product Listing Page)의 각 상품 영역은 **PLP 상품**으로 명명하며 프론트 타입은 `PLPProduct`, API 응답 모델은 `PLPProductResponse`를 사용합니다.
+
+- `market`: 마켓 ID, 이름, 프로필 이미지를 포함하며 마켓명 선택 시 `/markets/:id`로 이동합니다.
+- `tag_chips`: 서버가 노출 여부, 순서, 라벨과 톤을 확정한 배열입니다. 프론트는 배송 유형이나 기존 `tags`를 보고 칩을 추가 생성하지 않습니다.
+- 원가(`base_price`)와 판매가(`discount_price`)를 함께 표시하고 할인율과 할인액은 프론트에서 계산할 수 있습니다.
+- 마켓 페이지의 상품은 `GET /api/v1/products?marketID={marketId}`로 조회합니다.
+- 마켓 및 마켓 상품 API가 HTTP 404인 로컬 검수 환경에서만 데모 정보를 사용하며 다른 오류는 숨기지 않습니다.
+
+## 11. CategoryInformation 유비쿼터스 용어와 `/categories` 계약
+
+카테고리관(`/categories`)의 서버 주도 화면 계약은 **CategoryInformation**으로 부릅니다. 프론트와 백엔드, 기획 문서에서 아래 이름을 동일하게 사용합니다.
+
+- `CategoryInformation`: 카테고리 트리, 선택 카테고리, 묶음 문구, 상품 페이지, 실시간 인기 구좌를 한 번에 반환하는 응답 모델
+- `bundle_label`: `n개 카테고리 묶음`처럼 서버가 확정하는 표시 문구. 프론트에서 카테고리 수를 다시 세어 문구를 만들지 않습니다.
+- `RealtimePopularCarousel`: 선택 카테고리와 하위 카테고리 범위의 실시간 인기 상품 구좌
+- `insert_after`: 상품 대제목 바로 아래, 일반 상품 목록보다 먼저 배치하는 서버 결정값 `0`
+- `captured_at`: 실시간 인기 순위의 집계 기준 시각
+- `realtime_popularity_score`: 최근 24시간 클릭·좋아요·찜·구매확정 신호에 6시간 반감기를 적용한 서버 점수
+- 동일 점수는 기존 `popularity_score`, 상품 ID 순으로 안정 정렬하며 삭제된 마켓 상품은 PLP에서 제외합니다.
+- `pagination`: `page`, `page_size`, `has_next`로 구성하는 서버 페이지네이션 정보
+
+API:
+
+`GET /api/v1/category-information?category={slug}&page={page}&page_size={pageSize}`
+
+프론트 구현 원칙:
+
+- `상품 더보기`는 사용하지 않고 이전/다음 페이지 이동으로 즉시 다시 조회합니다.
+- 일반 상품과 `RealtimePopularCarousel`은 동일한 PLP 상품 계약을 사용하며 서버가 내려준 `tag_chips`만 표시합니다.
+- `RealtimePopularCarousel`은 홈 상품 캐러셀의 정사각 이미지 오버레이, 가로 스냅, 이전/다음 버튼 패턴을 재사용하고 순위 배지를 더해 아래 일반 PLP 그리드와 구분합니다.
+- PLP 상품의 마켓명은 `market.id`를 사용해 `/markets/:id`로 이동합니다.
+- 백엔드가 새 CategoryInformation API에 대해 HTTP 404를 반환할 때만 화면 검수용 데모 데이터를 표시합니다. 401, 403, 500, 계약 파싱 오류 등은 더미로 숨기지 않고 오류 상태로 표시합니다.
+
+앱 셸 원칙:
+
+- 데스크톱 헤더 우측에는 장바구니와 마이페이지 진입점을 함께 둡니다.
+- 마이페이지는 장바구니, 좋아요, 회원정보, 리뷰 관리로 이동하는 개인 허브 역할을 합니다.
+- 푸터는 탐색과 개인 메뉴를 구분하고 실제 존재하는 고객 라우트만 연결합니다.
