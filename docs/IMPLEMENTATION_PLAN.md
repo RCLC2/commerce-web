@@ -309,3 +309,6 @@ Define these contracts before building final seller/admin screens:
 - Seller pages: operational, compact, table-heavy, task-first.
 - Admin pages: dense back-office console with clear filters, audit reasons, and irreversible-state warnings.
 - Avoid marketing-style hero sections in seller/admin areas.
+## 10. PDP and Seller Product Authoring Contract
+
+The normative PDP, seller authoring, server Excel, and HTTP 404 preview behavior is documented in [PDP_AND_SELLER_PRODUCTS.md](PDP_AND_SELLER_PRODUCTS.md). New UI and API work must use its ubiquitous language.

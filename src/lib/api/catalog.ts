@@ -9,9 +9,11 @@ import {
   marketSchema,
   productSchema,
   reviewSchema,
+  reviewSummarySchema,
   statusResponseSchema,
 } from "./contracts/schemas";
 import { normalizePublicProduct } from "./normalizers/contracts";
+import { fallbackProduct, fallbackReviews, fallbackReviewSummary, isNotFound } from "../pdp-fallback";
 
 const productDetailSchema = z.object({
   product: productSchema,
@@ -66,9 +68,13 @@ export const catalogApi = {
       delivery_label: detail.delivery_label ?? detail.product.delivery_label,
       today_shipping_available:
         detail.today_shipping_available ?? detail.product.today_shipping_available,
-    })),
+    })).catch((error) => fallbackOn404(error, fallbackProduct(id))),
   getProductReviews: (id: number) =>
-    requestParsed(z.array(reviewSchema), `/api/v1/products/${id}/reviews`),
+    requestParsed(z.array(reviewSchema), `/api/v1/products/${id}/reviews`)
+      .catch((error) => fallbackOn404(error, fallbackReviews(id))),
+  getProductReviewSummary: (id: number) =>
+    requestParsed(reviewSummarySchema, `/api/v1/products/${id}/reviews/summary`)
+      .catch((error) => fallbackOn404(error, fallbackReviewSummary(id))),
   listActiveCarousels: () =>
     requestParsed(z.array(carouselSchema), "/api/v1/carousels/active"),
   recordCampaignClick: (campaignID: number) =>
@@ -77,4 +83,11 @@ export const catalogApi = {
 
 function discountPriceFromLowest(basePrice: number, lowestPrice?: number): number {
   return lowestPrice !== undefined && lowestPrice < basePrice ? lowestPrice : 0;
+}
+
+function fallbackOn404<T>(error: unknown, fallback: T): T {
+  if (isNotFound(error)) {
+    return fallback;
+  }
+  throw error;
 }

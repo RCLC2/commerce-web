@@ -33,12 +33,20 @@ export const productOptionSchema = z.object({
   is_active: z.boolean(),
 });
 
+export const productImageSchema = z.object({
+  id: identifierSchema.optional(),
+  url: z.string().min(1),
+  alt_text: z.string().optional(),
+  sort_order: nonNegativeIntSchema,
+});
+
 export const productSchema = z.object({
   id: identifierSchema,
   market_id: identifierSchema,
   category_id: identifierSchema,
   name: z.string(),
   description: z.string(),
+  summary_description: z.string().optional(),
   base_price: nonNegativeIntSchema,
   discount_price: nonNegativeIntSchema.default(0),
   shipping_type: z.string().default("NORMAL"),
@@ -49,6 +57,8 @@ export const productSchema = z.object({
   status: z.enum(["SELLING", "SOLD_OUT"]),
   options: z.array(productOptionSchema).optional(),
   image_url: z.string().optional(),
+  images: z.array(productImageSchema).max(5).optional(),
+  is_fallback: z.boolean().optional(),
   detail_html: z.string().optional(),
   market_name: z.string().optional(),
   tags: z.array(z.string()).optional(),
@@ -126,6 +136,16 @@ export const reviewImageSchema = z.object({
   size_bytes: nonNegativeIntSchema,
 });
 
+export const reviewSummarySchema = z.object({
+  product_id: identifierSchema,
+  review_count: nonNegativeIntSchema,
+  average_rating: z.number().min(0).max(5),
+  is_fallback: z.boolean().optional(),
+  photo_review_count: nonNegativeIntSchema.optional(),
+  rating_distribution: z.record(z.string(), nonNegativeIntSchema).optional(),
+  latest_review_at: dateStringSchema.optional(),
+});
+
 export const reviewSchema = z.object({
   id: identifierSchema,
   product_id: identifierSchema,
@@ -139,6 +159,16 @@ export const reviewSchema = z.object({
   is_photo_review: z.boolean().optional(),
   image_count: nonNegativeIntSchema.optional(),
   status: z.string().optional(),
+  reviewer_name: z.string().optional(),
+  verified_purchase: z.boolean().optional(),
+  option: z.object({
+    id: identifierSchema,
+    name: z.string(),
+    value: z.string(),
+  }).optional(),
+  badges: z.array(z.string()).optional(),
+  height_at_time: z.number().nullable().optional(),
+  weight_at_time: z.number().nullable().optional(),
   images: z.array(reviewImageSchema).optional(),
   created_at: dateStringSchema.optional(),
   updated_at: dateStringSchema.optional(),

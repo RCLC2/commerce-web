@@ -212,6 +212,9 @@ export function SellerProductsPage() {
   const [shipping, setShipping] = useState("ALL");
   const [managedProducts, setManagedProducts] = useState<Record<number, ProductEditState>>({});
   const [createForm, setCreateForm] = useState<ProductCreateState>(() => emptyProductCreateForm());
+  const [htmlPreview, setHTMLPreview] = useState(false);
+  const [workbookMessage, setWorkbookMessage] = useState("");
+  const workbookInputRef = useRef<HTMLInputElement>(null);
   const { data = [] } = useQuery({ queryKey: ["seller-products", resolvedMarketID], queryFn: () => api.sellerProducts(token ?? "", resolvedMarketID), enabled: Boolean(token && resolvedMarketID), meta: { consoleDataRole: "primary" } });
   const { data: categories = [] } = useQuery({ queryKey: ["seller-product-categories"], queryFn: api.listCategories, enabled: Boolean(token) });
   const marketID = resolvedMarketID ?? data[0]?.market_id;
@@ -235,6 +238,18 @@ export function SellerProductsPage() {
       void queryClient.invalidateQueries({ queryKey: ["admin-products"] });
     },
   });
+  const importWorkbook = useMutation({
+    mutationFn: (file: File) => {
+      if (!marketID) throw new Error("Market is required.");
+      return api.importSellerProducts(token ?? "", marketID, file);
+    },
+    onSuccess: (result) => {
+      setWorkbookMessage(`Created ${result.created}, updated ${result.updated}, errors ${result.errors.length}`);
+      void queryClient.invalidateQueries({ queryKey: ["seller-products", resolvedMarketID] });
+    },
+    onError: (error) => setWorkbookMessage(error.message),
+  });
+
   const sellerName = useSellerContextName() ?? sellerContext?.market_name ?? data[0]?.market_name ?? "셀러 마켓";
 
   if (!token) {
@@ -252,6 +267,43 @@ export function SellerProductsPage() {
   const totalStock = data.reduce((sum, product) => sum + productStock(product), 0);
   const categoryOptions = productCategoryOptions(categories);
   const selectedCategoryID = createForm.categoryID || String(categoryOptions[0]?.id ?? "");
+
+  async function downloadProductWorkbook(kind: "template" | "export") {
+    if (!marketID) return;
+    try {
+      const blob = kind === "template"
+        ? await api.sellerProductTemplate(token ?? "", marketID)
+        : await api.exportSellerProducts(token ?? "", marketID);
+      downloadBlob(blob, kind === "template" ? "seller-product-template.xlsx" : "seller-products.xlsx");
+      setWorkbookMessage("Workbook downloaded.");
+    } catch (error) {
+      setWorkbookMessage(error instanceof Error ? error.message : "Workbook download failed.");
+    }
+  }
+
+  function updateCreateImage(index: number, value: string) {
+    setCreateForm((current) => ({
+      ...current,
+      imageURLs: current.imageURLs.map((url, itemIndex) => itemIndex === index ? value : url),
+    }));
+  }
+
+  function moveCreateImage(index: number, delta: number) {
+    setCreateForm((current) => {
+      const target = index + delta;
+      if (target < 0 || target >= current.imageURLs.length) return current;
+      const imageURLs = [...current.imageURLs];
+      [imageURLs[index], imageURLs[target]] = [imageURLs[target], imageURLs[index]];
+      return { ...current, imageURLs };
+    });
+  }
+
+  function removeCreateImage(index: number) {
+    setCreateForm((current) => {
+      const imageURLs = current.imageURLs.filter((_, itemIndex) => itemIndex !== index);
+      return { ...current, imageURLs: imageURLs.length ? imageURLs : [""] };
+    });
+  }
 
   function updateProductEdit(product: Product, patch: Partial<ProductEditState>) {
     setManagedProducts((current) => ({
@@ -286,6 +338,27 @@ export function SellerProductsPage() {
           ]}
         />
       </div>
+      <ConsoleSection className="mt-5" title="Product workbook" description="The server creates and parses .xlsx files. Up to 1,000 rows and 10 MB per upload.">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="secondary" disabled={!marketID} onClick={() => void downloadProductWorkbook("template")}>Download template</Button>
+          <Button variant="secondary" disabled={!marketID} onClick={() => void downloadProductWorkbook("export")}>Download all products</Button>
+          <Button disabled={!marketID || importWorkbook.isPending} onClick={() => workbookInputRef.current?.click()}>
+            {importWorkbook.isPending ? "Importing..." : "Bulk create / edit"}
+          </Button>
+          <input
+            ref={workbookInputRef}
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) importWorkbook.mutate(file);
+              event.target.value = "";
+            }}
+          />
+          {workbookMessage ? <p className="text-sm font-bold text-muted">{workbookMessage}</p> : null}
+        </div>
+      </ConsoleSection>
       <ConsoleSection className="mt-5" title="New product" description="Register a product through POST /api/v1/products.">
         <div className="grid gap-3 lg:grid-cols-[1.1fr_0.9fr_120px_120px]">
           <input className="h-11 rounded-md border border-line px-3 text-sm outline-none focus:border-foreground" value={createForm.name} onChange={(event) => setCreateForm((current) => ({ ...current, name: event.target.value }))} placeholder="Product name" aria-label="Product name" />
@@ -295,14 +368,68 @@ export function SellerProductsPage() {
           <input type="number" min={0} className="h-11 rounded-md border border-line px-3 text-sm outline-none focus:border-foreground" value={createForm.basePrice} onChange={(event) => setCreateForm((current) => ({ ...current, basePrice: event.target.value }))} placeholder="Price" aria-label="Price" />
           <input type="number" min={0} className="h-11 rounded-md border border-line px-3 text-sm outline-none focus:border-foreground" value={createForm.optionQuantity} onChange={(event) => setCreateForm((current) => ({ ...current, optionQuantity: event.target.value }))} placeholder="Stock" aria-label="Stock" />
         </div>
-        <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_150px_1fr_130px_130px]">
-          <input className="h-11 rounded-md border border-line px-3 text-sm outline-none focus:border-foreground" value={createForm.imageURL} onChange={(event) => setCreateForm((current) => ({ ...current, imageURL: event.target.value }))} placeholder="Image URL" aria-label="Image URL" />
+        <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr_130px_130px]">
           <input className="h-11 rounded-md border border-line px-3 text-sm outline-none focus:border-foreground" value={createForm.optionName} onChange={(event) => setCreateForm((current) => ({ ...current, optionName: event.target.value }))} placeholder="Option name" aria-label="Option name" />
           <input className="h-11 rounded-md border border-line px-3 text-sm outline-none focus:border-foreground" value={createForm.optionValue} onChange={(event) => setCreateForm((current) => ({ ...current, optionValue: event.target.value }))} placeholder="Option value" aria-label="Option value" />
           <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={createForm.shippingType} onChange={(event) => setCreateForm((current) => ({ ...current, shippingType: event.target.value }))} aria-label="Shipping type"><option value="NORMAL">NORMAL</option><option value="FREE">FREE</option></select>
           <select className="h-11 rounded-md border border-line bg-white px-3 text-sm font-bold" value={createForm.status} onChange={(event) => setCreateForm((current) => ({ ...current, status: event.target.value }))} aria-label="Status"><option value="SELLING">SELLING</option><option value="SOLD_OUT">SOLD_OUT</option></select>
         </div>
-        <textarea className="mt-3 min-h-24 w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-foreground" value={createForm.description} onChange={(event) => setCreateForm((current) => ({ ...current, description: event.target.value }))} placeholder="Description" aria-label="Description" />
+        <textarea
+          className="mt-3 min-h-20 w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-foreground"
+          value={createForm.summaryDescription}
+          onChange={(event) => setCreateForm((current) => ({ ...current, summaryDescription: event.target.value }))}
+          placeholder="Purchase panel summary"
+          aria-label="Purchase panel summary"
+        />
+        <div className="mt-4 rounded-lg border border-line p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-black">Product images ({createForm.imageURLs.length}/5)</p>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={createForm.imageURLs.length >= 5}
+              onClick={() => setCreateForm((current) => ({ ...current, imageURLs: [...current.imageURLs, ""] }))}
+            >
+              Add image
+            </Button>
+          </div>
+          <div className="mt-3 space-y-2">
+            {createForm.imageURLs.map((url, index) => (
+              <div key={index} className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]">
+                <input className="h-10 rounded-md border border-line px-3 text-sm" value={url} onChange={(event) => updateCreateImage(index, event.target.value)} placeholder={`Image URL ${index + 1}`} aria-label={`Image URL ${index + 1}`} />
+                <Button size="sm" variant="secondary" disabled={index === 0} onClick={() => moveCreateImage(index, -1)}>Left</Button>
+                <Button size="sm" variant="secondary" disabled={index === createForm.imageURLs.length - 1} onClick={() => moveCreateImage(index, 1)}>Right</Button>
+                <Button size="sm" variant="secondary" onClick={() => removeCreateImage(index)}>Remove</Button>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="mt-4 rounded-lg border border-line p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-black">HTML product detail</p>
+            <div className="flex flex-wrap gap-2">
+              <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-line px-3 text-sm font-bold">
+                Import HTML
+                <input
+                  type="file"
+                  accept=".html,.htm,text/html"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void file.text().then((detailHTML) => setCreateForm((current) => ({ ...current, detailHTML })));
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+              <Button size="sm" variant="secondary" onClick={() => setHTMLPreview((value) => !value)}>{htmlPreview ? "Edit HTML" : "Preview"}</Button>
+            </div>
+          </div>
+          {htmlPreview ? (
+            <div className="prose mt-3 max-w-none rounded-md bg-zinc-50 p-4" dangerouslySetInnerHTML={{ __html: createForm.detailHTML }} />
+          ) : (
+            <textarea className="mt-3 min-h-64 w-full rounded-md border border-line px-3 py-2 font-mono text-xs outline-none focus:border-foreground" value={createForm.detailHTML} onChange={(event) => setCreateForm((current) => ({ ...current, detailHTML: event.target.value }))} placeholder="<section>...</section>" aria-label="HTML product detail" />
+          )}
+        </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <Button disabled={!createForm.name.trim() || !createForm.basePrice || !createForm.optionValue.trim() || !selectedCategoryID || !marketID || createProduct.isPending} onClick={() => createProduct.mutate()}>{createProduct.isPending ? "Saving" : "Create product"}</Button>
           <Button variant="secondary" onClick={() => setCreateForm(emptyProductCreateForm())}>Reset</Button>
@@ -900,8 +1027,9 @@ type ProductCreateState = {
   discountPrice: string;
   shippingType: string;
   status: string;
-  imageURL: string;
-  description: string;
+  imageURLs: string[];
+  summaryDescription: string;
+  detailHTML: string;
   optionName: string;
   optionValue: string;
   optionQuantity: string;
@@ -915,8 +1043,9 @@ function emptyProductCreateForm(): ProductCreateState {
     discountPrice: "0",
     shippingType: "NORMAL",
     status: "SELLING",
-    imageURL: "",
-    description: "",
+    imageURLs: [""],
+    summaryDescription: "",
+    detailHTML: "",
     optionName: "",
     optionValue: "",
     optionQuantity: "0",
@@ -930,13 +1059,15 @@ function productCreatePayload(form: ProductCreateState, marketID: number, catego
     market_id: marketID,
     category_id: categoryID,
     name: form.name.trim(),
-    description: JSON.stringify({ text: form.description.trim() }),
+    description: JSON.stringify({ html: form.detailHTML.trim() }),
+    summary_description: form.summaryDescription.trim() || undefined,
     base_price: Math.max(0, Number(form.basePrice) || 0),
     discount_price: Math.max(0, Number(form.discountPrice) || 0),
     shipping_type: form.shippingType,
     popularity_score: 0,
     status: form.status,
-    image_url: form.imageURL.trim() || undefined,
+    image_url: form.imageURLs[0]?.trim() || undefined,
+    images: form.imageURLs.filter((url) => url.trim()).slice(0, 5).map((url, sort_order) => ({ url: url.trim(), alt_text: form.name.trim(), sort_order })),
     options: [
       {
         id: 0,
@@ -1103,4 +1234,13 @@ function StatusFilter({ value, onChange, options }: { value: string; onChange: (
       ))}
     </select>
   );
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }

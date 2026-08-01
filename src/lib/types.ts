@@ -75,12 +75,20 @@ export type AdminDashboard = {
   recent_actions: AuditLog[];
 };
 
+export type ProductImage = {
+  id?: number;
+  url: string;
+  alt_text?: string;
+  sort_order: number;
+};
+
 export type Product = {
   id: number;
   market_id: number;
   category_id: number;
   name: string;
   description: string;
+  summary_description?: string;
   /** Opaque seller API value retained for lossless updates. */
   description_source?: string;
   base_price: number;
@@ -93,9 +101,33 @@ export type Product = {
   status: "SELLING" | "SOLD_OUT" | string;
   options?: ProductOption[];
   image_url?: string;
+  images?: ProductImage[];
+  is_fallback?: boolean;
   detail_html?: string;
   market_name?: string;
   tags?: string[];
+};
+
+export type PdpCardAd = {
+  campaign_id: number;
+  title: string;
+  image_url?: string;
+  link_url: string;
+  disclosure: "AD" | string;
+};
+
+export type SponsoredMarketShelf = {
+  campaign_id: number;
+  market: Pick<Market, "id" | "name" | "description" | "profile_image_url">;
+  products: Product[];
+  disclosure: "SPONSORED" | string;
+};
+
+export type PdpMerchandising = {
+  also_viewed: Product[];
+  card_ad: PdpCardAd | null;
+  sponsored_market: SponsoredMarketShelf | null;
+  is_fallback?: boolean;
 };
 
 export type SearchSuggestion = {
@@ -156,6 +188,12 @@ export type Review = {
   rating_x2?: number;
   rating: number;
   content: string;
+  reviewer_name?: string;
+  verified_purchase?: boolean;
+  option?: { id: number; name: string; value: string };
+  badges?: string[];
+  height_at_time?: number | null;
+  weight_at_time?: number | null;
   is_photo_review?: boolean;
   image_count?: number;
   status?: string;
@@ -163,6 +201,16 @@ export type Review = {
   created_at?: string;
   updated_at?: string;
   product?: ReviewProductSummary;
+};
+
+export type ReviewSummary = {
+  product_id: number;
+  review_count: number;
+  average_rating: number;
+  photo_review_count?: number;
+  rating_distribution?: Record<string, number>;
+  latest_review_at?: string;
+  is_fallback?: boolean;
 };
 
 export type ReviewImage = {
