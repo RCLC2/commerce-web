@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import type { Product, ProductTagChip } from "@/lib/types";
+import type { Product } from "@/lib/types";
 import { discountRate, formatPrice } from "@/lib/utils";
 import { SafeImage } from "./safe-image";
 
@@ -10,7 +12,7 @@ export function ProductCard({ product, imageAspect = "aspect-square" }: { produc
 
   return (
     <article className="group">
-      <Link prefetch={false} href={`/products/${product.id}`} className="block">
+      <Link href={`/products/${product.id}`} className="block">
         <div className={`relative ${imageAspect} overflow-hidden rounded-md bg-zinc-100`}>
           <SafeImage
             src={product.image_url}
@@ -22,14 +24,10 @@ export function ProductCard({ product, imageAspect = "aspect-square" }: { produc
         </div>
       </Link>
       <div className="mt-3 space-y-1.5">
-        <Link
-          prefetch={false}
-          href={`/markets/${product.market_id}`}
-          className="inline-flex max-w-full text-xs font-semibold text-muted underline-offset-2 hover:text-foreground hover:underline"
-        >
-          <span className="truncate">{product.market_name ?? `마켓 ${product.market_id}`}</span>
+        <Link href={`/markets/${product.market?.id ?? product.market_id}`} className="inline-flex w-fit text-xs font-semibold text-muted underline-offset-2 hover:text-foreground hover:underline">
+          {product.market?.name ?? product.market_name ?? `마켓 ${product.market_id}`}
         </Link>
-        <Link prefetch={false} href={`/products/${product.id}`} className="block">
+        <Link href={`/products/${product.id}`} className="block">
           <h3 className="line-clamp-2 min-h-10 text-sm font-medium leading-5 group-hover:underline">{product.name}</h3>
         </Link>
         <div className="rounded-md bg-zinc-50 px-2.5 py-2">
@@ -48,22 +46,25 @@ export function ProductCard({ product, imageAspect = "aspect-square" }: { produc
           )}
         </div>
         <div className="flex flex-wrap gap-1">
-          {(product.tag_chips ?? []).slice(0, 4).map((chip) => <ProductChip key={chip.code} chip={chip} />)}
+          {(product.tag_chips ?? []).slice(0, 4).map((chip) => (
+            <ProductChip key={chip.code} label={chip.label} tone={chip.tone} />
+          ))}
         </div>
       </div>
     </article>
   );
 }
 
-function ProductChip({ chip }: { chip: ProductTagChip }) {
+function ProductChip({ label, tone }: { label: string; tone: string }) {
   const toneClasses: Record<string, string> = {
     shipping: "bg-emerald-50 text-emerald-700",
     delivery: "bg-sky-50 text-sky-700",
-    promotion: "bg-amber-50 text-amber-800",
     exclusive: "bg-amber-50 text-amber-800",
+    promotion: "bg-amber-50 text-amber-800",
     new: "bg-brand text-white",
     default: "bg-zinc-100 text-zinc-600",
   };
+  const toneClass = toneClasses[tone] ?? toneClasses.default;
 
-  return <span className={`rounded-sm px-1.5 py-0.5 text-[11px] font-bold ${toneClasses[chip.tone] ?? toneClasses.default}`}>{chip.label}</span>;
+  return <span className={`rounded-sm px-1.5 py-0.5 text-[11px] font-bold ${toneClass}`}>{label}</span>;
 }

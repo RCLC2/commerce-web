@@ -75,6 +75,18 @@ export type AdminDashboard = {
   recent_actions: AuditLog[];
 };
 
+export type PLPMarketSummary = {
+  id: number;
+  name: string;
+  profile_image_url?: string;
+};
+
+export type PLPTagChip = {
+  code: string;
+  label: string;
+  tone: "shipping" | "delivery" | "exclusive" | "new" | "default" | string;
+};
+
 export type Product = {
   id: number;
   market_id: number;
@@ -90,22 +102,43 @@ export type Product = {
   delivery_label?: string;
   today_shipping_available?: boolean;
   popularity_score: number;
+  realtime_popularity_score?: number;
   status: "SELLING" | "SOLD_OUT" | string;
   options?: ProductOption[];
   image_url?: string;
   detail_html?: string;
   market_name?: string;
   market_profile_image_url?: string;
+  market?: PLPMarketSummary;
+  tag_chips?: PLPTagChip[];
   tags?: string[];
-  tag_chips?: ProductTagChip[];
   in_stock?: boolean;
 };
 
-export type ProductTagChip = {
-  code: string;
-  label: string;
-  tone: "default" | "shipping" | "delivery" | "promotion" | "new" | string;
+/** 상품 목록(Product Listing Page)에 노출하는 공통 상품 단위. */
+export type PLPProduct = Product;
+
+export type CategoryInformation = {
+  categories: CommerceCategory[];
+  selected_category: CommerceCategory;
+  bundle_label: string;
+  products: Product[];
+  pagination: {
+    page: number;
+    page_size: number;
+    has_next: boolean;
+  };
+  realtime_popular_carousel: {
+    title: string;
+    description: string;
+    insert_after: number;
+    captured_at: string;
+    products: Product[];
+  };
+  /** 프론트 화면 검수용 404 fallback에서만 설정됩니다. */
+  is_demo?: boolean;
 };
+
 
 export type PLPProductPage = {
   items: Product[];
@@ -122,7 +155,7 @@ export type PLPInformation = {
   price_ranges: Array<{ code: string; label: string; min_price: number; max_price: number }>;
   sort_options: Array<{ code: "popular" | "new" | "price-low" | "price-high"; label: string }>;
   default_sort: "popular" | "new" | "price-low" | "price-high";
-  tag_chips: ProductTagChip[];
+  tag_chips: PLPTagChip[];
   is_dummy?: boolean;
 };
 
@@ -566,6 +599,21 @@ export type CMSHomeSection = {
   created_at?: string;
   updated_at?: string;
 };
+
+export type HomeCategoryChip = {
+  id: number;
+  sequence: number;
+  chip_type: "CATEGORY" | "CATEGORY_EVENT";
+  category_id?: number;
+  category_event_id?: number;
+  icon_url: string;
+  status: "ACTIVE" | "INACTIVE" | string;
+  title: string;
+  href: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 
 export type InstagramTrendItem = {
   id: string;

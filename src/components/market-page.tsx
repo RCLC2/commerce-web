@@ -8,20 +8,25 @@ import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
 export function MarketPage({ marketId }: { marketId: number }) {
-  const { data: market, isLoading } = useQuery({
+  const marketQuery = useQuery({
     queryKey: ["market", marketId],
     queryFn: () => api.getMarket(marketId),
   });
-  const { data: productPage } = useQuery({
+  const productsQuery = useQuery({
     queryKey: ["market-products", marketId],
-    queryFn: () => api.listPLPProducts({ marketId, pageSize: 24 }),
+    queryFn: () => api.listPLPProducts({ marketId }),
   });
 
-  if (isLoading || !market) {
+  const market = marketQuery.data;
+  const marketProducts = productsQuery.data?.items ?? [];
+
+  if (marketQuery.isLoading || productsQuery.isLoading) {
     return <main className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted">마켓을 불러오는 중입니다.</main>;
   }
 
-  const marketProducts = productPage?.items ?? [];
+  if (marketQuery.error || productsQuery.error || !market) {
+    return <main className="mx-auto max-w-6xl px-4 py-16"><div className="rounded-md border border-red-200 bg-red-50 p-8 text-center"><h1 className="text-xl font-black text-red-900">마켓을 불러오지 못했습니다.</h1><p className="mt-2 text-sm text-red-700">잠시 후 다시 시도해주세요.</p></div></main>;
+  }
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24">
