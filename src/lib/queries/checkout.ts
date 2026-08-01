@@ -8,6 +8,11 @@ export type CheckoutOrderInput = {
 
 export const CHECKOUT_RETRY_STORAGE_KEY = "commerce.checkout.retry";
 
+export function selectedCartItemIDs(value: string | null): Set<number> | null {
+  if (value === null) return null;
+  return new Set(value.split(",").map(Number).filter((id) => Number.isSafeInteger(id) && id > 0));
+}
+
 export type CheckoutRetryState = {
   memberID?: unknown;
   orderCode?: unknown;

@@ -10,6 +10,7 @@ import {
   safeHostedCheckoutURL,
   saveCheckoutRetryState,
   clearCheckoutRetryState,
+  selectedCartItemIDs,
   shouldDiscardCheckoutRestoreStatus,
   submitServerAuthoritativeCheckout,
 } from "./checkout";
@@ -30,6 +31,14 @@ function hostedCheckout(orderCode = "ORDER-1", amount = 40000, checkoutURL = "ht
     amount,
   };
 }
+
+describe("selectedCartItemIDs", () => {
+  it("distinguishes an absent selection from a filtered valid selection", () => {
+    expect(selectedCartItemIDs(null)).toBeNull();
+    expect([...selectedCartItemIDs("11,22,22,0,nope")!]).toEqual([11, 22]);
+    expect(selectedCartItemIDs("")).toEqual(new Set());
+  });
+});
 
 describe("submitServerAuthoritativeCheckout", () => {
   it("reuses the created order and always requests checkout for the server-confirmed amount", async () => {
