@@ -33,22 +33,31 @@ Backend dependency:
 
 ### Phase C1.5: Integrated Search and Autocomplete
 
-Status: required
+Status: implemented
 
-Build:
-- Top app-shell search that routes to `/search?q=`
-- Search result page that returns both products and markets in one view
-- Autocomplete suggestions for keywords, products, and markets while typing
-- Trending search keywords segmented by audience group with captured time
-- MSW happy path for search result and suggestion contracts
+Ubiquitous language:
+- **통합 검색(Integrated Search)**: one query returning product and market result pages.
+- **검색 결과 페이지(Search Result Page)**: `/search` page with independently addressable product and market pagination.
+- **검색 결과 구좌(Search Result Section)**: server-managed carousel rendered between the product and market lists.
+- **연관 상품 캐러셀(Related Product Carousel)** and **스폰서 마켓 캐러셀(Sponsored Market Carousel)**: the default search result sections.
+- **연관 검색어(Related Keyword)**: server-produced related query shown as chips.
+- **인기 검색어(Trending Search)**: ranked query with `UP`, `SAME`, or `DOWN` movement.
+- **대상 세그먼트(Audience Segment)**: `women(여성)` or `men(남성)` trending-search chip.
 
-Backend dependency:
-- TODO: `GET /api/v1/search?q=&limit=`
-- TODO: `GET /api/v1/search/suggestions?q=&limit=`
-- TODO: `GET /api/v1/search/trending?segment=`
-- Response should include products, markets, and normalized suggestions so the frontend does not need to run separate product/market searches.
-- Trending search response should include `segments`, selected `segment`, `captured_at`, and ranked items so the frontend can render filters and 기준 시간 from backend data.
+Implemented behavior:
+- Top app-shell search routes to `/search?q=` and autocomplete uses server suggestions.
+- Product and market results use independent `product_page` and `market_page` URL parameters and render server totals.
+- `sections` render in server `sequence` order between the product and market result lists; unknown or empty sections are ignored safely.
+- Related keyword chips use `related_keywords` from the server and do not synthesize prefixes in the browser.
+- Trending chips are named 여성 and 남성 and show up, unchanged, and down movement.
+- The displayed current time is computed by the frontend every minute. The backend does not provide `captured_at`.
+- Search, suggestion, and trending requests use development dummy data only when the corresponding backend endpoint returns HTTP 404. HTTP 500, network, parse, and contract errors remain visible.
 
+Backend contract:
+- `GET /api/v1/search?q=&audience=&product_page=&market_page=&page_size=`
+- `GET /api/v1/search/suggestions?q=&limit=`
+- `GET /api/v1/search/trending?segment=women|men`
+- Search response includes paged `products`, paged `markets`, normalized `suggestions`, `related_keywords`, and ordered `sections`.
 ### Phase C2: PDP, Product Detail Page
 
 Status: required
