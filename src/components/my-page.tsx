@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, MapPin, Ticket, Wallet } from "lucide-react";
+import { ChevronRight, Heart, MapPin, MessageSquareText, Settings2, ShoppingBag, Ticket, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -84,7 +84,16 @@ export function MyPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 pb-24 pt-8">
-      <div className="flex items-start justify-between gap-4"><div><h1 className="text-2xl font-black">My page</h1><p className="mt-1 text-sm text-muted">{profile?.email ?? "-"}</p></div><Button variant="secondary" onClick={() => { logout(); router.push("/login"); }}>Logout</Button></div>
+      <div className="flex items-start justify-between gap-4">
+        <div><h1 className="text-2xl font-black">마이페이지</h1><p className="mt-1 text-sm text-muted">{profile?.email ?? "회원 정보를 불러오는 중입니다"}</p></div>
+        <Button variant="secondary" onClick={() => { logout(); router.push("/login"); }}>로그아웃</Button>
+      </div>
+      <section className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <MyShortcut href="/cart" icon={<ShoppingBag size={19} />} label="장바구니" description="담아둔 상품 보기" />
+          <MyShortcut href="/likes" icon={<Heart size={19} />} label="좋아요" description="관심 상품 모아보기" />
+          <MyShortcut href="/mypage/profile" icon={<Settings2 size={19} />} label="회원정보" description="프로필·배송지 관리" />
+          <MyShortcut href="/mypage/reviews" icon={<MessageSquareText size={19} />} label="리뷰 관리" description="작성한 리뷰 확인" />
+      </section>
       {queryError ? <div className="mt-5 rounded-md border border-brand/30 bg-red-50 p-4 text-sm"><p className="font-bold text-brand">{apiErrorMessage(queryError)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => { void profileQuery.refetch(); void ordersQuery.refetch(); void myCouponsQuery.refetch(); void issuableCouponsQuery.refetch(); void addressesQuery.refetch(); }}>Retry</Button></div> : null}
       <section className="mt-6 grid gap-3 md:grid-cols-3"><Metric icon={<Ticket size={16} />} label="Available coupons" value={issuableCouponsQuery.error ? "-" : `${issuableCoupons.length}`} /><Metric icon={<Wallet size={16} />} label="Points" value={profileQuery.error ? "-" : formatPrice(profile?.point_balance ?? 0)} /><Metric icon={<Ticket size={16} />} label="My coupons" value={myCouponsQuery.error ? "-" : `${myCoupons.length}`} /></section>
       <section className="mt-4 rounded-md border border-line bg-white p-4">
@@ -142,4 +151,8 @@ function orderPeriodCutoff(period: string) {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
   return cutoff;
+}
+
+function MyShortcut({ href, icon, label, description }: { href: string; icon: React.ReactNode; label: string; description: string }) {
+  return <Link href={href} className="rounded-md border border-line bg-white p-4 transition hover:bg-zinc-50"><div className="flex items-center gap-2 text-sm font-black text-brand">{icon}<span className="text-foreground">{label}</span></div><p className="mt-1 text-xs text-muted">{description}</p></Link>;
 }
