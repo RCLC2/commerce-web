@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Flame, Grid2X2, Heart, Home, Menu, Search, ShieldCheck, Star, Store, User, X } from "lucide-react";
+import { Flame, Grid2X2, Heart, Home, Menu, Search, ShieldCheck, ShoppingBag, Star, Store, User, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -132,6 +132,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Button>
             </Link>
           ) : null}
+          <Link href="/cart" aria-label="장바구니">
+            <Button variant="ghost" size="icon" title="장바구니">
+              <ShoppingBag size={20} />
+            </Button>
+          </Link>
           <Link href="/mypage" aria-label="마이페이지">
             <Button variant="ghost" size="icon">
               <User size={20} />
@@ -193,18 +198,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </p>
           </div>
           <div>
-            <p className="font-black text-foreground">서비스</p>
+            <p className="font-black text-foreground">쇼핑</p>
             <div className="mt-3 grid gap-2">
+              <Link href="/products" className="hover:text-foreground">전체 상품</Link>
               <Link href="/popular-products" className="hover:text-foreground">인기 상품</Link>
               <Link href="/popular-markets" className="hover:text-foreground">인기 마켓</Link>
-              <Link href="/recommendations" className="hover:text-foreground">추천 상품</Link>
+              <Link href="/cart" className="hover:text-foreground">장바구니</Link>
             </div>
           </div>
           <div>
-            <p className="font-black text-foreground">고객 지원</p>
+            <p className="font-black text-foreground">내 쇼핑</p>
             <div className="mt-3 grid gap-2">
-              <Link href="/mypage" className="hover:text-foreground">마이페이지</Link>
-              <Link href="/cart" className="hover:text-foreground">장바구니</Link>
+              <Link href="/mypage" className="hover:text-foreground">주문 조회</Link>
+              <Link href="/likes" className="hover:text-foreground">좋아요</Link>
+              <Link href="/mypage/reviews" className="hover:text-foreground">리뷰 관리</Link>
               <Link href="/login" className="hover:text-foreground">로그인</Link>
             </div>
           </div>

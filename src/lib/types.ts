@@ -19,6 +19,11 @@ export type Market = {
   profile_image_url?: string;
   cover_image_url?: string;
   follower_count?: number;
+  satisfaction_rate?: number;
+  average_product_rating?: number;
+  product_count?: number;
+  new_product_count?: number;
+  popular_products?: Product[];
   status: "OPEN" | "CLOSED" | "HIDE" | "EXIT" | string;
   tags?: string[];
 };
@@ -82,6 +87,18 @@ export type ProductImage = {
   sort_order: number;
 };
 
+export type PLPMarketSummary = {
+  id: number;
+  name: string;
+  profile_image_url?: string;
+};
+
+export type PLPTagChip = {
+  code: string;
+  label: string;
+  tone: "shipping" | "delivery" | "exclusive" | "new" | "default" | string;
+};
+
 export type Product = {
   id: number;
   market_id: number;
@@ -98,6 +115,7 @@ export type Product = {
   delivery_label?: string;
   today_shipping_available?: boolean;
   popularity_score: number;
+  realtime_popularity_score?: number;
   status: "SELLING" | "SOLD_OUT" | string;
   options?: ProductOption[];
   image_url?: string;
@@ -105,7 +123,69 @@ export type Product = {
   is_fallback?: boolean;
   detail_html?: string;
   market_name?: string;
+  market_profile_image_url?: string;
+  market?: PLPMarketSummary;
+  tag_chips?: PLPTagChip[];
   tags?: string[];
+  in_stock?: boolean;
+};
+
+/** 상품 목록(Product Listing Page)에 노출하는 공통 상품 단위. */
+export type PLPProduct = Product;
+
+export type CategoryInformation = {
+  categories: CommerceCategory[];
+  selected_category: CommerceCategory;
+  bundle_label: string;
+  products: Product[];
+  pagination: {
+    page: number;
+    page_size: number;
+    has_next: boolean;
+  };
+  realtime_popular_carousel: {
+    title: string;
+    description: string;
+    insert_after: number;
+    captured_at: string;
+    products: Product[];
+  };
+  /** 프론트 화면 검수용 404 fallback에서만 설정됩니다. */
+  is_demo?: boolean;
+};
+
+
+export type PLPProductPage = {
+  items: Product[];
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+  is_dummy?: boolean;
+};
+
+export type PLPInformation = {
+  categories: CommerceCategory[];
+  total_product_count: number;
+  price_ranges: Array<{ code: string; label: string; min_price: number; max_price: number }>;
+  sort_options: Array<{ code: "popular" | "new" | "price-low" | "price-high"; label: string }>;
+  default_sort: "popular" | "new" | "price-low" | "price-high";
+  tag_chips: PLPTagChip[];
+  is_dummy?: boolean;
+};
+
+export type PLPProductParams = {
+  categoryIDs?: number[];
+  marketId?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  shipping?: "free";
+  onSale?: boolean;
+  inStock?: boolean;
+  tagChip?: string;
+  sort?: "popular" | "new" | "price-low" | "price-high";
+  page?: number;
+  pageSize?: number;
 };
 
 export type PdpCardAd = {
@@ -139,9 +219,28 @@ export type SearchSuggestion = {
 
 export type SearchResponse = {
   q: string;
-  products: Product[];
-  markets: Market[];
+  products: SearchPage<Product>;
+  markets: SearchPage<Market>;
   suggestions: SearchSuggestion[];
+  related_keywords: string[];
+  sections: SearchResultSection[];
+};
+
+export type SearchPage<T> = {
+  items: T[];
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+};
+
+export type SearchResultSection = {
+  id: number;
+  sequence: number;
+  title: string;
+  section_type: "PRODUCT_CAROUSEL" | "MARKET_CAROUSEL";
+  products?: Product[];
+  markets?: Market[];
 };
 
 export type TrendingSearchItem = {
@@ -151,9 +250,8 @@ export type TrendingSearchItem = {
 };
 
 export type TrendingSearchResponse = {
-  segment: string;
-  captured_at: string;
-  segments: string[];
+  segment: "all" | "women" | "men";
+  segments: Array<{ id: "women" | "men"; label: string }>;
   items: TrendingSearchItem[];
 };
 
@@ -572,6 +670,21 @@ export type CMSHomeSection = {
   created_at?: string;
   updated_at?: string;
 };
+
+export type HomeCategoryChip = {
+  id: number;
+  sequence: number;
+  chip_type: "CATEGORY" | "CATEGORY_EVENT";
+  category_id?: number;
+  category_event_id?: number;
+  icon_url: string;
+  status: "ACTIVE" | "INACTIVE" | string;
+  title: string;
+  href: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 
 export type InstagramTrendItem = {
   id: string;

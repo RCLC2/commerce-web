@@ -40,6 +40,18 @@ export const productImageSchema = z.object({
   sort_order: nonNegativeIntSchema,
 });
 
+export const plpMarketSummarySchema = z.object({
+  id: identifierSchema,
+  name: z.string(),
+  profile_image_url: z.string().optional(),
+});
+
+export const plpTagChipSchema = z.object({
+  code: z.string().min(1),
+  label: z.string().min(1),
+  tone: z.enum(["shipping", "delivery", "exclusive", "new", "default"]),
+});
+
 export const productSchema = z.object({
   id: identifierSchema,
   market_id: identifierSchema,
@@ -54,6 +66,7 @@ export const productSchema = z.object({
   delivery_label: z.string().optional(),
   today_shipping_available: z.boolean().optional(),
   popularity_score: z.number().default(0),
+  realtime_popularity_score: z.number().nonnegative().optional(),
   status: z.enum(["SELLING", "SOLD_OUT"]),
   options: z.array(productOptionSchema).optional(),
   image_url: z.string().optional(),
@@ -61,7 +74,15 @@ export const productSchema = z.object({
   is_fallback: z.boolean().optional(),
   detail_html: z.string().optional(),
   market_name: z.string().optional(),
+  market_profile_image_url: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  tag_chips: z.array(z.object({ code: z.string(), label: z.string(), tone: z.string() })).optional(),
+  in_stock: z.boolean().optional(),
+});
+
+export const plpProductSchema = productSchema.extend({
+  market: plpMarketSummarySchema,
+  tag_chips: z.array(plpTagChipSchema),
 });
 
 export const marketSchema = z.object({
@@ -92,6 +113,41 @@ export const categorySchema: z.ZodType<CommerceCategory> = z.lazy(() =>
   }),
 );
 
+export const categoryInformationSchema = z.object({
+  categories: z.array(categorySchema),
+  selected_category: categorySchema,
+  bundle_label: z.string(),
+  products: z.array(plpProductSchema),
+  pagination: z.object({
+    page: z.number().int().positive(),
+    page_size: z.number().int().positive(),
+    has_next: z.boolean(),
+  }),
+  realtime_popular_carousel: z.object({
+    title: z.string(),
+    description: z.string(),
+    insert_after: z.number().int().nonnegative(),
+    captured_at: dateStringSchema,
+    products: z.array(plpProductSchema),
+  }),
+});
+
+export const plpProductPageSchema = z.object({
+  items: z.array(productSchema),
+  page: z.number().int().positive(),
+  page_size: z.number().int().positive(),
+  total: nonNegativeIntSchema,
+  total_pages: nonNegativeIntSchema,
+});
+
+export const plpInformationSchema = z.object({
+  categories: z.array(categorySchema),
+  total_product_count: nonNegativeIntSchema,
+  price_ranges: z.array(z.object({ code: z.string(), label: z.string(), min_price: nonNegativeIntSchema, max_price: nonNegativeIntSchema })),
+  sort_options: z.array(z.object({ code: z.enum(["popular", "new", "price-low", "price-high"]), label: z.string() })),
+  default_sort: z.enum(["popular", "new", "price-low", "price-high"]),
+  tag_chips: z.array(z.object({ code: z.string(), label: z.string(), tone: z.string() })),
+});
 export const homeSectionSchema = z.object({
   id: identifierSchema,
   sequence: z.number().int(),
@@ -102,6 +158,21 @@ export const homeSectionSchema = z.object({
   created_at: dateStringSchema.optional(),
   updated_at: dateStringSchema.optional(),
 });
+
+export const homeCategoryChipSchema = z.object({
+  id: identifierSchema,
+  sequence: z.number().int(),
+  chip_type: z.enum(["CATEGORY", "CATEGORY_EVENT"]),
+  category_id: identifierSchema.optional(),
+  category_event_id: identifierSchema.optional(),
+  icon_url: z.string().startsWith("/"),
+  status: z.string(),
+  title: z.string().min(1),
+  href: z.string().startsWith("/"),
+  created_at: dateStringSchema.optional(),
+  updated_at: dateStringSchema.optional(),
+});
+
 
 export const instagramTrendItemSchema = z.object({
   id: z.string(),

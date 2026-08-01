@@ -1,44 +1,19 @@
 "use client";
 
-import { useQueries, useQuery } from "@tanstack/react-query";
-import {
-  Backpack,
-  ChevronLeft,
-  ChevronRight,
-  Gem,
-  Shirt,
-  ShoppingBag,
-  Sparkles,
-  Star,
-  Watch,
-  Footprints,
-} from "lucide-react";
+import { useInfiniteQuery, useQueries, useQuery } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { queryKeys } from "@/lib/query-keys";
-import type { CMSHomeSection, CommerceCategory, Product } from "@/lib/types";
+import type { CMSHomeSection, Product } from "@/lib/types";
 import { useSessionStore } from "@/lib/session-store";
 import { formatPrice } from "@/lib/utils";
 import { ProductCard } from "./product-card";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
-const categoryIcons = {
-  tops: Shirt,
-  pants: Watch,
-  dress: Sparkles,
-  outer: ShoppingBag,
-  bags: Backpack,
-  skirts: Sparkles,
-  today: Footprints,
-  "free-shipping": Gem,
-};
-
-function compareCategoryOrder(a: CommerceCategory, b: CommerceCategory) {
-  return a.sort_order - b.sort_order || a.id - b.id;
-}
 
 function productsForHomeSection(section: CMSHomeSection) {
   if (section.api_url.includes("/products/promotions")) {
@@ -49,41 +24,40 @@ function productsForHomeSection(section: CMSHomeSection) {
   }
   return api.listPopularProducts();
 }
-function categoryIcon(category: CommerceCategory) {
-  return categoryIcons[category.slug as keyof typeof categoryIcons] ?? Star;
-}
 
 export function HomePage() {
   const token = useSessionStore((state) => state.accessToken);
   const [eventIndex, setEventIndex] = useState(0);
-  const [visibleCount, setVisibleCount] = useState(8);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const effectiveToken = getEffectiveToken(token);
   const { data: events = [] } = useQuery({
     queryKey: queryKeys.events,
     queryFn: api.listEvents,
   });
-  const { data: categories = [] } = useQuery({
-    queryKey: queryKeys.categories,
-    queryFn: api.listCategories,
+  const { data: homeCategoryChips = [] } = useQuery({
+    queryKey: queryKeys.homeCategoryChips,
+    queryFn: api.listHomeCategoryChips,
   });
   const { data: homeSections = [] } = useQuery({
     queryKey: ["home-sections"],
     queryFn: api.listHomeSections,
   });
-  const { data: recommendationProducts = [], isLoading: isRecommendationLoading } = useQuery({
+  const { data: recommendationPages, isLoading: isRecommendationLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: queryKeys.personalizedProducts({ sort: "new" }),
-    queryFn: api.listRecommendedProducts,
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) => api.listRecommendedProducts({ limit: 12, offset: pageParam }),
+    getNextPageParam: (lastPage, pages) => (
+      lastPage.length === 12 ? pages.length * 12 : undefined
+    ),
   });
+  const recommendationProducts = recommendationPages?.pages.flat() ?? [];
   const { data: profile } = useQuery({
     queryKey: queryKeys.homeMe(effectiveToken),
     queryFn: () => api.me(effectiveToken ?? ""),
     enabled: Boolean(effectiveToken),
   });
   const recommendationTitle = `${profile?.email?.split("@")[0] ?? "사용자"}님을 위한 추천 상품`;
-  const rootCategories = [...categories]
-    .filter((category) => !category.parent_id && category.level === 1)
-    .sort(compareCategoryOrder);
+  const displayHomeCategoryChips = [...homeCategoryChips].sort((a, b) => a.sequence - b.sequence || a.id - b.id);
   const displayHomeSections = [...homeSections].sort((a, b) => a.sequence - b.sequence || a.id - b.id);
   const homeSectionQueries = useQueries({
     queries: displayHomeSections.map((section) => ({
@@ -98,13 +72,13 @@ export function HomePage() {
       return;
     }
     const observer = new IntersectionObserver((entries) => {
-      if (entries[0]?.isIntersecting) {
-        setVisibleCount((count) => Math.min(count + 8, recommendationProducts.length));
+      if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+        void fetchNextPage();
       }
     });
     observer.observe(target);
     return () => observer.disconnect();
-  }, [recommendationProducts.length]);
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   function moveEvent(direction: "prev" | "next") {
     if (!events.length) {
@@ -161,18 +135,15 @@ export function HomePage() {
       </section>
 
       <section className="rounded-md border border-line bg-white p-3">
-        <div className="grid grid-cols-5 gap-1 md:grid-cols-10">
-          {rootCategories.map((category) => {
-            const Icon = categoryIcon(category);
-            return (
-              <Link key={category.href} href={category.href} className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-md p-1 hover:bg-zinc-50">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-brand">
-                  <Icon size={19} />
-                </span>
-                <span className="text-xs font-bold">{category.name}</span>
-              </Link>
-            );
-          })}
+        <div className="grid grid-cols-5 gap-1">
+          {displayHomeCategoryChips.map((chip) => (
+            <Link key={chip.id} href={chip.href} className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-md p-1 hover:bg-zinc-50">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-brand">
+                <SafeImage src={chip.icon_url} alt="" width={24} height={24} className="h-6 w-6 object-contain" />
+              </span>
+              <span className="text-center text-xs font-bold">{chip.title}</span>
+            </Link>
+          ))}
         </div>
       </section>
 
@@ -200,13 +171,13 @@ export function HomePage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
-            {recommendationProducts.slice(0, visibleCount).map((product) => (
+            {recommendationProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
         )}
         <div ref={loadMoreRef} className="h-8" />
-        {visibleCount < recommendationProducts.length ? (
+        {hasNextPage || isFetchingNextPage ? (
           <p className="text-center text-xs text-muted">추천 상품을 더 불러오는 중입니다.</p>
         ) : null}
       </section>
