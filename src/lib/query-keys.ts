@@ -12,7 +12,7 @@ export const queryKeys = {
   coupons: (token: string) => ["coupons", token] as const,
   issuableCoupons: (token: string) => ["issuable-coupons", token] as const,
   addresses: (token: string) => ["addresses", token] as const,
-  integratedSearch: (q: string) => ["integrated-search", q] as const,
+  integratedSearch: (params: { q: string; audience: string; productPage: number; marketPage: number }) => ["integrated-search", params] as const,
   searchSuggestions: (q: string) => ["search-page-suggestions", q] as const,
   trendingSearches: (segment: string) => ["trending-searches", segment] as const,
 };

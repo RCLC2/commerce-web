@@ -19,6 +19,11 @@ export type Market = {
   profile_image_url?: string;
   cover_image_url?: string;
   follower_count?: number;
+  satisfaction_rate?: number;
+  average_product_rating?: number;
+  product_count?: number;
+  new_product_count?: number;
+  popular_products?: Product[];
   status: "OPEN" | "CLOSED" | "HIDE" | "EXIT" | string;
   tags?: string[];
 };
@@ -107,9 +112,28 @@ export type SearchSuggestion = {
 
 export type SearchResponse = {
   q: string;
-  products: Product[];
-  markets: Market[];
+  products: SearchPage<Product>;
+  markets: SearchPage<Market>;
   suggestions: SearchSuggestion[];
+  related_keywords: string[];
+  sections: SearchResultSection[];
+};
+
+export type SearchPage<T> = {
+  items: T[];
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+};
+
+export type SearchResultSection = {
+  id: number;
+  sequence: number;
+  title: string;
+  section_type: "PRODUCT_CAROUSEL" | "MARKET_CAROUSEL";
+  products?: Product[];
+  markets?: Market[];
 };
 
 export type TrendingSearchItem = {
@@ -119,9 +143,8 @@ export type TrendingSearchItem = {
 };
 
 export type TrendingSearchResponse = {
-  segment: string;
-  captured_at: string;
-  segments: string[];
+  segment: "all" | "women" | "men";
+  segments: Array<{ id: "women" | "men"; label: string }>;
   items: TrendingSearchItem[];
 };
 
