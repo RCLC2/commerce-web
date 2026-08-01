@@ -1,11 +1,18 @@
 import { z } from "zod";
 import { ApiHttpError, requestParsed } from "../api-client";
 import { demoCategoryInformation, demoMarket, demoMarketProducts } from "../category-information-demo";
+import { fallbackHomeCategoryChips } from "../home-category-chip-fallback";
+import {
+  fallbackHomeEvents,
+  fallbackHomeProducts,
+  fallbackHomeSections,
+} from "../home-preview-fallback";
 import {
   carouselSchema,
+  categoryInformationSchema,
   categorySchema,
   eventSchema,
-  categoryInformationSchema,
+  homeCategoryChipSchema,
   homeSectionSchema,
   instagramTrendPageSchema,
   marketSchema,
@@ -26,6 +33,15 @@ const productDetailSchema = z.object({
 
 const parseProducts = async (path: string) =>
   (await requestParsed(z.array(plpProductSchema), path)).map(normalizePublicProduct);
+
+async function with404Fallback<T>(request: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await request();
+  } catch (error) {
+    if (error instanceof ApiHttpError && error.status === 404) return fallback;
+    throw error;
+  }
+}
 
 export const catalogApi = {
   listMarkets: () => requestParsed(z.array(marketSchema), "/api/v1/markets"),
@@ -69,9 +85,18 @@ export const catalogApi = {
       throw error;
     }
   },
-  listEvents: () => requestParsed(z.array(eventSchema), "/api/v1/events"),
-  listHomeSections: () =>
-    requestParsed(z.array(homeSectionSchema), "/api/v1/home/sections"),
+  listEvents: () => with404Fallback(
+    () => requestParsed(z.array(eventSchema), "/api/v1/events"),
+    fallbackHomeEvents,
+  ),
+  listHomeSections: () => with404Fallback(
+    () => requestParsed(z.array(homeSectionSchema), "/api/v1/home/sections"),
+    fallbackHomeSections,
+  ),
+  listHomeCategoryChips: () => with404Fallback(
+    () => requestParsed(z.array(homeCategoryChipSchema), "/api/v1/home/category-chips"),
+    fallbackHomeCategoryChips,
+  ),
   listTrendPosts: (params?: { limit?: number; after?: string; hashtag?: string }) => {
     const search = new URLSearchParams();
     if (params?.limit) search.set("limit", String(params.limit));
@@ -83,7 +108,22 @@ export const catalogApi = {
       `/api/v1/trends/posts${query ? `?${query}` : ""}`,
     );
   },
-  getEvent: (id: number) => requestParsed(eventSchema, `/api/v1/events/${id}`),
+  getEvent: async (id: number) => {
+    const previewEvent = fallbackHomeEvents.find((event) => event.id === id);
+
+    try {
+      return await requestParsed(eventSchema, `/api/v1/events/${id}`);
+    } catch (error) {
+      if (
+        error instanceof ApiHttpError
+        && error.status === 404
+        && previewEvent
+      ) {
+        return previewEvent;
+      }
+      throw error;
+    }
+  },
   listProducts: async (params?: { categoryID?: number; marketID?: number; sort?: string; q?: string }) => {
     const search = new URLSearchParams();
     if (params?.marketID) search.set("marketID", String(params.marketID));
@@ -94,16 +134,41 @@ export const catalogApi = {
     try {
       return await parseProducts(`/api/v1/products${query ? `?${query}` : ""}`);
     } catch (error) {
-      if (params?.marketID && error instanceof ApiHttpError && error.status === 404) {
-        return demoMarketProducts(params.marketID);
+      if (error instanceof ApiHttpError && error.status === 404) {
+        if (params?.marketID) {
+          return demoMarketProducts(params.marketID);
+        }
+        return fallbackHomeProducts
+          .filter((product) => !params?.categoryID || product.category_id === params.categoryID)
+          .filter((product) => !params?.q || product.name.includes(params.q));
       }
       throw error;
     }
   },
-  listPopularProducts: () => parseProducts("/api/v1/products/popular"),
-  listPromotionProducts: () => parseProducts("/api/v1/products/promotions"),
-  listRecommendedProducts: () => parseProducts("/api/v1/products/recommendations"),
-  listLatestProducts: () => parseProducts("/api/v1/products/latest"),
+  listPopularProducts: () => with404Fallback(
+    () => parseProducts("/api/v1/products/popular"),
+    fallbackHomeProducts.slice(0, 10),
+  ),
+  listPromotionProducts: () => with404Fallback(
+    () => parseProducts("/api/v1/products/promotions"),
+    fallbackHomeProducts.slice(10, 20),
+  ),
+  listRecommendedProducts: (params?: { limit?: number; offset?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.limit) search.set("limit", String(params.limit));
+    if (params?.offset !== undefined) search.set("offset", String(params.offset));
+    const query = search.toString();
+    const limit = params?.limit ?? fallbackHomeProducts.length;
+    const offset = params?.offset ?? 0;
+    return with404Fallback(
+      () => parseProducts(`/api/v1/products/recommendations${query ? `?${query}` : ""}`),
+      fallbackHomeProducts.slice(offset, offset + limit),
+    );
+  },
+  listLatestProducts: () => with404Fallback(
+    () => parseProducts("/api/v1/products/latest"),
+    fallbackHomeProducts.slice(20, 30),
+  ),
   getProduct: (id: number) =>
     requestParsed(productDetailSchema, `/api/v1/products/${id}`).then((detail) => normalizePublicProduct({
       ...detail.product,

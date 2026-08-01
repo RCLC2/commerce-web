@@ -2,6 +2,7 @@ export const queryKeys = {
   events: ["events"] as const,
   categories: ["categories"] as const,
   categoryTree: ["category-tree"] as const,
+  homeCategoryChips: ["home-category-chips"] as const,
   products: (params?: { categoryID?: number; sort?: string; q?: string }) => ["products", params] as const,
   product: (id: number) => ["product", id] as const,
   productReviews: (id: number) => ["product-reviews", id] as const,

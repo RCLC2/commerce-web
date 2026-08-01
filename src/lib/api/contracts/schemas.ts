@@ -130,6 +130,21 @@ export const homeSectionSchema = z.object({
   updated_at: dateStringSchema.optional(),
 });
 
+export const homeCategoryChipSchema = z.object({
+  id: identifierSchema,
+  sequence: z.number().int(),
+  chip_type: z.enum(["CATEGORY", "CATEGORY_EVENT"]),
+  category_id: identifierSchema.optional(),
+  category_event_id: identifierSchema.optional(),
+  icon_url: z.string().startsWith("/"),
+  status: z.string(),
+  title: z.string().min(1),
+  href: z.string().startsWith("/"),
+  created_at: dateStringSchema.optional(),
+  updated_at: dateStringSchema.optional(),
+});
+
+
 export const instagramTrendItemSchema = z.object({
   id: z.string(),
   platform: z.string(),

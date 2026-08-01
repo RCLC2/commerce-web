@@ -565,6 +565,21 @@ export type CMSHomeSection = {
   updated_at?: string;
 };
 
+export type HomeCategoryChip = {
+  id: number;
+  sequence: number;
+  chip_type: "CATEGORY" | "CATEGORY_EVENT";
+  category_id?: number;
+  category_event_id?: number;
+  icon_url: string;
+  status: "ACTIVE" | "INACTIVE" | string;
+  title: string;
+  href: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+
 export type InstagramTrendItem = {
   id: string;
   platform: string;
