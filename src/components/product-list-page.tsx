@@ -1,289 +1,175 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
-import type { CommerceCategory, Product } from "@/lib/types";
-import { formatPrice } from "@/lib/utils";
+import type { PLPProductParams } from "@/lib/types";
 import { ProductCard } from "./product-card";
-import { Button } from "./ui/button";
 
-const sorts = [
-  { label: "인기순", value: "popular" },
-  { label: "신상품", value: "new" },
-  { label: "낮은 가격", value: "price-low" },
-  { label: "높은 가격", value: "price-high" },
-];
-
-const priceRanges = [
-  { label: "전체 가격", value: "", min: 0, max: Infinity },
-  { label: "3만원 이하", value: "under-30000", min: 0, max: 30_000 },
-  { label: "3-5만원", value: "30000-50000", min: 30_000, max: 50_000 },
-  { label: "5만원 이상", value: "over-50000", min: 50_000, max: Infinity },
-];
-
-const tagFilters = ["오늘출발", "신상", "무료배송", "리뷰많음", "쿠폰가능"];
-
-function compareCategoryOrder(a: CommerceCategory, b: CommerceCategory) {
-  return a.level - b.level || (a.parent_id ?? 0) - (b.parent_id ?? 0) || a.sort_order - b.sort_order || a.id - b.id;
-}
-function productPrice(product: Product) {
-  return product.discount_price || product.base_price;
-}
-
-function categoryFilterIDs(category: CommerceCategory | undefined) {
-  if (!category) {
-    return [];
-  }
-  return category.category_ids?.length ? category.category_ids : [category.id];
+function positivePage(raw: string | null) {
+  const page = Number(raw);
+  return Number.isInteger(page) && page > 0 ? page : 1;
 }
 
 export function ProductListPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const q = searchParams.get("q") ?? "";
-  const sort = searchParams.get("sort") ?? "popular";
   const category = searchParams.get("category") ?? "";
-  const shipping = searchParams.get("shipping") ?? "";
-  const sale = searchParams.get("sale") ?? "";
-  const stock = searchParams.get("stock") ?? "";
-  const market = searchParams.get("market") ?? "";
-  const tag = searchParams.get("tag") ?? "";
+  const shipping = searchParams.get("shipping") === "free" ? "free" : undefined;
+  const onSale = searchParams.get("sale") === "on";
+  const inStock = searchParams.get("stock") === "available";
+  const tagChip = searchParams.get("tag_chip") ?? "";
   const price = searchParams.get("price") ?? "";
-  const [filtersOpen, setFiltersOpen] = useState(true);
-  const { data: serverCategories = [] } = useQuery({
-    queryKey: queryKeys.categories,
-    queryFn: api.listCategories,
+  const page = positivePage(searchParams.get("page"));
+
+  const informationQuery = useQuery({
+    queryKey: queryKeys.plpInformation,
+    queryFn: api.getPLPInformation,
+    staleTime: 5 * 60 * 1000,
   });
-  const { data: products = [], isLoading, error } = useQuery({
-    queryKey: queryKeys.products({ sort }),
-    queryFn: () => api.listProducts({ sort }),
-  });
-
-  const categories = useMemo(
-    () => [...serverCategories].sort(compareCategoryOrder),
-    [serverCategories],
-  );
-
-  const markets = useMemo(
-    () => Array.from(new Set(products.map((product) => product.market_name).filter((item): item is string => Boolean(item)))).sort(),
-    [products],
-  );
-
-  const rootCategories = useMemo(() => categories.filter((item) => !item.parent_id && item.level === 1), [categories]);
+  const categories = informationQuery.data?.categories ?? [];
+  const priceRanges = informationQuery.data?.price_ranges ?? [];
+  const sortOptions = informationQuery.data?.sort_options ?? [];
+  const requestedSort = searchParams.get("sort");
+  const sort = (sortOptions.some((item) => item.code === requestedSort) ? requestedSort : informationQuery.data?.default_sort) as PLPProductParams["sort"];
   const selectedCategory = categories.find((item) => item.slug === category);
-  const selectedCategoryIDs = useMemo(() => categoryFilterIDs(selectedCategory), [selectedCategory]);
-  const selectedPrice = priceRanges.find((item) => item.value === price) ?? priceRanges[0];
+  const selectedPrice = priceRanges.find((item) => item.code === price) ?? priceRanges[0];
+  const categoryIDs = selectedCategory?.category_ids?.length ? selectedCategory.category_ids : selectedCategory ? [selectedCategory.id] : undefined;
+  const request: PLPProductParams = {
+    categoryIDs,
+    minPrice: selectedPrice?.min_price || undefined,
+    maxPrice: selectedPrice?.max_price || undefined,
+    shipping,
+    onSale,
+    inStock,
+    tagChip: tagChip || undefined,
+    sort,
+    page,
+  };
+  const productsQuery = useQuery({
+    queryKey: queryKeys.plpProducts(request),
+    queryFn: () => api.listPLPProducts(request),
+    enabled: informationQuery.isSuccess,
+  });
+  const productPage = productsQuery.data;
 
-  const filteredProducts = useMemo(() => {
-    const query = q.trim().toLowerCase();
-    const result = products.filter((product) => {
-      const matchesQuery =
-        !query ||
-        product.name.toLowerCase().includes(query) ||
-        product.description.toLowerCase().includes(query) ||
-        product.tags?.some((item) => item.toLowerCase().includes(query)) ||
-        product.market_name?.toLowerCase().includes(query);
-      const matchesCategory = !selectedCategoryIDs.length || selectedCategoryIDs.includes(product.category_id);
-      const matchesShipping = shipping !== "free" || product.shipping_type === "FREE";
-      const matchesSale = sale !== "on" || product.discount_price < product.base_price;
-      const matchesStock =
-        stock !== "available" || product.options?.some((option) => option.is_active && option.quantity > 0);
-      const matchesMarket = !market || product.market_name === market;
-      const matchesTag = !tag || product.tags?.includes(tag) || (tag === "무료배송" && product.shipping_type === "FREE");
-      const matchesPrice = productPrice(product) >= selectedPrice.min && productPrice(product) <= selectedPrice.max;
-
-      return matchesQuery && matchesCategory && matchesShipping && matchesSale && matchesStock && matchesMarket && matchesTag && matchesPrice;
-    });
-
-    return result.sort((a, b) => {
-      if (sort === "price-low") {
-        return productPrice(a) - productPrice(b);
-      }
-      if (sort === "price-high") {
-        return productPrice(b) - productPrice(a);
-      }
-      if (sort === "new") {
-        return b.id - a.id;
-      }
-      return b.popularity_score - a.popularity_score;
-    });
-  }, [market, products, q, sale, selectedCategoryIDs, selectedPrice.max, selectedPrice.min, shipping, sort, stock, tag]);
-
-  function updateSearch(next: Record<string, string | undefined>) {
+  function updateSearch(next: Record<string, string | undefined>, resetPage = true) {
     const params = new URLSearchParams(searchParams.toString());
     Object.entries(next).forEach(([key, value]) => {
-      if (value) {
-        params.set(key, value);
-      } else {
-        params.delete(key);
-      }
+      if (value) params.set(key, value);
+      else params.delete(key);
     });
-    router.replace(`/products${params.toString() ? `?${params.toString()}` : ""}`);
+    if (resetPage) params.delete("page");
+    router.replace(`/products${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
   }
 
   function clearFilters() {
-    router.replace("/products?sort=popular");
+    router.replace("/products");
   }
 
+  const selectedTagChip = informationQuery.data?.tag_chips.find((item) => item.code === tagChip);
   const activeFilters = [
     selectedCategory ? `카테고리: ${selectedCategory.name}` : null,
-    q ? `검색: ${q}` : null,
-    market ? `마켓: ${market}` : null,
-    selectedPrice.value ? selectedPrice.label : null,
-    shipping === "free" ? "무료배송" : null,
-    sale === "on" ? "할인중" : null,
-    stock === "available" ? "재고 있음" : null,
-    tag ? `태그: ${tag}` : null,
-  ].filter(Boolean);
+    selectedPrice?.code ? selectedPrice.label : null,
+    shipping ? "무료배송" : null,
+    onSale ? "할인중" : null,
+    inStock ? "재고 있음" : null,
+    selectedTagChip ? `태그: ${selectedTagChip.label}` : null,
+  ].filter((item): item is string => Boolean(item));
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24 pt-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-black">{selectedCategory ? `${selectedCategory.name} 상품` : "상품"}</h1>
-          <p className="mt-1 text-sm text-muted">
-            {filteredProducts.length.toLocaleString("ko-KR")}개 상품을 필터 조건에 맞춰 보여드립니다.
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-brand">Product Listing Page</p>
+          <h1 className="mt-1 text-3xl font-black tracking-tight">{selectedCategory ? `${selectedCategory.name} 상품` : "전체 상품"}</h1>
+          <p className="mt-2 text-sm font-semibold text-muted">
+            서버가 필터링한 상품 <strong className="text-foreground">{(productPage?.total ?? informationQuery.data?.total_product_count ?? 0).toLocaleString("ko-KR")}개</strong>를 보여드립니다.
           </p>
         </div>
-        <form
-          className="flex h-11 items-center gap-2 rounded-md border border-line bg-white px-3 md:w-80"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const formData = new FormData(event.currentTarget);
-            updateSearch({ q: String(formData.get("q") ?? "").trim() || undefined });
-          }}
-        >
-          <Search size={18} className="text-muted" />
-          <input
-            key={q}
-            name="q"
-            defaultValue={q}
-            className="w-full outline-none"
-            placeholder="상품명, 태그, 마켓 검색"
-            aria-label="상품 검색"
-          />
-        </form>
+
       </div>
 
-      <div className="mt-5 flex gap-2 overflow-x-auto border-b border-line pb-4">
-        <button
-          className={`h-10 shrink-0 rounded-md px-4 text-sm font-bold ${
-            !selectedCategory ? "bg-foreground text-white" : "bg-white"
-          }`}
-          onClick={() => updateSearch({ category: undefined })}
-        >
-          전체
-        </button>
-        {rootCategories.map((item) => (
-          <button
-            key={item.id}
-            className={`h-10 shrink-0 rounded-md px-4 text-sm font-bold ${
-              selectedCategory?.id === item.id ? "bg-foreground text-white" : "bg-white"
-            }`}
-            onClick={() => updateSearch({ category: item.slug })}
-          >
+      <div className="mt-6 flex gap-2 overflow-x-auto border-y border-line py-3">
+        <button type="button" className={`h-10 shrink-0 rounded-full px-5 text-sm font-black ${!selectedCategory ? "bg-foreground text-white" : "bg-white"}`} onClick={() => updateSearch({ category: undefined })}>전체</button>
+        {categories.map((item) => (
+          <button type="button" key={item.id} className={`h-10 shrink-0 rounded-full px-5 text-sm font-black ${selectedCategory?.id === item.id ? "bg-foreground text-white" : "bg-white"}`} onClick={() => updateSearch({ category: item.slug })}>
             {item.name}
           </button>
         ))}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        {sorts.map((item) => (
-          <button
-            key={item.value}
-            className={`h-9 rounded-md px-3 text-sm font-bold ${sort === item.value ? "bg-brand text-white" : "bg-white"}`}
-            onClick={() => updateSearch({ sort: item.value })}
-          >
-            {item.label}
-          </button>
-        ))}
-        <Button variant="secondary" size="sm" className="ml-auto" onClick={() => setFiltersOpen((value) => !value)}>
-          <SlidersHorizontal size={16} />
-          필터
-        </Button>
-      </div>
-
-      {filtersOpen ? (
-        <section className="mt-4 grid gap-4 rounded-md border border-line bg-white p-4 md:grid-cols-4">
-          <label className="block">
-            <span className="text-xs font-black text-muted">마켓</span>
-            <select className="mt-2 h-10 w-full rounded-md border border-line px-3 text-sm outline-none" value={market} onChange={(event) => updateSearch({ market: event.target.value || undefined })}>
-              <option value="">전체 마켓</option>
-              {markets.map((item) => (
-                <option key={item} value={item}>{item}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="text-xs font-black text-muted">가격대</span>
-            <select className="mt-2 h-10 w-full rounded-md border border-line px-3 text-sm outline-none" value={price} onChange={(event) => updateSearch({ price: event.target.value || undefined })}>
-              {priceRanges.map((item) => (
-                <option key={item.value || "all"} value={item.value}>{item.label}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="text-xs font-black text-muted">태그</span>
-            <select className="mt-2 h-10 w-full rounded-md border border-line px-3 text-sm outline-none" value={tag} onChange={(event) => updateSearch({ tag: event.target.value || undefined })}>
-              <option value="">전체 태그</option>
-              {tagFilters.map((item) => (
-                <option key={item} value={item}>{item}</option>
-              ))}
-            </select>
-          </label>
-          <div>
-            <span className="text-xs font-black text-muted">빠른 조건</span>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button className={`h-9 rounded-md px-3 text-sm font-bold ${shipping === "free" ? "bg-emerald-600 text-white" : "bg-zinc-100"}`} onClick={() => updateSearch({ shipping: shipping === "free" ? undefined : "free" })}>
-                무료배송
-              </button>
-              <button className={`h-9 rounded-md px-3 text-sm font-bold ${sale === "on" ? "bg-brand text-white" : "bg-zinc-100"}`} onClick={() => updateSearch({ sale: sale === "on" ? undefined : "on" })}>
-                할인중
-              </button>
-              <button className={`h-9 rounded-md px-3 text-sm font-bold ${stock === "available" ? "bg-sky-600 text-white" : "bg-zinc-100"}`} onClick={() => updateSearch({ stock: stock === "available" ? undefined : "available" })}>
-                재고 있음
-              </button>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        {activeFilters.map((item) => (
-          <span key={item} className="inline-flex h-8 items-center gap-1 rounded-md bg-zinc-100 px-3 text-xs font-bold text-zinc-700">
-            {item}
-          </span>
-        ))}
-        {activeFilters.length ? (
-          <button className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-bold text-muted hover:text-foreground" onClick={clearFilters}>
-            <X size={14} />
-            초기화
-          </button>
-        ) : null}
-      </div>
-
-      {error ? <p className="mt-8 rounded-md border border-line bg-white p-4 text-sm text-brand">{error.message}</p> : null}
-      {isLoading ? <p className="mt-8 text-sm text-muted">상품을 불러오는 중입니다.</p> : null}
-      {!isLoading && !filteredProducts.length ? (
-        <div className="mt-8 rounded-md border border-line bg-white p-8 text-center">
-          <p className="font-bold">조건에 맞는 상품이 없습니다.</p>
-          <p className="mt-1 text-sm text-muted">카테고리나 필터를 조정해보세요.</p>
-        </div>
-      ) : null}
-      <div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
-        {filteredProducts.map((product) => (
-          <ProductCard key={product.id} product={product} />
-        ))}
-      </div>
-      {filteredProducts.length ? (
-        <p className="mt-8 text-center text-xs text-muted">
-          평균 상품가 {formatPrice(Math.round(filteredProducts.reduce((sum, product) => sum + productPrice(product), 0) / filteredProducts.length))}
+      {informationQuery.data?.is_dummy || productPage?.is_dummy ? (
+        <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
+          백엔드 PLP API가 404를 반환해 개발용 더미 데이터를 표시하고 있습니다.
         </p>
       ) : null}
+
+      <section className="mt-4 rounded-md border border-line bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-xs font-black text-muted">가격대</span>
+          {priceRanges.map((item) => (
+            <QuickFilter
+              key={item.code || "all"}
+              active={price === item.code}
+              label={item.label}
+              onClick={() => updateSearch({ price: item.code || undefined })}
+            />
+          ))}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
+          <span className="mr-1 text-xs font-black text-muted">빠른 필터</span>
+          <QuickFilter active={onSale} label="할인중" onClick={() => updateSearch({ sale: onSale ? undefined : "on" })} />
+          <QuickFilter active={inStock} label="재고 있음" onClick={() => updateSearch({ stock: inStock ? undefined : "available" })} />
+          {(informationQuery.data?.tag_chips ?? []).map((item) => (
+            <QuickFilter
+              key={item.code}
+              active={tagChip === item.code}
+              label={item.label}
+              onClick={() => updateSearch({ tag_chip: tagChip === item.code ? undefined : item.code })}
+            />
+          ))}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
+          <span className="mr-1 text-xs font-black text-muted">정렬 방식</span>
+          {sortOptions.map((item) => <QuickFilter key={item.code} active={sort === item.code} label={item.label} onClick={() => updateSearch({ sort: item.code })} />)}
+        </div>
+      </section>
+
+      <div className="mt-4 flex min-h-8 flex-wrap items-center gap-2">
+        {activeFilters.map((item) => <span key={item} className="inline-flex h-8 items-center rounded-full bg-zinc-100 px-3 text-xs font-bold text-zinc-700">{item}</span>)}
+        {activeFilters.length ? <button type="button" className="inline-flex h-8 items-center gap-1 px-2 text-xs font-bold text-muted hover:text-foreground" onClick={clearFilters}><X size={14} /> 초기화</button> : null}
+      </div>
+
+      {informationQuery.error || productsQuery.error ? <p className="mt-8 rounded-md border border-red-200 bg-red-50 p-4 text-sm font-bold text-brand">PLP 정보를 불러오지 못했습니다.</p> : null}
+      {productsQuery.isLoading ? <p className="mt-8 text-sm text-muted">상품을 불러오는 중입니다.</p> : null}
+      {!productsQuery.isLoading && productPage && !productPage.items.length ? (
+        <div className="mt-8 rounded-md border border-line bg-white p-10 text-center"><p className="font-black">조건에 맞는 상품이 없습니다.</p><p className="mt-1 text-sm text-muted">필터를 조정해보세요.</p></div>
+      ) : null}
+      <div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
+        {(productPage?.items ?? []).map((product) => <ProductCard key={product.id} product={product} />)}
+      </div>
+
+      {productPage ? <Pagination page={productPage.page} totalPages={productPage.total_pages} onChange={(nextPage) => updateSearch({ page: String(nextPage) }, false)} /> : null}
+
     </main>
+  );
+}
+
+function QuickFilter({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+  return <button type="button" className={`h-9 rounded-full border px-4 text-sm font-black ${active ? "border-brand bg-brand text-white" : "border-line bg-white text-zinc-700"}`} onClick={onClick}>{label}</button>;
+}
+
+function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (page: number) => void }) {
+  if (totalPages <= 1) return null;
+  const pages = Array.from({ length: Math.min(5, totalPages) }, (_, index) => Math.max(1, Math.min(totalPages - 4, page - 2)) + index).filter((value) => value <= totalPages);
+  return (
+    <nav aria-label="상품 페이지" className="mt-10 flex items-center justify-center gap-2">
+      <button type="button" aria-label="이전 페이지" disabled={page <= 1} onClick={() => onChange(page - 1)} className="flex h-10 w-10 items-center justify-center rounded-md border border-line bg-white disabled:opacity-30"><ChevronLeft size={18} /></button>
+      {pages.map((item) => <button type="button" key={item} aria-current={item === page ? "page" : undefined} onClick={() => onChange(item)} className={`h-10 min-w-10 rounded-md px-3 text-sm font-black ${item === page ? "bg-foreground text-white" : "border border-line bg-white"}`}>{item}</button>)}
+      <button type="button" aria-label="다음 페이지" disabled={page >= totalPages} onClick={() => onChange(page + 1)} className="flex h-10 w-10 items-center justify-center rounded-md border border-line bg-white disabled:opacity-30"><ChevronRight size={18} /></button>
+    </nav>
   );
 }

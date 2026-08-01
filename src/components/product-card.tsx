@@ -60,6 +60,7 @@ function ProductChip({ label, tone }: { label: string; tone: string }) {
     shipping: "bg-emerald-50 text-emerald-700",
     delivery: "bg-sky-50 text-sky-700",
     exclusive: "bg-amber-50 text-amber-800",
+    promotion: "bg-amber-50 text-amber-800",
     new: "bg-brand text-white",
     default: "bg-zinc-100 text-zinc-600",
   };

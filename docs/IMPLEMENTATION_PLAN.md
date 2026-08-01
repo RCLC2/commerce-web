@@ -29,7 +29,8 @@ Build:
 Backend dependency:
 - Implemented: `GET /api/v1/products`
 - TODO: `GET /api/v1/categories`
-- Current limitation: backend list filter query support is simplified, so frontend filters may start as local/MSW filters until API expands.
+- PLP server contract: `GET /api/v1/plp-information` supplies cached categories/count/average/filter options and `GET /api/v1/plp-products` supplies server-filtered pagination.
+- PLP terminology and 404-only dummy fallback are documented in `docs/PLP.md`.
 
 ### Phase C1.5: Integrated Search and Autocomplete
 

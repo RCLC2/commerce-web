@@ -113,9 +113,11 @@ export type Product = {
   image_url?: string;
   detail_html?: string;
   market_name?: string;
+  market_profile_image_url?: string;
   market?: PLPMarketSummary;
   tag_chips?: PLPTagChip[];
   tags?: string[];
+  in_stock?: boolean;
 };
 
 /** 상품 목록(Product Listing Page)에 노출하는 공통 상품 단위. */
@@ -142,6 +144,39 @@ export type CategoryInformation = {
   is_demo?: boolean;
 };
 
+
+export type PLPProductPage = {
+  items: Product[];
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+  is_dummy?: boolean;
+};
+
+export type PLPInformation = {
+  categories: CommerceCategory[];
+  total_product_count: number;
+  price_ranges: Array<{ code: string; label: string; min_price: number; max_price: number }>;
+  sort_options: Array<{ code: "popular" | "new" | "price-low" | "price-high"; label: string }>;
+  default_sort: "popular" | "new" | "price-low" | "price-high";
+  tag_chips: PLPTagChip[];
+  is_dummy?: boolean;
+};
+
+export type PLPProductParams = {
+  categoryIDs?: number[];
+  marketId?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  shipping?: "free";
+  onSale?: boolean;
+  inStock?: boolean;
+  tagChip?: string;
+  sort?: "popular" | "new" | "price-low" | "price-high";
+  page?: number;
+  pageSize?: number;
+};
 
 export type SearchSuggestion = {
   id: string;

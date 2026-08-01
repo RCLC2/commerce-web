@@ -51,6 +51,7 @@ if (imgproxyRemotePattern) {
 }
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["127.0.0.1"],
   images: {
     remotePatterns,
   },

@@ -1,4 +1,4 @@
-const LOCAL_API_BASE_URL = "http://localhost:8080";
+const LOCAL_API_BASE_URL = "http://127.0.0.1:8080";
 
 export function getApiBaseUrl() {
   const configuredUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();

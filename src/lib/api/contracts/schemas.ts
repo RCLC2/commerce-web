@@ -64,7 +64,10 @@ export const productSchema = z.object({
   image_url: z.string().optional(),
   detail_html: z.string().optional(),
   market_name: z.string().optional(),
+  market_profile_image_url: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  tag_chips: z.array(z.object({ code: z.string(), label: z.string(), tone: z.string() })).optional(),
+  in_stock: z.boolean().optional(),
 });
 
 export const plpProductSchema = productSchema.extend({
@@ -119,6 +122,22 @@ export const categoryInformationSchema = z.object({
   }),
 });
 
+export const plpProductPageSchema = z.object({
+  items: z.array(productSchema),
+  page: z.number().int().positive(),
+  page_size: z.number().int().positive(),
+  total: nonNegativeIntSchema,
+  total_pages: nonNegativeIntSchema,
+});
+
+export const plpInformationSchema = z.object({
+  categories: z.array(categorySchema),
+  total_product_count: nonNegativeIntSchema,
+  price_ranges: z.array(z.object({ code: z.string(), label: z.string(), min_price: nonNegativeIntSchema, max_price: nonNegativeIntSchema })),
+  sort_options: z.array(z.object({ code: z.enum(["popular", "new", "price-low", "price-high"]), label: z.string() })),
+  default_sort: z.enum(["popular", "new", "price-low", "price-high"]),
+  tag_chips: z.array(z.object({ code: z.string(), label: z.string(), tone: z.string() })),
+});
 export const homeSectionSchema = z.object({
   id: identifierSchema,
   sequence: z.number().int(),

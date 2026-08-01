@@ -14,11 +14,11 @@ export function MarketPage({ marketId }: { marketId: number }) {
   });
   const productsQuery = useQuery({
     queryKey: ["market-products", marketId],
-    queryFn: () => api.listProducts({ marketID: marketId }),
+    queryFn: () => api.listPLPProducts({ marketId }),
   });
 
   const market = marketQuery.data;
-  const marketProducts = productsQuery.data ?? [];
+  const marketProducts = productsQuery.data?.items ?? [];
 
   if (marketQuery.isLoading || productsQuery.isLoading) {
     return <main className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted">마켓을 불러오는 중입니다.</main>;
