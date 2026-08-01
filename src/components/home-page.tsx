@@ -134,14 +134,15 @@ export function HomePage() {
         )}
       </section>
 
-      <section className="rounded-md border border-line bg-white p-3">
-        <div className="grid grid-cols-5 gap-1">
+      <section className="rounded-2xl border border-line bg-white p-3 shadow-sm" aria-label="홈 카테고리와 이벤트">
+        <div className="grid grid-cols-5 gap-1.5">
           {displayHomeCategoryChips.map((chip) => (
-            <Link key={chip.id} href={chip.href} className="flex min-h-20 flex-col items-center justify-center gap-1 rounded-md p-1 hover:bg-zinc-50">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-brand">
+            <Link key={chip.id} href={chip.href} className={`relative flex min-h-20 flex-col items-center justify-center gap-1 rounded-xl p-1 transition hover:-translate-y-0.5 ${chip.chip_type === "CATEGORY_EVENT" ? "bg-rose-50 hover:bg-rose-100" : "hover:bg-zinc-50"}`}>
+              {chip.chip_type === "CATEGORY_EVENT" ? <span className="absolute right-1.5 top-1.5 rounded-full bg-brand px-1.5 py-0.5 text-[8px] font-black tracking-wide text-white">EVENT</span> : null}
+              <span className={`flex h-10 w-10 items-center justify-center rounded-full ${chip.chip_type === "CATEGORY_EVENT" ? "bg-white shadow-sm" : "bg-zinc-100"} text-brand`}>
                 <SafeImage src={chip.icon_url} alt="" width={24} height={24} className="h-6 w-6 object-contain" />
               </span>
-              <span className="text-center text-xs font-bold">{chip.title}</span>
+              <span className="line-clamp-1 text-center text-xs font-bold">{chip.title}</span>
             </Link>
           ))}
         </div>

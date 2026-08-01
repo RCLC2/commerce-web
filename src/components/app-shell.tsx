@@ -217,8 +217,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 backdrop-blur md:hidden">
-        <div className="mx-auto grid h-16 max-w-6xl grid-cols-5 px-1">
+      <nav className="fixed inset-x-0 bottom-0 z-50 isolate border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur md:hidden" aria-label="하단 주요 메뉴">
+        <div className="mx-auto grid h-16 max-w-6xl grid-cols-5 px-1" data-session-role={role ?? "guest"}>
           {nav.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);

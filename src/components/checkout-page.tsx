@@ -2,7 +2,7 @@
 
 import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { ApiHttpError, apiErrorMessage } from "@/lib/api-client";
@@ -16,6 +16,7 @@ import {
   normalizeRequestedPoints,
   readCheckoutRetryState,
   saveCheckoutRetryState,
+  selectedCartItemIDs,
   shouldDiscardCheckoutRestoreStatus,
   submitServerAuthoritativeCheckout,
 } from "@/lib/queries/checkout";
@@ -26,6 +27,7 @@ import { Button } from "./ui/button";
 
 export function CheckoutPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const token = useSessionStore((state) => state.accessToken);
   const memberID = useSessionStore((state) => state.memberID);
   const effectiveToken = token ?? "";
@@ -62,8 +64,11 @@ export function CheckoutPage() {
   });
   const confirmedLineItems = confirmedOrder?.market_orders?.flatMap((marketOrder) =>
     marketOrder.line_items) ?? [];
+  const requestedCartItemIDs = selectedCartItemIDs(searchParams.get("cartItemIDs"));
+  const checkoutCartItems = (cart.data ?? []).filter((item) =>
+    requestedCartItemIDs === null || requestedCartItemIDs.has(item.id));
   const productIDs = [...new Set([
-    ...(cart.data ?? []).map((item) => item.product_id),
+    ...checkoutCartItems.map((item) => item.product_id),
     ...confirmedLineItems.map((item) => item.product_id),
   ])];
   const products = useQueries({
@@ -75,7 +80,7 @@ export function CheckoutPage() {
   });
   const productByID = new Map(products.flatMap((query, index) =>
     query.data ? [[productIDs[index], query.data] as const] : []));
-  const items = (cart.data ?? []).map((item) => ({ ...item, product: productByID.get(item.product_id) }));
+  const items = checkoutCartItems.map((item) => ({ ...item, product: productByID.get(item.product_id) }));
   const displayItems = createdOrderCode
     ? confirmedLineItems.map((item) => ({
       id: item.id,
@@ -231,6 +236,11 @@ export function CheckoutPage() {
   return (
     <main className="mx-auto max-w-5xl px-4 pb-28 pt-8">
       <h1 className="text-2xl font-black">주문서</h1>
+      {requestedCartItemIDs !== null && cart.isSuccess && !items.length ? (
+        <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-900">
+          선택한 장바구니 상품을 찾을 수 없습니다. <Link href="/cart" className="underline">장바구니에서 다시 선택해주세요.</Link>
+        </div>
+      ) : null}
       {blockingError ? (
         <div className="mt-5 rounded-md border border-brand/30 bg-red-50 p-4 text-sm">
           <p className="font-bold text-brand">{apiErrorMessage(blockingError)}</p>

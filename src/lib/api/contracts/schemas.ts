@@ -71,7 +71,6 @@ export const productSchema = z.object({
   options: z.array(productOptionSchema).optional(),
   image_url: z.string().optional(),
   images: z.array(productImageSchema).max(5).optional(),
-  is_fallback: z.boolean().optional(),
   detail_html: z.string().optional(),
   market_name: z.string().optional(),
   market_profile_image_url: z.string().optional(),
@@ -211,7 +210,6 @@ export const reviewSummarySchema = z.object({
   product_id: identifierSchema,
   review_count: nonNegativeIntSchema,
   average_rating: z.number().min(0).max(5),
-  is_fallback: z.boolean().optional(),
   photo_review_count: nonNegativeIntSchema.optional(),
   rating_distribution: z.record(z.string(), nonNegativeIntSchema).optional(),
   latest_review_at: dateStringSchema.optional(),
@@ -346,13 +344,13 @@ export const recommendationSchema = z.looseObject({
 export const carouselSchema = z.object({
   id: identifierSchema,
   title: z.string(),
-  image_url: z.string(),
+  image_url: z.string().nullable().transform((value) => value ?? ""),
   target_type: z.string().optional(),
   target_id: nonNegativeIntSchema.optional(),
   display_order: z.number().int().optional(),
   is_active: z.boolean().optional(),
-  starts_at: dateStringSchema.optional(),
-  ends_at: dateStringSchema.optional(),
+  starts_at: dateStringSchema.nullable().optional(),
+  ends_at: dateStringSchema.nullable().optional(),
   created_at: dateStringSchema.optional(),
   link_url: z.string().default(""),
   status: z.string(),
@@ -365,8 +363,8 @@ export const eventSchema = z.object({
   image_url: z.string(),
   link_url: z.string(),
   status: z.string(),
-  starts_at: dateStringSchema,
-  ends_at: dateStringSchema,
+  starts_at: dateStringSchema.nullable(),
+  ends_at: dateStringSchema.nullable(),
 });
 
 export const trackingInfoSchema = z.looseObject({

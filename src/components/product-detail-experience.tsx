@@ -1,8 +1,9 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, Camera, ChevronLeft, ChevronRight, Heart, Minus, Plus, ShoppingBag, SlidersHorizontal, Star, X } from "lucide-react";
+import { BadgeCheck, Camera, CheckCircle2, ChevronLeft, ChevronRight, Heart, Minus, Plus, ShoppingBag, SlidersHorizontal, Star, X } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
@@ -16,6 +17,7 @@ import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
 export function ProductDetailExperience({ productId, initialProduct, initialMerchandising }: { productId: number; initialProduct?: Product; initialMerchandising: PdpMerchandising }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const token = useSessionStore((state) => state.accessToken);
   const effectiveToken = getEffectiveToken(token);
@@ -59,7 +61,21 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
         option_id: selectedOption?.id ?? 0,
         quantity,
       }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["cart", effectiveToken] });
+    },
   });
+  function handleCartAction() {
+    if (!effectiveToken) {
+      router.push("/login");
+      return;
+    }
+    if (addCart.isSuccess) {
+      router.push("/cart");
+      return;
+    }
+    addCart.mutate();
+  }
   const wishlist = useMutation({
     mutationFn: async () => {
       if (!effectiveToken) throw new Error("Login is required.");
@@ -97,7 +113,6 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
   const detailHtml = resolveProductDetailHtml(product);
   const price = product.discount_price || product.base_price;
   const saleRate = discountRate(product.base_price, product.discount_price);
-  const fallbackVisible = product.is_fallback || summary?.is_fallback || initialMerchandising.is_fallback;
 
   function moveImage(delta: number) {
     setActiveImage((current) => (current + delta + images.length) % images.length);
@@ -137,12 +152,6 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-28 pt-5 md:pb-20 md:pt-8">
-      {fallbackVisible ? (
-        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
-          백엔드가 404를 반환해 화면 확인용 미리보기 데이터를 표시하고 있습니다.
-        </div>
-      ) : null}
-
       <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_360px] lg:grid-cols-[minmax(0,620px)_420px] lg:justify-between">
         <section>
           <div
@@ -240,7 +249,7 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
               onOption={setOptionID}
               onQuantity={setQuantity}
               onWishlist={() => wishlist.mutate()}
-              onCart={() => addCart.mutate()}
+              onCart={handleCartAction}
             />
           </div>
         </aside>
@@ -338,16 +347,19 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
 
       <AlsoViewedSection products={initialMerchandising.also_viewed} />
 
-      <button
-        type="button"
-        className={`fixed bottom-24 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-foreground text-white shadow-xl transition md:bottom-8 md:right-8 ${showFloatingPurchase ? "opacity-100 hover:scale-105" : "pointer-events-none translate-y-3 opacity-0"}`}
-        aria-label="구매 옵션 열기"
-        onClick={() => setPurchaseOpen(true)}
+      <div
+        className={`fixed inset-x-0 bottom-16 z-40 border-t border-line bg-white/95 px-4 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] backdrop-blur transition md:bottom-0 ${showFloatingPurchase ? "opacity-100" : "pointer-events-none translate-y-full opacity-0"}`}
         aria-hidden={!showFloatingPurchase}
-        tabIndex={showFloatingPurchase ? 0 : -1}
       >
-        <SlidersHorizontal size={22} />
-      </button>
+        <div className="mx-auto flex max-w-5xl items-center gap-3">
+          <div className="hidden min-w-0 flex-1 sm:block"><p className="truncate text-xs font-bold text-muted">{product.name}</p><p className="font-black">{formatPrice(price + (selectedOption?.additional_price ?? 0))} · {quantity}개</p></div>
+          <Button className="shrink-0" variant="secondary" onClick={() => setPurchaseOpen(true)} tabIndex={showFloatingPurchase ? 0 : -1}><SlidersHorizontal size={18} /> 옵션·수량</Button>
+          <Button className="min-w-0 flex-1 sm:max-w-64" onClick={handleCartAction} disabled={addCart.isPending || !selectedOption} tabIndex={showFloatingPurchase ? 0 : -1}>
+            {addCart.isSuccess ? <CheckCircle2 size={19} /> : <ShoppingBag size={19} />}
+            {addCart.isPending ? "담는 중" : addCart.isSuccess ? "장바구니 보기" : !effectiveToken ? "로그인 후 담기" : "장바구니 담기"}
+          </Button>
+        </div>
+      </div>
 
       {purchaseOpen ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-0 md:items-center md:p-6" role="dialog" aria-modal="true" aria-label="구매 옵션">
@@ -372,7 +384,7 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
                 onOption={setOptionID}
                 onQuantity={setQuantity}
                 onWishlist={() => wishlist.mutate()}
-                onCart={() => addCart.mutate()}
+                onCart={handleCartAction}
               />
             </div>
           </div>
@@ -440,11 +452,12 @@ function PurchaseControls(props: PurchaseControlsProps) {
         <Button variant="secondary" size="lg" aria-label="좋아요" onClick={props.onWishlist} disabled={!props.authenticated || props.pending}>
           <Heart size={20} className={props.liked ? "fill-brand text-brand" : ""} />
         </Button>
-        <Button size="lg" onClick={props.onCart} disabled={!props.authenticated || props.pending || !props.selectedOption}>
-          <ShoppingBag size={19} />
-          {!props.authenticated ? "로그인 후 담기" : props.added ? "장바구니에 담김" : "장바구니 담기"}
+        <Button size="lg" onClick={props.onCart} disabled={props.pending || !props.selectedOption}>
+          {props.added ? <CheckCircle2 size={19} /> : <ShoppingBag size={19} />}
+          {props.pending ? "담는 중" : !props.authenticated ? "로그인 후 담기" : props.added ? "장바구니 보기" : "장바구니 담기"}
         </Button>
       </div>
+      {props.added ? <p className="rounded-lg bg-emerald-50 px-3 py-2 text-center text-sm font-bold text-emerald-700" role="status">상품을 담았습니다. 버튼을 다시 누르면 장바구니로 이동합니다.</p> : null}
     </div>
   );
 }

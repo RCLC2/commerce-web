@@ -101,12 +101,6 @@ export function ProductListPage() {
         ))}
       </div>
 
-      {informationQuery.data?.is_dummy || productPage?.is_dummy ? (
-        <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
-          백엔드 PLP API가 404를 반환해 개발용 더미 데이터를 표시하고 있습니다.
-        </p>
-      ) : null}
-
       <section className="mt-4 rounded-md border border-line bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <span className="mr-1 text-xs font-black text-muted">가격대</span>

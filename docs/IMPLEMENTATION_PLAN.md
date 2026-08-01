@@ -30,7 +30,7 @@ Backend dependency:
 - Implemented: `GET /api/v1/products`
 - TODO: `GET /api/v1/categories`
 - PLP server contract: `GET /api/v1/plp-information` supplies cached categories/count/average/filter options and `GET /api/v1/plp-products` supplies server-filtered pagination.
-- PLP terminology and 404-only dummy fallback are documented in `docs/PLP.md`.
+- PLP terminology and API error behavior are documented in `docs/PLP.md`.
 
 ### Phase C1.5: Integrated Search and Autocomplete
 
@@ -52,7 +52,7 @@ Implemented behavior:
 - Related keyword chips use `related_keywords` from the server and do not synthesize prefixes in the browser.
 - Trending chips are named 여성 and 남성 and show up, unchanged, and down movement.
 - The displayed current time is computed by the frontend every minute. The backend does not provide `captured_at`.
-- Search, suggestion, and trending requests use development dummy data only when the corresponding backend endpoint returns HTTP 404. HTTP 500, network, parse, and contract errors remain visible.
+- Search, suggestion, and trending request failures remain visible and are not replaced with development dummy data.
 
 Backend contract:
 - `GET /api/v1/search?q=&audience=&product_page=&market_page=&page_size=`
@@ -321,7 +321,7 @@ Define these contracts before building final seller/admin screens:
 - Avoid marketing-style hero sections in seller/admin areas.
 ## 10. PDP and Seller Product Authoring Contract
 
-The normative PDP, seller authoring, server Excel, and HTTP 404 preview behavior is documented in [PDP_AND_SELLER_PRODUCTS.md](PDP_AND_SELLER_PRODUCTS.md). New UI and API work must use its ubiquitous language.
+The normative PDP, seller authoring, server Excel, and API error behavior is documented in [PDP_AND_SELLER_PRODUCTS.md](PDP_AND_SELLER_PRODUCTS.md). New UI and API work must use its ubiquitous language.
 
 ## 11. PLP 상품 유비쿼터스 용어
 
@@ -332,7 +332,7 @@ The normative PDP, seller authoring, server Excel, and HTTP 404 preview behavior
 - `tag_chips`: 서버가 노출 여부, 순서, 라벨과 톤을 확정한 배열입니다. 프론트는 배송 유형이나 기존 `tags`를 보고 칩을 추가 생성하지 않습니다.
 - 원가(`base_price`)와 판매가(`discount_price`)를 함께 표시하고 할인율과 할인액은 프론트에서 계산할 수 있습니다.
 - 마켓 페이지의 상품은 `GET /api/v1/products?marketID={marketId}`로 조회합니다.
-- 마켓 및 마켓 상품 API가 HTTP 404인 로컬 검수 환경에서만 데모 정보를 사용하며 다른 오류는 숨기지 않습니다.
+- 마켓 및 마켓 상품 API 오류는 데모 정보로 대체하지 않습니다.
 
 ## 12. CategoryInformation 유비쿼터스 용어와 `/categories` 계약
 
@@ -357,7 +357,7 @@ API:
 - 일반 상품과 `RealtimePopularCarousel`은 동일한 PLP 상품 계약을 사용하며 서버가 내려준 `tag_chips`만 표시합니다.
 - `RealtimePopularCarousel`은 홈 상품 캐러셀의 정사각 이미지 오버레이, 가로 스냅, 이전/다음 버튼 패턴을 재사용하고 순위 배지를 더해 아래 일반 PLP 그리드와 구분합니다.
 - PLP 상품의 마켓명은 `market.id`를 사용해 `/markets/:id`로 이동합니다.
-- 백엔드가 새 CategoryInformation API에 대해 HTTP 404를 반환할 때만 화면 검수용 데모 데이터를 표시합니다. 401, 403, 500, 계약 파싱 오류 등은 더미로 숨기지 않고 오류 상태로 표시합니다.
+- CategoryInformation API 오류와 정상 빈 응답은 화면 검수용 데모 데이터로 대체하지 않습니다.
 
 앱 셸 원칙:
 

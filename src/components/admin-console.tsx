@@ -1051,7 +1051,7 @@ function cmsCarouselPayload(form: ReturnType<typeof emptyCMSCarouselForm>) {
   };
 }
 
-function toDateTimeLocal(value?: string) {
+function toDateTimeLocal(value?: string | null) {
   if (!value) {
     return "";
   }
@@ -1063,7 +1063,7 @@ function toDateTimeLocal(value?: string) {
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 }
 
-function cmsScheduleText(startsAt?: string, endsAt?: string) {
+function cmsScheduleText(startsAt?: string | null, endsAt?: string | null) {
   if (!startsAt && !endsAt) {
     return "상시 노출";
   }
