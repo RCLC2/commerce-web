@@ -75,6 +75,18 @@ export type AdminDashboard = {
   recent_actions: AuditLog[];
 };
 
+export type PLPMarketSummary = {
+  id: number;
+  name: string;
+  profile_image_url?: string;
+};
+
+export type PLPTagChip = {
+  code: string;
+  label: string;
+  tone: "shipping" | "delivery" | "exclusive" | "new" | "default" | string;
+};
+
 export type Product = {
   id: number;
   market_id: number;
@@ -95,8 +107,35 @@ export type Product = {
   image_url?: string;
   detail_html?: string;
   market_name?: string;
+  market?: PLPMarketSummary;
+  tag_chips?: PLPTagChip[];
   tags?: string[];
 };
+
+/** 상품 목록(Product Listing Page)에 노출하는 공통 상품 단위. */
+export type PLPProduct = Product;
+
+export type CategoryInformation = {
+  categories: CommerceCategory[];
+  selected_category: CommerceCategory;
+  bundle_label: string;
+  products: Product[];
+  pagination: {
+    page: number;
+    page_size: number;
+    has_next: boolean;
+  };
+  realtime_popular_carousel: {
+    title: string;
+    description: string;
+    insert_after: number;
+    captured_at: string;
+    products: Product[];
+  };
+  /** 프론트 화면 검수용 404 fallback에서만 설정됩니다. */
+  is_demo?: boolean;
+};
+
 
 export type SearchSuggestion = {
   id: string;

@@ -1,12 +1,15 @@
 import { z } from "zod";
-import { requestParsed } from "../api-client";
+import { ApiHttpError, requestParsed } from "../api-client";
+import { demoCategoryInformation, demoMarket, demoMarketProducts } from "../category-information-demo";
 import {
   carouselSchema,
   categorySchema,
   eventSchema,
+  categoryInformationSchema,
   homeSectionSchema,
   instagramTrendPageSchema,
   marketSchema,
+  plpProductSchema,
   productSchema,
   reviewSchema,
   statusResponseSchema,
@@ -22,13 +25,50 @@ const productDetailSchema = z.object({
 });
 
 const parseProducts = async (path: string) =>
-  (await requestParsed(z.array(productSchema), path)).map(normalizePublicProduct);
+  (await requestParsed(z.array(plpProductSchema), path)).map(normalizePublicProduct);
 
 export const catalogApi = {
   listMarkets: () => requestParsed(z.array(marketSchema), "/api/v1/markets"),
   listCategories: () => requestParsed(z.array(categorySchema), "/api/v1/categories"),
   listCategoryTree: () => requestParsed(z.array(categorySchema), "/api/v1/categories/tree"),
-  getMarket: (id: number) => requestParsed(marketSchema, `/api/v1/markets/${id}`),
+  getMarket: async (id: number) => {
+    try {
+      return await requestParsed(marketSchema, `/api/v1/markets/${id}`);
+    } catch (error) {
+      if (error instanceof ApiHttpError && error.status === 404) {
+        return demoMarket(id);
+      }
+      throw error;
+    }
+  },
+  getCategoryInformation: async (params: { category?: string; page?: number; pageSize?: number }) => {
+    const page = params.page ?? 1;
+    const pageSize = params.pageSize ?? 8;
+    const search = new URLSearchParams({
+      page: String(page),
+      page_size: String(pageSize),
+    });
+    if (params.category) search.set("category", params.category);
+    try {
+      const information = await requestParsed(
+        categoryInformationSchema,
+        `/api/v1/category-information?${search.toString()}`,
+      );
+      return {
+        ...information,
+        products: information.products.map(normalizePublicProduct),
+        realtime_popular_carousel: {
+          ...information.realtime_popular_carousel,
+          products: information.realtime_popular_carousel.products.map(normalizePublicProduct),
+        },
+      };
+    } catch (error) {
+      if (error instanceof ApiHttpError && error.status === 404) {
+        return demoCategoryInformation(params.category ?? "", page, pageSize);
+      }
+      throw error;
+    }
+  },
   listEvents: () => requestParsed(z.array(eventSchema), "/api/v1/events"),
   listHomeSections: () =>
     requestParsed(z.array(homeSectionSchema), "/api/v1/home/sections"),
@@ -44,13 +84,21 @@ export const catalogApi = {
     );
   },
   getEvent: (id: number) => requestParsed(eventSchema, `/api/v1/events/${id}`),
-  listProducts: (params?: { categoryID?: number; sort?: string; q?: string }) => {
+  listProducts: async (params?: { categoryID?: number; marketID?: number; sort?: string; q?: string }) => {
     const search = new URLSearchParams();
+    if (params?.marketID) search.set("marketID", String(params.marketID));
     if (params?.categoryID) search.set("categoryID", String(params.categoryID));
     if (params?.sort) search.set("sort", params.sort);
     if (params?.q) search.set("q", params.q);
     const query = search.toString();
-    return parseProducts(`/api/v1/products${query ? `?${query}` : ""}`);
+    try {
+      return await parseProducts(`/api/v1/products${query ? `?${query}` : ""}`);
+    } catch (error) {
+      if (params?.marketID && error instanceof ApiHttpError && error.status === 404) {
+        return demoMarketProducts(params.marketID);
+      }
+      throw error;
+    }
   },
   listPopularProducts: () => parseProducts("/api/v1/products/popular"),
   listPromotionProducts: () => parseProducts("/api/v1/products/promotions"),
