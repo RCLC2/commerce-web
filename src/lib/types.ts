@@ -258,11 +258,13 @@ export type MemberProfile = {
   notification_type: string;
   marketing_consent: boolean;
   nighttime_consent: boolean;
+  height: number;
+  weight: number;
   point_balance: number;
   created_at: string;
 };
 
-export type AdminMember = Omit<MemberProfile, "point_balance">;
+export type AdminMember = Omit<MemberProfile, "point_balance" | "height" | "weight">;
 
 export type ReviewProductSummary = {
   id: number;

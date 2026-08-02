@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { requestParsed } from "../api-client";
+import { requestParsed, requestVoid } from "../api-client";
 import type { PLPInformation, PLPProductPage, PLPProductParams } from "../types";
 import {
   carouselSchema,
@@ -42,6 +42,12 @@ export const catalogApi = {
   },
   listCategoryTree: () => requestParsed(z.array(categorySchema), "/api/v1/categories/tree"),
   getMarket: (id: number) => requestParsed(marketSchema, `/api/v1/markets/${id}`),
+  getMarketFollowStatus: (token: string, id: number) =>
+    requestParsed(z.object({ following: z.boolean() }), `/api/v1/markets/${id}/follow`, { token }),
+  followMarket: (token: string, id: number) =>
+    requestVoid(`/api/v1/markets/${id}/follow`, { method: "POST", token }),
+  unfollowMarket: (token: string, id: number) =>
+    requestVoid(`/api/v1/markets/${id}/follow`, { method: "DELETE", token }),
   getCategoryInformation: async (params: { category?: string; page?: number; pageSize?: number }) => {
     const search = new URLSearchParams({
       page: String(params.page ?? 1),

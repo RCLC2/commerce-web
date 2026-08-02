@@ -44,7 +44,7 @@ export function LikesPage() {
           </div>
           {isLoading ? <p className="mt-4 rounded-md border border-line bg-white p-5 text-sm text-muted">찜한 상품을 불러오는 중입니다.</p> : null}
           {!isLoading && pageProducts.length ? (
-            <div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
+            <div className="mt-6 grid grid-cols-3 gap-x-2 gap-y-6 md:grid-cols-5 md:gap-x-4">
               {pageProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}

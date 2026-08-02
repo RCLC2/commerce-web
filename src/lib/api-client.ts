@@ -66,6 +66,13 @@ export async function request(path: string, options: RequestOptions = {}): Promi
   const payload = parseResponseText(text, response);
 
   if (!response.ok) {
+    if (response.status === 401 && options.token && typeof window !== "undefined") {
+      window.localStorage.removeItem("commerce.accessToken");
+      window.localStorage.removeItem("commerce.memberID");
+      window.localStorage.removeItem("commerce.role");
+      window.localStorage.removeItem("commerce.sellerContext");
+      window.dispatchEvent(new CustomEvent("commerce:unauthorized"));
+    }
     throw new ApiHttpError(errorMessage(payload, text, response.status), response.status, payload);
   }
 

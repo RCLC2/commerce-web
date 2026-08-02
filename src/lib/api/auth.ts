@@ -17,6 +17,8 @@ const memberProfileSchema = z.object({
   notification_type: z.string(),
   marketing_consent: z.boolean(),
   nighttime_consent: z.boolean(),
+  height: z.number().nonnegative(),
+  weight: z.number().nonnegative(),
   point_balance: z.number().int().nonnegative(),
   created_at: z.string(),
 });
@@ -44,4 +46,6 @@ export const authApi = {
   signup: signUp,
   register: signUp,
   me: (token: string) => requestParsed(memberProfileSchema, "/api/v1/me", { token }),
+  updateMe: (token: string, payload: { notification_type: string; marketing_consent: boolean; nighttime_consent: boolean; height: number; weight: number }) =>
+    requestParsed(memberProfileSchema, "/api/v1/me", { method: "PATCH", token, body: JSON.stringify(payload) }),
 };
