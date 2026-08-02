@@ -36,6 +36,18 @@ describe("request", () => {
     await expect(request("/failure")).rejects.toMatchObject({ kind: "http", status });
   });
 
+  it("clears the stored session and emits an unauthorized event for an authenticated 401", async () => {
+    window.localStorage.setItem("commerce.accessToken", "expired");
+    const listener = vi.fn();
+    window.addEventListener("commerce:unauthorized", listener);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("expired", { status: 401 })));
+
+    await expect(request("/me", { token: "expired" })).rejects.toMatchObject({ status: 401 });
+
+    expect(window.localStorage.getItem("commerce.accessToken")).toBeNull();
+    expect(listener).toHaveBeenCalledOnce();
+    window.removeEventListener("commerce:unauthorized", listener);
+  });
   it("distinguishes invalid JSON from an HTTP failure", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("<html>", { status: 200 })));
     await expect(request("/invalid-json")).rejects.toBeInstanceOf(ApiParseError);

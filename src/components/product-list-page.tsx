@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
-import type { PLPProductParams } from "@/lib/types";
+import type { PLPInformation, PLPProductParams } from "@/lib/types";
 import { ProductCard } from "./product-card";
 
 function positivePage(raw: string | null) {
@@ -29,7 +29,7 @@ export function ProductListPage() {
     queryFn: api.getPLPInformation,
     staleTime: 5 * 60 * 1000,
   });
-  const categories = informationQuery.data?.categories ?? [];
+  const categories = flattenPLPCategories(informationQuery.data?.categories ?? []);
   const priceRanges = informationQuery.data?.price_ranges ?? [];
   const sortOptions = informationQuery.data?.sort_options ?? [];
   const requestedSort = searchParams.get("sort");
@@ -96,7 +96,7 @@ export function ProductListPage() {
         <button type="button" className={`h-10 shrink-0 rounded-full px-5 text-sm font-black ${!selectedCategory ? "bg-foreground text-white" : "bg-white"}`} onClick={() => updateSearch({ category: undefined })}>전체</button>
         {categories.map((item) => (
           <button type="button" key={item.id} className={`h-10 shrink-0 rounded-full px-5 text-sm font-black ${selectedCategory?.id === item.id ? "bg-foreground text-white" : "bg-white"}`} onClick={() => updateSearch({ category: item.slug })}>
-            {item.name}
+            {`— `.repeat(Math.max(0, item.depth - 1))}{item.name}
           </button>
         ))}
       </div>
@@ -150,6 +150,10 @@ export function ProductListPage() {
 
     </main>
   );
+}
+
+function flattenPLPCategories(categories: PLPInformation["categories"]): PLPInformation["categories"] {
+  return categories.flatMap((category) => [category, ...flattenPLPCategories(category.children ?? [])]);
 }
 
 function QuickFilter({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {

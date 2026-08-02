@@ -93,6 +93,10 @@ export const customerApi = {
     requestVoid(`/api/v1/coupons/${couponID}/issue`, { method: "POST", token }),
   listAddresses: async (token: string) =>
     (await requestParsed(z.array(rawAddressSchema), "/api/v1/me/addresses", { token })).map(normalizeAddress),
+  updateAddress: (token: string, addressID: number, payload: { address_name?: string; receiver: string; phone: string; zip_code: string; line1: string; line2: string; is_default: boolean }) =>
+    requestVoid(`/api/v1/me/addresses/${addressID}`, { method: "PATCH", token, body: JSON.stringify(payload) }),
+  listMyReviews: async (token: string) =>
+    (await requestParsed(z.array(rawReviewMutationSchema), "/api/v1/me/reviews", { token })).map(normalizeReviewMutation),
   listNotifications: async (token: string) =>
     (await requestParsed(z.array(rawNotificationSchema), "/api/v1/me/notifications", { token }))
       .map(normalizeNotification),

@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { api } from "@/lib/api";
@@ -19,6 +19,7 @@ type LoginForm = z.infer<typeof schema>;
 
 export function LoginPage() {
   const router = useRouter();
+  const next = useSearchParams().get("next") || "/mypage";
   const setSession = useSessionStore((state) => state.setSession);
   const form = useForm<LoginForm>({
     resolver: zodResolver(schema),
@@ -32,7 +33,7 @@ export function LoginPage() {
     mutationFn: api.signin,
     onSuccess: (data) => {
       setSession({ accessToken: data.accessToken, memberID: data.memberID, role: data.role });
-      router.push("/mypage");
+      router.push(next.startsWith("/") ? next : "/mypage");
     },
   });
 
