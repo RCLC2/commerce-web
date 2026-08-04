@@ -51,20 +51,182 @@ test.describe("public and customer journeys against backend origin/main", () => 
     ).toBeVisible();
   });
 
-  test("my reviews reports the backend blocker without calling a nonexistent endpoint", async ({ page }) => {
+  test("my reviews loads the deployed collection without a stale backend blocker", async ({ page }) => {
     await loginThroughUI(page, seedAccounts.member);
-    let nonexistentReviewRequests = 0;
-    page.on("request", (browserRequest) => {
-      if (new URL(browserRequest.url()).pathname === "/api/v1/me/reviews") {
-        nonexistentReviewRequests += 1;
-      }
-    });
+    await page.route("**/api/v1/me/reviews", (route) => route.fulfill({ status: 200, json: [] }));
+    const reviewsResponse = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === "/api/v1/me/reviews");
+    await page.goto("/mypage/reviews");
+    expect((await reviewsResponse).ok()).toBeTruthy();
 
+    await expect(page.getByRole("heading", { name: "리뷰 관리" })).toBeVisible();
+    await expect(page.getByText("현재 서버에서 지원하지 않는 기능입니다", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("작성한 리뷰가 없습니다.", { exact: true })).toBeVisible();
+  });
+
+  test("my reviews distinguishes an API failure from an empty collection", async ({ page }) => {
+    await loginThroughUI(page, seedAccounts.member);
+    await page.route("**/api/v1/me/reviews", (route) => route.fulfill({ status: 503, body: "reviews unavailable" }));
     await page.goto("/mypage/reviews");
 
-    await expect(page.getByRole("heading", { name: "내 리뷰" })).toBeVisible();
-    await expect(page.getByText("현재 서버에서 지원하지 않는 기능입니다", { exact: true })).toBeVisible();
-    expect(nonexistentReviewRequests).toBe(0);
+    await expect(page.getByRole("button", { name: "다시 불러오기", exact: true })).toBeVisible();
+    await expect(page.getByText("작성한 리뷰가 없습니다.", { exact: true })).toHaveCount(0);
+  });
+
+  test("my review mutations report success and refresh the persisted collection", async ({ page }) => {
+    await loginThroughUI(page, seedAccounts.member);
+    let reviews = [{
+      id: 5,
+      product_id: 1,
+      option_id: 1,
+      member_id: 3,
+      order_id: 4,
+      order_line_item_id: 6,
+      rating_x2: 10,
+      rating: 5,
+      content: "원래 리뷰",
+      is_photo_review: false,
+      status: "ACTIVE",
+      images: [],
+    }];
+    let updateAttempts = 0;
+    let deleteAttempts = 0;
+    await page.route("**/api/v1/me/reviews", (route) => route.fulfill({ status: 200, json: reviews }));
+    await page.route("**/api/v1/reviews/5", async (route) => {
+      if (route.request().method() === "DELETE") {
+        deleteAttempts += 1;
+        if (deleteAttempts === 1) {
+          await route.fulfill({ status: 503, body: "delete unavailable" });
+          return;
+        }
+        reviews = [];
+        await route.fulfill({ status: 204, body: "" });
+        return;
+      }
+      updateAttempts += 1;
+      if (updateAttempts === 1) {
+        await route.fulfill({ status: 503, body: "update unavailable" });
+        return;
+      }
+      const draft = route.request().postDataJSON() as { rating_x2: number; content: string };
+      reviews = [{ ...reviews[0], ...draft, rating: draft.rating_x2 / 2 }];
+      await route.fulfill({ status: 200, json: reviews[0] });
+    });
+    await page.goto("/mypage/reviews");
+
+    await page.getByRole("button", { name: "수정", exact: true }).click();
+    await page.locator("textarea").fill("수정한 리뷰");
+    await page.getByRole("button", { name: "저장", exact: true }).click();
+    await expect(page.getByText(/리뷰를 수정하지 못했습니다/)).toBeVisible();
+    await page.getByRole("button", { name: "저장", exact: true }).click();
+    await expect(page.getByText("리뷰를 수정했습니다.", { exact: true })).toBeVisible();
+    await expect(page.getByText("수정한 리뷰", { exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "삭제", exact: true }).click();
+    await expect(page.getByText(/리뷰를 삭제하지 못했습니다/)).toBeVisible();
+    await page.getByRole("button", { name: "삭제 다시 시도", exact: true }).click();
+    await expect(page.getByText("리뷰를 삭제했습니다.", { exact: true })).toBeVisible();
+    await expect(page.getByText("작성한 리뷰가 없습니다.", { exact: true })).toBeVisible();
+  });
+
+  test("coupon issue exposes success and refreshes the issuable collection", async ({ page }) => {
+    await loginThroughUI(page, seedAccounts.member);
+    let issuable = true;
+    let issueAttempts = 0;
+    await page.route("**/api/v1/coupons/issuable", (route) => route.fulfill({
+      status: 200,
+      json: issuable ? [{
+        ID: 91,
+        Code: "E2E1000",
+        Name: "E2E 쿠폰",
+        DiscountType: "AMOUNT",
+        DiscountValue: 1000,
+        MaxDiscount: 1000,
+        MinOrderAmount: 10000,
+        ExpiresAt: null,
+        Status: "ACTIVE",
+      }] : [],
+    }));
+    await page.route("**/api/v1/coupons", (route) => route.fulfill({ status: 200, json: [] }));
+    await page.route("**/api/v1/coupons/91/issue", (route) => {
+      issueAttempts += 1;
+      if (issueAttempts === 1) return route.fulfill({ status: 503, body: "issue unavailable" });
+      issuable = false;
+      return route.fulfill({ status: 204, body: "" });
+    });
+    await page.goto("/mypage/coupons");
+
+    await expect(page.getByText("E2E 쿠폰", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "쿠폰 받기", exact: true }).click();
+    await expect(page.getByText(/쿠폰을 발급하지 못했습니다/)).toBeVisible();
+    await page.getByRole("button", { name: "발급 상태 확인 후 다시 시도", exact: true }).click();
+    await expect(page.getByText("쿠폰을 발급했습니다.", { exact: true })).toBeVisible();
+    await expect(page.getByText("표시할 쿠폰이 없습니다.", { exact: true })).toBeVisible();
+  });
+
+  test("coupon query failure is not rendered as an empty collection", async ({ page }) => {
+    await loginThroughUI(page, seedAccounts.member);
+    await page.route("**/api/v1/coupons/issuable", (route) => route.fulfill({ status: 503, body: "coupons unavailable" }));
+    await page.route("**/api/v1/coupons", (route) => route.fulfill({ status: 200, json: [] }));
+    await page.goto("/mypage/coupons");
+
+    await expect(page.getByRole("button", { name: "다시 불러오기", exact: true })).toBeVisible();
+    await expect(page.getByText("표시할 쿠폰이 없습니다.", { exact: true })).toHaveCount(0);
+  });
+
+  test("order detail keeps a persisted reviewed line closed after reload", async ({ page }) => {
+    await loginThroughUI(page, seedAccounts.member);
+    await page.route("**/api/v1/orders/REVIEWED-E2E", (route) => route.fulfill({
+      status: 200,
+      json: {
+        id: 4,
+        order_code: "REVIEWED-E2E",
+        total_order_price: 29901,
+        total_discount_price: 0,
+        used_point: 0,
+        status: "COMPLETED",
+        market_orders: [{
+          id: 5,
+          market_id: 1,
+          shipping_fee: 0,
+          status: "COMPLETED",
+          expected_settlement_amount: 25000,
+          line_items: [{
+            id: 6,
+            product_id: 1,
+            option_id: 1,
+            quantity: 1,
+            price: 29901,
+            status: "COMPLETED",
+            reviewable: true,
+          }],
+        }],
+      },
+    }));
+    await page.route("**/api/v1/me/reviews", (route) => route.fulfill({
+      status: 200,
+      json: [{
+        id: 7,
+        product_id: 1,
+        option_id: 1,
+        member_id: 3,
+        order_id: 4,
+        order_line_item_id: 6,
+        rating_x2: 10,
+        rating: 5,
+        content: "이미 작성한 리뷰",
+        is_photo_review: false,
+        status: "ACTIVE",
+        images: [],
+      }],
+    }));
+    await page.goto("/orders/REVIEWED-E2E");
+
+    await expect(page.getByText("Reviewed", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Write review", exact: true })).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByText("Reviewed", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Write review", exact: true })).toHaveCount(0);
   });
 
   test("customer restores one live order after checkout failure and hands off to hosted payment", async ({ page, request }, testInfo) => {

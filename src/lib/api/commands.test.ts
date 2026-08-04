@@ -64,6 +64,26 @@ describe("command route regressions", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
+
+  it("keeps product likes and wishlists on separate command routes", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await customerApi.addLike("token", 7);
+    await customerApi.removeLike("token", 7);
+    await customerApi.addWishlist("token", 7);
+    await customerApi.removeWishlist("token", 7);
+
+    expect(fetchMock.mock.calls.map((call) => {
+      const url = new URL(String(call[0]));
+      return [url.pathname, call[1].method];
+    })).toEqual([
+      ["/api/v1/products/7/like", "POST"],
+      ["/api/v1/products/7/like", "DELETE"],
+      ["/api/v1/products/7/wishlist", "POST"],
+      ["/api/v1/products/7/wishlist", "DELETE"],
+    ]);
+  });
 });
 
 describe("coupon response regressions", () => {
