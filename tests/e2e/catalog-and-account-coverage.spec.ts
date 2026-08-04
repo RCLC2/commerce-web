@@ -179,10 +179,23 @@ test.describe("remaining public catalog routes against backend origin/main", () 
 });
 
 test.describe("remaining customer account routes against backend origin/main", () => {
-  test("wishlist add, remove, and collection rendering work through the UI", async ({ page, request }, testInfo) => {
-    const account = await createMember(request, testInfo, "e2e-wishlist");
+  test("product likes and wishlists persist and render as separate collections", async ({ page, request }, testInfo) => {
+    const account = await createMember(request, testInfo, "e2e-engagement");
     await installSession(page, account.session);
     await page.goto("/products/1");
+
+    const likeButton = page.getByRole("button", { name: "좋아요", exact: true });
+    const addLikeResponse = page.waitForResponse((response) =>
+      response.url().endsWith("/api/v1/products/1/like")
+      && response.request().method() === "POST");
+    await likeButton.click();
+    expect((await addLikeResponse).ok()).toBeTruthy();
+    await expect(page.getByRole("button", { name: "좋아요 취소", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "찜하기", exact: true })).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByRole("button", { name: "좋아요 취소", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "찜하기", exact: true })).toBeVisible();
 
     const wishlistButton = page.getByRole("button", { name: "찜하기", exact: true });
     const addResponse = page.waitForResponse((response) =>
@@ -190,28 +203,81 @@ test.describe("remaining customer account routes against backend origin/main", (
       && response.request().method() === "POST");
     await wishlistButton.click();
     expect((await addResponse).ok()).toBeTruthy();
-    await expect(wishlistButton).toHaveAttribute("title", "찜 해제");
+    await expect(page.getByRole("button", { name: "찜 해제", exact: true })).toBeVisible();
 
-    const removeResponse = page.waitForResponse((response) =>
+    const removeLikeResponse = page.waitForResponse((response) =>
+      response.url().endsWith("/api/v1/products/1/like")
+      && response.request().method() === "DELETE");
+    await page.getByRole("button", { name: "좋아요 취소", exact: true }).click();
+    expect((await removeLikeResponse).ok()).toBeTruthy();
+
+    await page.reload();
+    await expect(page.getByRole("button", { name: "좋아요", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "찜 해제", exact: true })).toBeVisible();
+
+    await page.goto("/likes");
+    await expect(page.getByRole("heading", { name: "좋아요", exact: true })).toBeVisible();
+    await expect(page.getByRole("tab", { name: /좋아요 상품/ })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByText("좋아요한 상품이 없습니다.", { exact: true })).toBeVisible();
+
+    await page.getByRole("tab", { name: /찜한 상품/ }).click();
+    await expect(page.getByRole("tab", { name: /찜한 상품/ })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByText("스냅 코튼 크롭 셔츠", { exact: true }).first()).toBeVisible();
+
+    await page.goto("/products/1");
+    const removeWishlistResponse = page.waitForResponse((response) =>
       response.url().endsWith("/api/v1/products/1/wishlist")
       && response.request().method() === "DELETE");
-    await wishlistButton.click();
-    expect((await removeResponse).ok()).toBeTruthy();
-    await expect(wishlistButton).toHaveAttribute("title", "찜하기");
+    await page.getByRole("button", { name: "찜 해제", exact: true }).click();
+    expect((await removeWishlistResponse).ok()).toBeTruthy();
+    await expect(page.getByRole("button", { name: "찜하기", exact: true })).toBeVisible();
+  });
 
-    const readdResponse = page.waitForResponse((response) =>
-      response.url().endsWith("/api/v1/products/1/wishlist")
+  test("market follow UI persists when the deployed route is available", async ({ page, request }, testInfo) => {
+    const account = await createMember(request, testInfo, "e2e-market-follow");
+    await installSession(page, account.session);
+    let following = false;
+    await page.route("**/api/v1/markets/1/follow", async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({ status: 200, json: { following } });
+        return;
+      }
+      following = route.request().method() === "POST";
+      await route.fulfill({ status: 204, body: "" });
+    });
+    await page.goto("/markets/1");
+
+    const followButton = page.getByRole("button", { name: /^팔로우 ·/ });
+    const followResponse = page.waitForResponse((response) =>
+      response.url().endsWith("/api/v1/markets/1/follow")
       && response.request().method() === "POST");
-    await wishlistButton.click();
-    expect((await readdResponse).ok()).toBeTruthy();
+    await followButton.click();
+    expect((await followResponse).ok()).toBeTruthy();
+    await expect(page.getByRole("button", { name: /^팔로잉 ·/ })).toBeVisible();
 
-    const collectionResponse = page.waitForResponse((response) =>
-      response.url().includes("/api/v1/me/wishlist"));
-    await page.goto("/likes");
-    expect((await collectionResponse).ok()).toBeTruthy();
+    await page.reload();
+    await expect(page.getByRole("button", { name: /^팔로잉 ·/ })).toBeVisible();
 
-    await expect(page.getByRole("heading", { name: "좋아요", exact: true })).toBeVisible();
-    await expect(page.getByText("스냅 코튼 크롭 셔츠", { exact: true })).toBeVisible();
+    const unfollowResponse = page.waitForResponse((response) =>
+      response.url().endsWith("/api/v1/markets/1/follow")
+      && response.request().method() === "DELETE");
+    await page.getByRole("button", { name: /^팔로잉 ·/ }).click();
+    expect((await unfollowResponse).ok()).toBeTruthy();
+    await expect(page.getByRole("button", { name: /^팔로우 ·/ })).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByRole("button", { name: /^팔로우 ·/ })).toBeVisible();
+  });
+
+  test("market follow failure is not rendered as an unfollowed state", async ({ page, request }, testInfo) => {
+    const account = await createMember(request, testInfo, "e2e-market-follow-error");
+    await installSession(page, account.session);
+    await page.route("**/api/v1/markets/1/follow", (route) => route.fulfill({ status: 503, body: "follow unavailable" }));
+    await page.goto("/markets/1");
+
+    await expect(page.getByRole("button", { name: /^상태 확인 필요 ·/ })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "팔로우 상태 다시 확인", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^팔로우 ·/ })).toHaveCount(0);
   });
 
   test("profile exposes the live account as a truthful read-only view", async ({ page, request }) => {

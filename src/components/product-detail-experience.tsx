@@ -1,12 +1,14 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, Camera, CheckCircle2, ChevronLeft, ChevronRight, Heart, Minus, Plus, ShoppingBag, SlidersHorizontal, Star, X } from "lucide-react";
+import { BadgeCheck, Bookmark, Camera, CheckCircle2, ChevronLeft, ChevronRight, Heart, Minus, Plus, ShoppingBag, SlidersHorizontal, Star, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/api-client";
 import { getEffectiveToken } from "@/lib/auth-token";
+import { includesProduct } from "@/lib/product-engagement";
 import { resolveProductDetailHtml } from "@/lib/product-detail-html";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
@@ -23,7 +25,6 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
   const effectiveToken = getEffectiveToken(token);
   const [quantity, setQuantity] = useState(1);
   const [optionID, setOptionID] = useState<number | null>(null);
-  const [liked, setLiked] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [showFloatingPurchase, setShowFloatingPurchase] = useState(false);
@@ -45,10 +46,22 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
     queryKey: [...queryKeys.productReviews(productId), "summary"],
     queryFn: () => api.getProductReviewSummary(productId),
   });
+  const likedProductsQuery = useQuery({
+    queryKey: queryKeys.likedProducts(effectiveToken),
+    queryFn: () => api.listLikedProducts(effectiveToken ?? ""),
+    enabled: Boolean(effectiveToken),
+  });
+  const wishlistQuery = useQuery({
+    queryKey: queryKeys.wishlist(effectiveToken),
+    queryFn: () => api.listWishlistedProducts(effectiveToken ?? ""),
+    enabled: Boolean(effectiveToken),
+  });
 
   const product = productQuery.data;
   const reviews = reviewsQuery.data ?? [];
   const summary = summaryQuery.data;
+  const liked = includesProduct(likedProductsQuery.data, productId);
+  const wishlisted = includesProduct(wishlistQuery.data, productId);
   const selectedOption = useMemo(
     () => product?.options?.find((option) => option.id === optionID) ?? product?.options?.[0],
     [optionID, product?.options],
@@ -76,17 +89,57 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
     }
     addCart.mutate();
   }
-  const wishlist = useMutation({
+  const likeMutation = useMutation({
     mutationFn: async () => {
-      if (!effectiveToken) throw new Error("Login is required.");
-      if (liked) await api.removeWishlist(effectiveToken, productId);
+      if (!effectiveToken) throw new Error("로그인이 필요합니다.");
+      if (liked) await api.removeLike(effectiveToken, productId);
+      else await api.addLike(effectiveToken, productId);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.likedProducts(effectiveToken) }),
+  });
+  const wishlistMutation = useMutation({
+    mutationFn: async () => {
+      if (!effectiveToken) throw new Error("로그인이 필요합니다.");
+      if (wishlisted) await api.removeWishlist(effectiveToken, productId);
       else await api.addWishlist(effectiveToken, productId);
     },
-    onSuccess: () => {
-      setLiked((value) => !value);
-      void queryClient.invalidateQueries({ queryKey: ["me-wishlist", effectiveToken] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.wishlist(effectiveToken) }),
   });
+
+  function handleProtectedEngagement(action: "like" | "wishlist") {
+    if (!effectiveToken) {
+      router.push(`/login?next=/products/${productId}`);
+      return;
+    }
+    if (likeMutation.isPending || wishlistMutation.isPending) return;
+    if (action === "like") {
+      likeMutation.reset();
+      likeMutation.mutate();
+      return;
+    }
+    wishlistMutation.reset();
+    wishlistMutation.mutate();
+  }
+
+  function retryLike() {
+    if (likedProductsQuery.isError) {
+      void likedProductsQuery.refetch();
+      return;
+    }
+    if (likeMutation.isError) likeMutation.mutate();
+  }
+
+  function retryWishlist() {
+    if (wishlistQuery.isError) {
+      void wishlistQuery.refetch();
+      return;
+    }
+    if (wishlistMutation.isError) wishlistMutation.mutate();
+  }
+
+  const likeError = likedProductsQuery.error ?? likeMutation.error;
+  const wishlistError = wishlistQuery.error ?? wishlistMutation.error;
+  const engagementLoading = Boolean(effectiveToken) && (likedProductsQuery.isLoading || wishlistQuery.isLoading);
 
   useEffect(() => {
     function updateFloatingPurchase() {
@@ -243,12 +296,25 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
               optionID={optionID}
               quantity={quantity}
               liked={liked}
-              pending={addCart.isPending || wishlist.isPending}
+              wishlisted={wishlisted}
+              cartPending={addCart.isPending}
+              likePending={likeMutation.isPending}
+              wishlistPending={wishlistMutation.isPending}
+              likeSucceeded={likeMutation.isSuccess}
+              wishlistSucceeded={wishlistMutation.isSuccess}
+              likeReady={!effectiveToken || likedProductsQuery.isSuccess}
+              wishlistReady={!effectiveToken || wishlistQuery.isSuccess}
+              engagementLoading={engagementLoading}
+              likeError={likeError ? `좋아요 상태를 처리하지 못했습니다. ${apiErrorMessage(likeError)}` : undefined}
+              wishlistError={wishlistError ? `찜 상태를 처리하지 못했습니다. ${apiErrorMessage(wishlistError)}` : undefined}
               added={addCart.isSuccess}
               authenticated={Boolean(effectiveToken)}
               onOption={setOptionID}
               onQuantity={setQuantity}
-              onWishlist={() => wishlist.mutate()}
+              onLike={() => handleProtectedEngagement("like")}
+              onWishlist={() => handleProtectedEngagement("wishlist")}
+              onRetryLike={retryLike}
+              onRetryWishlist={retryWishlist}
               onCart={handleCartAction}
             />
           </div>
@@ -378,12 +444,25 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
                 optionID={optionID}
                 quantity={quantity}
                 liked={liked}
-                pending={addCart.isPending || wishlist.isPending}
+                wishlisted={wishlisted}
+                cartPending={addCart.isPending}
+                likePending={likeMutation.isPending}
+                wishlistPending={wishlistMutation.isPending}
+                likeSucceeded={likeMutation.isSuccess}
+                wishlistSucceeded={wishlistMutation.isSuccess}
+                likeReady={!effectiveToken || likedProductsQuery.isSuccess}
+                wishlistReady={!effectiveToken || wishlistQuery.isSuccess}
+                engagementLoading={engagementLoading}
+                likeError={likeError ? `좋아요 상태를 처리하지 못했습니다. ${apiErrorMessage(likeError)}` : undefined}
+                wishlistError={wishlistError ? `찜 상태를 처리하지 못했습니다. ${apiErrorMessage(wishlistError)}` : undefined}
                 added={addCart.isSuccess}
                 authenticated={Boolean(effectiveToken)}
                 onOption={setOptionID}
                 onQuantity={setQuantity}
-                onWishlist={() => wishlist.mutate()}
+                onLike={() => handleProtectedEngagement("like")}
+                onWishlist={() => handleProtectedEngagement("wishlist")}
+                onRetryLike={retryLike}
+                onRetryWishlist={retryWishlist}
                 onCart={handleCartAction}
               />
             </div>
@@ -414,12 +493,25 @@ type PurchaseControlsProps = {
   optionID: number | null;
   quantity: number;
   liked: boolean;
-  pending: boolean;
+  wishlisted: boolean;
+  cartPending: boolean;
+  likePending: boolean;
+  wishlistPending: boolean;
+  likeSucceeded: boolean;
+  wishlistSucceeded: boolean;
+  likeReady: boolean;
+  wishlistReady: boolean;
+  engagementLoading: boolean;
+  likeError?: string;
+  wishlistError?: string;
   added: boolean;
   authenticated: boolean;
   onOption: (id: number) => void;
   onQuantity: (quantity: number) => void;
+  onLike: () => void;
   onWishlist: () => void;
+  onRetryLike: () => void;
+  onRetryWishlist: () => void;
   onCart: () => void;
 };
 
@@ -448,15 +540,24 @@ function PurchaseControls(props: PurchaseControlsProps) {
           <Button variant="secondary" size="icon" onClick={() => props.onQuantity(props.quantity + 1)} aria-label="수량 늘리기"><Plus size={16} /></Button>
         </div>
       </div>
-      <div className="grid grid-cols-[56px_1fr] gap-2">
-        <Button variant="secondary" size="lg" aria-label="좋아요" onClick={props.onWishlist} disabled={!props.authenticated || props.pending}>
+      <div className="grid grid-cols-[56px_56px_1fr] gap-2">
+        <Button variant="secondary" size="lg" aria-label={props.liked ? "좋아요 취소" : "좋아요"} title={props.liked ? "좋아요 취소" : "좋아요"} onClick={props.onLike} disabled={props.likePending || props.wishlistPending || (props.authenticated && !props.likeReady)}>
           <Heart size={20} className={props.liked ? "fill-brand text-brand" : ""} />
         </Button>
-        <Button size="lg" onClick={props.onCart} disabled={props.pending || !props.selectedOption}>
+        <Button variant="secondary" size="lg" aria-label={props.wishlisted ? "찜 해제" : "찜하기"} title={props.wishlisted ? "찜 해제" : "찜하기"} onClick={props.onWishlist} disabled={props.likePending || props.wishlistPending || (props.authenticated && !props.wishlistReady)}>
+          <Bookmark size={20} className={props.wishlisted ? "fill-brand text-brand" : ""} />
+        </Button>
+        <Button size="lg" onClick={props.onCart} disabled={props.cartPending || !props.selectedOption}>
           {props.added ? <CheckCircle2 size={19} /> : <ShoppingBag size={19} />}
-          {props.pending ? "담는 중" : !props.authenticated ? "로그인 후 담기" : props.added ? "장바구니 보기" : "장바구니 담기"}
+          {props.cartPending ? "담는 중" : !props.authenticated ? "로그인 후 담기" : props.added ? "장바구니 보기" : "장바구니 담기"}
         </Button>
       </div>
+      {props.engagementLoading ? <p className="text-xs font-bold text-muted">좋아요와 찜 상태를 확인하는 중입니다.</p> : null}
+      {props.likeError ? <div className="rounded-lg bg-red-50 px-3 py-2 text-sm"><p className="font-bold text-brand">{props.likeError}</p><Button className="mt-2" size="sm" variant="secondary" onClick={props.onRetryLike}>좋아요 다시 시도</Button></div> : null}
+      {props.wishlistError ? <div className="rounded-lg bg-red-50 px-3 py-2 text-sm"><p className="font-bold text-brand">{props.wishlistError}</p><Button className="mt-2" size="sm" variant="secondary" onClick={props.onRetryWishlist}>찜 다시 시도</Button></div> : null}
+      {props.likePending || props.wishlistPending ? <p className="text-xs font-bold text-muted" role="status">상품 상태를 저장하는 중입니다.</p> : null}
+      {props.likeSucceeded && !props.likeError ? <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-900" role="status">{props.liked ? "좋아요에 추가했습니다." : "좋아요를 취소했습니다."}</p> : null}
+      {props.wishlistSucceeded && !props.wishlistError ? <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-900" role="status">{props.wishlisted ? "찜한 상품에 추가했습니다." : "찜을 해제했습니다."}</p> : null}
       {props.added ? <p className="rounded-lg bg-emerald-50 px-3 py-2 text-center text-sm font-bold text-emerald-700" role="status">상품을 담았습니다. 버튼을 다시 누르면 장바구니로 이동합니다.</p> : null}
     </div>
   );
