@@ -8,7 +8,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
 import { getEffectiveToken } from "@/lib/auth-token";
+import {
+  couponRewardIsOwned,
+  eventRewardIsConfirmed,
+} from "@/lib/event-rewards";
 import type { EventProduct, EventReward, EventSort } from "@/lib/event-detail-types";
+import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import { EventBenefitTicket } from "./event-benefit-ticket";
 import { ProductCard } from "./product-card";
@@ -21,18 +26,27 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const token = useSessionStore((state) => state.accessToken);
+  const memberID = useSessionStore((state) => state.memberID);
   const effectiveToken = getEffectiveToken(token);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [sort, setSort] = useState<EventSort | undefined>();
   const [marketID, setMarketID] = useState<number | undefined>();
   const [categoryID, setCategoryID] = useState<number | undefined>();
-  const [claimedRewards, setClaimedRewards] = useState<Set<number>>(new Set());
+  const [confirmedPointClaims, setConfirmedPointClaims] = useState<{ scope: string; ids: Set<number> }>({
+    scope: "",
+    ids: new Set(),
+  });
 
   const eventQuery = useQuery({
     queryKey: ["event-detail", eventId],
     queryFn: () => api.getEvent(eventId),
   });
   const event = eventQuery.data;
+  const ownedCouponsQuery = useQuery({
+    queryKey: queryKeys.coupons(memberID),
+    queryFn: () => api.listCoupons(effectiveToken ?? ""),
+    enabled: Boolean(effectiveToken && memberID !== null),
+  });
 
   const activeSort = sort ?? event?.product_display.default_sort ?? "RECOMMENDED";
 
@@ -57,6 +71,17 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
     () => productsQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [productsQuery.data?.pages],
   );
+  const rewardScope = memberID === null ? "" : `${memberID}:${eventId}`;
+  const confirmedClaimedRewards = useMemo(() => {
+    const ids = new Set<number>();
+    const currentPointClaims = confirmedPointClaims.scope === rewardScope
+      ? confirmedPointClaims.ids
+      : new Set<number>();
+    for (const reward of event?.rewards ?? []) {
+      if (eventRewardIsConfirmed(reward, ownedCouponsQuery.data, currentPointClaims)) ids.add(reward.id);
+    }
+    return ids;
+  }, [confirmedPointClaims, event?.rewards, ownedCouponsQuery.data, rewardScope]);
 
   useEffect(() => {
     const target = loadMoreRef.current;
@@ -71,14 +96,42 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
   }, [productsQuery]);
 
   const claimReward = useMutation({
-    mutationFn: (reward: EventReward) => {
+    mutationFn: async (reward: EventReward) => {
       if (!effectiveToken) throw new Error("로그인이 필요합니다.");
-      return api.claimEventReward(effectiveToken, eventId, reward.id);
+      try {
+        return await api.claimEventReward(effectiveToken, eventId, reward.id);
+      } catch (error) {
+        if (reward.reward_type === "COUPON") {
+          try {
+            const coupons = await api.listCoupons(effectiveToken);
+            queryClient.setQueryData(queryKeys.coupons(memberID), coupons);
+            if (couponRewardIsOwned(reward, coupons)) {
+              return {
+                status: "ISSUED",
+                event_id: eventId,
+                reward_row_id: reward.id,
+                reward_type: reward.reward_type,
+                reward_id: reward.reward_id,
+              };
+            }
+          } catch {
+            // Preserve the original claim error if coupon reconciliation fails.
+          }
+        }
+        throw error;
+      }
     },
-    onSuccess: (claim) => {
-      setClaimedRewards((current) => new Set(current).add(claim.reward_row_id));
-      void queryClient.invalidateQueries({ queryKey: ["me"] });
-      void queryClient.invalidateQueries({ queryKey: ["coupons"] });
+    onSuccess: async (_claim, reward) => {
+      if (reward.reward_type === "POINT_EVENT") {
+        setConfirmedPointClaims((current) => {
+          const base = current.scope === rewardScope ? current.ids : new Set<number>();
+          return { scope: rewardScope, ids: new Set(base).add(reward.id) };
+        });
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.me(memberID) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.coupons(memberID) }),
+      ]);
     },
   });
 
@@ -129,17 +182,26 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               {[...event.rewards].sort((a, b) => a.sequence - b.sequence || a.id - b.id).map((reward) => {
-                const claimed = claimedRewards.has(reward.id);
+                const claimed = confirmedClaimedRewards.has(reward.id);
                 const isPending = claimReward.isPending && claimReward.variables?.id === reward.id;
-                return <EventBenefitTicket key={reward.id} reward={reward} claimed={claimed} pending={isPending} authenticated={Boolean(effectiveToken)} onClaim={() => effectiveToken ? claimReward.mutate(reward) : router.push(`/login?next=/events/${eventId}`)} />;
+                const couponClaimAwaitingOwnership = reward.reward_type === "COUPON"
+                  && claimReward.isSuccess
+                  && claimReward.variables?.id === reward.id
+                  && !claimed;
+                const ready = !effectiveToken
+                  || reward.reward_type !== "COUPON"
+                  || (ownedCouponsQuery.isSuccess && !ownedCouponsQuery.isFetching && !couponClaimAwaitingOwnership);
+                return <EventBenefitTicket key={reward.id} reward={reward} claimed={claimed} pending={isPending} ready={ready} authenticated={Boolean(effectiveToken)} onClaim={() => effectiveToken ? claimReward.mutate(reward) : router.push(`/login?next=/events/${eventId}`)} />;
               })}
             </div>
             {claimReward.isError ? <p className="mt-3 text-sm font-bold text-brand">{apiErrorMessage(claimReward.error)}</p> : null}
+            {ownedCouponsQuery.isError ? <div className="mt-3 text-sm"><p className="font-bold text-brand">보유 쿠폰을 불러오지 못해 기존 수령 여부를 확인할 수 없습니다.</p><Button className="mt-2" size="sm" variant="secondary" onClick={() => void ownedCouponsQuery.refetch()}>쿠폰 상태 다시 확인</Button></div> : null}
+            {claimReward.isSuccess && claimReward.variables?.reward_type === "COUPON" && !confirmedClaimedRewards.has(claimReward.variables.id) ? <div className="mt-3 text-sm"><p className="font-bold text-amber-900">발급 응답을 받았지만 보유 쿠폰 목록에서 아직 확인되지 않았습니다.</p><Button className="mt-2" size="sm" variant="secondary" onClick={() => void ownedCouponsQuery.refetch()}>쿠폰 상태 다시 확인</Button></div> : null}
           </div>
         </section>
       ) : null}
 
-      {event.product_display.enabled && (productsQuery.isLoading || products.length > 0) ? (
+      {event.product_display.enabled ? (
         <section className="py-8">
           <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <h2 className="text-xl font-black">{event.product_display.section_title}</h2>
@@ -156,7 +218,9 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
             </div>
           </div>
 
-          {productsQuery.isLoading ? <ProductSkeleton /> : event.product_display.mode === "MARKET_CAROUSELS" ? (
+          {productsQuery.isError ? <div className="rounded-md border border-brand/30 bg-red-50 p-4 text-sm"><p className="font-bold text-brand">{apiErrorMessage(productsQuery.error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void productsQuery.refetch()}>이벤트 상품 다시 시도</Button></div> : productsQuery.isLoading ? <ProductSkeleton /> : products.length === 0 ? (
+            <p className="rounded-md border border-line bg-white p-8 text-center text-sm text-muted">표시할 이벤트 상품이 없습니다.</p>
+          ) : event.product_display.mode === "MARKET_CAROUSELS" ? (
             <MarketCarousels products={products} />
           ) : (
             <div className="grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">

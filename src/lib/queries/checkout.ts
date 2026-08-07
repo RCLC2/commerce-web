@@ -1,4 +1,5 @@
 import type { CouponDefinition, OrderResponse } from "../types";
+import { ApiHttpError } from "../api-client";
 
 export type CheckoutOrderInput = {
   cart_item_ids: number[];
@@ -16,6 +17,19 @@ export function selectedCartItemIDs(value: string | null): Set<number> | null {
 export type CheckoutRetryState = {
   memberID?: unknown;
   orderCode?: unknown;
+  cartItemIDs?: unknown;
+  usedCouponID?: unknown;
+  usedPoint?: unknown;
+  attemptedAt?: unknown;
+};
+
+export type PersistedCheckoutRetryState = {
+  memberID: number;
+  orderCode?: string;
+  cartItemIDs?: number[];
+  usedCouponID?: number;
+  usedPoint?: number;
+  attemptedAt?: string;
 };
 
 type CheckoutRetryStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -93,7 +107,7 @@ export function readCheckoutRetryState(
 
 export function saveCheckoutRetryState(
   storageAccess: CheckoutRetryStorageAccess,
-  state: { memberID: number; orderCode: string },
+  state: PersistedCheckoutRetryState,
 ): boolean {
   try {
     storageAccess().setItem(CHECKOUT_RETRY_STORAGE_KEY, JSON.stringify(state));
@@ -101,6 +115,48 @@ export function saveCheckoutRetryState(
   } catch {
     return false;
   }
+}
+
+export function pendingCheckoutInput(
+  state: CheckoutRetryState | null,
+  memberID: number,
+): CheckoutOrderInput | undefined {
+  if (state?.memberID !== memberID || !Array.isArray(state.cartItemIDs)) return undefined;
+  const cartItemIDs = state.cartItemIDs.filter(
+    (id): id is number => Number.isSafeInteger(id) && id > 0,
+  );
+  if (
+    cartItemIDs.length === 0
+    || cartItemIDs.length !== state.cartItemIDs.length
+    || new Set(cartItemIDs).size !== cartItemIDs.length
+  ) return undefined;
+  const usedPoint = normalizeRequestedPoints(
+    typeof state.usedPoint === "number" ? state.usedPoint : 0,
+  );
+  const usedCouponID = typeof state.usedCouponID === "number"
+    && Number.isSafeInteger(state.usedCouponID)
+    && state.usedCouponID > 0
+    ? state.usedCouponID
+    : undefined;
+  return { cart_item_ids: [...new Set(cartItemIDs)], used_coupon_id: usedCouponID, used_point: usedPoint };
+}
+
+export function findUniqueOrderByCartItemIDs(
+  orders: readonly OrderResponse[],
+  cartItemIDs: readonly number[],
+): OrderResponse | undefined {
+  const expected = new Set(cartItemIDs);
+  if (expected.size === 0 || expected.size !== cartItemIDs.length) return undefined;
+
+  const matches = orders.filter((order) => {
+    const lineItems = order.market_orders?.flatMap((marketOrder) => marketOrder.line_items) ?? [];
+    const actualIDs = lineItems.flatMap((item) => item.cart_id === undefined ? [] : [item.cart_id]);
+    return actualIDs.length === lineItems.length
+      && actualIDs.length === expected.size
+      && new Set(actualIDs).size === actualIDs.length
+      && actualIDs.every((id) => expected.has(id));
+  });
+  return matches.length === 1 ? matches[0] : undefined;
 }
 
 export function clearCheckoutRetryState(
@@ -116,6 +172,11 @@ export function clearCheckoutRetryState(
 
 export function shouldDiscardCheckoutRestoreStatus(status: number | undefined): boolean {
   return status !== undefined && [400, 403, 404, 410, 422].includes(status);
+}
+
+export function shouldDiscardCheckoutAttemptError(error: unknown): boolean {
+  return error instanceof ApiHttpError
+    && [400, 401, 403, 404, 409, 410, 422].includes(error.status ?? 0);
 }
 
 export function safeHostedCheckoutURL(value: string): string {
@@ -147,6 +208,8 @@ export async function submitServerAuthoritativeCheckout({
   placeOrder,
   getOrder,
   createPaymentCheckout,
+  recoverCreatedOrder,
+  onOrderAttempt,
   onOrderCreated,
   onOrderConfirmed,
 }: {
@@ -155,12 +218,31 @@ export async function submitServerAuthoritativeCheckout({
   placeOrder: (input: CheckoutOrderInput) => Promise<{ orderCode: string }>;
   getOrder: (orderCode: string) => Promise<OrderResponse>;
   createPaymentCheckout: (orderCode: string) => Promise<HostedPaymentCheckout>;
+  recoverCreatedOrder?: (input: CheckoutOrderInput) => Promise<OrderResponse | undefined>;
+  onOrderAttempt?: (input: CheckoutOrderInput) => void;
   onOrderCreated: (orderCode: string) => void;
   onOrderConfirmed: (order: OrderResponse) => void;
 }) {
   let orderCode = existingOrderCode;
   if (!orderCode) {
-    orderCode = (await placeOrder(orderInput)).orderCode;
+    onOrderAttempt?.(orderInput);
+    try {
+      orderCode = (await placeOrder(orderInput)).orderCode;
+    } catch (error) {
+      let recovered: OrderResponse | undefined;
+      try {
+        recovered = await recoverCreatedOrder?.(orderInput);
+      } catch {
+        // Keep the original failure as the cause shown to the user.
+      }
+      if (!recovered) {
+        throw new CheckoutOrderStateError(
+          `주문 생성 결과를 확인할 수 없습니다. 주문 내역을 확인한 뒤 다시 시도해주세요. (${error instanceof Error ? error.message : "요청 실패"})`,
+          shouldDiscardCheckoutAttemptError(error),
+        );
+      }
+      orderCode = recovered.order_code;
+    }
     onOrderCreated(orderCode);
   }
 

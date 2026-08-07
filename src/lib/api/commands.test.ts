@@ -1,11 +1,32 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { adminApi } from "./admin";
+import { authApi } from "./auth";
 import { customerApi, normalizeCouponQuoteOrderAmount } from "./customer";
 import { sellerApi } from "./seller";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("command route regressions", () => {
+  it("defaults optional profile measurements omitted by the member API", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      id: 8,
+      email: "member@test.com",
+      role: "MEMBER",
+      status: "ACTIVE",
+      notification_type: "PUSH",
+      marketing_consent: false,
+      nighttime_consent: false,
+      point_balance: 5000,
+      created_at: "2026-07-29T04:53:31Z",
+    }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(authApi.me("token")).resolves.toMatchObject({
+      height: 0,
+      weight: 0,
+    });
+  });
+
   it("issues an admin coupon with the member_id body", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       status: "issued", coupon_id: 7, member_id: 11,
@@ -63,6 +84,57 @@ describe("command route regressions", () => {
     await expect(adminApi.createCarousel("token", { title: "배너" })).resolves.toBeUndefined();
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps product likes and wishlists on separate command routes", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await customerApi.addLike("token", 7);
+    await customerApi.removeLike("token", 7);
+    await customerApi.addWishlist("token", 7);
+    await customerApi.removeWishlist("token", 7);
+
+    expect(fetchMock.mock.calls.map((call) => {
+      const url = new URL(String(call[0]));
+      return [url.pathname, call[1].method];
+    })).toEqual([
+      ["/api/v1/products/7/like", "POST"],
+      ["/api/v1/products/7/like", "DELETE"],
+      ["/api/v1/products/7/wishlist", "POST"],
+      ["/api/v1/products/7/wishlist", "DELETE"],
+    ]);
+  });
+
+  it("keeps customer review update and delete on their deployed routes", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        id: 5,
+        product_id: 1,
+        option_id: 2,
+        member_id: 3,
+        order_id: 4,
+        order_line_item_id: 6,
+        rating_x2: 8,
+        rating: 4,
+        content: "수정한 리뷰",
+        is_photo_review: false,
+        status: "ACTIVE",
+        images: [],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await customerApi.updateReview("token", 5, { rating_x2: 8, content: "수정한 리뷰" });
+    await customerApi.deleteReview("token", 5);
+
+    expect(fetchMock.mock.calls.map((call) => {
+      const url = new URL(String(call[0]));
+      return [url.pathname, call[1].method];
+    })).toEqual([
+      ["/api/v1/reviews/5", "PATCH"],
+      ["/api/v1/reviews/5", "DELETE"],
+    ]);
   });
 });
 

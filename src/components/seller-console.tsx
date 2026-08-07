@@ -425,7 +425,13 @@ export function SellerProductsPage() {
             </div>
           </div>
           {htmlPreview ? (
-            <div className="prose mt-3 max-w-none rounded-md bg-zinc-50 p-4" dangerouslySetInnerHTML={{ __html: createForm.detailHTML }} />
+            <iframe
+              title="HTML product detail preview"
+              sandbox=""
+              referrerPolicy="no-referrer"
+              srcDoc={createForm.detailHTML}
+              className="mt-3 min-h-64 w-full rounded-md border border-line bg-white"
+            />
           ) : (
             <textarea className="mt-3 min-h-64 w-full rounded-md border border-line px-3 py-2 font-mono text-xs outline-none focus:border-foreground" value={createForm.detailHTML} onChange={(event) => setCreateForm((current) => ({ ...current, detailHTML: event.target.value }))} placeholder="<section>...</section>" aria-label="HTML product detail" />
           )}

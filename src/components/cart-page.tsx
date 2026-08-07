@@ -16,11 +16,12 @@ import { Button } from "./ui/button";
 export function CartPage() {
   const router = useRouter();
   const token = useSessionStore((state) => state.accessToken);
+  const memberID = useSessionStore((state) => state.memberID);
   const effectiveToken = token ?? "";
   const [selectedIDs, setSelectedIDs] = useState<Set<number>>(new Set());
   const initializedSelection = useRef(false);
   const cart = useQuery({
-    queryKey: ["cart", effectiveToken],
+    queryKey: queryKeys.cart(memberID),
     queryFn: () => api.listCart(effectiveToken),
     enabled: Boolean(effectiveToken),
   });

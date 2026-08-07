@@ -44,7 +44,7 @@ export type EventProductPage = {
 };
 
 export type EventRewardClaim = {
-  status: "ISSUED" | "PREVIEW" | string;
+  status: "ISSUED";
   event_id: number;
   reward_row_id: number;
   reward_type: "COUPON" | "POINT_EVENT";

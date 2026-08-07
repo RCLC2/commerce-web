@@ -41,4 +41,25 @@ describe("catalogApi backend contracts", () => {
     const events = await catalogApi.listEvents();
     expect(events[0]).toMatchObject({ starts_at: null, ends_at: null });
   });
+
+  it("reads and mutates market follow state through the same route", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ following: false }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(catalogApi.getMarketFollowStatus("token", 3)).resolves.toEqual({ following: false });
+    await catalogApi.followMarket("token", 3);
+    await catalogApi.unfollowMarket("token", 3);
+
+    expect(fetchMock.mock.calls.map((call) => {
+      const url = new URL(String(call[0]));
+      return [url.pathname, call[1]?.method ?? "GET"];
+    })).toEqual([
+      ["/api/v1/markets/3/follow", "GET"],
+      ["/api/v1/markets/3/follow", "POST"],
+      ["/api/v1/markets/3/follow", "DELETE"],
+    ]);
+  });
 });

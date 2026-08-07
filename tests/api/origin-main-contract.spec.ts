@@ -74,6 +74,9 @@ test.describe("backend origin/main live API contract", () => {
       "/api/v1/coupons",
       "/api/v1/coupons/issuable",
       "/api/v1/me/addresses",
+      "/api/v1/me/reviews",
+      "/api/v1/me/wishlist",
+      "/api/v1/me/liked-products",
       "/api/v1/orders?limit=100&offset=0",
     ]) {
       expect(Array.isArray(await getJSON(request, endpoint, session.accessToken)), endpoint).toBeTruthy();
@@ -81,6 +84,33 @@ test.describe("backend origin/main live API contract", () => {
 
     const unauthorized = await request.get(`${backendBaseURL}/api/v1/me`);
     expect(unauthorized.status()).toBe(401);
+  });
+
+  test("market follow exposes reversible read and mutation contracts", async ({ request }) => {
+    const session = await signIn(request, seedAccounts.member);
+    const headers = { Authorization: `Bearer ${session.accessToken}` };
+    const initial = await getJSON(request, "/api/v1/markets/1/follow", session.accessToken) as { following: boolean };
+    expect(initial).toEqual(expect.objectContaining({ following: expect.any(Boolean) }));
+
+    let changedState = false;
+    try {
+      const toggle = initial.following
+        ? await request.delete(`${backendBaseURL}/api/v1/markets/1/follow`, { headers })
+        : await request.post(`${backendBaseURL}/api/v1/markets/1/follow`, { headers });
+      expect(toggle.ok(), await toggle.text()).toBeTruthy();
+      changedState = true;
+      const changed = await getJSON(request, "/api/v1/markets/1/follow", session.accessToken) as { following: boolean };
+      expect(changed.following).toBe(!initial.following);
+    } finally {
+      if (changedState) {
+        const restore = initial.following
+          ? await request.post(`${backendBaseURL}/api/v1/markets/1/follow`, { headers })
+          : await request.delete(`${backendBaseURL}/api/v1/markets/1/follow`, { headers });
+        expect(restore.ok(), await restore.text()).toBeTruthy();
+        const restored = await getJSON(request, "/api/v1/markets/1/follow", session.accessToken) as { following: boolean };
+        expect(restored.following).toBe(initial.following);
+      }
+    }
   });
 
   test("customer coupon endpoints expose the raw shapes handled by explicit adapters", async ({ request }) => {

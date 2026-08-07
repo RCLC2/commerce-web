@@ -12,8 +12,10 @@ import {
   clearCheckoutRetryState,
   CheckoutOrderStateError,
   estimatedCouponDiscount,
+  findUniqueOrderByCartItemIDs,
   maxApplicablePoints,
   normalizeRequestedPoints,
+  pendingCheckoutInput,
   readCheckoutRetryState,
   saveCheckoutRetryState,
   selectedCartItemIDs,
@@ -41,24 +43,26 @@ export function CheckoutPage() {
   const [retryStateReady, setRetryStateReady] = useState(false);
   const [restoreError, setRestoreError] = useState<string>();
   const [mockCheckoutUrl, setMockCheckoutUrl] = useState<string>();
+  const [pendingAttemptBlocked, setPendingAttemptBlocked] = useState(false);
+  const [restoreNonce, setRestoreNonce] = useState(0);
 
   const cart = useQuery({
-    queryKey: ["cart", effectiveToken],
+    queryKey: queryKeys.cart(memberID),
     queryFn: () => api.listCart(effectiveToken),
     enabled: Boolean(effectiveToken),
   });
   const coupons = useQuery({
-    queryKey: queryKeys.coupons(effectiveToken),
+    queryKey: queryKeys.coupons(memberID),
     queryFn: () => api.listCoupons(effectiveToken),
     enabled: Boolean(effectiveToken),
   });
   const profile = useQuery({
-    queryKey: queryKeys.me(effectiveToken),
+    queryKey: queryKeys.me(memberID),
     queryFn: () => api.me(effectiveToken),
     enabled: Boolean(effectiveToken),
   });
   const addresses = useQuery({
-    queryKey: queryKeys.addresses(effectiveToken),
+    queryKey: queryKeys.addresses(memberID),
     queryFn: () => api.listAddresses(effectiveToken),
     enabled: Boolean(effectiveToken),
   });
@@ -126,6 +130,7 @@ export function CheckoutPage() {
       clearCheckoutRetryState(() => window.sessionStorage);
       setCreatedOrderCode(undefined);
       setConfirmedOrder(undefined);
+      setPendingAttemptBlocked(false);
     };
 
     const restore = async () => {
@@ -133,13 +138,50 @@ export function CheckoutPage() {
       setRestoreError(undefined);
       const stored = readCheckoutRetryState(() => window.sessionStorage);
 
-      if (
-        stored?.memberID !== memberID
-        || typeof stored.orderCode !== "string"
-        || !stored.orderCode.trim()
-      ) {
+      if (stored?.memberID !== memberID) {
         clearStoredOrder();
         setRetryStateReady(true);
+        return;
+      }
+
+      const pendingInput = pendingCheckoutInput(stored, memberID);
+      if (typeof stored.orderCode !== "string" || !stored.orderCode.trim()) {
+        if (!pendingInput) {
+          clearStoredOrder();
+          setRetryStateReady(true);
+          return;
+        }
+
+        setPendingAttemptBlocked(true);
+        try {
+          const orders = await api.listAllOrders(effectiveToken);
+          if (cancelled) return;
+          const recovered = findUniqueOrderByCartItemIDs(orders, pendingInput.cart_item_ids);
+          if (!recovered) {
+            setRestoreError("이전 주문 생성 결과가 불명확합니다. 중복 주문을 막기 위해 주문 내역을 확인하기 전에는 다시 생성하지 않습니다.");
+            return;
+          }
+          if (recovered.status === "CANCELLED") {
+            clearStoredOrder();
+            return;
+          }
+          setCreatedOrderCode(recovered.order_code);
+          setConfirmedOrder(recovered);
+          setPendingAttemptBlocked(false);
+          saveCheckoutRetryState(() => window.sessionStorage, {
+            memberID,
+            orderCode: recovered.order_code,
+            cartItemIDs: pendingInput.cart_item_ids,
+            usedCouponID: pendingInput.used_coupon_id,
+            usedPoint: pendingInput.used_point,
+          });
+        } catch {
+          if (!cancelled) {
+            setRestoreError("이전 주문 생성 결과를 확인하지 못했습니다. 주문 내역 확인 전에는 중복 방지를 위해 다시 생성하지 않습니다.");
+          }
+        } finally {
+          if (!cancelled) setRetryStateReady(true);
+        }
         return;
       }
 
@@ -174,7 +216,7 @@ export function CheckoutPage() {
     return () => {
       cancelled = true;
     };
-  }, [effectiveToken, memberID]);
+  }, [effectiveToken, memberID, restoreNonce]);
 
   const checkout = useMutation({
     onMutate: () => setMockCheckoutUrl(undefined),
@@ -189,8 +231,31 @@ export function CheckoutPage() {
         placeOrder: (input) => api.placeOrder(effectiveToken, input),
         getOrder: (orderCode) => api.getOrder(effectiveToken, orderCode),
         createPaymentCheckout: (orderCode) => api.createPaymentCheckout(effectiveToken, orderCode),
+        recoverCreatedOrder: async (input) =>
+          findUniqueOrderByCartItemIDs(
+            await api.listAllOrders(effectiveToken),
+            input.cart_item_ids,
+          ),
+        onOrderAttempt: (input) => {
+          if (memberID === null) {
+            throw new Error("회원 정보를 확인하지 못해 주문을 생성할 수 없습니다. 다시 로그인해주세요.");
+          }
+          const saved = saveCheckoutRetryState(() => window.sessionStorage, {
+            memberID,
+            cartItemIDs: input.cart_item_ids,
+            usedCouponID: input.used_coupon_id,
+            usedPoint: input.used_point,
+            attemptedAt: new Date().toISOString(),
+          });
+          if (!saved) {
+            setRestoreError("브라우저 저장소를 사용할 수 없어 안전을 위해 주문 생성을 중단했습니다.");
+            throw new Error("주문 복구 정보를 저장하지 못해 안전을 위해 주문 생성을 중단했습니다.");
+          }
+          setPendingAttemptBlocked(true);
+        },
         onOrderCreated: (orderCode) => {
           setCreatedOrderCode(orderCode);
+          setPendingAttemptBlocked(false);
           if (memberID === null) {
             setRestoreError("회원 정보를 확인하지 못해 주문 복구 상태를 저장할 수 없습니다. 페이지를 새로고침하지 말고 결제를 계속해주세요.");
             return;
@@ -198,6 +263,9 @@ export function CheckoutPage() {
           const saved = saveCheckoutRetryState(() => window.sessionStorage, {
             memberID,
             orderCode,
+            cartItemIDs: items.map((item) => item.id),
+            usedCouponID: eligibleSelectedCoupon?.id,
+            usedPoint: appliedPoint,
           });
           if (!saved) {
             setRestoreError("이 브라우저에서는 주문 복구 저장소를 사용할 수 없습니다. 페이지를 새로고침하지 말고 결제를 계속해주세요.");
@@ -222,6 +290,7 @@ export function CheckoutPage() {
         clearCheckoutRetryState(() => window.sessionStorage);
         setCreatedOrderCode(undefined);
         setConfirmedOrder(undefined);
+        setPendingAttemptBlocked(false);
       }
     },
   });
@@ -236,7 +305,7 @@ export function CheckoutPage() {
   return (
     <main className="mx-auto max-w-5xl px-4 pb-28 pt-8">
       <h1 className="text-2xl font-black">주문서</h1>
-      {requestedCartItemIDs !== null && cart.isSuccess && !items.length ? (
+      {!createdOrderCode && requestedCartItemIDs !== null && cart.isSuccess && !items.length ? (
         <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-900">
           선택한 장바구니 상품을 찾을 수 없습니다. <Link href="/cart" className="underline">장바구니에서 다시 선택해주세요.</Link>
         </div>
@@ -347,6 +416,7 @@ export function CheckoutPage() {
                 !items.length
                 || !Number.isSafeInteger(expectedAmount)
                 || expectedAmount <= 0
+                || pendingAttemptBlocked
               ))
               || Boolean(blockingError && !createdOrderCode)
               || checkout.isPending
@@ -360,6 +430,12 @@ export function CheckoutPage() {
             <p className="mt-3 text-xs font-bold text-brand">최소 결제 금액은 1원입니다. 쿠폰 또는 포인트 사용액을 조정해주세요.</p>
           ) : null}
           {restoreError ? <p className="mt-3 text-xs font-bold text-amber-800">{restoreError}</p> : null}
+          {pendingAttemptBlocked && !createdOrderCode ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link href="/mypage"><Button size="sm" variant="secondary">주문 내역 확인</Button></Link>
+              <Button size="sm" variant="secondary" onClick={() => setRestoreNonce((value) => value + 1)}>복구 다시 확인</Button>
+            </div>
+          ) : null}
           {checkout.error ? <p className="mt-3 text-sm font-bold text-brand">{apiErrorMessage(checkout.error)}</p> : null}
           {mockCheckoutUrl ? (
             <section className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-4">

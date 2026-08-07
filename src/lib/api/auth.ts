@@ -17,8 +17,8 @@ const memberProfileSchema = z.object({
   notification_type: z.string(),
   marketing_consent: z.boolean(),
   nighttime_consent: z.boolean(),
-  height: z.number().nonnegative(),
-  weight: z.number().nonnegative(),
+  height: z.number().nonnegative().optional().default(0),
+  weight: z.number().nonnegative().optional().default(0),
   point_balance: z.number().int().nonnegative(),
   created_at: z.string(),
 });

@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/api-client";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { queryKeys } from "@/lib/query-keys";
 import type { CMSHomeSection, Product } from "@/lib/types";
@@ -27,22 +28,26 @@ function productsForHomeSection(section: CMSHomeSection) {
 
 export function HomePage() {
   const token = useSessionStore((state) => state.accessToken);
+  const memberID = useSessionStore((state) => state.memberID);
   const [eventIndex, setEventIndex] = useState(0);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const effectiveToken = getEffectiveToken(token);
-  const { data: events = [] } = useQuery({
+  const eventsQuery = useQuery({
     queryKey: queryKeys.events,
     queryFn: api.listEvents,
   });
-  const { data: homeCategoryChips = [] } = useQuery({
+  const events = eventsQuery.data ?? [];
+  const homeCategoryChipsQuery = useQuery({
     queryKey: queryKeys.homeCategoryChips,
     queryFn: api.listHomeCategoryChips,
   });
-  const { data: homeSections = [] } = useQuery({
+  const homeCategoryChips = homeCategoryChipsQuery.data ?? [];
+  const homeSectionsQuery = useQuery({
     queryKey: ["home-sections"],
     queryFn: api.listHomeSections,
   });
-  const { data: recommendationPages, isLoading: isRecommendationLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+  const homeSections = homeSectionsQuery.data ?? [];
+  const recommendationQuery = useInfiniteQuery({
     queryKey: queryKeys.personalizedProducts({ sort: "new" }),
     initialPageParam: 0,
     queryFn: ({ pageParam }) => api.listRecommendedProducts({ limit: 12, offset: pageParam }),
@@ -50,12 +55,14 @@ export function HomePage() {
       lastPage.length === 12 ? pages.length * 12 : undefined
     ),
   });
-  const recommendationProducts = recommendationPages?.pages.flat() ?? [];
-  const { data: profile } = useQuery({
-    queryKey: queryKeys.homeMe(effectiveToken),
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = recommendationQuery;
+  const recommendationProducts = recommendationQuery.data?.pages.flat() ?? [];
+  const profileQuery = useQuery({
+    queryKey: queryKeys.homeMe(memberID),
     queryFn: () => api.me(effectiveToken ?? ""),
     enabled: Boolean(effectiveToken),
   });
+  const profile = profileQuery.data;
   const recommendationTitle = `${profile?.email?.split("@")[0] ?? "사용자"}님을 위한 추천 상품`;
   const displayHomeCategoryChips = [...homeCategoryChips].sort((a, b) => a.sequence - b.sequence || a.id - b.id);
   const displayHomeSections = [...homeSections].sort((a, b) => a.sequence - b.sequence || a.id - b.id);
@@ -95,7 +102,9 @@ export function HomePage() {
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24">
       <section className="py-5">
-        {events.length ? (
+        {eventsQuery.isError ? (
+          <div className="rounded-md border border-brand/30 bg-red-50 p-4 text-sm"><p className="font-bold text-brand">{apiErrorMessage(eventsQuery.error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void eventsQuery.refetch()}>이벤트 다시 시도</Button></div>
+        ) : events.length ? (
           <div className="relative overflow-hidden rounded-md border border-line bg-white">
             <div
               className="flex transition-transform duration-500 ease-out"
@@ -129,12 +138,15 @@ export function HomePage() {
               </Button>
             </div>
           </div>
-        ) : (
+        ) : eventsQuery.isLoading ? (
           <div className="h-64 animate-pulse rounded-md bg-zinc-200" />
-        )}
+        ) : <p className="rounded-md border border-line bg-white p-6 text-sm text-muted">진행 중인 이벤트가 없습니다.</p>}
       </section>
 
       <section className="rounded-2xl border border-line bg-white p-3 shadow-sm" aria-label="홈 카테고리와 이벤트">
+        {homeCategoryChipsQuery.isError ? <div className="p-3 text-sm"><p className="font-bold text-brand">{apiErrorMessage(homeCategoryChipsQuery.error)}</p><Button className="mt-2" size="sm" variant="secondary" onClick={() => void homeCategoryChipsQuery.refetch()}>카테고리 다시 시도</Button></div> : null}
+        {homeCategoryChipsQuery.isLoading ? <p className="p-3 text-sm text-muted">카테고리를 불러오는 중입니다.</p> : null}
+        {homeCategoryChipsQuery.isSuccess && displayHomeCategoryChips.length === 0 ? <p className="p-3 text-sm text-muted">표시할 홈 카테고리가 없습니다.</p> : null}
         <div className="grid grid-cols-5 gap-1.5">
           {displayHomeCategoryChips.map((chip) => (
             <Link key={chip.id} href={chip.href} className={`relative flex min-h-20 flex-col items-center justify-center gap-1 rounded-xl p-1 transition hover:-translate-y-0.5 ${chip.chip_type === "CATEGORY_EVENT" ? "bg-rose-50 hover:bg-rose-100" : "hover:bg-zinc-50"}`}>
@@ -148,6 +160,9 @@ export function HomePage() {
         </div>
       </section>
 
+      {homeSectionsQuery.isError ? <div className="my-7 rounded-md border border-brand/30 bg-red-50 p-4 text-sm"><p className="font-bold text-brand">{apiErrorMessage(homeSectionsQuery.error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void homeSectionsQuery.refetch()}>홈 구좌 다시 시도</Button></div> : null}
+      {homeSectionsQuery.isLoading ? <p className="py-7 text-sm text-muted">홈 상품 구좌를 불러오는 중입니다.</p> : null}
+      {homeSectionsQuery.isSuccess && displayHomeSections.length === 0 ? <p className="py-7 text-sm text-muted">표시할 홈 상품 구좌가 없습니다.</p> : null}
       {displayHomeSections.map((section, index) => (
         <ProductCarouselSection
           key={section.id || section.api_url}
@@ -155,6 +170,9 @@ export function HomePage() {
           description={section.description ?? ""}
           products={homeSectionQueries[index]?.data ?? []}
           isLoading={homeSectionQueries[index]?.isLoading ?? false}
+          isSuccess={homeSectionQueries[index]?.isSuccess ?? false}
+          error={homeSectionQueries[index]?.error}
+          onRetry={() => void homeSectionQueries[index]?.refetch()}
         />
       ))}
 
@@ -162,9 +180,12 @@ export function HomePage() {
         <div className="mb-4 flex items-end justify-between">
           <div>
             <h2 className="text-xl font-black">{recommendationTitle}</h2>
+            {profileQuery.isError ? <p className="mt-1 text-xs font-bold text-amber-800">회원 정보를 불러오지 못해 일반 추천을 표시합니다.</p> : null}
           </div>
         </div>
-        {isRecommendationLoading ? (
+        {recommendationQuery.isError ? (
+          <div className="rounded-md border border-brand/30 bg-red-50 p-4 text-sm"><p className="font-bold text-brand">{apiErrorMessage(recommendationQuery.error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void recommendationQuery.refetch()}>추천 다시 시도</Button></div>
+        ) : recommendationQuery.isLoading ? (
           <div className="grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
             {Array.from({ length: 4 }).map((_, index) => (
               <div key={index} className="aspect-square animate-pulse rounded-md bg-zinc-200" />
@@ -177,8 +198,9 @@ export function HomePage() {
             ))}
           </div>
         )}
+        {recommendationQuery.isSuccess && recommendationProducts.length === 0 ? <p className="text-sm text-muted">표시할 추천 상품이 없습니다.</p> : null}
         <div ref={loadMoreRef} className="h-8" />
-        {hasNextPage || isFetchingNextPage ? (
+        {recommendationQuery.hasNextPage || recommendationQuery.isFetchingNextPage ? (
           <p className="text-center text-xs text-muted">추천 상품을 더 불러오는 중입니다.</p>
         ) : null}
       </section>
@@ -191,11 +213,17 @@ function ProductCarouselSection({
   description,
   products,
   isLoading,
+  isSuccess,
+  error,
+  onRetry,
 }: {
   title: string;
   description: string;
   products: Product[];
   isLoading: boolean;
+  isSuccess: boolean;
+  error: unknown;
+  onRetry: () => void;
 }) {
   const carouselRef = useRef<HTMLDivElement | null>(null);
 
@@ -228,6 +256,8 @@ function ProductCarouselSection({
             <div key={index} className="h-56 w-[42vw] shrink-0 animate-pulse rounded-md bg-zinc-200 sm:w-48 md:w-52" />
           ))}
         </div>
+      ) : error ? (
+        <div className="rounded-md border border-brand/30 bg-red-50 p-4 text-sm"><p className="font-bold text-brand">{apiErrorMessage(error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={onRetry}>다시 시도</Button></div>
       ) : (
         <div ref={carouselRef} className="no-scrollbar flex snap-x gap-3 overflow-x-auto scroll-smooth pb-1 md:gap-4">
           {products.map((product) => (
@@ -237,6 +267,7 @@ function ProductCarouselSection({
           ))}
         </div>
       )}
+      {isSuccess && products.length === 0 ? <p className="text-sm text-muted">표시할 상품이 없습니다.</p> : null}
     </section>
   );
 }

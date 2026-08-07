@@ -183,6 +183,26 @@ test.describe("seller console against backend origin/main", () => {
     });
   }
 
+  test("seller HTML preview cannot execute imported scripts in the parent origin", async ({ page, request }) => {
+    const session = await signIn(request, seedAccounts.seller);
+    await installSession(page, session);
+    await page.goto("/seller/products");
+    await expect(page.getByRole("heading", { name: "내 상품 관리" })).toBeVisible();
+    await page.evaluate(() => {
+      (window as Window & { __sellerPreviewPwned?: boolean }).__sellerPreviewPwned = false;
+    });
+
+    await page.getByLabel("HTML product detail").fill(
+      '<script>parent.__sellerPreviewPwned=true</script><img src="x" onerror="parent.__sellerPreviewPwned=true">',
+    );
+    await page.getByRole("button", { name: "Preview", exact: true }).click();
+
+    const preview = page.getByTitle("HTML product detail preview");
+    await expect(preview).toHaveAttribute("sandbox", "");
+    await expect.poll(() => page.evaluate(() =>
+      (window as Window & { __sellerPreviewPwned?: boolean }).__sellerPreviewPwned)).toBe(false);
+  });
+
   test("seller creates and updates a product while exposing the base-price migration blocker", async ({ page, request }, testInfo) => {
     const session = await signIn(request, seedAccounts.seller);
     await installSession(page, session);
@@ -195,7 +215,7 @@ test.describe("seller console against backend origin/main", () => {
     await page.getByLabel("Stock").fill("3");
     await page.getByLabel("Option name").fill("SIZE");
     await page.getByLabel("Option value").fill("FREE");
-    await page.getByLabel("Description").fill("origin/main 실연동 테스트 상품");
+    await page.getByLabel("HTML product detail").fill("<p>origin/main 실연동 테스트 상품</p>");
 
     const createResponsePromise = page.waitForResponse((response) =>
       response.url().endsWith("/api/v1/products") && response.request().method() === "POST");

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
+import { canWriteOrderLineReview, reviewedOrderLineItemIDs } from "@/lib/product-engagement";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import type { OrderLineItemResponse, TrackingInfo } from "@/lib/types";
@@ -33,6 +34,7 @@ function statusLabel(status: string) {
 
 export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   const token = useSessionStore((state) => state.accessToken);
+  const memberID = useSessionStore((state) => state.memberID);
   const effectiveToken = getEffectiveToken(token) ?? "";
   const queryClient = useQueryClient();
   const [trackingInfo, setTrackingInfo] = useState<TrackingInfo | null>(null);
@@ -40,10 +42,17 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   const [submittedLineItemIDs, setSubmittedLineItemIDs] = useState<Set<number>>(() => new Set());
 
   const { data: order, isLoading, error, refetch } = useQuery({
-    queryKey: ["order", orderCode],
+    queryKey: queryKeys.order(orderCode, memberID),
     queryFn: () => api.getOrder(effectiveToken, orderCode),
     enabled: Boolean(effectiveToken),
   });
+  const myReviews = useQuery({
+    queryKey: queryKeys.myReviews(memberID),
+    queryFn: () => api.listMyReviews(effectiveToken),
+    enabled: Boolean(effectiveToken),
+    refetchOnMount: "always",
+  });
+  const reviewedLineItemIDs = reviewedOrderLineItemIDs(myReviews.data);
   const productIDs = [...new Set(order?.market_orders?.flatMap((marketOrder) =>
     marketOrder.line_items.map((item) => item.product_id)) ?? [])];
   const productQueries = useQueries({
@@ -59,8 +68,8 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   const confirmPurchase = useMutation({
     mutationFn: (itemID: number) => api.confirmPurchase(effectiveToken, orderCode, itemID),
     onSuccess: (updated) => {
-      queryClient.setQueryData(["order", orderCode], updated);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.orders(effectiveToken) });
+      queryClient.setQueryData(queryKeys.order(orderCode, memberID), updated);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders(memberID) });
     },
   });
   const trackDelivery = useMutation({
@@ -146,9 +155,13 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
 
       <section className="mt-6 space-y-4">
         <h2 className="text-lg font-black">Items</h2>
-        <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-900">
-          서버에 내 리뷰 목록 API가 없어 새로고침 뒤 중복 작성 여부는 제출 시 서버가 최종 확인합니다.
-        </p>
+        {myReviews.isFetching ? <p className="text-xs text-muted">리뷰 작성 여부를 확인하는 중입니다.</p> : null}
+        {myReviews.error ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-xs font-bold text-brand">
+            <p>리뷰 작성 여부를 확인하지 못해 중복 작성을 막기 위해 작성 버튼을 숨겼습니다.</p>
+            <Button size="sm" variant="secondary" onClick={() => void myReviews.refetch()}>다시 확인</Button>
+          </div>
+        ) : null}
         {order.market_orders?.map((marketOrder) => (
           <div key={marketOrder.id} className="rounded-md border border-line bg-white p-4">
             <div className="flex justify-between text-sm">
@@ -159,9 +172,15 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
               {marketOrder.line_items.map((item) => {
                 const product = item.product ?? productByID.get(item.product_id);
                 const completed = item.status === "COMPLETED" || Boolean(item.purchase_confirmed_at);
-                const canWriteReview =
-                  (item.reviewable ?? completed) && !submittedLineItemIDs.has(item.id);
+                const serverReviewed = reviewedLineItemIDs.has(item.id);
+                const reviewEligible = canWriteOrderLineReview({
+                  reviewable: item.reviewable ?? completed,
+                  reviewStatusLoaded: myReviews.isSuccess,
+                  serverReviewed,
+                  submitted: submittedLineItemIDs.has(item.id),
+                });
                 const isReviewing = reviewingLineItemID === item.id;
+                const canToggleReview = reviewEligible && (!myReviews.isFetching || isReviewing);
 
                 return (
                   <div key={item.id} className="border-t border-line pt-4 first:border-t-0 first:pt-0">
@@ -183,23 +202,25 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
                           item={item}
                           busy={confirmPurchase.isPending}
                           completed={completed}
-                          reviewSubmitted={submittedLineItemIDs.has(item.id)}
-                          canWriteReview={canWriteReview}
+                          reviewSubmitted={serverReviewed || submittedLineItemIDs.has(item.id)}
+                          canWriteReview={canToggleReview}
                           reviewOpen={isReviewing}
                           onConfirm={() => confirmPurchase.mutate(item.id)}
                           onToggleReview={() => setReviewingLineItemID(isReviewing ? null : item.id)}
                         />
                       </div>
                     </div>
-                    {canWriteReview && isReviewing ? (
+                    {reviewEligible && isReviewing ? (
                       <ReviewWritePanel
                         token={effectiveToken}
+                        memberID={memberID}
                         orderCode={order.order_code}
                         lineItemID={item.id}
                         productID={item.product_id}
                         onSubmitted={() => {
                           setSubmittedLineItemIDs((current) => new Set(current).add(item.id));
                           setReviewingLineItemID(null);
+                          void queryClient.invalidateQueries({ queryKey: queryKeys.myReviews(memberID) });
                         }}
                       />
                     ) : null}

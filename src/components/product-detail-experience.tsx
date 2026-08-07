@@ -1,12 +1,20 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, Camera, CheckCircle2, ChevronLeft, ChevronRight, Heart, Minus, Plus, ShoppingBag, SlidersHorizontal, Star, X } from "lucide-react";
+import { BadgeCheck, Bookmark, Camera, CheckCircle2, ChevronLeft, ChevronRight, Heart, Minus, Plus, ShoppingBag, SlidersHorizontal, Star, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/api-client";
 import { getEffectiveToken } from "@/lib/auth-token";
+import {
+  availableOptionQuantity,
+  clampOptionQuantity,
+  findNewMatchingCartItem,
+  firstSellableOption,
+  includesProduct,
+} from "@/lib/product-engagement";
 import { resolveProductDetailHtml } from "@/lib/product-detail-html";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
@@ -16,14 +24,21 @@ import { AlsoViewedSection, PdpCardAdSection, SponsoredMarketSection } from "./p
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
+class CartPreflightError extends Error {
+  constructor(cause: unknown) {
+    super(`담기 전 장바구니를 확인하지 못했습니다. ${apiErrorMessage(cause)}`);
+    this.name = "CartPreflightError";
+  }
+}
+
 export function ProductDetailExperience({ productId, initialProduct, initialMerchandising }: { productId: number; initialProduct?: Product; initialMerchandising: PdpMerchandising }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const token = useSessionStore((state) => state.accessToken);
+  const memberID = useSessionStore((state) => state.memberID);
   const effectiveToken = getEffectiveToken(token);
   const [quantity, setQuantity] = useState(1);
   const [optionID, setOptionID] = useState<number | null>(null);
-  const [liked, setLiked] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [showFloatingPurchase, setShowFloatingPurchase] = useState(false);
@@ -45,26 +60,74 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
     queryKey: [...queryKeys.productReviews(productId), "summary"],
     queryFn: () => api.getProductReviewSummary(productId),
   });
+  const likedProductsQuery = useQuery({
+    queryKey: queryKeys.likedProducts(memberID),
+    queryFn: () => api.listLikedProducts(effectiveToken ?? ""),
+    enabled: Boolean(effectiveToken),
+    refetchOnMount: "always",
+  });
+  const wishlistQuery = useQuery({
+    queryKey: queryKeys.wishlist(memberID),
+    queryFn: () => api.listWishlistedProducts(effectiveToken ?? ""),
+    enabled: Boolean(effectiveToken),
+    refetchOnMount: "always",
+  });
 
   const product = productQuery.data;
   const reviews = reviewsQuery.data ?? [];
   const summary = summaryQuery.data;
+  const liked = includesProduct(likedProductsQuery.data, productId);
+  const wishlisted = includesProduct(wishlistQuery.data, productId);
+  const productSellable = product?.status === "SELLING" && product.in_stock !== false;
   const selectedOption = useMemo(
-    () => product?.options?.find((option) => option.id === optionID) ?? product?.options?.[0],
-    [optionID, product?.options],
+    () => {
+      if (!productSellable) return undefined;
+      const options = product?.options;
+      return options?.find((option) =>
+        option.id === optionID && availableOptionQuantity(option) > 0)
+        ?? firstSellableOption(options);
+    },
+    [optionID, product?.options, productSellable],
   );
+  const availableQuantity = availableOptionQuantity(selectedOption);
+  const purchaseQuantity = clampOptionQuantity(quantity, selectedOption);
 
   const addCart = useMutation({
-    mutationFn: () =>
-      api.addCartItem(effectiveToken ?? "", {
+    mutationFn: async () => {
+      if (!effectiveToken || !selectedOption || availableQuantity === 0) {
+        throw new Error("현재 담을 수 있는 상품 옵션이 없습니다.");
+      }
+      const input = {
         product_id: productId,
-        option_id: selectedOption?.id ?? 0,
-        quantity,
-      }),
+        option_id: selectedOption.id,
+        quantity: purchaseQuantity,
+      };
+      let before: Awaited<ReturnType<typeof api.listCart>>;
+      try {
+        before = await api.listCart(effectiveToken);
+      } catch (error) {
+        throw new CartPreflightError(error);
+      }
+      try {
+        await api.addCartItem(effectiveToken, input);
+        return { reconciled: false };
+      } catch (error) {
+        try {
+          const after = await api.listCart(effectiveToken);
+          if (findNewMatchingCartItem(before, after, input)) {
+            return { reconciled: true };
+          }
+        } catch {
+          // Preserve the original add failure when reconciliation also fails.
+        }
+        throw error;
+      }
+    },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["cart", effectiveToken] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cart(memberID) });
     },
   });
+
   function handleCartAction() {
     if (!effectiveToken) {
       router.push("/login");
@@ -74,19 +137,93 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
       router.push("/cart");
       return;
     }
+    if (addCart.error instanceof CartPreflightError) {
+      addCart.reset();
+      addCart.mutate();
+      return;
+    }
+    if (addCart.isError) {
+      router.push("/cart");
+      return;
+    }
     addCart.mutate();
   }
-  const wishlist = useMutation({
-    mutationFn: async () => {
-      if (!effectiveToken) throw new Error("Login is required.");
-      if (liked) await api.removeWishlist(effectiveToken, productId);
-      else await api.addWishlist(effectiveToken, productId);
+  function handleOption(option: number) {
+    addCart.reset();
+    setOptionID(option);
+    setQuantity(1);
+  }
+  function handleQuantity(next: number) {
+    addCart.reset();
+    setQuantity(clampOptionQuantity(next, selectedOption));
+  }
+  const likeMutation = useMutation({
+    mutationFn: async (target: boolean) => {
+      if (!effectiveToken) throw new Error("로그인이 필요합니다.");
+      if (target) await api.addLike(effectiveToken, productId);
+      else await api.removeLike(effectiveToken, productId);
     },
-    onSuccess: () => {
-      setLiked((value) => !value);
-      void queryClient.invalidateQueries({ queryKey: ["me-wishlist", effectiveToken] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.likedProducts(memberID) }),
   });
+  const wishlistMutation = useMutation({
+    mutationFn: async (target: boolean) => {
+      if (!effectiveToken) throw new Error("로그인이 필요합니다.");
+      if (target) await api.addWishlist(effectiveToken, productId);
+      else await api.removeWishlist(effectiveToken, productId);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.wishlist(memberID) }),
+  });
+
+  function handleProtectedEngagement(action: "like" | "wishlist") {
+    if (!effectiveToken) {
+      router.push(`/login?next=/products/${productId}`);
+      return;
+    }
+    if (likeMutation.isPending || wishlistMutation.isPending) return;
+    if (action === "like") {
+      likeMutation.reset();
+      likeMutation.mutate(!liked);
+      return;
+    }
+    wishlistMutation.reset();
+    wishlistMutation.mutate(!wishlisted);
+  }
+
+  async function retryLike() {
+    if (likedProductsQuery.isError) {
+      await likedProductsQuery.refetch();
+      return;
+    }
+    if (!likeMutation.isError || likeMutation.variables === undefined) return;
+    const target = likeMutation.variables;
+    const result = await likedProductsQuery.refetch();
+    if (!result.isSuccess) return;
+    if (includesProduct(result.data, productId) === target) {
+      likeMutation.reset();
+      return;
+    }
+    likeMutation.mutate(target);
+  }
+
+  async function retryWishlist() {
+    if (wishlistQuery.isError) {
+      await wishlistQuery.refetch();
+      return;
+    }
+    if (!wishlistMutation.isError || wishlistMutation.variables === undefined) return;
+    const target = wishlistMutation.variables;
+    const result = await wishlistQuery.refetch();
+    if (!result.isSuccess) return;
+    if (includesProduct(result.data, productId) === target) {
+      wishlistMutation.reset();
+      return;
+    }
+    wishlistMutation.mutate(target);
+  }
+
+  const likeError = likedProductsQuery.error ?? likeMutation.error;
+  const wishlistError = wishlistQuery.error ?? wishlistMutation.error;
+  const engagementLoading = Boolean(effectiveToken) && (likedProductsQuery.isFetching || wishlistQuery.isFetching);
 
   useEffect(() => {
     function updateFloatingPurchase() {
@@ -173,6 +310,7 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
                 src={images[safeImageIndex]?.url}
                 alt={images[safeImageIndex]?.alt_text || product.name}
                 fill
+                priority={safeImageIndex === 0}
                 sizes="(max-width: 768px) 100vw, 55vw"
                 className="pointer-events-none select-none object-cover"
               />
@@ -240,15 +378,30 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
             <PurchaseControls
               product={product}
               selectedOption={selectedOption}
-              optionID={optionID}
-              quantity={quantity}
+              quantity={purchaseQuantity}
+              availableQuantity={availableQuantity}
               liked={liked}
-              pending={addCart.isPending || wishlist.isPending}
+              wishlisted={wishlisted}
+              cartPending={addCart.isPending}
+              likePending={likeMutation.isPending}
+              wishlistPending={wishlistMutation.isPending}
+              likeSucceeded={likeMutation.isSuccess}
+              wishlistSucceeded={wishlistMutation.isSuccess}
+              likeReady={!effectiveToken || (likedProductsQuery.isSuccess && !likedProductsQuery.isFetching)}
+              wishlistReady={!effectiveToken || (wishlistQuery.isSuccess && !wishlistQuery.isFetching)}
+              engagementLoading={engagementLoading}
+              likeError={likeError ? `좋아요 상태를 처리하지 못했습니다. ${apiErrorMessage(likeError)}` : undefined}
+              wishlistError={wishlistError ? `찜 상태를 처리하지 못했습니다. ${apiErrorMessage(wishlistError)}` : undefined}
               added={addCart.isSuccess}
+              cartError={addCart.isError ? addCart.error instanceof CartPreflightError ? addCart.error.message : `장바구니 반영 여부를 확인하지 못했습니다. ${apiErrorMessage(addCart.error)}` : undefined}
+              cartRetrySafe={addCart.error instanceof CartPreflightError}
               authenticated={Boolean(effectiveToken)}
-              onOption={setOptionID}
-              onQuantity={setQuantity}
-              onWishlist={() => wishlist.mutate()}
+              onOption={handleOption}
+              onQuantity={handleQuantity}
+              onLike={() => handleProtectedEngagement("like")}
+              onWishlist={() => handleProtectedEngagement("wishlist")}
+              onRetryLike={retryLike}
+              onRetryWishlist={retryWishlist}
               onCart={handleCartAction}
             />
           </div>
@@ -351,13 +504,14 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
         className={`fixed inset-x-0 bottom-16 z-40 border-t border-line bg-white/95 px-4 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] backdrop-blur transition md:bottom-0 ${showFloatingPurchase ? "opacity-100" : "pointer-events-none translate-y-full opacity-0"}`}
         aria-hidden={!showFloatingPurchase}
       >
-        <div className="mx-auto flex max-w-5xl items-center gap-3">
-          <div className="hidden min-w-0 flex-1 sm:block"><p className="truncate text-xs font-bold text-muted">{product.name}</p><p className="font-black">{formatPrice(price + (selectedOption?.additional_price ?? 0))} · {quantity}개</p></div>
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3">
+          <div className="hidden min-w-0 flex-1 sm:block"><p className="truncate text-xs font-bold text-muted">{product.name}</p><p className="font-black">{formatPrice(price + (selectedOption?.additional_price ?? 0))} · {purchaseQuantity}개</p></div>
           <Button className="shrink-0" variant="secondary" onClick={() => setPurchaseOpen(true)} tabIndex={showFloatingPurchase ? 0 : -1}><SlidersHorizontal size={18} /> 옵션·수량</Button>
           <Button className="min-w-0 flex-1 sm:max-w-64" onClick={handleCartAction} disabled={addCart.isPending || !selectedOption} tabIndex={showFloatingPurchase ? 0 : -1}>
             {addCart.isSuccess ? <CheckCircle2 size={19} /> : <ShoppingBag size={19} />}
-            {addCart.isPending ? "담는 중" : addCart.isSuccess ? "장바구니 보기" : !effectiveToken ? "로그인 후 담기" : "장바구니 담기"}
+            {addCart.isPending ? "담는 중" : addCart.isSuccess || (addCart.isError && !(addCart.error instanceof CartPreflightError)) ? "장바구니 확인" : addCart.isError ? "다시 담기" : !effectiveToken ? "로그인 후 담기" : "장바구니 담기"}
           </Button>
+          {addCart.isError ? <p className="basis-full text-right text-xs font-bold text-brand">{addCart.error instanceof CartPreflightError ? addCart.error.message : "담기 결과가 불명확합니다. 장바구니에서 확인해주세요."}</p> : null}
         </div>
       </div>
 
@@ -375,15 +529,30 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
               <PurchaseControls
                 product={product}
                 selectedOption={selectedOption}
-                optionID={optionID}
-                quantity={quantity}
+                quantity={purchaseQuantity}
+                availableQuantity={availableQuantity}
                 liked={liked}
-                pending={addCart.isPending || wishlist.isPending}
+                wishlisted={wishlisted}
+                cartPending={addCart.isPending}
+                likePending={likeMutation.isPending}
+                wishlistPending={wishlistMutation.isPending}
+                likeSucceeded={likeMutation.isSuccess}
+                wishlistSucceeded={wishlistMutation.isSuccess}
+                likeReady={!effectiveToken || (likedProductsQuery.isSuccess && !likedProductsQuery.isFetching)}
+                wishlistReady={!effectiveToken || (wishlistQuery.isSuccess && !wishlistQuery.isFetching)}
+                engagementLoading={engagementLoading}
+                likeError={likeError ? `좋아요 상태를 처리하지 못했습니다. ${apiErrorMessage(likeError)}` : undefined}
+                wishlistError={wishlistError ? `찜 상태를 처리하지 못했습니다. ${apiErrorMessage(wishlistError)}` : undefined}
                 added={addCart.isSuccess}
+                cartError={addCart.isError ? addCart.error instanceof CartPreflightError ? addCart.error.message : `장바구니 반영 여부를 확인하지 못했습니다. ${apiErrorMessage(addCart.error)}` : undefined}
+                cartRetrySafe={addCart.error instanceof CartPreflightError}
                 authenticated={Boolean(effectiveToken)}
-                onOption={setOptionID}
-                onQuantity={setQuantity}
-                onWishlist={() => wishlist.mutate()}
+                onOption={handleOption}
+                onQuantity={handleQuantity}
+                onLike={() => handleProtectedEngagement("like")}
+                onWishlist={() => handleProtectedEngagement("wishlist")}
+                onRetryLike={retryLike}
+                onRetryWishlist={retryWishlist}
                 onCart={handleCartAction}
               />
             </div>
@@ -411,15 +580,30 @@ function GalleryButton({ label, side, onClick, children }: { label: string; side
 type PurchaseControlsProps = {
   product: Product;
   selectedOption?: ProductOption;
-  optionID: number | null;
   quantity: number;
+  availableQuantity: number;
   liked: boolean;
-  pending: boolean;
+  wishlisted: boolean;
+  cartPending: boolean;
+  likePending: boolean;
+  wishlistPending: boolean;
+  likeSucceeded: boolean;
+  wishlistSucceeded: boolean;
+  likeReady: boolean;
+  wishlistReady: boolean;
+  engagementLoading: boolean;
+  likeError?: string;
+  wishlistError?: string;
   added: boolean;
+  cartError?: string;
+  cartRetrySafe: boolean;
   authenticated: boolean;
   onOption: (id: number) => void;
   onQuantity: (quantity: number) => void;
+  onLike: () => void;
   onWishlist: () => void;
+  onRetryLike: () => void;
+  onRetryWishlist: () => void;
   onCart: () => void;
 };
 
@@ -430,33 +614,45 @@ function PurchaseControls(props: PurchaseControlsProps) {
         옵션
         <select
           className="mt-2 h-12 w-full rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-foreground"
-          value={props.optionID ?? props.selectedOption?.id ?? ""}
+          value={props.selectedOption?.id ?? ""}
           onChange={(event) => props.onOption(Number(event.target.value))}
         >
+          {!props.selectedOption ? <option value="">판매 가능한 옵션 없음</option> : null}
           {props.product.options?.map((option) => (
-            <option key={option.id} value={option.id} disabled={!option.is_active || option.quantity <= 0}>
-              {option.option_value}{option.quantity <= 0 ? " (품절)" : ""}
+            <option key={option.id} value={option.id} disabled={availableOptionQuantity(option) <= 0}>
+              {option.option_value}{availableOptionQuantity(option) <= 0 ? " (품절)" : ""}
             </option>
           ))}
         </select>
       </label>
+      {!props.selectedOption ? <p className="rounded-lg bg-zinc-100 px-3 py-2 text-sm font-bold text-muted">현재 구매 가능한 옵션이 없습니다.</p> : null}
       <div className="flex items-center justify-between rounded-lg border border-line p-3">
         <span className="text-sm font-black">수량</span>
         <div className="flex items-center gap-3">
           <Button variant="secondary" size="icon" onClick={() => props.onQuantity(Math.max(1, props.quantity - 1))} aria-label="수량 줄이기"><Minus size={16} /></Button>
           <span className="w-6 text-center font-black">{props.quantity}</span>
-          <Button variant="secondary" size="icon" onClick={() => props.onQuantity(props.quantity + 1)} aria-label="수량 늘리기"><Plus size={16} /></Button>
+          <Button variant="secondary" size="icon" disabled={props.quantity >= props.availableQuantity} onClick={() => props.onQuantity(Math.min(props.availableQuantity, props.quantity + 1))} aria-label="수량 늘리기"><Plus size={16} /></Button>
         </div>
       </div>
-      <div className="grid grid-cols-[56px_1fr] gap-2">
-        <Button variant="secondary" size="lg" aria-label="좋아요" onClick={props.onWishlist} disabled={!props.authenticated || props.pending}>
+      <div className="grid grid-cols-[56px_56px_1fr] gap-2">
+        <Button variant="secondary" size="lg" aria-label={props.liked ? "좋아요 취소" : "좋아요"} title={props.liked ? "좋아요 취소" : "좋아요"} onClick={props.onLike} disabled={props.likePending || props.wishlistPending || (props.authenticated && !props.likeReady)}>
           <Heart size={20} className={props.liked ? "fill-brand text-brand" : ""} />
         </Button>
-        <Button size="lg" onClick={props.onCart} disabled={props.pending || !props.selectedOption}>
+        <Button variant="secondary" size="lg" aria-label={props.wishlisted ? "찜 해제" : "찜하기"} title={props.wishlisted ? "찜 해제" : "찜하기"} onClick={props.onWishlist} disabled={props.likePending || props.wishlistPending || (props.authenticated && !props.wishlistReady)}>
+          <Bookmark size={20} className={props.wishlisted ? "fill-brand text-brand" : ""} />
+        </Button>
+        <Button size="lg" onClick={props.onCart} disabled={props.cartPending || !props.selectedOption}>
           {props.added ? <CheckCircle2 size={19} /> : <ShoppingBag size={19} />}
-          {props.pending ? "담는 중" : !props.authenticated ? "로그인 후 담기" : props.added ? "장바구니 보기" : "장바구니 담기"}
+          {props.cartPending ? "담는 중" : !props.authenticated ? "로그인 후 담기" : props.added || (props.cartError && !props.cartRetrySafe) ? "장바구니 확인" : props.cartRetrySafe ? "다시 담기" : "장바구니 담기"}
         </Button>
       </div>
+      {props.engagementLoading ? <p className="text-xs font-bold text-muted">좋아요와 찜 상태를 확인하는 중입니다.</p> : null}
+      {props.likeError ? <div className="rounded-lg bg-red-50 px-3 py-2 text-sm"><p className="font-bold text-brand">{props.likeError}</p><Button className="mt-2" size="sm" variant="secondary" onClick={props.onRetryLike}>좋아요 다시 시도</Button></div> : null}
+      {props.wishlistError ? <div className="rounded-lg bg-red-50 px-3 py-2 text-sm"><p className="font-bold text-brand">{props.wishlistError}</p><Button className="mt-2" size="sm" variant="secondary" onClick={props.onRetryWishlist}>찜 다시 시도</Button></div> : null}
+      {props.cartError ? <div className="rounded-lg bg-red-50 px-3 py-2 text-sm"><p className="font-bold text-brand">{props.cartError}</p><Button className="mt-2" size="sm" variant="secondary" onClick={props.onCart}>{props.cartRetrySafe ? "다시 담기" : "장바구니 확인"}</Button></div> : null}
+      {props.likePending || props.wishlistPending ? <p className="text-xs font-bold text-muted" role="status">상품 상태를 저장하는 중입니다.</p> : null}
+      {props.likeSucceeded && !props.likeError ? <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-900" role="status">{props.liked ? "좋아요에 추가했습니다." : "좋아요를 취소했습니다."}</p> : null}
+      {props.wishlistSucceeded && !props.wishlistError ? <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-900" role="status">{props.wishlisted ? "찜한 상품에 추가했습니다." : "찜을 해제했습니다."}</p> : null}
       {props.added ? <p className="rounded-lg bg-emerald-50 px-3 py-2 text-center text-sm font-bold text-emerald-700" role="status">상품을 담았습니다. 버튼을 다시 누르면 장바구니로 이동합니다.</p> : null}
     </div>
   );

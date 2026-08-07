@@ -2,6 +2,7 @@
 
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleDollarSign, ShoppingBag, Store, Users } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
@@ -918,6 +919,7 @@ export function AdminCMSPage() {
   );
 }
 export function AdminTokenLookupPage() {
+  const router = useRouter();
   const token = useAdminToken();
   const setSellerContext = useSessionStore((state) => state.setSellerContext);
   const [query, setQuery] = useState("");
@@ -927,7 +929,7 @@ export function AdminTokenLookupPage() {
     mutationFn: (market: Market) => api.createSellerImpersonationToken(token ?? "", market.id),
     onSuccess: (response) => {
       setSellerContext({ marketID: response.market_id, marketName: response.market_name, token: response.access_token, expiresAt: response.expires_at });
-      window.location.href = "/seller";
+      router.push("/seller");
     },
   });
 

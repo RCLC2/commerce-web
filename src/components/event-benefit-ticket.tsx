@@ -6,12 +6,14 @@ export function EventBenefitTicket({
   reward,
   claimed,
   pending,
+  ready,
   authenticated,
   onClaim,
 }: {
   reward: EventReward;
   claimed: boolean;
   pending: boolean;
+  ready: boolean;
   authenticated: boolean;
   onClaim: () => void;
 }) {
@@ -38,7 +40,7 @@ export function EventBenefitTicket({
         <button
           type="button"
           aria-label={`${reward.title} ${authenticated ? reward.button_label : "로그인 후 받기"}`}
-          disabled={claimed || pending}
+          disabled={claimed || pending || !ready}
           onClick={onClaim}
           className={cn(
             "flex h-12 w-12 items-center justify-center rounded-full text-white shadow-sm transition active:scale-95 disabled:cursor-default disabled:active:scale-100",
@@ -48,7 +50,7 @@ export function EventBenefitTicket({
           {claimed ? <Check size={21} strokeWidth={3} /> : <Download size={21} strokeWidth={2.5} />}
         </button>
         <span className={cn("mt-2 text-center text-[11px] font-black leading-4", claimed ? "text-zinc-500" : accent)}>
-          {claimed ? "발급 완료" : pending ? "발급 중" : authenticated ? reward.button_label : "로그인 후 받기"}
+          {claimed ? "발급 완료" : pending ? "발급 중" : !ready ? "상태 확인 필요" : authenticated ? reward.button_label : "로그인 후 받기"}
         </span>
       </div>
     </article>

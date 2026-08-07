@@ -18,6 +18,7 @@ type UploadedReviewImage = {
 
 type ReviewWritePanelProps = {
   token: string;
+  memberID: number | null;
   orderCode: string;
   lineItemID: number;
   productID: number;
@@ -28,7 +29,7 @@ const maxReviewImages = 5;
 const maxReviewImageBytes = 10 * 1024 * 1024;
 const supportedReviewImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-export function ReviewWritePanel({ token, orderCode, lineItemID, productID, onSubmitted }: ReviewWritePanelProps) {
+export function ReviewWritePanel({ token, memberID, orderCode, lineItemID, productID, onSubmitted }: ReviewWritePanelProps) {
   const inputID = useId();
   const queryClient = useQueryClient();
   const previewURLsRef = useRef(new Set<string>());
@@ -53,25 +54,38 @@ export function ReviewWritePanel({ token, orderCode, lineItemID, productID, onSu
   };
 
   const createReview = useMutation({
-    mutationFn: () =>
-      api.createOrderLineReview(token, orderCode, lineItemID, {
-        rating_x2: ratingX2,
-        content,
-        images: images.map((image, index) => ({
-          s3_key: image.s3Key,
-          object_key: image.objectKey,
-          sort_order: index + 1,
-          is_representative: index === 0,
-        })),
-    }),
+    mutationFn: async () => {
+      try {
+        return await api.createOrderLineReview(token, orderCode, lineItemID, {
+          rating_x2: ratingX2,
+          content,
+          images: images.map((image, index) => ({
+            s3_key: image.s3Key,
+            object_key: image.objectKey,
+            sort_order: index + 1,
+            is_representative: index === 0,
+          })),
+        });
+      } catch (error) {
+        try {
+          const reviews = await api.listMyReviews(token);
+          const matches = reviews.filter((review) => review.order_line_item_id === lineItemID);
+          if (matches.length === 1) return matches[0];
+        } catch {
+          // Preserve the original create error if review reconciliation also fails.
+        }
+        throw error;
+      }
+    },
     onSuccess: async () => {
       images.forEach((image) => revokePreviewURL(image.previewURL));
       setImages([]);
       setContent("");
       setRatingX2(10);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["order", orderCode] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.order(orderCode, memberID) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.productReviews(productID) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.myReviews(memberID) }),
       ]);
       onSubmitted?.();
     },
