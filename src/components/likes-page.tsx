@@ -20,14 +20,15 @@ export function LikesPage() {
   const [view, setView] = useState<CollectionView>("liked");
   const [page, setPage] = useState(1);
   const token = useSessionStore((state) => state.accessToken);
+  const memberID = useSessionStore((state) => state.memberID);
   const effectiveToken = getEffectiveToken(token);
   const likedProducts = useQuery({
-    queryKey: queryKeys.likedProducts(effectiveToken),
+    queryKey: queryKeys.likedProducts(memberID),
     queryFn: () => api.listLikedProducts(effectiveToken ?? ""),
     enabled: Boolean(effectiveToken),
   });
   const wishlistedProducts = useQuery({
-    queryKey: queryKeys.wishlist(effectiveToken),
+    queryKey: queryKeys.wishlist(memberID),
     queryFn: () => api.listWishlistedProducts(effectiveToken ?? ""),
     enabled: Boolean(effectiveToken),
   });

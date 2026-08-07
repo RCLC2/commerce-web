@@ -24,17 +24,18 @@ export function MyPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const token = useSessionStore((state) => state.accessToken) ?? "";
+  const memberID = useSessionStore((state) => state.memberID);
   const logout = useSessionStore((state) => state.logout);
   const [status, setStatus] = useState("ALL");
   const [search, setSearch] = useState("");
   const [editingAddress, setEditingAddress] = useState(false);
   const [addressDraft, setAddressDraft] = useState<Address | null>(null);
 
-  const profileQuery = useQuery({ queryKey: queryKeys.me(token), queryFn: () => api.me(token), enabled: Boolean(token) });
-  const ordersQuery = useQuery({ queryKey: queryKeys.orders(token), queryFn: () => api.listAllOrders(token), enabled: Boolean(token) });
-  const couponsQuery = useQuery({ queryKey: queryKeys.coupons(token), queryFn: () => api.listCoupons(token), enabled: Boolean(token) });
-  const issuableQuery = useQuery({ queryKey: queryKeys.issuableCoupons(token), queryFn: () => api.listIssuableCoupons(token), enabled: Boolean(token) });
-  const addressesQuery = useQuery({ queryKey: queryKeys.addresses(token), queryFn: () => api.listAddresses(token), enabled: Boolean(token) });
+  const profileQuery = useQuery({ queryKey: queryKeys.me(memberID), queryFn: () => api.me(token), enabled: Boolean(token) });
+  const ordersQuery = useQuery({ queryKey: queryKeys.orders(memberID), queryFn: () => api.listAllOrders(token), enabled: Boolean(token) });
+  const couponsQuery = useQuery({ queryKey: queryKeys.coupons(memberID), queryFn: () => api.listCoupons(token), enabled: Boolean(token) });
+  const issuableQuery = useQuery({ queryKey: queryKeys.issuableCoupons(memberID), queryFn: () => api.listIssuableCoupons(token), enabled: Boolean(token) });
+  const addressesQuery = useQuery({ queryKey: queryKeys.addresses(memberID), queryFn: () => api.listAddresses(token), enabled: Boolean(token) });
 
   const orders = ordersQuery.data ?? [];
   const productIDs = [...new Set(orders.flatMap((order) => order.market_orders?.flatMap((marketOrder) => marketOrder.line_items.map((item) => item.product_id)) ?? []))];
@@ -44,7 +45,7 @@ export function MyPage() {
 
   const saveAddress = useMutation({
     mutationFn: (address: Address) => api.updateAddress(token, address.id, { address_name: "기본 배송지", receiver: address.receiver, phone: address.phone, zip_code: address.zip_code, line1: address.line1, line2: address.line2, is_default: true }),
-    onSuccess: () => { setEditingAddress(false); void queryClient.invalidateQueries({ queryKey: queryKeys.addresses(token) }); },
+    onSuccess: () => { setEditingAddress(false); void queryClient.invalidateQueries({ queryKey: queryKeys.addresses(memberID) }); },
   });
 
   const filteredOrders = orders.filter((order) => {
@@ -67,9 +68,9 @@ export function MyPage() {
           <Button variant="secondary" size="sm" onClick={() => { logout(); router.push("/login"); }}>로그아웃</Button>
         </div>
         <div className="mt-6 grid grid-cols-3 divide-x divide-line rounded-xl bg-zinc-50 px-2 py-4 text-center">
-          <div><p className="text-xs text-muted">포인트</p><p className="mt-1 font-black">{formatPrice(profile?.point_balance ?? 0)}</p></div>
-          <div><p className="text-xs text-muted">보유 쿠폰</p><p className="mt-1 font-black">{couponsQuery.data?.length ?? 0}장</p></div>
-          <div><p className="text-xs text-muted">최근 90일 주문</p><p className="mt-1 font-black">{orders.length}건</p></div>
+          <div><p className="text-xs text-muted">포인트</p><p className="mt-1 font-black">{profileQuery.isSuccess ? formatPrice(profile?.point_balance ?? 0) : "확인 필요"}</p></div>
+          <div><p className="text-xs text-muted">보유 쿠폰</p><p className="mt-1 font-black">{couponsQuery.isSuccess ? `${couponsQuery.data.length}장` : "확인 필요"}</p></div>
+          <div><p className="text-xs text-muted">최근 90일 주문</p><p className="mt-1 font-black">{ordersQuery.isSuccess ? `${orders.length}건` : "확인 필요"}</p></div>
         </div>
       </section>
 
@@ -83,20 +84,23 @@ export function MyPage() {
       {queryError ? <div className="mt-5 rounded-xl border border-brand/30 bg-red-50 p-4 text-sm"><p className="font-bold text-brand">{apiErrorMessage(queryError)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => { void profileQuery.refetch(); void ordersQuery.refetch(); void couponsQuery.refetch(); void issuableQuery.refetch(); void addressesQuery.refetch(); }}>다시 시도</Button></div> : null}
 
       <section className="mt-6 grid gap-3 md:grid-cols-2">
-        <BenefitCard title="발급 가능한 쿠폰" value={`${issuableQuery.data?.length ?? 0}장`} href="/mypage/coupons?view=issuable" />
-        <BenefitCard title="발급한 쿠폰" value={`${couponsQuery.data?.length ?? 0}장`} href="/mypage/coupons?view=owned" />
+        <BenefitCard title="발급 가능한 쿠폰" value={issuableQuery.isSuccess ? `${issuableQuery.data.length}장` : "확인 필요"} href="/mypage/coupons?view=issuable" />
+        <BenefitCard title="발급한 쿠폰" value={couponsQuery.isSuccess ? `${couponsQuery.data.length}장` : "확인 필요"} href="/mypage/coupons?view=owned" />
       </section>
 
       <section className="mt-4 rounded-2xl border border-line bg-white p-5">
-        <div className="flex items-center justify-between gap-3"><h2 className="font-black">기본 배송지</h2>{defaultAddress ? <button className="text-sm font-bold text-brand" onClick={() => { setAddressDraft({ ...defaultAddress }); setEditingAddress(true); }}>편집하기</button> : null}</div>
-        {editingAddress && addressDraft ? (
+        <div className="flex items-center justify-between gap-3"><h2 className="font-black">기본 배송지</h2>{defaultAddress ? <button className="text-sm font-bold text-brand" onClick={() => { saveAddress.reset(); setAddressDraft({ ...defaultAddress }); setEditingAddress(true); }}>편집하기</button> : null}</div>
+        {addressesQuery.isError ? (
+          <p className="mt-3 text-sm font-bold text-brand">배송지를 불러오지 못했습니다. 위의 다시 시도를 눌러주세요.</p>
+        ) : editingAddress && addressDraft ? (
           <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); saveAddress.mutate(addressDraft); }}>
             <AddressInput label="받는 분" value={addressDraft.receiver} onChange={(value) => setAddressDraft({ ...addressDraft, receiver: value })} />
             <AddressInput label="연락처" value={addressDraft.phone} onChange={(value) => setAddressDraft({ ...addressDraft, phone: value })} />
             <AddressInput label="우편번호" value={addressDraft.zip_code} onChange={(value) => setAddressDraft({ ...addressDraft, zip_code: value })} />
             <AddressInput label="기본 주소" value={addressDraft.line1} onChange={(value) => setAddressDraft({ ...addressDraft, line1: value })} />
             <div className="sm:col-span-2"><AddressInput label="상세 주소" value={addressDraft.line2} onChange={(value) => setAddressDraft({ ...addressDraft, line2: value })} /></div>
-            <div className="flex gap-2 sm:col-span-2"><Button type="submit" size="sm" disabled={saveAddress.isPending}>저장</Button><Button type="button" size="sm" variant="secondary" onClick={() => setEditingAddress(false)}>취소</Button></div>
+            <div className="flex gap-2 sm:col-span-2"><Button type="submit" size="sm" disabled={saveAddress.isPending}>저장</Button><Button type="button" size="sm" variant="secondary" onClick={() => { saveAddress.reset(); setEditingAddress(false); }}>취소</Button></div>
+            {saveAddress.error ? <p className="text-sm font-bold text-brand sm:col-span-2">{apiErrorMessage(saveAddress.error)}</p> : null}
           </form>
         ) : defaultAddress ? <div className="mt-3 flex gap-3 text-sm"><MapPin size={18} className="mt-0.5 shrink-0 text-brand" /><div><p className="font-bold">{defaultAddress.receiver} / {defaultAddress.phone}</p><p className="mt-1 text-muted">({defaultAddress.zip_code}) {defaultAddress.line1} {defaultAddress.line2}</p></div></div> : <p className="mt-3 text-sm text-muted">등록된 배송지가 없습니다.</p>}
       </section>
@@ -114,7 +118,7 @@ export function MyPage() {
             const product = item ? item.product ?? productByID.get(item.product_id) : undefined;
             return <Link key={order.id} href={`/orders/${order.order_code}`} className="block rounded-xl border border-line bg-white p-4 hover:bg-zinc-50"><div className="flex gap-3"><div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-zinc-100"><SafeImage src={product?.image_url} alt="" fill sizes="80px" className="object-cover" /></div><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><div><p className="font-black">{orderStatusLabel(order.status)}</p><p className="mt-1 truncate text-sm font-bold">{product?.name ?? `상품 #${item?.product_id ?? "-"}`}</p></div><p className="font-black">{formatPrice(order.total_order_price - order.total_discount_price - order.used_point)}</p></div><p className="mt-2 text-xs text-muted">{order.ordered_at ? new Date(order.ordered_at).toLocaleDateString("ko-KR") : ""} · {order.order_code}</p></div></div></Link>;
           })}
-          {!ordersQuery.isLoading && !filteredOrders.length ? <div className="rounded-md border border-line bg-white p-8 text-center text-sm text-muted">조건에 맞는 주문이 없습니다.</div> : null}
+          {ordersQuery.isSuccess && !filteredOrders.length ? <div className="rounded-md border border-line bg-white p-8 text-center text-sm text-muted">조건에 맞는 주문이 없습니다.</div> : null}
         </div>
       </section>
     </main>

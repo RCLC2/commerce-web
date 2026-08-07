@@ -3,10 +3,9 @@ title: '고객 좋아요·팔로우·리뷰·쿠폰 상태 복구'
 type: 'bugfix'
 created: '2026-08-04'
 status: 'done'
-review_loop_iteration: 0
+review_loop_iteration: 2
 baseline_commit: '7c2ba717dc7b19bc169ad86b8b4e2a96ed8ba76a'
-context:
-  - '{project-root}/docs/implementation-artifacts/spec-frontend-origin-main-contract-finalization.md'
+context: []
 ---
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
@@ -72,7 +71,8 @@ PDP 하트는 Product Like, 북마크는 Wishlist로 고정한다. 좋아요 페
 - `npm test -- --run` -- 전체 Vitest 통과.
 - `npm run lint` -- lint 통과.
 - `npm run build` -- Next.js 프로덕션 빌드 통과.
-- `npm run test:e2e:ui -- tests/e2e/catalog-and-account-coverage.spec.ts` -- 가용 백엔드에서 고객 상태 시나리오 통과.
+- `npx playwright test tests/e2e/catalog-and-account-coverage.spec.ts tests/e2e/public-and-customer.spec.ts --grep "like|wishlist|engagement|follow|review|coupon"` -- live 및 controlled API 경계를 구분한 고객 상태 시나리오 통과.
+- `npm run test:e2e:api` -- 배포 백엔드에서 Follow GET·POST·DELETE 원상복구 계약과 고객 collection 계약 검증.
 
 ## Suggested Review Order
 
@@ -112,5 +112,5 @@ PDP 하트는 Product Like, 북마크는 Wishlist로 고정한다. 좋아요 페
 - Like·Wishlist 상이 상태와 POST·DELETE 새로고침을 검증합니다.
   [`catalog-and-account-coverage.spec.ts:182`](../../tests/e2e/catalog-and-account-coverage.spec.ts#L182)
 
-- 리뷰·쿠폰 실패 재시도와 중복 리뷰 방지를 검증합니다.
+- controlled API로 리뷰·쿠폰 실패 재시도와 중복 리뷰 방지를 검증합니다.
   [`public-and-customer.spec.ts:76`](../../tests/e2e/public-and-customer.spec.ts#L76)

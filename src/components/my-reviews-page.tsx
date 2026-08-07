@@ -13,10 +13,12 @@ import { Button } from "./ui/button";
 
 export function MyReviewsPage() {
   const token = useSessionStore((state) => state.accessToken) ?? "";
+  const memberID = useSessionStore((state) => state.memberID);
   const queryClient = useQueryClient();
   const [editingID, setEditingID] = useState<number | null>(null);
   const [draft, setDraft] = useState({ rating_x2: 10, content: "" });
-  const reviewsKey = queryKeys.myReviews(token);
+  const [removeResolution, setRemoveResolution] = useState<string | null>(null);
+  const reviewsKey = queryKeys.myReviews(memberID);
   const reviews = useQuery({ queryKey: reviewsKey, queryFn: () => api.listMyReviews(token), enabled: Boolean(token) });
   const items = reviews.data ?? [];
   const productIDs = [...new Set(items.map((review) => review.product_id))];
@@ -38,12 +40,26 @@ export function MyReviewsPage() {
     mutationFn: ({ id }: { id: number; productID: number }) => api.deleteReview(token, id),
     onSuccess: async (_, { id, productID }) => {
       queryClient.setQueryData<typeof items>(reviewsKey, (current) => current?.filter((review) => review.id !== id));
+      setRemoveResolution("리뷰를 삭제했습니다.");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: reviewsKey }),
         queryClient.invalidateQueries({ queryKey: queryKeys.productReviews(productID) }),
       ]);
     },
   });
+
+  async function retryRemove() {
+    const variables = remove.variables;
+    if (variables === undefined) return;
+    const refreshed = await reviews.refetch();
+    if (refreshed.isError) return;
+    if (!refreshed.data?.some((review) => review.id === variables.id)) {
+      remove.reset();
+      setRemoveResolution("리뷰를 삭제했습니다.");
+      return;
+    }
+    remove.mutate(variables);
+  }
 
   if (!token) return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-black">내 리뷰</h1><Link href="/login?next=/mypage/reviews"><Button className="mt-5">로그인하기</Button></Link></main>;
 
@@ -59,8 +75,8 @@ export function MyReviewsPage() {
         </div>
       ) : null}
       {reviews.isLoading ? <p className="mt-6 text-sm text-muted">리뷰를 불러오는 중입니다.</p> : null}
-      {remove.error ? <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-red-50 p-4 text-sm font-bold text-brand"><p>리뷰를 삭제하지 못했습니다. {apiErrorMessage(remove.error)}</p><Button size="sm" variant="secondary" disabled={remove.isPending || remove.variables === undefined} onClick={() => { if (remove.variables !== undefined) remove.mutate(remove.variables); }}>삭제 다시 시도</Button></div> : null}
-      {remove.isSuccess ? <p className="mt-4 rounded-md bg-emerald-50 p-4 text-sm font-bold text-emerald-900">리뷰를 삭제했습니다.</p> : null}
+      {remove.error ? <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-red-50 p-4 text-sm font-bold text-brand"><p>리뷰를 삭제하지 못했습니다. {apiErrorMessage(remove.error)}</p><Button size="sm" variant="secondary" disabled={remove.isPending || remove.variables === undefined} onClick={() => void retryRemove()}>삭제 상태 확인 후 다시 시도</Button></div> : null}
+      {removeResolution ? <p className="mt-4 rounded-md bg-emerald-50 p-4 text-sm font-bold text-emerald-900">{removeResolution}</p> : null}
       {update.isSuccess ? <p className="mt-4 rounded-md bg-emerald-50 p-4 text-sm font-bold text-emerald-900">리뷰를 수정했습니다.</p> : null}
       <div className="mt-6 space-y-3">
         {items.map((review) => {
@@ -85,7 +101,7 @@ export function MyReviewsPage() {
                     <>
                       <p className="mt-2 flex items-center gap-1 text-sm font-black"><Star size={15} className="fill-amber-400 text-amber-400" /> {review.rating.toFixed(1)}</p>
                       <p className="mt-2 text-sm leading-6">{review.content}</p>
-                      <div className="mt-3 flex gap-3 text-xs font-bold"><button disabled={update.isPending || remove.isPending} onClick={() => { remove.reset(); update.reset(); setEditingID(review.id); setDraft({ rating_x2: review.rating_x2 ?? Math.round(review.rating * 2), content: review.content }); }}>수정</button><button className="text-brand" disabled={update.isPending || remove.isPending} onClick={() => { update.reset(); remove.reset(); remove.mutate({ id: review.id, productID: review.product_id }); }}>{remove.isPending && remove.variables?.id === review.id ? "삭제 중" : "삭제"}</button></div>
+                      <div className="mt-3 flex gap-3 text-xs font-bold"><button disabled={update.isPending || remove.isPending} onClick={() => { remove.reset(); update.reset(); setRemoveResolution(null); setEditingID(review.id); setDraft({ rating_x2: review.rating_x2 ?? Math.round(review.rating * 2), content: review.content }); }}>수정</button><button className="text-brand" disabled={update.isPending || remove.isPending} onClick={() => { update.reset(); remove.reset(); setRemoveResolution(null); remove.mutate({ id: review.id, productID: review.product_id }); }}>{remove.isPending && remove.variables?.id === review.id ? "삭제 중" : "삭제"}</button></div>
                     </>
                   )}
                 </div>

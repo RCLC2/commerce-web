@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { api } from "@/lib/api";
+import { safeInternalPath } from "@/lib/navigation";
 import { useSessionStore } from "@/lib/session-store";
 import { Button } from "./ui/button";
 
@@ -33,7 +34,7 @@ export function LoginPage() {
     mutationFn: api.signin,
     onSuccess: (data) => {
       setSession({ accessToken: data.accessToken, memberID: data.memberID, role: data.role });
-      router.push(next.startsWith("/") ? next : "/mypage");
+      router.push(safeInternalPath(next));
     },
   });
 

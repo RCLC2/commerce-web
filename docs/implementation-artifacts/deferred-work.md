@@ -1,9 +1,9 @@
-- source_spec: `docs/implementation-artifacts/spec-frontend-api-contract-recovery.md`
-  summary: Next.js와 전이 의존성의 high 등급 보안 권고를 별도 의존성 업그레이드 작업으로 처리한다.
-  evidence: `npm audit --omit=dev --audit-level=high`가 기존 `next@16.2.7` 및 포함된 PostCSS·Sharp에 3건을 보고하며, 자동 수정은 현재 명시 범위를 벗어난 `next@16.2.12` 강제 업그레이드를 요구한다.
-- source_spec: `docs/implementation-artifacts/spec-frontend-origin-main-contract-followup.md`
-  summary: 쿠폰 견적 요청 금액이 유한한 안전 정수인지 검증하는 입력 경계를 별도 작업으로 보강한다.
-  evidence: 기존 `customer.ts` 구현은 `NaN`·`Infinity`·안전 정수 범위 밖 값을 `Math.max`와 `Math.floor`에 통과시켜 잘못된 `order_amount` 쿼리를 만들 수 있으며, 이번 응답 계약 복구에서 새로 생긴 문제는 아니다.
+- source_spec: docs/implementation-artifacts/spec-resolve-remaining-frontend-defects.md
+  summary: 포인트 이벤트 보상의 회원별 수령 여부를 서버 응답에 포함한다.
+  evidence: 쿠폰 보상은 보유 쿠폰의 `coupon_id`로 재조정할 수 있지만 포인트 보상은 현재 잔액만으로 특정 reward 수령 여부를 증명할 수 없다. 프론트는 확인된 성공만 회원별로 보존하고 실패를 성공으로 추론하지 않는다.
+- source_spec: docs/implementation-artifacts/spec-resolve-remaining-frontend-defects.md
+  summary: 주문·장바구니·리뷰 생성 mutation에 idempotency key 계약을 추가한다.
+  evidence: 프론트는 응답 유실 뒤 cart/review/order 컬렉션을 재조회해 유일한 결과만 복구하지만, 완전한 exactly-once 보장은 서버의 중복 키 저장과 동일 응답 재생이 필요하다.
 - source_spec: none
   summary: 주문 상세에서 현재 백엔드의 배송 정보를 조회하고 고객 배송조회 기능을 연결한다.
   evidence: 좋아요·팔로우·리뷰·쿠폰 상태 수정과 독립적으로 배포 가능한 주문 상세 기능이므로 사용자 선택에 따라 분리했다.

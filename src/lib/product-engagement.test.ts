@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  availableOptionQuantity,
   canWriteOrderLineReview,
+  clampOptionQuantity,
+  findNewMatchingCartItem,
+  firstSellableOption,
   includesProduct,
   reviewedOrderLineItemIDs,
   validCollectionPage,
@@ -42,5 +46,28 @@ describe("product engagement state", () => {
     expect(canWriteOrderLineReview({ ...base, reviewStatusLoaded: false })).toBe(false);
     expect(canWriteOrderLineReview({ ...base, serverReviewed: true })).toBe(false);
     expect(canWriteOrderLineReview({ ...base, submitted: true })).toBe(false);
+  });
+
+  it("selects and clamps against active unreserved inventory", () => {
+    const options = [
+      { id: 1, quantity: 5, reserved_quantity: 5, is_active: true },
+      { id: 2, quantity: 10, reserved_quantity: 3, is_active: false },
+      { id: 3, quantity: 4, reserved_quantity: 1, is_active: true },
+    ];
+
+    expect(firstSellableOption(options)?.id).toBe(3);
+    expect(availableOptionQuantity(options[2])).toBe(3);
+    expect(clampOptionQuantity(9, options[2])).toBe(3);
+    expect(clampOptionQuantity(0, options[2])).toBe(1);
+  });
+
+  it("reconciles only one newly-created matching cart row", () => {
+    const before = [{ id: 1, product_id: 7, option_id: 2, quantity: 1 }];
+    const input = { product_id: 7, option_id: 3, quantity: 2 };
+    const created = { id: 2, ...input };
+
+    expect(findNewMatchingCartItem(before, [...before, created], input)).toEqual(created);
+    expect(findNewMatchingCartItem(before, before, input)).toBeUndefined();
+    expect(findNewMatchingCartItem(before, [...before, created, { ...created, id: 3 }], input)).toBeUndefined();
   });
 });

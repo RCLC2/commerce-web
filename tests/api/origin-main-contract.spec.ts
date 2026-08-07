@@ -86,10 +86,31 @@ test.describe("backend origin/main live API contract", () => {
     expect(unauthorized.status()).toBe(401);
   });
 
-  test("market follow status exposes the boolean consumed by the customer UI", async ({ request }) => {
+  test("market follow exposes reversible read and mutation contracts", async ({ request }) => {
     const session = await signIn(request, seedAccounts.member);
-    const status = await getJSON(request, "/api/v1/markets/1/follow", session.accessToken);
-    expect(status).toEqual(expect.objectContaining({ following: expect.any(Boolean) }));
+    const headers = { Authorization: `Bearer ${session.accessToken}` };
+    const initial = await getJSON(request, "/api/v1/markets/1/follow", session.accessToken) as { following: boolean };
+    expect(initial).toEqual(expect.objectContaining({ following: expect.any(Boolean) }));
+
+    let changedState = false;
+    try {
+      const toggle = initial.following
+        ? await request.delete(`${backendBaseURL}/api/v1/markets/1/follow`, { headers })
+        : await request.post(`${backendBaseURL}/api/v1/markets/1/follow`, { headers });
+      expect(toggle.ok(), await toggle.text()).toBeTruthy();
+      changedState = true;
+      const changed = await getJSON(request, "/api/v1/markets/1/follow", session.accessToken) as { following: boolean };
+      expect(changed.following).toBe(!initial.following);
+    } finally {
+      if (changedState) {
+        const restore = initial.following
+          ? await request.post(`${backendBaseURL}/api/v1/markets/1/follow`, { headers })
+          : await request.delete(`${backendBaseURL}/api/v1/markets/1/follow`, { headers });
+        expect(restore.ok(), await restore.text()).toBeTruthy();
+        const restored = await getJSON(request, "/api/v1/markets/1/follow", session.accessToken) as { following: boolean };
+        expect(restored.following).toBe(initial.following);
+      }
+    }
   });
 
   test("customer coupon endpoints expose the raw shapes handled by explicit adapters", async ({ request }) => {

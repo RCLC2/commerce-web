@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
+import { ApiHttpError } from "../api-client";
 import type { OrderResponse } from "../types";
 import {
   cartBoundCouponID,
   CheckoutOrderStateError,
   estimatedCouponDiscount,
+  findUniqueOrderByCartItemIDs,
   maxApplicablePoints,
   normalizeRequestedPoints,
+  pendingCheckoutInput,
   readCheckoutRetryState,
   safeHostedCheckoutURL,
   saveCheckoutRetryState,
@@ -94,6 +97,72 @@ describe("submitServerAuthoritativeCheckout", () => {
     })).rejects.toThrow("0원 이하 주문");
 
     expect(createPaymentCheckout).not.toHaveBeenCalled();
+  });
+
+  it("recovers a committed order after the create response is lost", async () => {
+    const recoveredOrder = {
+      ...serverOrder,
+      market_orders: [{
+        id: 1,
+        market_id: 1,
+        shipping_fee: 0,
+        status: "PAYMENT_PENDING",
+        expected_settlement_amount: 40000,
+        line_items: [{
+          id: 3,
+          cart_id: 11,
+          product_id: 7,
+          option_id: 2,
+          quantity: 1,
+          price: 50000,
+          status: "PAYMENT_PENDING",
+        }],
+      }],
+    } satisfies OrderResponse;
+    const onOrderAttempt = vi.fn();
+    const onOrderCreated = vi.fn();
+
+    await expect(submitServerAuthoritativeCheckout({
+      orderInput: { cart_item_ids: [11], used_point: 0 },
+      placeOrder: vi.fn().mockRejectedValue(new Error("connection reset")),
+      recoverCreatedOrder: vi.fn().mockResolvedValue(recoveredOrder),
+      getOrder: vi.fn().mockResolvedValue(recoveredOrder),
+      createPaymentCheckout: vi.fn().mockResolvedValue(hostedCheckout()),
+      onOrderAttempt,
+      onOrderCreated,
+      onOrderConfirmed: vi.fn(),
+    })).resolves.toMatchObject({ orderCode: "ORDER-1" });
+
+    expect(onOrderAttempt).toHaveBeenCalledBefore(onOrderCreated);
+    expect(onOrderCreated).toHaveBeenCalledWith("ORDER-1");
+  });
+
+  it("does not start order creation when the recovery clue cannot be persisted", async () => {
+    const placeOrder = vi.fn();
+
+    await expect(submitServerAuthoritativeCheckout({
+      orderInput: { cart_item_ids: [11], used_point: 0 },
+      placeOrder,
+      getOrder: vi.fn(),
+      createPaymentCheckout: vi.fn(),
+      onOrderAttempt: () => { throw new Error("storage blocked"); },
+      onOrderCreated: vi.fn(),
+      onOrderConfirmed: vi.fn(),
+    })).rejects.toThrow("storage blocked");
+
+    expect(placeOrder).not.toHaveBeenCalled();
+  });
+
+  it("releases a pending attempt after a definitive client rejection", async () => {
+    await expect(submitServerAuthoritativeCheckout({
+      orderInput: { cart_item_ids: [11], used_point: 0 },
+      placeOrder: vi.fn().mockRejectedValue(new ApiHttpError("invalid coupon", 422)),
+      recoverCreatedOrder: vi.fn().mockResolvedValue(undefined),
+      getOrder: vi.fn(),
+      createPaymentCheckout: vi.fn(),
+      onOrderCreated: vi.fn(),
+      onOrderConfirmed: vi.fn(),
+    })).rejects.toMatchObject({ discardOrder: true });
   });
 
   it("does not request another checkout when a retry observes an already paid order", async () => {
@@ -275,5 +344,45 @@ describe("checkout retry storage", () => {
     });
     expect(clearCheckoutRetryState(storage)).toBe(true);
     expect(readCheckoutRetryState(storage)).toBeNull();
+  });
+
+  it("validates a member-scoped pending checkout attempt", () => {
+    expect(pendingCheckoutInput({
+      memberID: 7,
+      cartItemIDs: [11, 12],
+      usedCouponID: 4,
+      usedPoint: 300,
+    }, 7)).toEqual({ cart_item_ids: [11, 12], used_coupon_id: 4, used_point: 300 });
+    expect(pendingCheckoutInput({ memberID: 8, cartItemIDs: [11] }, 7)).toBeUndefined();
+    expect(pendingCheckoutInput({ memberID: 7, cartItemIDs: [11, "bad"] }, 7)).toBeUndefined();
+    expect(pendingCheckoutInput({ memberID: 7, cartItemIDs: [11, 11] }, 7)).toBeUndefined();
+  });
+
+  it("finds only an exact unique order for the attempted cart IDs", () => {
+    const order = {
+      ...serverOrder,
+      market_orders: [{
+        id: 1,
+        market_id: 1,
+        shipping_fee: 0,
+        status: "PAYMENT_PENDING",
+        expected_settlement_amount: 40000,
+        line_items: [
+          { id: 1, cart_id: 11, product_id: 1, option_id: 1, quantity: 1, price: 20000, status: "PLACED" },
+          { id: 2, cart_id: 12, product_id: 2, option_id: 2, quantity: 1, price: 30000, status: "PLACED" },
+        ],
+      }],
+    } satisfies OrderResponse;
+
+    expect(findUniqueOrderByCartItemIDs([order], [12, 11])).toBe(order);
+    expect(findUniqueOrderByCartItemIDs([order], [11])).toBeUndefined();
+    expect(findUniqueOrderByCartItemIDs([order, { ...order, id: 2 }], [11, 12])).toBeUndefined();
+    expect(findUniqueOrderByCartItemIDs([{
+      ...order,
+      market_orders: [{
+        ...order.market_orders![0],
+        line_items: order.market_orders![0].line_items.map((item) => ({ ...item, cart_id: 11 })),
+      }],
+    }], [11, 12])).toBeUndefined();
   });
 });

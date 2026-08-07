@@ -14,27 +14,36 @@ type ProfileForm = { notification_type: string; marketing_consent: boolean; nigh
 
 export function ProfileEditPage() {
   const token = useSessionStore((state) => state.accessToken) ?? "";
+  const memberID = useSessionStore((state) => state.memberID);
   const queryClient = useQueryClient();
-  const profile = useQuery({ queryKey: queryKeys.me(token), queryFn: () => api.me(token), enabled: Boolean(token) });
-  const [edited, setEdited] = useState<ProfileForm | null>(null);
-  const values: ProfileForm = edited ?? {
-    notification_type: profile.data?.notification_type ?? "PUSH",
-    marketing_consent: profile.data?.marketing_consent ?? false,
-    nighttime_consent: profile.data?.nighttime_consent ?? false,
-    height: profile.data?.height ?? 0,
-    weight: profile.data?.weight ?? 0,
+  const profile = useQuery({ queryKey: queryKeys.me(memberID), queryFn: () => api.me(token), enabled: Boolean(token) });
+  const [edited, setEdited] = useState<{ memberID: number | null; values: ProfileForm } | null>(null);
+  const editedValues = edited?.memberID === memberID ? edited.values : null;
+  const values: ProfileForm | null = editedValues ?? (profile.data ? {
+    notification_type: profile.data.notification_type,
+    marketing_consent: profile.data.marketing_consent,
+    nighttime_consent: profile.data.nighttime_consent,
+    height: profile.data.height,
+    weight: profile.data.weight,
+  } : null);
+  const change = (next: Partial<ProfileForm>) => {
+    if (values) setEdited({ memberID, values: { ...values, ...next } });
   };
-  const change = (next: Partial<ProfileForm>) => setEdited({ ...values, ...next });
 
   const save = useMutation({
-    mutationFn: () => api.updateMe(token, values),
+    mutationFn: () => {
+      if (!values) throw new Error("프로필을 먼저 불러와야 합니다.");
+      return api.updateMe(token, values);
+    },
     onSuccess: (data) => {
-      queryClient.setQueryData(queryKeys.me(token), data);
+      queryClient.setQueryData(queryKeys.me(memberID), data);
       setEdited(null);
     },
   });
 
   if (!token) return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-black">로그인이 필요합니다</h1><Link href="/login"><Button className="mt-5">로그인하기</Button></Link></main>;
+  if (profile.isLoading || (!profile.data && !profile.error)) return <main className="mx-auto max-w-2xl px-4 py-16 text-sm text-muted">프로필을 불러오는 중입니다.</main>;
+  if (!profile.data || !values) return <main className="mx-auto max-w-2xl px-4 py-16"><p className="text-sm font-bold text-brand">{apiErrorMessage(profile.error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void profile.refetch()}>다시 시도</Button></main>;
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-24 pt-8">
@@ -56,7 +65,7 @@ export function ProfileEditPage() {
         <label className="flex items-center gap-3 text-sm font-bold"><input type="checkbox" checked={values.nighttime_consent} onChange={(event) => change({ nighttime_consent: event.target.checked })} /> 야간 알림 수신 동의</label>
         {profile.error || save.error ? <p className="text-sm font-bold text-brand">{apiErrorMessage(profile.error ?? save.error)}</p> : null}
         {save.isSuccess ? <p className="text-sm font-bold text-emerald-700">저장했습니다.</p> : null}
-        <Button type="submit" disabled={save.isPending || profile.isLoading}>{save.isPending ? "저장 중" : "변경사항 저장"}</Button>
+        <Button type="submit" disabled={save.isPending}>{save.isPending ? "저장 중" : "변경사항 저장"}</Button>
       </form>
     </main>
   );

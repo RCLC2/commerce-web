@@ -1,8 +1,9 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Heart, Store } from "lucide-react";
+import { CircleHelp, Heart, Store } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
@@ -15,17 +16,19 @@ export function MarketPage({ marketId }: { marketId: number }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const token = useSessionStore((state) => state.accessToken) ?? "";
+  const memberID = useSessionStore((state) => state.memberID);
+  const [toggleResolution, setToggleResolution] = useState<string>();
   const marketQuery = useQuery({ queryKey: ["market", marketId], queryFn: () => api.getMarket(marketId) });
   const productsQuery = useQuery({ queryKey: ["market-products", marketId], queryFn: () => api.listPLPProducts({ marketId }) });
-  const followKey = queryKeys.marketFollow(marketId, token);
+  const followKey = queryKeys.marketFollow(marketId, memberID);
   const followQuery = useQuery({ queryKey: followKey, queryFn: () => api.getMarketFollowStatus(token, marketId), enabled: Boolean(token) });
-  const following = followQuery.isSuccess ? followQuery.data.following : false;
+  const following = !token ? false : followQuery.isSuccess ? followQuery.data.following : undefined;
   const toggle = useMutation({
-    mutationFn: () => following ? api.unfollowMarket(token, marketId) : api.followMarket(token, marketId),
+    mutationFn: (currentFollowing: boolean) => currentFollowing ? api.unfollowMarket(token, marketId) : api.followMarket(token, marketId),
     onMutate: () => queryClient.cancelQueries({ queryKey: followKey }),
-    onSuccess: async () => {
-      queryClient.setQueryData(followKey, { following: !following });
-      queryClient.setQueryData(["market", marketId], (current: typeof marketQuery.data) => current ? { ...current, follower_count: Math.max(0, (current.follower_count ?? 0) + (following ? -1 : 1)) } : current);
+    onSuccess: async (_data, currentFollowing) => {
+      queryClient.setQueryData(followKey, { following: !currentFollowing });
+      queryClient.setQueryData(["market", marketId], (current: typeof marketQuery.data) => current ? { ...current, follower_count: Math.max(0, (current.follower_count ?? 0) + (currentFollowing ? -1 : 1)) } : current);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: followKey }),
         queryClient.invalidateQueries({ queryKey: ["market", marketId] }),
@@ -33,10 +36,25 @@ export function MarketPage({ marketId }: { marketId: number }) {
     },
   });
 
+  async function reconcileToggle() {
+    const attemptedCurrent = toggle.variables;
+    if (attemptedCurrent === undefined) return;
+    const target = !attemptedCurrent;
+    const refreshed = await followQuery.refetch();
+    if (!refreshed.isSuccess) return;
+    if (refreshed.data.following === target) {
+      toggle.reset();
+      setToggleResolution("서버에서 마켓 팔로우 상태를 확인했습니다.");
+      await queryClient.invalidateQueries({ queryKey: ["market", marketId] });
+      return;
+    }
+    toggle.mutate(refreshed.data.following);
+  }
+
   const market = marketQuery.data;
   const products = productsQuery.data?.items ?? [];
   if (marketQuery.isLoading) return <main className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted">마켓을 불러오는 중입니다.</main>;
-  if (marketQuery.error || !market) return <main className="mx-auto max-w-6xl px-4 py-16"><div className="rounded-md border border-red-200 bg-red-50 p-8 text-center"><h1 className="text-xl font-black text-red-900">마켓을 불러오지 못했습니다.</h1></div></main>;
+  if (marketQuery.error || !market) return <main className="mx-auto max-w-6xl px-4 py-16"><div className="rounded-md border border-red-200 bg-red-50 p-8 text-center"><h1 className="text-xl font-black text-red-900">마켓을 불러오지 못했습니다.</h1><Button className="mt-4" size="sm" variant="secondary" onClick={() => void marketQuery.refetch()}>마켓 다시 불러오기</Button></div></main>;
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24">
@@ -48,18 +66,21 @@ export function MarketPage({ marketId }: { marketId: number }) {
             <div><div className="flex items-center gap-2"><Store size={18} className="text-brand" /><h1 className="text-2xl font-black">{market.name}</h1></div><p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{market.description}</p></div>
           </div>
           <Button
-            variant={following ? "primary" : "secondary"}
-            disabled={Boolean(token) && (!followQuery.isSuccess || toggle.isPending)}
+            variant={following === true ? "primary" : following === false ? "secondary" : "ghost"}
+            className={following === undefined ? "border border-dashed border-zinc-300 bg-zinc-50 text-muted" : undefined}
+            disabled={Boolean(token) && (following === undefined || toggle.isPending)}
             onClick={() => {
               if (!token) {
                 router.push(`/login?next=/markets/${marketId}`);
                 return;
               }
+              if (following === undefined) return;
+              setToggleResolution(undefined);
               toggle.reset();
-              toggle.mutate();
+              toggle.mutate(following);
             }}
           >
-            <Heart size={18} className={following ? "fill-current" : ""} />
+            {following === undefined ? <CircleHelp size={18} /> : <Heart size={18} className={following ? "fill-current" : ""} />}
             {followQuery.isLoading ? "확인 중" : followQuery.isError ? "상태 확인 필요" : following ? "팔로잉" : "팔로우"} · {market.follower_count?.toLocaleString("ko-KR") ?? 0}
           </Button>
         </div>
@@ -72,10 +93,11 @@ export function MarketPage({ marketId }: { marketId: number }) {
         {toggle.error ? (
           <div className="mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 rounded-md bg-red-50 p-3 text-sm font-bold text-brand">
             <p>마켓 팔로우 상태를 저장하지 못했습니다. {apiErrorMessage(toggle.error)}</p>
-            <Button size="sm" variant="secondary" disabled={!followQuery.isSuccess || toggle.isPending} onClick={() => toggle.mutate()}>다시 시도</Button>
+            <Button size="sm" variant="secondary" disabled={toggle.isPending} onClick={() => void reconcileToggle()}>상태 확인 후 다시 시도</Button>
           </div>
         ) : null}
         {toggle.isSuccess ? <p className="mx-5 mb-5 rounded-md bg-emerald-50 p-3 text-sm font-bold text-emerald-900" role="status">마켓 팔로우 상태를 저장했습니다.</p> : null}
+        {toggleResolution ? <p className="mx-5 mb-5 rounded-md bg-emerald-50 p-3 text-sm font-bold text-emerald-900" role="status">{toggleResolution}</p> : null}
       </section>
       <section className="py-8">
         <h2 className="text-xl font-black">마켓 상품</h2>
