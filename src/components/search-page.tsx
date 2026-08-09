@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import type { Market, Product, SearchResultSection } from "@/lib/types";
-import { formatPrice } from "@/lib/utils";
+import { formatFollowerCount, formatPrice } from "@/lib/utils";
 import { ProductCard } from "./product-card";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
@@ -194,7 +194,7 @@ function CompactProductCard({ product }: { product: Product }) {
 }
 
 function CompactMarketCard({ market }: { market: Market }) {
-  return <Link href={`/markets/${market.id}`} className="flex h-36 w-[72vw] max-w-72 shrink-0 snap-start gap-3 rounded-md border border-line bg-white p-3"><div className="relative h-full w-24 shrink-0 overflow-hidden rounded-md bg-zinc-100"><SafeImage src={market.profile_image_url} alt={market.name} fill sizes="96px" className="object-cover" /></div><div className="min-w-0 py-1"><div className="flex items-center gap-1"><Store size={14} className="text-brand" /><p className="truncate font-black">{market.name}</p></div><p className="mt-2 line-clamp-2 text-xs leading-5 text-muted">{market.description}</p><p className="mt-3 text-xs font-bold text-brand">팔로워 {(market.follower_count ?? 0).toLocaleString("ko-KR")}</p></div></Link>;
+  return <Link href={`/markets/${market.id}`} className="flex h-36 w-[72vw] max-w-72 shrink-0 snap-start gap-3 rounded-md border border-line bg-white p-3"><div className="relative h-full w-24 shrink-0 overflow-hidden rounded-md bg-zinc-100"><SafeImage src={market.profile_image_url} alt={market.name} fill sizes="96px" className="object-cover" /></div><div className="min-w-0 py-1"><div className="flex items-center gap-1"><Store size={14} className="text-brand" /><p className="truncate font-black">{market.name}</p></div><p className="mt-2 line-clamp-2 text-xs leading-5 text-muted">{market.description}</p><p className="mt-3 text-xs font-bold text-brand">팔로워 {formatFollowerCount(market.follower_count ?? 0)}</p></div></Link>;
 }
 
 function MarketCard({ market }: { market: Market }) {
@@ -202,14 +202,14 @@ function MarketCard({ market }: { market: Market }) {
     <article className="rounded-md border border-line bg-white p-4 md:p-5">
       <div className="flex gap-4">
       <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-zinc-100"><SafeImage src={market.profile_image_url} alt="" fill sizes="64px" className="object-cover" /></div>
-      <div className="min-w-0"><div className="flex items-center gap-1"><Store size={14} className="text-brand" /><p className="truncate font-black">{market.name}</p></div><p className="mt-1 line-clamp-2 text-xs leading-5 text-muted">{market.description}</p><p className="mt-1 text-xs font-bold text-muted">팔로워 {(market.follower_count ?? 0).toLocaleString("ko-KR")}</p></div>
+      <div className="min-w-0"><div className="flex items-center gap-1"><Store size={14} className="text-brand" /><p className="truncate font-black">{market.name}</p></div><p className="mt-1 line-clamp-2 text-xs leading-5 text-muted">{market.description}</p><p className="mt-1 text-xs font-bold text-muted">팔로워 {formatFollowerCount(market.follower_count ?? 0)}</p></div>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
         <MarketMetric icon={<Sparkles size={14} />} label="마켓 만족도" value={market.satisfaction_rate == null ? "-" : `${market.satisfaction_rate.toFixed(0)}%`} />
         <MarketMetric icon={<Star size={14} />} label="평균 상품 평점" value={market.average_product_rating == null ? "-" : market.average_product_rating.toFixed(1)} />
         <MarketMetric icon={<Package size={14} />} label="상품 수" value={(market.product_count ?? 0).toLocaleString("ko-KR")} />
         <MarketMetric icon={<Sparkles size={14} />} label="신상품 수" value={(market.new_product_count ?? 0).toLocaleString("ko-KR")} />
-        <MarketMetric icon={<Users size={14} />} label="팔로워 수" value={(market.follower_count ?? 0).toLocaleString("ko-KR")} />
+        <MarketMetric icon={<Users size={14} />} label="팔로워 수" value={formatFollowerCount(market.follower_count ?? 0)} />
       </div>
       {(market.popular_products ?? []).length ? <div className="mt-4"><p className="mb-2 text-xs font-black text-muted">인기 상품</p><div className="no-scrollbar flex snap-x gap-3 overflow-x-auto pb-1">{(market.popular_products ?? []).slice(0, 3).map((product) => <div key={product.id} className="w-28 shrink-0 snap-start sm:w-32"><MarketPopularProductCard product={product} /></div>)}</div></div> : null}
       <div className="mt-2 flex justify-end"><Link href={`/markets/${market.id}`} className="inline-flex h-7 items-center gap-0.5 rounded border border-line px-2 text-xs font-black hover:border-brand hover:text-brand">더보기 <ChevronRight size={13} /></Link></div>

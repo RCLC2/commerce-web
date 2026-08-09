@@ -15,6 +15,7 @@ import {
 import type { EventProduct, EventReward, EventSort } from "@/lib/event-detail-types";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
+import { formatFollowerCount } from "@/lib/utils";
 import { EventBenefitTicket } from "./event-benefit-ticket";
 import { ProductCard } from "./product-card";
 import { SafeImage } from "./safe-image";
@@ -303,7 +304,7 @@ function MarketCarousel({ market }: {
             {market.description ? <span className="mt-1 block truncate text-xs text-muted md:text-sm">{market.description}</span> : null}
             {market.followerCount != null ? (
               <span className="mt-1 flex items-center gap-1 text-xs font-bold text-muted">
-                <Users size={13} /> 팔로워 {market.followerCount.toLocaleString("ko-KR")}
+                <Users size={13} /> 팔로워 {formatFollowerCount(market.followerCount)}
               </span>
             ) : null}
           </span>
