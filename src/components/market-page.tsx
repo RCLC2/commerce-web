@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
+import { formatFollowerCount } from "@/lib/utils";
 import { ProductCard } from "./product-card";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
@@ -81,7 +82,7 @@ export function MarketPage({ marketId }: { marketId: number }) {
             }}
           >
             {following === undefined ? <CircleHelp size={18} /> : <Heart size={18} className={following ? "fill-current" : ""} />}
-            {followQuery.isLoading ? "확인 중" : followQuery.isError ? "상태 확인 필요" : following ? "팔로잉" : "팔로우"} · {market.follower_count?.toLocaleString("ko-KR") ?? 0}
+            {followQuery.isLoading ? "확인 중" : followQuery.isError ? "상태 확인 필요" : following ? "팔로잉" : "팔로우"} · {formatFollowerCount(market.follower_count ?? 0)}
           </Button>
         </div>
         {followQuery.error ? (

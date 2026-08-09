@@ -11,7 +11,7 @@ import { firstOrderItem, orderStatusLabel } from "@/lib/order-utils";
 import { applySellerProductEdits } from "@/lib/seller-product-edits";
 import { useSessionStore } from "@/lib/session-store";
 import type { CommerceCategory, OrderResponse, Product, ProductOption } from "@/lib/types";
-import { formatPrice } from "@/lib/utils";
+import { formatFollowerCount, formatPrice } from "@/lib/utils";
 import {
   ConsoleHeader,
   ConsoleLayout,
@@ -133,7 +133,7 @@ export function SellerHomePage() {
             <div className="mt-4">
               <SummaryStrip
                 items={[
-                  { label: "팔로워", value: `${(market?.follower_count ?? 0).toLocaleString("ko-KR")}명` },
+                  { label: "팔로워", value: `${formatFollowerCount(market?.follower_count ?? 0)}명` },
                   { label: "운영 상품", value: `${products.length}개` },
                   { label: "총 재고", value: `${products.reduce((sum, product) => sum + productStock(product), 0).toLocaleString("ko-KR")}개` },
                   { label: "정산 상태", value: settlements[0]?.status ? <StatusBadge value={settlements[0].status} /> : "-" },

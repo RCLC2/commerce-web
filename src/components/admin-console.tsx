@@ -16,7 +16,7 @@ import type {
   MarketPenalty,
   Product,
 } from "@/lib/types";
-import { formatPrice } from "@/lib/utils";
+import { formatFollowerCount, formatPrice } from "@/lib/utils";
 import {
   ConsoleHeader,
   ConsoleLayout,
@@ -330,7 +330,7 @@ export function AdminMarketsPage() {
           columns={["마켓", "팔로워", "상태", "태그", "페널티", "운영"]}
           rows={filteredMarkets.map((market) => [
             <MarketName key="market" market={market} />,
-            market.follower_count?.toLocaleString("ko-KR") ?? "-",
+            market.follower_count == null ? "-" : formatFollowerCount(market.follower_count),
             <StatusBadge key="status" value={market.status} />,
             market.tags?.join(", ") ?? "-",
             marketPenaltyLabel(penaltiesByMarketID.get(market.id) ?? []),

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
+import { formatFollowerCount } from "@/lib/utils";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
@@ -30,7 +31,7 @@ export function PopularMarketsPage() {
             <div className="p-4">
               <h2 className="font-black">{market.name}</h2>
               <p className="mt-1 line-clamp-2 text-sm text-muted">{market.description}</p>
-              <p className="mt-3 text-xs font-bold text-brand">{market.follower_count?.toLocaleString("ko-KR") ?? "-"} followers</p>
+              <p className="mt-3 text-xs font-bold text-brand">{market.follower_count == null ? "-" : formatFollowerCount(market.follower_count)} followers</p>
             </div>
           </Link>
         ))}
