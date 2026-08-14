@@ -14,7 +14,7 @@ import {
   rawIssuableCouponQuoteSchema,
   rawNotificationSchema,
   rawOwnedCouponSchema,
-  rawPaymentCheckoutSchema,
+  rawPaymentRequestSchema,
   rawReviewMutationSchema,
   rawSettlementSummarySchema,
 } from "./contracts/raw";
@@ -25,7 +25,7 @@ import {
   normalizeIssuableCouponQuote,
   normalizeNotification,
   normalizeOwnedCoupon,
-  normalizePaymentCheckout,
+  normalizePaymentRequest,
   normalizeReviewMutation,
   normalizeSettlementSummary,
 } from "./normalizers/contracts";
@@ -122,15 +122,21 @@ export const customerApi = {
     requestParsed(orderSchema, `/api/v1/orders/${orderCode}`, { token }),
   confirmPurchase: (token: string, orderCode: string, itemID: number) =>
     requestParsed(orderSchema, `/api/v1/orders/${orderCode}/items/${itemID}/confirm-purchase`, { method: "POST", token }),
-  createPaymentCheckout: async (token: string, orderCode: string) =>
-    normalizePaymentCheckout(await requestParsed(
-      rawPaymentCheckoutSchema,
-      `/api/v1/orders/${orderCode}/payment-checkout`,
+  createPaymentRequest: async (token: string, orderCode: string) =>
+    normalizePaymentRequest(await requestParsed(
+      rawPaymentRequestSchema,
+      `/api/v1/orders/${orderCode}/payment-request`,
       {
         method: "POST",
         token,
       },
     )),
+  completePayment: (token: string, orderCode: string, payload: { payment_key: string; order_id: string; amount: number }) =>
+    requestVoid(`/api/v1/orders/${orderCode}/complete-payment`, {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    }),
   trackDelivery: (token: string, orderCode: string, deliveryID: number) =>
     requestParsed(trackingInfoSchema, `/api/v1/orders/${orderCode}/deliveries/${deliveryID}/track`, { method: "POST", token }),
   createOrderLineReview: async (token: string, orderCode: string, itemID: number, payload: CreateOrderLineReviewPayload) =>

@@ -23,8 +23,9 @@ import {
   submitServerAuthoritativeCheckout,
 } from "@/lib/queries/checkout";
 import { useSessionStore } from "@/lib/session-store";
-import type { CartItem, OrderResponse } from "@/lib/types";
+import type { CartItem, OrderResponse, PaymentRequest } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
+import { TossPaymentWidget } from "./toss-payment-widget";
 import { Button } from "./ui/button";
 
 export function CheckoutPage() {
@@ -42,7 +43,7 @@ export function CheckoutPage() {
   const [confirmedOrder, setConfirmedOrder] = useState<OrderResponse>();
   const [retryStateReady, setRetryStateReady] = useState(false);
   const [restoreError, setRestoreError] = useState<string>();
-  const [mockCheckoutUrl, setMockCheckoutUrl] = useState<string>();
+  const [paymentRequest, setPaymentRequest] = useState<PaymentRequest>();
   const [pendingAttemptBlocked, setPendingAttemptBlocked] = useState(false);
   const [restoreNonce, setRestoreNonce] = useState(0);
 
@@ -130,6 +131,7 @@ export function CheckoutPage() {
       clearCheckoutRetryState(() => window.sessionStorage);
       setCreatedOrderCode(undefined);
       setConfirmedOrder(undefined);
+      setPaymentRequest(undefined);
       setPendingAttemptBlocked(false);
     };
 
@@ -219,7 +221,7 @@ export function CheckoutPage() {
   }, [effectiveToken, memberID, restoreNonce]);
 
   const checkout = useMutation({
-    onMutate: () => setMockCheckoutUrl(undefined),
+    onMutate: () => setPaymentRequest(undefined),
     mutationFn: () =>
       submitServerAuthoritativeCheckout({
         existingOrderCode: createdOrderCode,
@@ -230,7 +232,7 @@ export function CheckoutPage() {
         },
         placeOrder: (input) => api.placeOrder(effectiveToken, input),
         getOrder: (orderCode) => api.getOrder(effectiveToken, orderCode),
-        createPaymentCheckout: (orderCode) => api.createPaymentCheckout(effectiveToken, orderCode),
+        createPaymentRequest: (orderCode) => api.createPaymentRequest(effectiveToken, orderCode),
         recoverCreatedOrder: async (input) =>
           findUniqueOrderByCartItemIDs(
             await api.listAllOrders(effectiveToken),
@@ -273,13 +275,9 @@ export function CheckoutPage() {
         },
         onOrderConfirmed: setConfirmedOrder,
       }),
-    onSuccess: ({ orderCode, checkoutUrl, checkoutMode }) => {
-      if (checkoutUrl) {
-        if (checkoutMode === "loopback-mock") {
-          setMockCheckoutUrl(checkoutUrl);
-          return;
-        }
-        window.location.assign(checkoutUrl);
+    onSuccess: ({ orderCode, paymentRequest: nextPaymentRequest, paymentSkipped }) => {
+      if (!paymentSkipped && nextPaymentRequest) {
+        setPaymentRequest(nextPaymentRequest);
         return;
       }
       clearCheckoutRetryState(() => window.sessionStorage);
@@ -407,24 +405,34 @@ export function CheckoutPage() {
             <div className="flex justify-between"><span>포인트</span><strong>-{formatPrice(confirmedOrder?.used_point ?? appliedPoint)}</strong></div>
           </div>
           <div className="mt-4 border-t border-line pt-4"><div className="flex justify-between"><span className="font-bold">결제 금액</span><strong className="text-xl">{serverAmount === undefined ? "주문 후 확정" : formatPrice(serverAmount)}</strong></div></div>
-          <Button
-            className="mt-5 w-full"
-            size="lg"
-            disabled={
-              !retryStateReady
-              || (!createdOrderCode && (
-                !items.length
-                || !Number.isSafeInteger(expectedAmount)
-                || expectedAmount <= 0
-                || pendingAttemptBlocked
-              ))
-              || Boolean(blockingError && !createdOrderCode)
-              || checkout.isPending
-            }
-            onClick={() => checkout.mutate()}
-          >
-            {checkout.isPending ? "처리 중" : createdOrderCode ? "같은 주문 결제 재시도" : "주문 생성 후 결제"}
-          </Button>
+          {!paymentRequest ? (
+            <Button
+              className="mt-5 w-full"
+              size="lg"
+              disabled={
+                !retryStateReady
+                || (!createdOrderCode && (
+                  !items.length
+                  || !Number.isSafeInteger(expectedAmount)
+                  || expectedAmount <= 0
+                  || pendingAttemptBlocked
+                ))
+                || Boolean(blockingError && !createdOrderCode)
+                || checkout.isPending
+              }
+              onClick={() => checkout.mutate()}
+            >
+              {checkout.isPending ? "처리 중" : createdOrderCode ? "결제 정보 다시 준비" : "주문 생성 후 결제"}
+            </Button>
+          ) : (
+            <TossPaymentWidget
+              clientKey={paymentRequest.client_key}
+              orderId={paymentRequest.order_id}
+              orderName={paymentRequest.order_name}
+              amount={paymentRequest.amount}
+              customerEmail={profile.data?.email}
+            />
+          )}
           {createdOrderCode ? <p className="mt-3 text-xs text-muted">생성된 주문: {createdOrderCode}. 재시도해도 주문은 다시 생성하지 않습니다.</p> : null}
           {!createdOrderCode && items.length > 0 && expectedAmount <= 0 ? (
             <p className="mt-3 text-xs font-bold text-brand">최소 결제 금액은 1원입니다. 쿠폰 또는 포인트 사용액을 조정해주세요.</p>
@@ -437,22 +445,6 @@ export function CheckoutPage() {
             </div>
           ) : null}
           {checkout.error ? <p className="mt-3 text-sm font-bold text-brand">{apiErrorMessage(checkout.error)}</p> : null}
-          {mockCheckoutUrl ? (
-            <section className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-4">
-              <h3 className="font-black text-amber-950">실제 결제 완료는 지원하지 않습니다</h3>
-              <p className="mt-2 text-xs leading-5 text-amber-900">
-                로컬 결제 mock에는 checkout 페이지와 webhook이 없습니다. 다음 이동은 hosted handoff 주소만 확인합니다.
-              </p>
-              <Button
-                className="mt-3"
-                size="sm"
-                variant="secondary"
-                onClick={() => window.location.assign(mockCheckoutUrl)}
-              >
-                mock handoff 주소 열기
-              </Button>
-            </section>
-          ) : null}
         </aside>
       </div>
     </main>

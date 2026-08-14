@@ -1,12 +1,11 @@
-- source_spec: docs/implementation-artifacts/spec-resolve-remaining-frontend-defects.md
-  summary: 포인트 이벤트 보상의 회원별 수령 여부를 서버 응답에 포함한다.
-  evidence: 쿠폰 보상은 보유 쿠폰의 `coupon_id`로 재조정할 수 있지만 포인트 보상은 현재 잔액만으로 특정 reward 수령 여부를 증명할 수 없다. 프론트는 확인된 성공만 회원별로 보존하고 실패를 성공으로 추론하지 않는다.
-- source_spec: docs/implementation-artifacts/spec-resolve-remaining-frontend-defects.md
-  summary: 주문·장바구니·리뷰 생성 mutation에 idempotency key 계약을 추가한다.
-  evidence: 프론트는 응답 유실 뒤 cart/review/order 컬렉션을 재조회해 유일한 결과만 복구하지만, 완전한 exactly-once 보장은 서버의 중복 키 저장과 동일 응답 재생이 필요하다.
-- source_spec: none
-  summary: 주문 상세에서 현재 백엔드의 배송 정보를 조회하고 고객 배송조회 기능을 연결한다.
-  evidence: 좋아요·팔로우·리뷰·쿠폰 상태 수정과 독립적으로 배포 가능한 주문 상세 기능이므로 사용자 선택에 따라 분리했다.
-- source_spec: none
-  summary: 개인화 추천과 CMS 홈 구좌를 백엔드 설정 및 회원 추천 결과에 맞게 연결한다.
-  evidence: 고객 상호작용 상태 수정과 독립적인 홈 콘텐츠 전달 기능이므로 사용자 선택에 따라 분리했다.
+- source_spec: `docs/implementation-artifacts/spec-toss-test-payments.md`
+  summary: `payment_key` 컬럼 down migration은 100자를 넘는 Toss 키가 저장된 뒤 비파괴적으로 축소되지 않는다.
+  evidence: `migrations/20260814001_expand_order_payment_key.sql`의 down 절은 varchar(100)으로 되돌리므로 운영 데이터가 있으면 rollback 전에 별도 데이터 검증이 필요하다.
+
+- source_spec: `docs/implementation-artifacts/spec-toss-test-payments.md`
+  summary: 실제 Toss 테스트 카드 브라우저 E2E를 실행하려면 실행 중인 API·DB·Temporal과 테스트 키가 필요하다.
+  evidence: 로컬 API·DB·Temporal과 Toss 테스트 키를 주입한 무목 Playwright E2E를 실행해 주문 생성·결제창 결제·success callback·서버 승인·주문 `Paid` 상태를 확인했다. 재현 영상은 PR에 첨부한다.
+
+- source_spec: `docs/implementation-artifacts/spec-toss-test-payments.md`
+  summary: 저장소의 legacy `deployments/k8s/api.yaml`은 애플리케이션 DB 환경변수도 선언하지 않아 cluster-config 주입 계약 확인이 필요하다.
+  evidence: 새 Toss 키 주입은 이 저장소가 아닌 운영 cluster-config에서 관리해야 하며, 해당 외부 저장소는 이번 worktree 범위에 없다.
