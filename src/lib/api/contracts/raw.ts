@@ -184,9 +184,10 @@ export const rawNotificationSchema = z.looseObject({
   CreatedAt: dateStringSchema,
 });
 
-export const rawPaymentCheckoutSchema = z.object({
-  order_code: z.string().min(1),
-  checkout_url: z.string().min(1),
+export const rawPaymentRequestSchema = z.object({
+	client_key: z.string().regex(/^test_gck_.+/),
+  order_id: z.string().min(1),
+  order_name: z.string().min(1),
   amount: z.number().int().positive(),
 });
 

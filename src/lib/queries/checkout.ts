@@ -42,9 +42,10 @@ export class CheckoutOrderStateError extends Error {
   }
 }
 
-export type HostedPaymentCheckout = {
-  order_code: string;
-  checkout_url: string;
+export type TossPaymentRequest = {
+  client_key: string;
+  order_id: string;
+  order_name: string;
   amount: number;
 };
 
@@ -179,35 +180,12 @@ export function shouldDiscardCheckoutAttemptError(error: unknown): boolean {
     && [400, 401, 403, 404, 409, 410, 422].includes(error.status ?? 0);
 }
 
-export function safeHostedCheckoutURL(value: string): string {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    throw new CheckoutOrderStateError("결제 이동 주소가 올바르지 않습니다.");
-  }
-  if (
-    (
-      url.protocol !== "https:"
-      && !(
-        url.protocol === "http:"
-        && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
-      )
-    )
-    || url.username
-    || url.password
-  ) {
-    throw new CheckoutOrderStateError("안전하지 않은 결제 이동 주소를 차단했습니다.");
-  }
-  return url.toString();
-}
-
 export async function submitServerAuthoritativeCheckout({
   existingOrderCode,
   orderInput,
   placeOrder,
   getOrder,
-  createPaymentCheckout,
+  createPaymentRequest,
   recoverCreatedOrder,
   onOrderAttempt,
   onOrderCreated,
@@ -217,7 +195,7 @@ export async function submitServerAuthoritativeCheckout({
   orderInput: CheckoutOrderInput;
   placeOrder: (input: CheckoutOrderInput) => Promise<{ orderCode: string }>;
   getOrder: (orderCode: string) => Promise<OrderResponse>;
-  createPaymentCheckout: (orderCode: string) => Promise<HostedPaymentCheckout>;
+  createPaymentRequest: (orderCode: string) => Promise<TossPaymentRequest>;
   recoverCreatedOrder?: (input: CheckoutOrderInput) => Promise<OrderResponse | undefined>;
   onOrderAttempt?: (input: CheckoutOrderInput) => void;
   onOrderCreated: (orderCode: string) => void;
@@ -264,18 +242,14 @@ export async function submitServerAuthoritativeCheckout({
   }
 
   if (!Number.isSafeInteger(amount) || amount <= 0) {
-    throw new Error("0원 이하 주문의 hosted checkout은 현재 서버에서 지원되지 않습니다.");
+    throw new Error("0원 이하 주문의 토스 테스트 결제는 지원되지 않습니다.");
   }
-  const checkout = await createPaymentCheckout(orderCode);
-  if (checkout.order_code !== orderCode) {
-    throw new CheckoutOrderStateError("결제 체크아웃의 주문 코드가 조회한 주문과 일치하지 않습니다.");
+  const paymentRequest = await createPaymentRequest(orderCode);
+  if (paymentRequest.order_id !== orderCode) {
+    throw new CheckoutOrderStateError("결제 요청의 주문 ID가 조회한 주문과 일치하지 않습니다.");
   }
-  if (checkout.amount !== amount) {
-    throw new CheckoutOrderStateError("결제 체크아웃 금액이 서버 주문 금액과 일치하지 않습니다.");
+  if (paymentRequest.amount !== amount) {
+    throw new CheckoutOrderStateError("결제 요청 금액이 서버 주문 금액과 일치하지 않습니다.");
   }
-  const checkoutUrl = safeHostedCheckoutURL(checkout.checkout_url);
-  const checkoutMode = new URL(checkoutUrl).protocol === "http:"
-    ? "loopback-mock" as const
-    : "external" as const;
-  return { orderCode, order, amount, checkoutUrl, checkoutMode, paymentSkipped: false };
+  return { orderCode, order, amount, paymentRequest, paymentSkipped: false };
 }

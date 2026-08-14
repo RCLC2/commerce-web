@@ -10,7 +10,6 @@ import {
   normalizeRequestedPoints,
   pendingCheckoutInput,
   readCheckoutRetryState,
-  safeHostedCheckoutURL,
   saveCheckoutRetryState,
   clearCheckoutRetryState,
   selectedCartItemIDs,
@@ -27,10 +26,11 @@ const serverOrder: OrderResponse = {
   status: "PAYMENT_PENDING",
 };
 
-function hostedCheckout(orderCode = "ORDER-1", amount = 40000, checkoutURL = "https://pay.example.test/checkout/1") {
+function tossPaymentRequest(orderID = "ORDER-1", amount = 40000) {
   return {
-    order_code: orderCode,
-    checkout_url: checkoutURL,
+		client_key: "test_gck_test-client",
+    order_id: orderID,
+    order_name: `주문 ${orderID}`,
     amount,
   };
 }
@@ -44,42 +44,41 @@ describe("selectedCartItemIDs", () => {
 });
 
 describe("submitServerAuthoritativeCheckout", () => {
-  it("reuses the created order and always requests checkout for the server-confirmed amount", async () => {
+  it("reuses the created order and requests payment for the server-confirmed amount", async () => {
     const placeOrder = vi.fn().mockResolvedValue({ orderCode: "ORDER-1" });
     const getOrder = vi.fn().mockResolvedValue(serverOrder);
-    const createPaymentCheckout = vi.fn()
-      .mockRejectedValueOnce(new Error("checkout failed"))
-      .mockResolvedValueOnce(hostedCheckout());
+    const createPaymentRequest = vi.fn()
+      .mockRejectedValueOnce(new Error("payment request failed"))
+      .mockResolvedValueOnce(tossPaymentRequest());
     let createdOrderCode: string | undefined;
     const common = {
       orderInput: { cart_item_ids: [11], used_coupon_id: 99, used_point: 3000 },
       placeOrder,
       getOrder,
-      createPaymentCheckout,
+      createPaymentRequest,
       onOrderCreated: (code: string) => { createdOrderCode = code; },
       onOrderConfirmed: vi.fn(),
     };
 
-    await expect(submitServerAuthoritativeCheckout(common)).rejects.toThrow("checkout failed");
+    await expect(submitServerAuthoritativeCheckout(common)).rejects.toThrow("payment request failed");
     await expect(submitServerAuthoritativeCheckout({
       ...common,
       existingOrderCode: createdOrderCode,
     })).resolves.toMatchObject({
       orderCode: "ORDER-1",
       amount: 40000,
-      checkoutUrl: "https://pay.example.test/checkout/1",
-      checkoutMode: "external",
+      paymentRequest: tossPaymentRequest(),
     });
 
     expect(placeOrder).toHaveBeenCalledTimes(1);
     expect(getOrder).toHaveBeenCalledTimes(2);
-    expect(createPaymentCheckout).toHaveBeenCalledTimes(2);
-    expect(createPaymentCheckout).toHaveBeenNthCalledWith(1, "ORDER-1");
-    expect(createPaymentCheckout).toHaveBeenNthCalledWith(2, "ORDER-1");
+    expect(createPaymentRequest).toHaveBeenCalledTimes(2);
+    expect(createPaymentRequest).toHaveBeenNthCalledWith(1, "ORDER-1");
+    expect(createPaymentRequest).toHaveBeenNthCalledWith(2, "ORDER-1");
   });
 
-  it("does not create a hosted checkout when the server-confirmed amount is zero", async () => {
-    const createPaymentCheckout = vi.fn();
+  it("does not create a Toss payment request when the server-confirmed amount is zero", async () => {
+    const createPaymentRequest = vi.fn();
 
     await expect(submitServerAuthoritativeCheckout({
       existingOrderCode: "ORDER-FREE",
@@ -91,12 +90,12 @@ describe("submitServerAuthoritativeCheckout", () => {
         total_order_price: 5000,
         total_discount_price: 5000,
       }),
-      createPaymentCheckout,
+      createPaymentRequest,
       onOrderCreated: vi.fn(),
       onOrderConfirmed: vi.fn(),
     })).rejects.toThrow("0원 이하 주문");
 
-    expect(createPaymentCheckout).not.toHaveBeenCalled();
+    expect(createPaymentRequest).not.toHaveBeenCalled();
   });
 
   it("recovers a committed order after the create response is lost", async () => {
@@ -127,7 +126,7 @@ describe("submitServerAuthoritativeCheckout", () => {
       placeOrder: vi.fn().mockRejectedValue(new Error("connection reset")),
       recoverCreatedOrder: vi.fn().mockResolvedValue(recoveredOrder),
       getOrder: vi.fn().mockResolvedValue(recoveredOrder),
-      createPaymentCheckout: vi.fn().mockResolvedValue(hostedCheckout()),
+      createPaymentRequest: vi.fn().mockResolvedValue(tossPaymentRequest()),
       onOrderAttempt,
       onOrderCreated,
       onOrderConfirmed: vi.fn(),
@@ -144,7 +143,7 @@ describe("submitServerAuthoritativeCheckout", () => {
       orderInput: { cart_item_ids: [11], used_point: 0 },
       placeOrder,
       getOrder: vi.fn(),
-      createPaymentCheckout: vi.fn(),
+      createPaymentRequest: vi.fn(),
       onOrderAttempt: () => { throw new Error("storage blocked"); },
       onOrderCreated: vi.fn(),
       onOrderConfirmed: vi.fn(),
@@ -159,93 +158,61 @@ describe("submitServerAuthoritativeCheckout", () => {
       placeOrder: vi.fn().mockRejectedValue(new ApiHttpError("invalid coupon", 422)),
       recoverCreatedOrder: vi.fn().mockResolvedValue(undefined),
       getOrder: vi.fn(),
-      createPaymentCheckout: vi.fn(),
+      createPaymentRequest: vi.fn(),
       onOrderCreated: vi.fn(),
       onOrderConfirmed: vi.fn(),
     })).rejects.toMatchObject({ discardOrder: true });
   });
 
-  it("does not request another checkout when a retry observes an already paid order", async () => {
-    const createPaymentCheckout = vi.fn();
+  it("does not request another payment when a retry observes an already paid order", async () => {
+    const createPaymentRequest = vi.fn();
 
     await expect(submitServerAuthoritativeCheckout({
       existingOrderCode: "ORDER-1",
       orderInput: { cart_item_ids: [11], used_point: 0 },
       placeOrder: vi.fn(),
       getOrder: vi.fn().mockResolvedValue({ ...serverOrder, status: "PAID" }),
-      createPaymentCheckout,
+      createPaymentRequest,
       onOrderCreated: vi.fn(),
       onOrderConfirmed: vi.fn(),
     })).resolves.toMatchObject({ orderCode: "ORDER-1", paymentSkipped: true });
 
-    expect(createPaymentCheckout).not.toHaveBeenCalled();
+    expect(createPaymentRequest).not.toHaveBeenCalled();
   });
 
-  it("rejects mismatched order and hosted checkout responses before navigation", async () => {
-    const createPaymentCheckout = vi.fn();
+  it("rejects mismatched order and Toss payment responses before rendering", async () => {
+    const createPaymentRequest = vi.fn();
 
     await expect(submitServerAuthoritativeCheckout({
       existingOrderCode: "ORDER-1",
       orderInput: { cart_item_ids: [11], used_point: 0 },
       placeOrder: vi.fn(),
       getOrder: vi.fn().mockResolvedValue({ ...serverOrder, order_code: "ORDER-2" }),
-      createPaymentCheckout,
+      createPaymentRequest,
       onOrderCreated: vi.fn(),
       onOrderConfirmed: vi.fn(),
     })).rejects.toBeInstanceOf(CheckoutOrderStateError);
-    expect(createPaymentCheckout).not.toHaveBeenCalled();
+    expect(createPaymentRequest).not.toHaveBeenCalled();
 
     await expect(submitServerAuthoritativeCheckout({
       existingOrderCode: "ORDER-1",
       orderInput: { cart_item_ids: [11], used_point: 0 },
       placeOrder: vi.fn(),
       getOrder: vi.fn().mockResolvedValue(serverOrder),
-      createPaymentCheckout: vi.fn().mockResolvedValue(hostedCheckout("ORDER-2")),
+      createPaymentRequest: vi.fn().mockResolvedValue(tossPaymentRequest("ORDER-2")),
       onOrderCreated: vi.fn(),
       onOrderConfirmed: vi.fn(),
-    })).rejects.toThrow("주문 코드");
+    })).rejects.toThrow("주문 ID");
 
     await expect(submitServerAuthoritativeCheckout({
       existingOrderCode: "ORDER-1",
       orderInput: { cart_item_ids: [11], used_point: 0 },
       placeOrder: vi.fn(),
       getOrder: vi.fn().mockResolvedValue(serverOrder),
-      createPaymentCheckout: vi.fn().mockResolvedValue(hostedCheckout("ORDER-1", 39999)),
+      createPaymentRequest: vi.fn().mockResolvedValue(tossPaymentRequest("ORDER-1", 39999)),
       onOrderCreated: vi.fn(),
       onOrderConfirmed: vi.fn(),
     })).rejects.toThrow("금액");
-  });
-
-  it.each([
-    "javascript:alert(1)",
-    "data:text/html,boom",
-    "https://user:secret@pay.example.test/checkout",
-    "http://pay.example.test/checkout",
-    "/relative-checkout",
-  ])("blocks unsafe hosted checkout URL %s", (url) => {
-    expect(() => safeHostedCheckoutURL(url)).toThrow(CheckoutOrderStateError);
-  });
-
-  it.each([
-    "http://localhost:8090/mock-checkout/ORDER-1",
-    "http://127.0.0.1:8090/mock-checkout/ORDER-1",
-    "http://[::1]:8090/mock-checkout/ORDER-1",
-  ])("accepts an explicit loopback mock URL %s", async (checkoutURL) => {
-    await expect(submitServerAuthoritativeCheckout({
-      existingOrderCode: "ORDER-1",
-      orderInput: { cart_item_ids: [11], used_point: 0 },
-      placeOrder: vi.fn(),
-      getOrder: vi.fn().mockResolvedValue(serverOrder),
-      createPaymentCheckout: vi.fn().mockResolvedValue(hostedCheckout(
-        "ORDER-1",
-        40000,
-        checkoutURL,
-      )),
-      onOrderCreated: vi.fn(),
-      onOrderConfirmed: vi.fn(),
-    })).resolves.toMatchObject({
-      checkoutMode: "loopback-mock",
-    });
   });
 });
 

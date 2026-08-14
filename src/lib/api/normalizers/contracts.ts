@@ -12,7 +12,7 @@ import type {
   IssuableCouponQuote,
   Notification,
   OwnedCoupon,
-  PaymentCheckout,
+  PaymentRequest,
   Product,
   Review,
   SellerSettlementDashboard,
@@ -37,7 +37,7 @@ import type {
   rawIssuableCouponQuoteSchema,
   rawNotificationSchema,
   rawOwnedCouponSchema,
-  rawPaymentCheckoutSchema,
+  rawPaymentRequestSchema,
   rawReviewMutationSchema,
   rawSellerSettlementDashboardSchema,
   rawSellerProductSchema,
@@ -216,12 +216,13 @@ export function normalizeNotification(
   };
 }
 
-export function normalizePaymentCheckout(
-  raw: z.infer<typeof rawPaymentCheckoutSchema>,
-): PaymentCheckout {
+export function normalizePaymentRequest(
+  raw: z.infer<typeof rawPaymentRequestSchema>,
+): PaymentRequest {
   return {
-    order_code: raw.order_code,
-    checkout_url: raw.checkout_url,
+    client_key: raw.client_key,
+    order_id: raw.order_id,
+    order_name: raw.order_name,
     amount: raw.amount,
   };
 }

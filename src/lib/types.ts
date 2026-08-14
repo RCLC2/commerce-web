@@ -416,9 +416,10 @@ export type OrderResponse = {
   delivery?: Delivery;
 };
 
-export type PaymentCheckout = {
-  order_code: string;
-  checkout_url: string;
+export type PaymentRequest = {
+  client_key: string;
+  order_id: string;
+  order_name: string;
   amount: number;
 };
 
