@@ -429,7 +429,7 @@ test.describe("public and customer journeys with live and controlled API boundar
     await expect(page.getByRole("button", { name: "Write review", exact: true })).toHaveCount(0);
   });
 
-  test("customer restores one live order after checkout failure and hands off to hosted payment", async ({ page, request }, testInfo) => {
+  test("customer restores one live order after payment request failure and opens Toss payment UI", async ({ page, request }, testInfo) => {
     const email = `e2e-checkout-${Date.now()}-${testInfo.retry}@test.com`;
     const signup = await request.post(`${backendBaseURL}/api/v1/auth/signup`, {
       data: {
@@ -468,25 +468,25 @@ test.describe("public and customer journeys with live and controlled API boundar
         orderCreateRequests += 1;
       }
     });
-    const checkoutPattern = "**/api/v1/orders/*/payment-checkout";
+    const paymentRequestPattern = "**/api/v1/orders/*/payment-request";
     const orderCreatePattern = "**/api/v1/orders";
     await page.route(orderCreatePattern, async (route) => {
       const committed = await route.fetch();
       expect(committed.status(), await committed.text()).toBe(201);
       await route.fulfill({ status: 503, body: "order create response lost" });
     });
-    await page.route(checkoutPattern, async (route) => {
+    await page.route(paymentRequestPattern, async (route) => {
       await route.fulfill({
         status: 503,
         contentType: "text/plain",
-        body: "temporary checkout failure",
+        body: "temporary payment request failure",
       });
     });
     await checkoutButton.click();
 
-    const retryButton = page.getByRole("button", { name: "같은 주문 결제 재시도" });
+    const retryButton = page.getByRole("button", { name: "결제 정보 다시 준비" });
     await expect(retryButton).toBeVisible();
-    await expect(page.getByText(/temporary checkout failure/)).toBeVisible();
+    await expect(page.getByText(/temporary payment request failure/)).toBeVisible();
     expect(orderCreateRequests).toBe(1);
 
     const replacementCart = await request.post(`${backendBaseURL}/api/v1/cart/items`, {
@@ -503,18 +503,29 @@ test.describe("public and customer journeys with live and controlled API boundar
     await expect(page.getByText("옵션 #1 · 1개", { exact: true })).toBeVisible();
     await expect(page.getByText("옵션 #1 · 2개", { exact: true })).toHaveCount(0);
 
-    await page.unroute(checkoutPattern);
+    await page.unroute(paymentRequestPattern);
     await page.unroute(orderCreatePattern);
-    const checkoutResponsePromise = page.waitForResponse((response) =>
-      /\/api\/v1\/orders\/[^/]+\/payment-checkout$/.test(response.url())
+    const paymentRequestResponsePromise = page.waitForResponse((response) =>
+      /\/api\/v1\/orders\/[^/]+\/payment-request$/.test(response.url())
       && response.request().method() === "POST");
+    await page.route(paymentRequestPattern, async (route) => {
+      const orderCode = route.request().url().match(/\/orders\/([^/]+)\/payment-request$/)?.[1] ?? "ORDER-1";
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+			client_key: "test_gck_test-client",
+          order_id: orderCode,
+          order_name: `주문 ${orderCode}`,
+          amount: 40000,
+        }),
+      });
+    });
     await retryButton.click();
-    const checkoutResponse = await checkoutResponsePromise;
-    expect(checkoutResponse.ok()).toBeTruthy();
-    await expect(page.getByRole("heading", { name: "실제 결제 완료는 지원하지 않습니다" })).toBeVisible();
+    const paymentRequestResponse = await paymentRequestResponsePromise;
+    expect(paymentRequestResponse.ok()).toBeTruthy();
+    await expect(page.getByRole("region", { name: "토스 테스트 결제" })).toBeVisible();
     await expect(page).toHaveURL(/\/checkout(?:\?.*)?$/);
-    await page.getByRole("button", { name: "mock handoff 주소 열기" }).click();
-    await expect(page).toHaveURL(/^http:\/\/localhost:8090\/mock-checkout\/[^/]+$/);
     expect(orderCreateRequests).toBe(1);
   });
 });
