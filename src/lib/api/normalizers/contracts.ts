@@ -108,7 +108,8 @@ export function normalizeSellerProduct(raw: z.infer<typeof rawSellerProductSchem
 }
 
 export function normalizePublicProduct(product: Product): Product {
-  return { ...product, description: normalizeDescription(product.description) };
+  const detailHTML = product.detail_html || detailHTMLFromDescription(product.description);
+  return { ...product, description: normalizeDescription(product.description), detail_html: detailHTML };
 }
 
 export function encodeSellerProduct(product: Product): Record<string, unknown> {
@@ -362,6 +363,20 @@ export function normalizeDescription(value: string): string {
   return trimmed;
 }
 
+export function detailHTMLFromDescription(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (parsed && typeof parsed === "object" && "html" in parsed && typeof parsed.html === "string") {
+      const html = parsed.html.trim();
+      return html || undefined;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
 export function normalizeCouponDefinition(
   raw: z.infer<typeof rawCouponDefinitionSchema>,
 ): CouponDefinition {
