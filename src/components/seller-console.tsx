@@ -30,6 +30,7 @@ import { Button } from "./ui/button";
 const sellerLinks = [
   { href: "/seller", label: "홈" },
   { href: "/seller/products", label: "상품" },
+  { href: "/seller/ads", label: "광고" },
   { href: "/seller/inventory", label: "재고 연동" },
   { href: "/seller/orders", label: "주문/배송" },
   { href: "/seller/settlements", label: "정산" },
