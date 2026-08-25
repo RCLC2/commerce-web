@@ -43,6 +43,7 @@ export const adminLinks = [
   { href: "/admin/tokens", label: "토큰 조회" },
   { href: "/admin/audit-logs", label: "감사 로그" },
   { href: "/admin/cms", label: "CMS" },
+  { href: "/admin/ads", label: "광고 운영" },
   { href: "/admin/experiments", label: "실험" },
 ];
 

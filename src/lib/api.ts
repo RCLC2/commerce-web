@@ -1,5 +1,6 @@
 import { adminApi } from "./api/admin";
 import { authApi } from "./api/auth";
+import { advertisingApi } from "./api/advertising";
 import { catalogApi } from "./api/catalog";
 import { customerApi } from "./api/customer";
 import { eventDetailApi } from "./api/event-detail";
@@ -15,6 +16,7 @@ export const api = {
   ...authApi,
   ...customerApi,
   ...mediaApi,
+  ...advertisingApi,
   ...sellerApi,
   ...adminApi,
   ...experimentApi,

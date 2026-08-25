@@ -10,6 +10,7 @@ import { queryKeys } from "@/lib/query-keys";
 import type { Market, Product, SearchResultSection } from "@/lib/types";
 import { formatFollowerCount, formatPrice } from "@/lib/utils";
 import { ProductCard } from "./product-card";
+import { SponsoredProductSlot } from "./sponsored-product-slot";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
@@ -143,6 +144,9 @@ function SearchExperience({
         </section>
       ) : (
         <div className="mx-auto max-w-4xl">
+          <section className="mb-5" aria-label="검색 스폰서드 상품">
+            <SponsoredProductSlot placementKey="search.sponsored_top" />
+          </section>
           <ResultListHeader title="상품" total={results?.products.total ?? 0} />
           <div className="space-y-7">
             {productSections.map((section) => <SearchCarousel key={section.id} section={section} setRef={(node) => { if (node) carouselRefs.current.set(section.id, node); else carouselRefs.current.delete(section.id); }} onSlide={(direction) => slide(section.id, direction)} />)}
