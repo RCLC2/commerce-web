@@ -8,6 +8,7 @@ import { getEffectiveToken } from "@/lib/auth-token";
 import { inventorySourceValidationError } from "@/lib/inventory-source-validation";
 import { createInvoiceTemplateCsv, parseInvoiceCsv } from "@/lib/invoice-csv";
 import { firstOrderItem, orderStatusLabel } from "@/lib/order-utils";
+import { emptyProductDetailDocument, serializeProductDetailDocument, type ProductDetailDocument } from "@/lib/product-detail-document";
 import { applySellerProductEdits } from "@/lib/seller-product-edits";
 import { useSessionStore } from "@/lib/session-store";
 import type { CommerceCategory, OrderResponse, Product, ProductOption } from "@/lib/types";
@@ -25,6 +26,7 @@ import {
   SummaryStrip,
 } from "./console-layout";
 import { SafeImage } from "./safe-image";
+import { ProductDetailEditor } from "./product-detail-editor";
 import { Button } from "./ui/button";
 
 const sellerLinks = [
@@ -212,7 +214,7 @@ export function SellerProductsPage() {
   const [shipping, setShipping] = useState("ALL");
   const [managedProducts, setManagedProducts] = useState<Record<number, ProductEditState>>({});
   const [createForm, setCreateForm] = useState<ProductCreateState>(() => emptyProductCreateForm());
-  const [htmlPreview, setHTMLPreview] = useState(false);
+
   const [workbookMessage, setWorkbookMessage] = useState("");
   const workbookInputRef = useRef<HTMLInputElement>(null);
   const { data = [] } = useQuery({ queryKey: ["seller-products", resolvedMarketID], queryFn: () => api.sellerProducts(token ?? "", resolvedMarketID), enabled: Boolean(token && resolvedMarketID), meta: { consoleDataRole: "primary" } });
@@ -404,38 +406,7 @@ export function SellerProductsPage() {
             ))}
           </div>
         </div>
-        <div className="mt-4 rounded-lg border border-line p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm font-black">HTML product detail</p>
-            <div className="flex flex-wrap gap-2">
-              <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-line px-3 text-sm font-bold">
-                Import HTML
-                <input
-                  type="file"
-                  accept=".html,.htm,text/html"
-                  className="hidden"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) void file.text().then((detailHTML) => setCreateForm((current) => ({ ...current, detailHTML })));
-                    event.target.value = "";
-                  }}
-                />
-              </label>
-              <Button size="sm" variant="secondary" onClick={() => setHTMLPreview((value) => !value)}>{htmlPreview ? "Edit HTML" : "Preview"}</Button>
-            </div>
-          </div>
-          {htmlPreview ? (
-            <iframe
-              title="HTML product detail preview"
-              sandbox=""
-              referrerPolicy="no-referrer"
-              srcDoc={createForm.detailHTML}
-              className="mt-3 min-h-64 w-full rounded-md border border-line bg-white"
-            />
-          ) : (
-            <textarea className="mt-3 min-h-64 w-full rounded-md border border-line px-3 py-2 font-mono text-xs outline-none focus:border-foreground" value={createForm.detailHTML} onChange={(event) => setCreateForm((current) => ({ ...current, detailHTML: event.target.value }))} placeholder="<section>...</section>" aria-label="HTML product detail" />
-          )}
-        </div>
+        <ProductDetailEditor value={createForm.detailDocument} onChange={(detailDocument) => setCreateForm((current) => ({ ...current, detailDocument }))} />
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <Button disabled={!createForm.name.trim() || !createForm.basePrice || !createForm.optionValue.trim() || !selectedCategoryID || !marketID || createProduct.isPending} onClick={() => createProduct.mutate()}>{createProduct.isPending ? "Saving" : "Create product"}</Button>
           <Button variant="secondary" onClick={() => setCreateForm(emptyProductCreateForm())}>Reset</Button>
@@ -1035,7 +1006,7 @@ type ProductCreateState = {
   status: string;
   imageURLs: string[];
   summaryDescription: string;
-  detailHTML: string;
+  detailDocument: ProductDetailDocument;
   optionName: string;
   optionValue: string;
   optionQuantity: string;
@@ -1051,7 +1022,7 @@ function emptyProductCreateForm(): ProductCreateState {
     status: "SELLING",
     imageURLs: [""],
     summaryDescription: "",
-    detailHTML: "",
+    detailDocument: emptyProductDetailDocument(),
     optionName: "",
     optionValue: "",
     optionQuantity: "0",
@@ -1065,7 +1036,7 @@ function productCreatePayload(form: ProductCreateState, marketID: number, catego
     market_id: marketID,
     category_id: categoryID,
     name: form.name.trim(),
-    description: JSON.stringify({ html: form.detailHTML.trim() }),
+    description: serializeProductDetailDocument(form.detailDocument),
     summary_description: form.summaryDescription.trim() || undefined,
     base_price: Math.max(0, Number(form.basePrice) || 0),
     discount_price: Math.max(0, Number(form.discountPrice) || 0),
