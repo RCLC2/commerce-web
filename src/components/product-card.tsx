@@ -9,6 +9,8 @@ export function ProductCard({ product, imageAspect = "aspect-square" }: { produc
   const saleRate = discountRate(product.base_price, product.discount_price);
   const price = product.discount_price || product.base_price;
   const discountAmount = Math.max(0, product.base_price - price);
+  const couponOffer = product.coupon_offer;
+  const couponPrice = product.coupon_lowest_price || couponOffer?.discounted_amount;
 
   return (
     <article className="group">
@@ -44,6 +46,12 @@ export function ProductCard({ product, imageAspect = "aspect-square" }: { produc
           ) : (
             <p className="mt-1 text-[11px] text-muted">원가와 동일</p>
           )}
+          {couponOffer && couponPrice ? (
+            <div className="mt-2 border-t border-zinc-200 pt-2">
+              <p className="text-[11px] font-bold text-violet-700">{couponOffer.requires_claim ? "이벤트 쿠폰 받으면" : "쿠폰 받으면"}</p>
+              <p className="mt-0.5 text-base font-black text-violet-700">{formatPrice(couponPrice)}</p>
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-1">
           {(product.tag_chips ?? []).slice(0, 4).map((chip) => (

@@ -194,7 +194,9 @@ function SearchCarousel({ section, setRef, onSlide }: { section: SearchResultSec
 }
 
 function CompactProductCard({ product }: { product: Product }) {
-  return <Link href={`/products/${product.id}`} className="flex h-36 w-[72vw] max-w-72 shrink-0 snap-start gap-3 rounded-md border border-line bg-white p-3"><div className="relative aspect-square h-full shrink-0 overflow-hidden rounded-md bg-zinc-100"><SafeImage src={product.image_url} alt={product.name} fill sizes="120px" className="object-cover" /></div><div className="min-w-0 py-1"><p className="text-xs font-bold text-muted">{product.market_name ?? `마켓 ${product.market_id}`}</p><p className="mt-2 line-clamp-2 text-sm font-black leading-5">{product.name}</p><p className="mt-3 text-sm font-black text-brand">{formatPrice(product.discount_price || product.base_price)}</p></div></Link>;
+  const price = product.discount_price || product.base_price;
+  const couponPrice = product.coupon_lowest_price || product.coupon_offer?.discounted_amount;
+  return <Link href={`/products/${product.id}`} className="flex h-36 w-[72vw] max-w-72 shrink-0 snap-start gap-3 rounded-md border border-line bg-white p-3"><div className="relative aspect-square h-full shrink-0 overflow-hidden rounded-md bg-zinc-100"><SafeImage src={product.image_url} alt={product.name} fill sizes="120px" className="object-cover" /></div><div className="min-w-0 py-1"><p className="text-xs font-bold text-muted">{product.market_name ?? `마켓 ${product.market_id}`}</p><p className="mt-2 line-clamp-2 text-sm font-black leading-5">{product.name}</p><p className="mt-3 text-sm font-black text-brand">{formatPrice(price)}</p>{couponPrice ? <p className="mt-0.5 text-xs font-black text-violet-700">쿠폰 받으면 {formatPrice(couponPrice)}</p> : null}</div></Link>;
 }
 
 function CompactMarketCard({ market }: { market: Market }) {

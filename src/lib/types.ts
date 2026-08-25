@@ -99,6 +99,17 @@ export type PLPTagChip = {
   tone: "shipping" | "delivery" | "exclusive" | "new" | "default" | string;
 };
 
+export type ProductCouponOffer = {
+  coupon_id: number;
+  code: string;
+  name: string;
+  target_type: "PRODUCT" | "PROMOTION";
+  event_id?: number;
+  discount_amount: number;
+  discounted_amount: number;
+  requires_claim: boolean;
+};
+
 export type Product = {
   id: number;
   market_id: number;
@@ -110,6 +121,8 @@ export type Product = {
   description_source?: string;
   base_price: number;
   discount_price: number;
+  coupon_offer?: ProductCouponOffer;
+  coupon_lowest_price?: number;
   shipping_type: "NORMAL" | "FREE" | string;
   delivery_type?: string;
   delivery_label?: string;

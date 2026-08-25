@@ -250,6 +250,8 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
   const detailHtml = resolveProductDetailHtml(product);
   const price = product.discount_price || product.base_price;
   const saleRate = discountRate(product.base_price, product.discount_price);
+  const couponOffer = product.coupon_offer;
+  const couponPrice = product.coupon_lowest_price || couponOffer?.discounted_amount;
 
   function moveImage(delta: number) {
     setActiveImage((current) => (current + delta + images.length) % images.length);
@@ -367,6 +369,12 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
               <span className="text-3xl font-black">{formatPrice(price)}</span>
             </div>
             {saleRate > 0 ? <p className="mt-1 text-sm text-muted line-through">{formatPrice(product.base_price)}</p> : null}
+            {couponOffer && couponPrice ? (
+              <div className="mt-3 rounded-lg bg-violet-50 px-3 py-2.5 text-violet-800">
+                <p className="text-xs font-bold">{couponOffer.requires_claim ? "이벤트에서 쿠폰을 받으면" : "쿠폰을 받으면"}</p>
+                <p className="mt-0.5 text-xl font-black">{formatPrice(couponPrice)}</p>
+              </div>
+            ) : null}
           </div>
 
           <div className="py-5">
