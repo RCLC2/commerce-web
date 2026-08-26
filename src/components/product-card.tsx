@@ -8,9 +8,10 @@ import { SafeImage } from "./safe-image";
 export function ProductCard({ product, imageAspect = "aspect-square" }: { product: Product; imageAspect?: string }) {
   const saleRate = discountRate(product.base_price, product.discount_price);
   const price = product.discount_price || product.base_price;
-  const discountAmount = Math.max(0, product.base_price - price);
+  const hasDiscount = price < product.base_price;
   const couponOffer = product.coupon_offer;
   const couponPrice = product.coupon_lowest_price || couponOffer?.discounted_amount;
+  const hasCoupon = Boolean(couponPrice && couponPrice > 0);
 
   return (
     <article className="group">
@@ -32,26 +33,27 @@ export function ProductCard({ product, imageAspect = "aspect-square" }: { produc
         <Link href={`/products/${product.id}`} className="block">
           <h3 className="line-clamp-2 min-h-10 text-sm font-medium leading-5 group-hover:underline">{product.name}</h3>
         </Link>
-        <div className="rounded-md bg-zinc-50 px-2.5 py-2">
+        <div className="min-h-14 rounded-md bg-zinc-50 px-2.5 py-2">
           <p className="text-[11px] font-bold text-muted">판매가</p>
-          <div className="mt-0.5 flex items-baseline gap-1.5">
-            {saleRate > 0 ? <span className="text-base font-black text-brand">{saleRate}%</span> : null}
-            <strong className="text-lg font-black tracking-tight">{formatPrice(price)}</strong>
+          <div className="mt-1 flex min-w-0 items-baseline justify-between gap-2">
+            <div className="flex min-w-0 items-baseline gap-1.5">
+              {hasDiscount && !hasCoupon ? <span className="shrink-0 text-sm font-black text-brand">{saleRate}%</span> : null}
+              {hasDiscount || hasCoupon ? (
+                <del className="truncate text-xs font-bold text-muted">
+                  {formatPrice(hasCoupon ? price : product.base_price)}
+                </del>
+              ) : (
+                <span className="text-xs font-bold text-muted">정상가</span>
+              )}
+            </div>
+            <strong className={hasCoupon ? "shrink-0 text-sm font-black text-violet-700" : "shrink-0 text-base font-black tracking-tight text-brand"}>
+              {hasCoupon
+                ? "쿠폰 최적가 " + formatPrice(couponPrice ?? 0)
+                : hasDiscount
+                  ? "할인가 " + formatPrice(price)
+                  : formatPrice(price)}
+            </strong>
           </div>
-          {discountAmount > 0 ? (
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
-              <span className="text-muted">원가 <del>{formatPrice(product.base_price)}</del></span>
-              <span className="font-black text-brand">-{formatPrice(discountAmount)} 할인</span>
-            </div>
-          ) : (
-            <p className="mt-1 text-[11px] text-muted">원가와 동일</p>
-          )}
-          {couponOffer && couponPrice ? (
-            <div className="mt-2 border-t border-zinc-200 pt-2">
-              <p className="text-[11px] font-bold text-violet-700">{couponOffer.requires_claim ? "이벤트 쿠폰 받으면" : "쿠폰 받으면"}</p>
-              <p className="mt-0.5 text-base font-black text-violet-700">{formatPrice(couponPrice)}</p>
-            </div>
-          ) : null}
         </div>
         <div className="flex flex-wrap gap-1">
           {(product.tag_chips ?? []).slice(0, 4).map((chip) => (

@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleDollarSign, ShoppingBag, Store, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -98,10 +97,6 @@ function couponDiscountLabel(coupon: { discount_type: string; discount_value: nu
 export function AdminHomePage() {
   const token = useAdminToken();
   const { data: dashboard } = useQuery({ queryKey: ["admin-dashboard"], queryFn: () => api.adminDashboard(token ?? ""), enabled: Boolean(token) });
-  const { data: members = [] } = useQuery({ queryKey: ["admin-members"], queryFn: () => api.adminMembers(token ?? ""), enabled: Boolean(token) });
-  const { data: markets = [] } = useQuery({ queryKey: ["admin-markets"], queryFn: () => api.adminMarkets(token ?? ""), enabled: Boolean(token) });
-  const { data: orders = [] } = useQuery({ queryKey: ["admin-orders"], queryFn: () => api.adminOrders(token ?? ""), enabled: Boolean(token) });
-  const { data: settlements = [] } = useQuery({ queryKey: ["admin-settlements"], queryFn: () => api.adminSettlements(token ?? ""), enabled: Boolean(token) });
 
   if (!token) {
     return <AdminAuthRequired />;
@@ -112,7 +107,7 @@ export function AdminHomePage() {
       <ConsoleHeader title="어드민 홈" description="플랫폼 전체 주문, 정산, 마켓 리스크를 한 화면에서 감시합니다." />
       <div className="mt-5">{dashboard ? <MetricGrid metrics={dashboard.metrics} /> : null}</div>
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+      <div className="mt-5">
         <ConsoleSection title="운영 알림" description="정산, 배송, 마켓 상태와 관련된 고위험 이슈입니다.">
           <div className="grid gap-3">
             {dashboard?.alerts.map((alert) => (
@@ -124,14 +119,6 @@ export function AdminHomePage() {
                 <p className="mt-1 text-sm text-muted">{alert.description}</p>
               </div>
             ))}
-          </div>
-        </ConsoleSection>
-        <ConsoleSection title="플랫폼 스냅샷">
-          <div className="grid gap-3">
-            <AdminSignal icon={<Users size={18} />} label="회원" value={`${members.length}명`} />
-            <AdminSignal icon={<Store size={18} />} label="운영 마켓" value={`${markets.filter((market) => market.status === "OPEN").length}개`} />
-            <AdminSignal icon={<ShoppingBag size={18} />} label="주문" value={`${orders.length}건`} />
-            <AdminSignal icon={<CircleDollarSign size={18} />} label="정산 검증" value={`${settlements.filter((item) => item.status !== "PAID").length}건`} />
           </div>
         </ConsoleSection>
       </div>
@@ -577,7 +564,6 @@ export function AdminCouponsPage() {
   const [status, setStatus] = useState("ALL");
   const [targetMemberID, setTargetMemberID] = useState<number | null>(null);
   const { data = [] } = useQuery({ queryKey: ["admin-coupons", targetMemberID], queryFn: () => api.adminCoupons(token ?? "", targetMemberID), enabled: Boolean(token), meta: { consoleDataRole: "primary" } });
-  const { data: members = [] } = useQuery({ queryKey: ["admin-members"], queryFn: () => api.adminMembers(token ?? ""), enabled: Boolean(token) });
   const issueCoupon = useMutation({
     mutationFn: (couponID: number) => {
       if (!targetMemberID) {
@@ -618,14 +604,14 @@ export function AdminCouponsPage() {
         />
       </div>
       <ConsoleSection className="mt-5" title="쿠폰 발급 대상" description="발급 버튼을 누르면 선택된 회원에게 발급하는 흐름으로 처리됩니다.">
-        <select className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm font-bold md:w-96" value={targetMemberID ?? ""} onChange={(event) => setTargetMemberID(Number(event.target.value) || null)}>
-          <option value="">회원 선택</option>
-          {members.map((member) => (
-            <option key={member.id} value={member.id}>
-              #{member.id} {member.user_name ?? member.email} · {member.role}
-            </option>
-          ))}
-        </select>
+        <input
+          className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm font-bold md:w-96"
+          type="number"
+          min={1}
+          value={targetMemberID ?? ""}
+          onChange={(event) => setTargetMemberID(Number(event.target.value) || null)}
+          placeholder="발급할 회원 번호"
+        />
         {issueCoupon.data ? (
           <p className="mt-3 text-sm font-bold text-brand">
             회원 #{issueCoupon.data.member_id}에게 쿠폰 #{issueCoupon.data.coupon_id}을 발급했습니다.
@@ -1076,17 +1062,6 @@ function cmsScheduleText(startsAt?: string | null, endsAt?: string | null) {
 }
 
 
-function AdminSignal({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between rounded-md bg-zinc-50 px-3 py-3">
-      <div className="flex items-center gap-2 text-sm font-bold text-muted">
-        {icon}
-        {label}
-      </div>
-      <span className="font-black">{value}</span>
-    </div>
-  );
-}
 
 function MemberName({ member }: { member: AdminMember }) {
   return (

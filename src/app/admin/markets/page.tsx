@@ -1,5 +1,5 @@
-import { AdminMarketsPage } from "@/components/admin-console";
+import { AdminMarketsPageV2 } from "@/components/admin-members-markets-v2";
 
 export default function AdminMarkets() {
-  return <AdminMarketsPage />;
+  return <AdminMarketsPageV2 />;
 }

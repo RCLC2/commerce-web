@@ -5,6 +5,7 @@ import { Boxes, CircleDollarSign, RefreshCw, Star, Store, Truck } from "lucide-r
 import { useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
+import { sellerConsoleApi } from "@/lib/seller-console-api";
 import { inventorySourceValidationError } from "@/lib/inventory-source-validation";
 import { createInvoiceTemplateCsv, parseInvoiceCsv } from "@/lib/invoice-csv";
 import { firstOrderItem, orderStatusLabel } from "@/lib/order-utils";
@@ -25,19 +26,12 @@ import {
   StatusBadge,
   SummaryStrip,
 } from "./console-layout";
+import { PaginationBar, useDebouncedValue } from "./console-ui";
+import { sellerLinks } from "./seller-shell";
 import { SafeImage } from "./safe-image";
 import { ProductDetailEditor } from "./product-detail-editor";
 import { Button } from "./ui/button";
 
-const sellerLinks = [
-  { href: "/seller", label: "홈" },
-  { href: "/seller/products", label: "상품" },
-  { href: "/seller/ads", label: "광고" },
-  { href: "/seller/inventory", label: "재고 연동" },
-  { href: "/seller/orders", label: "주문/배송" },
-  { href: "/seller/settlements", label: "정산" },
-  { href: "/seller/reviews", label: "리뷰" },
-];
 
 function useSellerToken() {
   const token = useSessionStore((state) => state.accessToken);
@@ -530,11 +524,25 @@ export function SellerInventoryPage() {
   const [tokenForm, setTokenForm] = useState<Record<number, { access_token: string; webhook_secret: string; refresh_token: string; client_secret: string }>>({});
   const [mappingForm, setMappingForm] = useState({ inventory_source_id: "", product_option_id: "", external_product_id: "", external_variant_id: "", external_inventory_item_id: "", external_location_id: "", disconnect_if_necessary: false });
   const [stockForm, setStockForm] = useState({ option_id: "", quantity: "" });
+  const [optionPage, setOptionPage] = useState(1);
+  const [optionQuery, setOptionQuery] = useState("");
+  const debouncedOptionQuery = useDebouncedValue(optionQuery);
   const queryClient = useQueryClient();
   const { data: sources = [] } = useQuery({ queryKey: ["seller-inventory-sources", resolvedMarketID], queryFn: () => api.sellerInventorySources(effectiveToken, resolvedMarketID), enabled: Boolean(token && resolvedMarketID) });
   const { data: logs = [] } = useQuery({ queryKey: ["seller-inventory-logs", resolvedMarketID], queryFn: () => api.sellerInventoryLogs(effectiveToken, resolvedMarketID), enabled: Boolean(token && resolvedMarketID) });
-  const { data: products = [] } = useQuery({ queryKey: ["seller-products", resolvedMarketID], queryFn: () => api.sellerProducts(effectiveToken, resolvedMarketID), enabled: Boolean(token && resolvedMarketID) });
-  const marketID = resolvedMarketID ?? sources[0]?.market_id ?? products[0]?.market_id;
+  const optionsQuery = useQuery({
+    queryKey: ["seller-inventory-options", resolvedMarketID, optionPage, debouncedOptionQuery],
+    queryFn: () => sellerConsoleApi.inventoryOptions(effectiveToken, {
+      market_id: resolvedMarketID,
+      page: optionPage,
+      page_size: 20,
+      q: debouncedOptionQuery || undefined,
+    }),
+    enabled: Boolean(token && resolvedMarketID),
+  });
+  const optionPageData = optionsQuery.data;
+  const options = optionPageData?.items ?? [];
+  const marketID = resolvedMarketID ?? sources[0]?.market_id;
   const register = useMutation({
     mutationFn: () => {
       if (!marketID) {
@@ -604,11 +612,15 @@ export function SellerInventoryPage() {
       setStockForm((current) => ({ ...current, quantity: String(result.quantity) }));
       void queryClient.invalidateQueries({ queryKey: ["seller-products", resolvedMarketID] });
       void queryClient.invalidateQueries({ queryKey: ["seller-inventory-logs", resolvedMarketID] });
+      void queryClient.invalidateQueries({ queryKey: ["seller-inventory-options", resolvedMarketID] });
     },
   });
   const pushStock = useMutation({
     mutationFn: () => api.pushInventoryOptionStock(effectiveToken, Number(stockForm.option_id), Number(stockForm.quantity)),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["seller-inventory-logs", resolvedMarketID] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["seller-inventory-logs", resolvedMarketID] });
+      void queryClient.invalidateQueries({ queryKey: ["seller-inventory-options", resolvedMarketID] });
+    },
   });
   const retryLog = useMutation({
     mutationFn: (logID: number) => api.retryInventorySyncLog(effectiveToken, logID),
@@ -620,7 +632,6 @@ export function SellerInventoryPage() {
     return <SellerAuthRequired />;
   }
 
-  const options = products.flatMap((product) => (product.options ?? []).map((option) => ({ ...option, productName: product.name })));
   const filteredSources = sourceStatus === "ALL" ? sources : sources.filter((source) => source.status === sourceStatus);
   const filteredLogs = logs.filter((log) => (logStatus === "ALL" || log.status === logStatus) && (logProvider === "ALL" || log.provider === logProvider));
   const sourceValidationError = inventorySourceValidationError(sourceForm);
@@ -636,7 +647,7 @@ export function SellerInventoryPage() {
     <SellerConsoleLayout sellerName={sellerName}>
       <ConsoleHeader title="외부몰 재고 연동" description="Shopify/Cafe24 재고 소스, 옵션 매핑, 동기화 실패 로그를 관리합니다." />
       <div className="mt-5">
-        <SummaryStrip items={[{ label: "연동 소스", value: `${sources.length}개` }, { label: "활성", value: `${sources.filter((source) => source.status === "ACTIVE").length}개` }, { label: "실패 로그", value: `${logs.filter((log) => log.status === "FAILED").length}건` }, { label: "매핑 가능 옵션", value: `${options.length}개` }]} />
+        <SummaryStrip items={[{ label: "연동 소스", value: `${sources.length}개` }, { label: "활성", value: `${sources.filter((source) => source.status === "ACTIVE").length}개` }, { label: "실패 로그", value: `${logs.filter((log) => log.status === "FAILED").length}건` }, { label: "매핑 가능 옵션", value: `${optionPageData?.total ?? 0}개` }]} />
       </div>
       <ConsoleSection className="mt-5" title="소스 등록">
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
@@ -664,10 +675,25 @@ export function SellerInventoryPage() {
         ])} />
       </ConsoleSection>
       <ConsoleSection className="mt-5" title="옵션 매핑 및 재고 동기화">
+        <div className="mb-4 max-w-xl">
+          <FilterField label="상품/옵션 검색">
+            <input
+              className="h-10 w-full rounded-md border border-line bg-white px-3 text-sm font-bold outline-none focus:border-foreground"
+              value={optionQuery}
+              onChange={(event) => {
+                setOptionQuery(event.target.value);
+                setOptionPage(1);
+                setMappingForm((current) => ({ ...current, product_option_id: "" }));
+                setStockForm((current) => ({ ...current, option_id: "" }));
+              }}
+              placeholder="상품명, 옵션명 또는 옵션값 검색"
+            />
+          </FilterField>
+        </div>
         <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="grid gap-3 md:grid-cols-2">
             <select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={mappingForm.inventory_source_id} onChange={(event) => setMappingForm((current) => ({ ...current, inventory_source_id: event.target.value }))}><option value="">소스 선택</option>{sources.map((source) => <option key={source.id} value={source.id}>{source.display_name}</option>)}</select>
-            <select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={mappingForm.product_option_id} onChange={(event) => setMappingForm((current) => ({ ...current, product_option_id: event.target.value }))}><option value="">옵션 선택</option>{options.map((option) => <option key={option.id} value={option.id}>{option.productName} · {option.option_name}:{option.option_value}</option>)}</select>
+            <select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={mappingForm.product_option_id} onChange={(event) => setMappingForm((current) => ({ ...current, product_option_id: event.target.value }))}><option value="">옵션 선택</option>{options.map((option) => <option key={option.id} value={option.id}>{option.product_name} · {option.option_name}:{option.option_value}</option>)}</select>
             <InventoryInput label="External Product" value={mappingForm.external_product_id} onChange={(value) => setMappingForm((current) => ({ ...current, external_product_id: value }))} />
             <InventoryInput label="External Variant" value={mappingForm.external_variant_id} onChange={(value) => setMappingForm((current) => ({ ...current, external_variant_id: value }))} />
             <InventoryInput label="Inventory Item" value={mappingForm.external_inventory_item_id} onChange={(value) => setMappingForm((current) => ({ ...current, external_inventory_item_id: value }))} />
@@ -675,8 +701,18 @@ export function SellerInventoryPage() {
             <label className="flex h-10 items-center gap-2 rounded-md border border-line px-3 text-sm font-bold"><input type="checkbox" checked={mappingForm.disconnect_if_necessary} onChange={(event) => setMappingForm((current) => ({ ...current, disconnect_if_necessary: event.target.checked }))} /> disconnect</label>
             <Button disabled={!mappingForm.inventory_source_id || !mappingForm.product_option_id || registerMapping.isPending} onClick={() => registerMapping.mutate()}>{registerMapping.isPending ? "매핑 중" : "매핑 저장"}</Button>
           </div>
-          <div className="grid content-start gap-3"><select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={stockForm.option_id} onChange={(event) => setStockForm((current) => ({ ...current, option_id: event.target.value }))}><option value="">동기화 옵션 선택</option>{options.map((option) => <option key={option.id} value={option.id}>{option.productName} · 현재 {option.quantity}개</option>)}</select><InventoryInput label="Push Quantity" type="number" value={stockForm.quantity} onChange={(value) => setStockForm((current) => ({ ...current, quantity: value }))} /><div className="flex gap-2"><Button variant="secondary" disabled={!stockForm.option_id || pullStock.isPending} onClick={() => pullStock.mutate()}>{pullStock.isPending ? "조회 중" : "Pull"}</Button><Button disabled={!stockForm.option_id || stockForm.quantity === "" || pushStock.isPending} onClick={() => pushStock.mutate()}>{pushStock.isPending ? "반영 중" : "Push"}</Button></div></div>
+          <div className="grid content-start gap-3"><select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={stockForm.option_id} onChange={(event) => setStockForm((current) => ({ ...current, option_id: event.target.value }))}><option value="">동기화 옵션 선택</option>{options.map((option) => <option key={option.id} value={option.id}>{option.product_name} · 현재 {option.quantity}개</option>)}</select><InventoryInput label="Push Quantity" type="number" value={stockForm.quantity} onChange={(value) => setStockForm((current) => ({ ...current, quantity: value }))} /><div className="flex gap-2"><Button variant="secondary" disabled={!stockForm.option_id || pullStock.isPending} onClick={() => pullStock.mutate()}>{pullStock.isPending ? "조회 중" : "Pull"}</Button><Button disabled={!stockForm.option_id || stockForm.quantity === "" || pushStock.isPending} onClick={() => pushStock.mutate()}>{pushStock.isPending ? "반영 중" : "Push"}</Button></div></div>
         </div>
+        <PaginationBar
+          page={optionPageData?.page ?? optionPage}
+          totalPages={optionPageData?.total_pages ?? 1}
+          total={optionPageData?.total ?? 0}
+          onChange={(nextPage) => {
+            setOptionPage(nextPage);
+            setMappingForm((current) => ({ ...current, product_option_id: "" }));
+            setStockForm((current) => ({ ...current, option_id: "" }));
+          }}
+        />
       </ConsoleSection>
       <ConsoleSection className="mt-5" title="동기화 로그" action={<div className="flex flex-col gap-2 md:flex-row"><StatusFilter value={logProvider} onChange={setLogProvider} options={["ALL", "SHOPIFY", "CAFE24"]} /><StatusFilter value={logStatus} onChange={setLogStatus} options={["ALL", "SUCCESS", "FAILED"]} /></div>}>
         <DataTable columns={["Provider", "옵션", "상태", "수량", "실패 원인", "일시", "작업"]} rows={filteredLogs.map((log) => [log.provider ?? "-", log.product_option_id ? `#${log.product_option_id}` : "-", <StatusBadge key="status" value={log.status} />, typeof log.new_quantity === "number" ? `${log.previous_quantity ?? "-"} → ${log.new_quantity}` : "-", <span key="message" className="line-clamp-2">{log.error_message || log.message || log.external_reference || "-"}</span>, new Date(log.created_at).toLocaleString("ko-KR"), <Button key="retry" size="sm" variant="secondary" disabled={log.status !== "FAILED" || retryLog.isPending} onClick={() => retryLog.mutate(log.id)}>재시도</Button>])} />

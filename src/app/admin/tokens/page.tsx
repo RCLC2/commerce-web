@@ -1,5 +1,5 @@
-import { AdminTokenLookupPage } from "@/components/admin-console";
+import { AdminTokenLookupPageV2 } from "@/components/admin-token-lookup-v2";
 
 export default function AdminTokens() {
-  return <AdminTokenLookupPage />;
+  return <AdminTokenLookupPageV2 />;
 }

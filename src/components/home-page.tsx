@@ -148,7 +148,7 @@ export function HomePage() {
         {homeCategoryChipsQuery.isError ? <div className="p-3 text-sm"><p className="font-bold text-brand">{apiErrorMessage(homeCategoryChipsQuery.error)}</p><Button className="mt-2" size="sm" variant="secondary" onClick={() => void homeCategoryChipsQuery.refetch()}>카테고리 다시 시도</Button></div> : null}
         {homeCategoryChipsQuery.isLoading ? <p className="p-3 text-sm text-muted">카테고리를 불러오는 중입니다.</p> : null}
         {homeCategoryChipsQuery.isSuccess && displayHomeCategoryChips.length === 0 ? <p className="p-3 text-sm text-muted">표시할 홈 카테고리가 없습니다.</p> : null}
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(72px,1fr))] gap-1.5">
           {displayHomeCategoryChips.map((chip) => (
             <Link key={chip.id} href={chip.href} className={`relative flex min-h-20 flex-col items-center justify-center gap-1 rounded-xl p-1 transition hover:-translate-y-0.5 ${chip.chip_type === "CATEGORY_EVENT" ? "bg-rose-50 hover:bg-rose-100" : "hover:bg-zinc-50"}`}>
               {chip.chip_type === "CATEGORY_EVENT" ? <span className="absolute right-1.5 top-1.5 rounded-full bg-brand px-1.5 py-0.5 text-[8px] font-black tracking-wide text-white">EVENT</span> : null}

@@ -1,5 +1,5 @@
-import { AdminOrdersPage } from "@/components/admin-console";
+import { AdminOrdersPageV2 } from "@/components/admin-commerce-v2";
 
 export default function AdminOrders() {
-  return <AdminOrdersPage />;
+  return <AdminOrdersPageV2 />;
 }
