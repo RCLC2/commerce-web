@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { ApiHttpError, apiErrorMessage } from "@/lib/api-client";
+import { groupCartItemsForDisplay } from "@/lib/cart-display";
 import { queryKeys } from "@/lib/query-keys";
 import {
   cartBoundCouponID,
@@ -86,22 +87,23 @@ export function CheckoutPage() {
   const productByID = new Map(products.flatMap((query, index) =>
     query.data ? [[productIDs[index], query.data] as const] : []));
   const items = checkoutCartItems.map((item) => ({ ...item, product: productByID.get(item.product_id) }));
+  const checkoutDisplayGroups = groupCartItemsForDisplay(items);
   const displayItems = createdOrderCode
     ? confirmedLineItems.map((item) => ({
-      id: item.id,
+      id: String(item.id),
       product_id: item.product_id,
       option_id: item.option_id,
       quantity: item.quantity,
-      price: item.price,
+      totalPrice: item.price * item.quantity,
       product: item.product ?? productByID.get(item.product_id),
     }))
-    : items.map((item) => ({
-      id: item.id,
-      product_id: item.product_id,
-      option_id: item.option_id,
-      quantity: item.quantity,
-      price: item.price_at_added,
-      product: item.product,
+    : checkoutDisplayGroups.map((group) => ({
+      id: group.key,
+      product_id: group.product_id,
+      option_id: group.option_id,
+      quantity: group.quantity,
+      totalPrice: group.totalPrice,
+      product: group.items[0].product,
     }));
   const ownedCoupons = (coupons.data ?? []).filter((coupon) => coupon.status === "AVAILABLE");
   const couponID = cartBoundCouponID(couponSelection, cart.data);
@@ -357,12 +359,15 @@ export function CheckoutPage() {
               </div>
             ) : null}
             <div className="mt-4 space-y-3">
-              {displayItems.map((item) => (
-                <div key={item.id} className="flex justify-between gap-4 text-sm">
-                  <div><p className="font-bold">{item.product?.name ?? `상품 #${item.product_id}`}</p><p className="mt-1 text-muted">옵션 #{item.option_id} · {item.quantity}개</p></div>
-                  <p className="font-black">{formatPrice(item.price * item.quantity)}</p>
-                </div>
-              ))}
+              {displayItems.map((item) => {
+                const option = item.product?.options?.find((candidate) => candidate.id === item.option_id);
+                return (
+                  <div key={item.id} className="flex justify-between gap-4 text-sm">
+                    <div><p className="font-bold">{item.product?.name ?? `상품 #${item.product_id}`}</p><p className="mt-1 text-muted">{option ? `${option.option_name} · ${option.option_value}` : `옵션 #${item.option_id}`} · {item.quantity}개</p></div>
+                    <p className="font-black">{formatPrice(item.totalPrice)}</p>
+                  </div>
+                );
+              })}
               {createdOrderCode && confirmedOrder && displayItems.length === 0 ? (
                 <p className="text-sm text-muted">서버 주문에 표시할 상품 상세가 없습니다. 결제 금액은 서버 확정값을 사용합니다.</p>
               ) : null}
