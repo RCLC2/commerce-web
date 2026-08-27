@@ -123,7 +123,7 @@ export const sellerOrderDetailSchema = z.object({
   status: z.string(),
   items: z.array(sellerOrderLineSchema),
   delivery: z.object({
-    id: z.number().int().positive(),
+    id: z.number().int().positive().optional(),
     tracking_number: z.string().optional(),
     carrier: z.string().optional(),
     status: z.string(),

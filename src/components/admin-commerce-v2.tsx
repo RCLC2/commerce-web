@@ -291,6 +291,10 @@ export function AdminOrdersPageV2() {
               <option value="SHIPPED">배송중</option>
               <option value="DELIVERED">배송 완료</option>
               <option value="COMPLETED">구매 확정</option>
+              <option value="RETURN_REQUESTED">반품 요청</option>
+              <option value="RETURN_APPROVED">반품 승인</option>
+              <option value="RETURN_REJECTED">반품 거절</option>
+              <option value="RETURN_COMPLETED">반품 완료</option>
               <option value="CANCELLED">취소</option>
             </select>
           </FilterField>
@@ -366,6 +370,11 @@ export function AdminOrdersPageV2() {
                   <div>
                     <h3 className="font-black">{marketOrder.market_name}</h3>
                     <p className="mt-1 text-xs text-muted">배송비 {formatPrice(marketOrder.shipping_fee)} · 예상 정산 {formatPrice(marketOrder.expected_settlement_amount)}</p>
+                    {marketOrder.shipping_package ? (
+                      <p className="mt-1 text-xs text-muted">
+                        {marketOrder.shipping_package.carrier || "택배사 미지정"} · {marketOrder.shipping_package.tracking_number || "송장 미등록"} · {marketOrder.shipping_package.status}
+                      </p>
+                    ) : null}
                   </div>
                   <StatusBadge value={marketOrder.status} />
                 </div>

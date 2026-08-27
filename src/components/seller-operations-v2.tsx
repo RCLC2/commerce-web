@@ -110,26 +110,12 @@ export function SellerOrdersPageV2() {
     },
     onSuccess: refreshOrder,
   });
-  const startDelivery = useMutation({
-    mutationFn: () => {
-      if (!marketID || !orderQuery.data?.delivery?.id || !carrier || !invoice.trim()) {
-        throw new Error("배송 정보와 송장 번호를 확인해 주세요.");
-      }
-      return api.startSellerDelivery(
-        token ?? "",
-        marketID,
-        orderQuery.data.delivery.id,
-        { carrier, tracking_number: invoice.trim() },
-      );
-    },
-    onSuccess: refreshOrder,
-  });
   const completeDelivery = useMutation({
     mutationFn: () => {
       if (!marketID || !orderQuery.data?.delivery?.id) {
         throw new Error("배송 정보를 확인해 주세요.");
       }
-      return api.completeSellerDelivery(token ?? "", marketID, orderQuery.data.delivery.id);
+      return api.completeSellerPackage(token ?? "", marketID, orderQuery.data.delivery.id);
     },
     onSuccess: refreshOrder,
   });
@@ -140,16 +126,14 @@ export function SellerOrdersPageV2() {
   const order = orderQuery.data;
   const deliveryStatus = order?.delivery?.status ?? order?.status ?? "PENDING";
   const shippingPending =
-    registerInvoice.isPending || startDelivery.isPending || completeDelivery.isPending;
+    registerInvoice.isPending || completeDelivery.isPending;
 
   let orderAction = null;
   if (order && !["DELIVERED", "COMPLETED", "CANCELLED"].includes(deliveryStatus)) {
-    if (!order.delivery?.id) {
+    if (!order.delivery?.id || deliveryStatus === "PENDING") {
       orderAction = <Button type="button" disabled={shippingPending || !carrier || !invoice.trim()} onClick={() => registerInvoice.mutate()}>송장 등록</Button>;
     } else if (["SHIPPING", "SHIPPED"].includes(deliveryStatus)) {
       orderAction = <Button type="button" disabled={shippingPending} onClick={() => completeDelivery.mutate()}>배송 완료</Button>;
-    } else {
-      orderAction = <Button type="button" disabled={shippingPending || !carrier || !invoice.trim()} onClick={() => startDelivery.mutate()}>배송 시작</Button>;
     }
   }
 
@@ -167,11 +151,16 @@ export function SellerOrdersPageV2() {
           <FilterField label="상태">
             <select className={consoleInputClass} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
               <option value="ALL">전체 상태</option>
+              <option value="PAYMENT_PENDING">결제 대기</option>
               <option value="PAID">출고 대기</option>
               <option value="PLACED">주문 접수</option>
               <option value="SHIPPED">배송중</option>
               <option value="DELIVERED">배송 완료</option>
               <option value="COMPLETED">구매 확정</option>
+              <option value="RETURN_REQUESTED">반품 요청</option>
+              <option value="RETURN_APPROVED">반품 승인</option>
+              <option value="RETURN_REJECTED">반품 거절</option>
+              <option value="RETURN_COMPLETED">반품 완료</option>
               <option value="CANCELLED">취소</option>
             </select>
           </FilterField>

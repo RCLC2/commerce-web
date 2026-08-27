@@ -229,6 +229,13 @@ export function CheckoutPage() {
           cart_item_ids: items.map((item) => item.id),
           used_coupon_id: eligibleSelectedCoupon?.id,
           used_point: appliedPoint,
+          shipping_address: defaultAddress ? {
+            receiver: defaultAddress.receiver,
+            phone: defaultAddress.phone,
+            zip_code: defaultAddress.zip_code,
+            line1: defaultAddress.line1,
+            line2: defaultAddress.line2,
+          } : undefined,
         },
         placeOrder: (input) => api.placeOrder(effectiveToken, input),
         getOrder: (orderCode) => api.getOrder(effectiveToken, orderCode),
@@ -297,8 +304,8 @@ export function CheckoutPage() {
     return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-black">로그인이 필요합니다</h1><Link href="/login"><Button className="mt-5">로그인하기</Button></Link></main>;
   }
 
-  const blockingError = cart.error;
-  const supportingError = coupons.error ?? profile.error ?? addresses.error;
+  const blockingError = cart.error ?? (!createdOrderCode ? addresses.error : null);
+  const supportingError = coupons.error ?? profile.error;
 
   return (
     <main className="mx-auto max-w-5xl px-4 pb-28 pt-8">
@@ -336,9 +343,7 @@ export function CheckoutPage() {
                 <p className="text-muted">({defaultAddress.zip_code}) {defaultAddress.line1} {defaultAddress.line2}</p>
               </div>
             ) : <p className="mt-3 text-sm text-muted">등록된 기본 배송지가 없습니다.</p>}
-            <p className="mt-3 rounded-md bg-amber-50 p-3 text-xs font-bold text-amber-800">
-              현재 주문 API는 배송지를 주문에 연결하지 않습니다. 위 주소는 계정의 기본 배송지를 참고용으로만 표시합니다.
-            </p>
+            {defaultAddress ? <p className="mt-3 text-xs font-bold text-emerald-700">이 배송지는 주문 당시 정보로 저장되어 셀러와 관리자 배송 처리에 사용됩니다.</p> : null}
           </div>
 
           <div className="rounded-md border border-line bg-white p-4">
@@ -413,6 +418,7 @@ export function CheckoutPage() {
                 !retryStateReady
                 || (!createdOrderCode && (
                   !items.length
+                  || !defaultAddress
                   || !Number.isSafeInteger(expectedAmount)
                   || expectedAmount <= 0
                   || pendingAttemptBlocked
@@ -436,6 +442,9 @@ export function CheckoutPage() {
           {createdOrderCode ? <p className="mt-3 text-xs text-muted">생성된 주문: {createdOrderCode}. 재시도해도 주문은 다시 생성하지 않습니다.</p> : null}
           {!createdOrderCode && items.length > 0 && expectedAmount <= 0 ? (
             <p className="mt-3 text-xs font-bold text-brand">최소 결제 금액은 1원입니다. 쿠폰 또는 포인트 사용액을 조정해주세요.</p>
+          ) : null}
+          {!createdOrderCode && addresses.isSuccess && !defaultAddress ? (
+            <p className="mt-3 text-xs font-bold text-brand">주문하려면 마이페이지에서 배송지를 먼저 등록해 주세요.</p>
           ) : null}
           {restoreError ? <p className="mt-3 text-xs font-bold text-amber-800">{restoreError}</p> : null}
           {pendingAttemptBlocked && !createdOrderCode ? (

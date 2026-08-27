@@ -1,9 +1,12 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
+
+const modalStack: symbol[] = [];
+let bodyOverflowBeforeModal = "";
 
 type ConsoleTableProps = {
   columns: string[];
@@ -162,19 +165,37 @@ export function ConsoleModal({
   footer?: ReactNode;
   size?: "md" | "lg" | "xl";
 }) {
+  const modalID = useRef(Symbol("console-modal"));
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const id = modalID.current;
+    if (modalStack.length === 0) {
+      bodyOverflowBeforeModal = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    }
+    modalStack.push(id);
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape" && modalStack.at(-1) === id) {
+        event.preventDefault();
+        onCloseRef.current();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => {
-      document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
+      const stackIndex = modalStack.lastIndexOf(id);
+      if (stackIndex >= 0) modalStack.splice(stackIndex, 1);
+      if (modalStack.length === 0) {
+        document.body.style.overflow = bodyOverflowBeforeModal;
+      }
     };
-  }, [onClose, open]);
+  }, [open]);
 
   if (!open) return null;
 

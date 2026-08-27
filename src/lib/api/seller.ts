@@ -1,27 +1,17 @@
 import { z } from "zod";
 import { requestParsed, requestVoid } from "../api-client";
-import { getApiBaseUrl } from "../api-base-url";
 import type { InventorySourceForm, Product, SettlementAccountInput } from "../types";
 import {
-  dateStringSchema,
-  deliverySchema,
   inventorySourceSchema,
   inventorySyncLogSchema,
-  orderSchema,
-  reviewSchema,
 } from "./contracts/schemas";
 import {
   rawExternalInventoryMappingSchema,
   rawInventoryDetailSchema,
   rawInventoryLocationSchema,
-  rawSellerSettlementDashboardSchema,
-  rawSellerProductSchema,
   rawSettlementAccountSchema,
-  rawSettlementLineSchema,
-  rawSettlementSchema,
   rawSuppliedProductOptionSchema,
   sellerContextSchema,
-  sellerDashboardSchema,
 } from "./contracts/raw";
 import {
   encodeSellerProduct,
@@ -29,14 +19,9 @@ import {
   normalizeExternalInventoryMapping,
   normalizeInventoryDetail,
   normalizeInventoryLocation,
-  normalizeSellerProduct,
-  normalizeSellerSettlementDashboard,
-  normalizeSettlement,
   normalizeSettlementAccount,
-  normalizeSettlementLine,
   normalizeSuppliedProductOption,
 } from "./normalizers/contracts";
-import { collectAllUniquePages } from "./pagination";
 
 function marketQuery(marketID?: number | null) {
   return marketID ? `?market_id=${marketID}` : "";
@@ -45,91 +30,24 @@ function marketQuery(marketID?: number | null) {
 const carriersSchema = z.object({
   carriers: z.array(z.object({ code: z.string(), name: z.string(), tracking_key: z.string() })),
 });
-const sellerReviewSchema = reviewSchema.extend({
-  created_at: dateStringSchema,
-});
-const settlementLinesResponseSchema = z.object({
-  items: z.array(rawSettlementLineSchema),
-});
 const externalOrderResultSchema = z.object({
   external_order_id: z.string().min(1),
   external_name: z.string().optional(),
 });
 
-const productWorkbookResultSchema = z.object({
-  created: z.number().int().nonnegative(),
-  updated: z.number().int().nonnegative(),
-  errors: z.array(z.object({ row: z.number().int().positive(), message: z.string() })),
-});
-
-async function downloadProductWorkbook(token: string, path: string): Promise<Blob> {
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!response.ok) {
-    throw new Error((await response.text()) || `Workbook download failed (${response.status})`);
-  }
-  return response.blob();
-}
-
-async function uploadProductWorkbook(token: string, marketID: number, file: File) {
-  const form = new FormData();
-  form.set("file", file);
-  const response = await fetch(`${getApiBaseUrl()}/api/v1/seller/products/bulk.xlsx?market_id=${marketID}`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: form,
-  });
-  const text = await response.text();
-  if (!response.ok) {
-    throw new Error(text || `Workbook import failed (${response.status})`);
-  }
-  let payload: unknown;
-  try {
-    payload = JSON.parse(text);
-  } catch {
-    throw new Error("Workbook import returned invalid JSON.");
-  }
-  return productWorkbookResultSchema.parse(payload);
-}
-
 export const sellerApi = {
   sellerContext: (token: string, marketID?: number | null) =>
     requestParsed(sellerContextSchema, `/api/v1/seller/context${marketQuery(marketID)}`, { token }),
-  sellerDashboard: (token: string, marketID?: number | null) =>
-    requestParsed(sellerDashboardSchema, `/api/v1/seller/dashboard${marketQuery(marketID)}`, { token }),
-  sellerProducts: async (token: string, marketID?: number | null) =>
-    requestParsed(z.array(rawSellerProductSchema), `/api/v1/seller/products${marketQuery(marketID)}`, { token })
-      .then((products) => products.map(normalizeSellerProduct)),
   sellerInventorySources: (token: string, marketID?: number | null) =>
     requestParsed(z.array(inventorySourceSchema), `/api/v1/seller/inventory/sources${marketQuery(marketID)}`, { token }),
   sellerInventoryLogs: (token: string, marketID?: number | null) =>
     requestParsed(z.array(inventorySyncLogSchema), `/api/v1/seller/inventory/sync-logs${marketQuery(marketID)}`, { token }),
-  sellerOrders: (token: string, marketID?: number | null) =>
-    requestParsed(z.array(orderSchema), `/api/v1/seller/orders${marketQuery(marketID)}`, { token }),
-  sellerSettlements: async (token: string, marketID?: number | null) =>
-    (await requestParsed(z.array(rawSettlementSchema), `/api/v1/seller/settlements${marketQuery(marketID)}`, { token }))
-      .map(normalizeSettlement),
-  sellerReviews: (token: string, marketID?: number | null) =>
-    requestParsed(z.array(sellerReviewSchema), `/api/v1/seller/reviews${marketQuery(marketID)}`, { token }),
-  updateSellerProduct: (token: string, product: Product) =>
-    requestVoid(`/api/v1/products/${product.id}`, {
-      method: "PUT",
-      token,
-      body: JSON.stringify(encodeSellerProduct(product)),
-    }),
   createSellerProduct: (token: string, product: Product) =>
     requestVoid("/api/v1/products", {
       method: "POST",
       token,
       body: JSON.stringify(encodeSellerProduct(product)),
     }),
-  sellerProductTemplate: (token: string, marketID: number) =>
-    downloadProductWorkbook(token, `/api/v1/seller/products/template.xlsx?market_id=${marketID}`),
-  exportSellerProducts: (token: string, marketID: number) =>
-    downloadProductWorkbook(token, `/api/v1/seller/products/export.xlsx?market_id=${marketID}`),
-  importSellerProducts: (token: string, marketID: number, file: File) =>
-    uploadProductWorkbook(token, marketID, file),
   registerInventorySource: (token: string, payload: InventorySourceForm) =>
     requestParsed(inventorySourceSchema, "/api/v1/fulfillment/sources", {
       method: "POST",
@@ -208,39 +126,10 @@ export const sellerApi = {
   retryInventorySyncLog: (token: string, logID: number) =>
     requestVoid(`/api/v1/fulfillment/sync-logs/${logID}/retry`, { method: "POST", token }),
   deliveryCarriers: (token: string) => requestParsed(carriersSchema, "/api/v1/deliveries/carriers", { token }),
-  getDeliveryByOrder: (token: string, orderID: number) =>
-    requestParsed(deliverySchema, `/api/v1/deliveries/by-order/${orderID}`, { token }),
-  getDelivery: (token: string, deliveryID: number) =>
-    requestParsed(deliverySchema, `/api/v1/deliveries/${deliveryID}`, { token }),
   registerSellerInvoices: (token: string, payload: { market_id: number; invoices: Array<{ order_id: number; carrier: string; invoice_number: string; is_fake_invoice?: boolean }> }) =>
     requestVoid("/api/v1/seller/deliveries/invoices", { method: "POST", token, body: JSON.stringify(payload) }),
-  startSellerDelivery: (token: string, marketID: number, deliveryID: number, payload: { carrier: string; tracking_number: string }) =>
-    requestVoid(`/api/v1/seller/markets/${marketID}/deliveries/${deliveryID}/start`, { method: "POST", token, body: JSON.stringify(payload) }),
-  completeSellerDelivery: (token: string, marketID: number, deliveryID: number) =>
-    requestVoid(`/api/v1/seller/markets/${marketID}/deliveries/${deliveryID}/complete`, { method: "POST", token }),
-  sellerMarketOrders: (token: string, marketID: number) =>
-    collectAllUniquePages(
-      (limit, offset) => requestParsed(
-        z.array(orderSchema),
-        `/api/v1/seller/markets/${marketID}/orders?limit=${limit}&offset=${offset}`,
-        { token },
-      ),
-      (order) => order.id,
-    ),
-  sellerMarketOrder: (token: string, marketID: number, orderCode: string) =>
-    requestParsed(orderSchema, `/api/v1/seller/markets/${marketID}/orders/${orderCode}`, { token }),
-  sellerMarketSettlements: async (token: string, marketID: number) =>
-    normalizeSellerSettlementDashboard(await requestParsed(
-      rawSellerSettlementDashboardSchema,
-      `/api/v1/seller/markets/${marketID}/settlements`,
-      { token },
-    )),
-  sellerMarketSettlementLines: async (token: string, marketID: number) =>
-    (await requestParsed(
-      settlementLinesResponseSchema,
-      `/api/v1/seller/markets/${marketID}/settlement-lines`,
-      { token },
-    )).items.map(normalizeSettlementLine),
+  completeSellerPackage: (token: string, marketID: number, packageID: number) =>
+    requestVoid(`/api/v1/seller/markets/${marketID}/shipping-packages/${packageID}/complete`, { method: "POST", token }),
   getSettlementAccount: async (token: string, marketID: number) =>
     normalizeSettlementAccount(await requestParsed(
       rawSettlementAccountSchema,

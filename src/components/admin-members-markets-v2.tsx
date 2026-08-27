@@ -121,6 +121,14 @@ export function AdminMembersPageV2() {
     setEditing(false);
   }
 
+  function cancelMemberEdit() {
+    if (memberQuery.data) {
+      setEditRole(memberQuery.data.role);
+      setEditStatus(memberQuery.data.status);
+    }
+    setEditing(false);
+  }
+
   return (
     <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <ConsoleHeader
@@ -205,7 +213,7 @@ export function AdminMembersPageV2() {
           tab === "INFO" && memberQuery.data ? (
             <>
               {editing ? (
-                <Button type="button" variant="secondary" onClick={() => setEditing(false)}>
+                <Button type="button" variant="secondary" onClick={cancelMemberEdit}>
                   취소
                 </Button>
               ) : null}

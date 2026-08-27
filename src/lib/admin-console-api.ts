@@ -177,6 +177,12 @@ export const adminOrderDetailSchema = z.object({
     status: z.string(),
     expected_settlement_amount: z.number().int(),
     items: z.array(adminOrderLineSchema),
+    shipping_package: z.object({
+      id: z.number().int().positive(),
+      carrier: z.string().optional(),
+      tracking_number: z.string().optional(),
+      status: z.string(),
+    }).optional(),
   })),
   delivery: z.object({
     id: z.number().int().positive(),
@@ -277,7 +283,7 @@ export const adminConsoleApi = {
   addMarketPenalty: (token: string, marketID: number, payload: { score: number; reason: string }) =>
     requestVoid(`/api/v1/admin/markets/${marketID}/penalties`, { method: "POST", token, body: JSON.stringify(payload) }),
   updateMarketStatus: (token: string, marketID: number, status: string) =>
-    requestVoid(`/api/v1/markets/${marketID}/status`, { method: "POST", token, body: JSON.stringify({ status }) }),
+    requestVoid(`/api/v1/admin/markets/${marketID}/status`, { method: "POST", token, body: JSON.stringify({ status }) }),
 
   products: (token: string, params: ListParams & { market_id?: number; category_id?: number }) =>
     requestParsed(pageSchema(adminProductListItemSchema), withQuery("/api/v1/admin/products", params), { token }),
@@ -296,5 +302,5 @@ export const adminConsoleApi = {
   settlement: (token: string, settlementID: number, linePage = 1) =>
     requestParsed(adminSettlementDetailSchema, withQuery(`/api/v1/admin/settlements/${settlementID}`, { page: linePage, page_size: 20 }), { token }),
   markSettlementPaid: (token: string, settlementID: number) =>
-    requestVoid(`/api/v1/admin/settlements/${settlementID}/mark-paid`, { method: "POST", token }),
+    requestVoid(`/api/v1/admin/settlements/${settlementID}/pay`, { method: "POST", token }),
 };
