@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { adminConsoleApi } from "../admin-console-api";
 import { adminApi } from "./admin";
 import { authApi } from "./auth";
 import { customerApi, normalizeCouponQuoteOrderAmount } from "./customer";
@@ -73,6 +74,63 @@ describe("command route regressions", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toContain("/api/v1/seller/deliveries/invoices");
+  });
+
+  it("completes only the selected seller market shipping package", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await sellerApi.completeSellerPackage("token", 4, 21);
+
+    expect(new URL(String(fetchMock.mock.calls[0][0])).pathname).toBe(
+      "/api/v1/seller/markets/4/shipping-packages/21/complete",
+    );
+  });
+
+  it("keeps admin market status and settlement payment on admin-only canonical routes", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await adminConsoleApi.updateMarketStatus("token", 3, "HIDE");
+    await adminConsoleApi.markSettlementPaid("token", 17);
+
+    expect(fetchMock.mock.calls.map((call) => {
+      const url = new URL(String(call[0]));
+      return [url.pathname, call[1].method];
+    })).toEqual([
+      ["/api/v1/admin/markets/3/status", "POST"],
+      ["/api/v1/admin/settlements/17/pay", "POST"],
+    ]);
+  });
+
+  it("snapshots the selected shipping address when placing an order", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      orderCode: "ORDER-1",
+    }), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await customerApi.placeOrder("token", {
+      cart_item_ids: [11],
+      used_point: 0,
+      shipping_address: {
+        receiver: "홍길동",
+        phone: "010-0000-0000",
+        zip_code: "01234",
+        line1: "서울시 중구",
+        line2: "101호",
+      },
+    });
+
+    expect(new URL(String(fetchMock.mock.calls[0][0])).pathname).toBe("/api/v1/orders");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      shipping_address: {
+        receiver: "홍길동",
+        phone: "010-0000-0000",
+        zip_code: "01234",
+        line1: "서울시 중구",
+        line2: "101호",
+      },
+    });
   });
 
   it("accepts successful empty command responses", async () => {
@@ -449,7 +507,7 @@ describe("origin/main mixed contract regressions", () => {
     );
   });
 
-  it("decodes seller settlement dashboard, line wrapper, and summary contracts", async () => {
+  it("decodes the customer settlement summary contract", async () => {
     const settlement = {
       ID: 7,
       MarketID: 2,
@@ -459,180 +517,13 @@ describe("origin/main mixed contract regressions", () => {
       FinalSettlementAmount: 9000,
       Status: "PREPARED",
     };
-    const metrics = {
-      line_count: 1,
-      gross_sales_amount: 10000,
-      platform_coupon_amount: 0,
-      market_coupon_amount: 0,
-      point_discount_amount: 0,
-      promotion_amount: 0,
-      customer_payment_amount: 10000,
-      commission_amount: 1000,
-      return_shipping_fee: 0,
-      final_settlement_amount: 9000,
-    };
-    const line = {
-      id: 1,
-      settlement_id: 7,
-      market_id: 2,
-      order_id: 3,
-      order_code: "ORDER-3",
-      market_order_id: 4,
-      order_line_item_id: 5,
-      target_month: "2026-07",
-      line_type: "SALE",
-      status: "ELIGIBLE",
-      purchase_confirmed_at: "2026-07-28T00:00:00Z",
-      settlement_eligible_at: "2026-07-28T00:00:00Z",
-      product_id: 6,
-      option_id: 7,
-      quantity: 1,
-      unit_price: 10000,
-      gross_amount: 10000,
-      platform_coupon_amount: 0,
-      market_coupon_amount: 0,
-      point_discount_amount: 0,
-      promotion_amount: 0,
-      customer_payment_amount: 10000,
-      commission_amount: 1000,
-      return_shipping_fee: 0,
-      final_settlement_amount: 9000,
-      created_at: "2026-07-28T00:00:00Z",
-      updated_at: "2026-07-28T00:00:00Z",
-    };
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        market_id: 2,
-        settlements: [settlement],
-        ...metrics,
-        paid_amount: 0,
-        pending_amount: 9000,
-        status_breakdown: { ELIGIBLE: 1 },
-        monthly: { "2026-07": metrics },
-      }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [line] }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ settlements: [settlement] }), { status: 200 }));
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify({ settlements: [settlement] }), { status: 200 }),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(sellerApi.sellerMarketSettlements("token", 2)).resolves.toMatchObject({
-      market_id: 2,
-      settlements: [{ id: 7, market_id: 2 }],
-      pending_amount: 9000,
-    });
-    await expect(sellerApi.sellerMarketSettlementLines("token", 2)).resolves.toMatchObject([
-      { id: 1, gross_amount: 10000, final_settlement_amount: 9000 },
-    ]);
     await expect(customerApi.getSettlementSummary("token", 2)).resolves.toMatchObject({
       settlements: [{ id: 7, market_id: 2 }],
     });
-  });
-});
-
-describe("admin pagination regressions", () => {
-  it("collects every unique member with explicit limit and offset until an empty page", async () => {
-    const member = (id: number) => ({
-      ID: id,
-      Email: `member-${id}@test.com`,
-      Role: "MEMBER",
-      Status: "ACTIVE",
-      NotificationType: "EMAIL",
-      MarketingConsent: false,
-      NighttimeConsent: false,
-      CreatedAt: "2026-07-29T00:00:00Z",
-    });
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(
-        Array.from({ length: 100 }, (_, index) => member(index + 1)),
-      ), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify([member(101)]), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    const members = await adminApi.adminMembers("token");
-
-    expect(members).toHaveLength(101);
-    expect(new Set(members.map((item) => item.id)).size).toBe(101);
-    expect(fetchMock.mock.calls.map((call) => {
-      const url = new URL(String(call[0]));
-      return `${url.searchParams.get("limit")}:${url.searchParams.get("offset")}`;
-    })).toEqual(["100:0", "100:100", "100:101"]);
-  });
-
-  it("stops pagination when a backend repeats a page without new IDs", async () => {
-    const orders = Array.from({ length: 100 }, (_, index) => ({
-      id: index + 1,
-      order_code: `ORDER-${index + 1}`,
-      total_order_price: 1000,
-      total_discount_price: 0,
-      used_point: 0,
-      status: "PAYMENT_PENDING",
-    }));
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(orders), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(orders), { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(adminApi.adminOrders("token")).resolves.toEqual(orders);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-  });
-
-  it("continues when the backend caps pages below the requested size", async () => {
-    const order = (id: number) => ({
-      id,
-      order_code: `CAPPED-ORDER-${id}`,
-      total_order_price: 1000,
-      total_discount_price: 0,
-      used_point: 0,
-      status: "PAYMENT_PENDING",
-    });
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(
-        Array.from({ length: 50 }, (_, index) => order(index + 1)),
-      ), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(
-        Array.from({ length: 50 }, (_, index) => order(index + 51)),
-      ), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(adminApi.adminOrders("token")).resolves.toHaveLength(100);
-    expect(fetchMock.mock.calls.map((call) => {
-      const url = new URL(String(call[0]));
-      return `${url.searchParams.get("limit")}:${url.searchParams.get("offset")}`;
-    })).toEqual(["100:0", "100:50", "100:100"]);
-  });
-
-  it("uses explicit pagination for the dormant seller market order helper", async () => {
-    const orders = Array.from({ length: 100 }, (_, index) => ({
-      id: index + 1,
-      order_code: `SELLER-ORDER-${index + 1}`,
-      total_order_price: 1000,
-      total_discount_price: 0,
-      used_point: 0,
-      status: "PAYMENT_PENDING",
-    }));
-    const lastOrder = {
-      id: 101,
-      order_code: "SELLER-ORDER-101",
-      total_order_price: 1000,
-      total_discount_price: 0,
-      used_point: 0,
-      status: "PAYMENT_PENDING",
-    };
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(orders), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify([lastOrder]), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(sellerApi.sellerMarketOrders("token", 7)).resolves.toHaveLength(101);
-    expect(fetchMock.mock.calls.map((call) => {
-      const url = new URL(String(call[0]));
-      return `${url.pathname}?${url.searchParams.toString()}`;
-    })).toEqual([
-      "/api/v1/seller/markets/7/orders?limit=100&offset=0",
-      "/api/v1/seller/markets/7/orders?limit=100&offset=100",
-      "/api/v1/seller/markets/7/orders?limit=100&offset=101",
-    ]);
   });
 });

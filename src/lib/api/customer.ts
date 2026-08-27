@@ -103,7 +103,7 @@ export const customerApi = {
   listMyRecommendations: (token: string) => requestParsed(z.array(recommendationSchema), "/api/v1/me/recommendations", { token }),
   listWishlistedProducts: (token: string) => requestParsed(z.array(productSchema), "/api/v1/me/wishlist", { token }),
   listLikedProducts: (token: string) => requestParsed(z.array(productSchema), "/api/v1/me/liked-products", { token }),
-  placeOrder: (token: string, payload: { cart_item_ids: number[]; used_coupon_id?: number; used_point: number }) =>
+  placeOrder: (token: string, payload: { cart_item_ids: number[]; used_coupon_id?: number; used_point: number; shipping_address?: { receiver: string; phone: string; zip_code: string; line1: string; line2: string } }) =>
     requestParsed(z.object({ orderCode: z.string().min(1) }), "/api/v1/orders", {
       method: "POST",
       token,

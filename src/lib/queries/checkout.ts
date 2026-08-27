@@ -5,6 +5,13 @@ export type CheckoutOrderInput = {
   cart_item_ids: number[];
   used_coupon_id?: number;
   used_point: number;
+  shipping_address?: {
+    receiver: string;
+    phone: string;
+    zip_code: string;
+    line1: string;
+    line2: string;
+  };
 };
 
 export const CHECKOUT_RETRY_STORAGE_KEY = "commerce.checkout.retry";

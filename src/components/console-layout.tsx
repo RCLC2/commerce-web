@@ -60,16 +60,16 @@ export function ConsoleLayout({
     : activeQueries.length === 0 || hasResolvedData;
 
   return (
-    <main className="mx-auto grid max-w-7xl gap-5 px-4 pb-24 pt-5 md:grid-cols-[228px_1fr]">
-      <aside className="h-fit rounded-md border border-line bg-white p-3 md:sticky md:top-24">
+    <main className="mx-auto grid max-w-7xl gap-5 px-4 pb-24 pt-5 md:grid-cols-[208px_minmax(0,1fr)]">
+      <aside className="h-fit min-w-0 rounded-md border border-line bg-white p-3 md:sticky md:top-24">
         <div className="px-3 py-2">
           <h1 className="text-lg font-black">{title}</h1>
           {subtitle ? <p className="mt-1 text-xs font-bold leading-5 text-muted">{subtitle}</p> : null}
         </div>
         {sidebarHeader ? <div className="mb-3 px-1">{sidebarHeader}</div> : null}
-        <nav className="mt-2 grid gap-1">
+        <nav className="mt-2 grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-1">
           {links.map((link) => {
-            const active = pathname === link.href;
+            const active = pathname === link.href || (link.href !== "/admin" && pathname.startsWith(`${link.href}/`));
             return (
               <Link
                 key={link.href}
@@ -86,7 +86,7 @@ export function ConsoleLayout({
         </nav>
         {sidebarFooter ? <div className="mt-4 border-t border-line pt-4">{sidebarFooter}</div> : null}
       </aside>
-      <section className="min-w-0">
+      <section className="min-w-0 overflow-hidden">
         {activeQueryErrors.length ? (
           <div className="mb-4 rounded-md border border-brand/30 bg-red-50 p-4 text-sm">
             <p className="font-black text-brand">데이터를 불러오지 못했습니다.</p>
@@ -158,7 +158,7 @@ export function ConsoleSection({
   className?: string;
 }) {
   return (
-    <section className={cn("rounded-md border border-line bg-white p-4", className)}>
+    <section className={cn("min-w-0 overflow-hidden rounded-md border border-line bg-white p-4", className)}>
       {title || description || action ? (
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { apiErrorMessage } from "@/lib/api-client";
 import { api } from "@/lib/api";
+import { sellerConsoleApi } from "@/lib/seller-console-api";
 import type { AdCampaign } from "@/lib/api/advertising";
 import {
   campaignBudgetMicros,
@@ -18,22 +19,10 @@ import {
 } from "@/lib/advertising-view";
 import { useSessionStore } from "@/lib/session-store";
 import { ConsoleHeader, ConsoleLayout, ConsoleSection, DataTable, MetricGrid, StatusBadge } from "./console-layout";
+import { adminLinks } from "./admin-console";
+import { ConsoleModal, useDebouncedValue } from "./console-ui";
+import { sellerLinks } from "./seller-shell";
 import { Button } from "./ui/button";
-
-const sellerAdLinks = [
-  { href: "/seller", label: "홈" },
-  { href: "/seller/products", label: "상품" },
-  { href: "/seller/ads", label: "광고" },
-  { href: "/seller/orders", label: "주문/배송" },
-  { href: "/seller/settlements", label: "정산" },
-];
-
-const adminAdLinks = [
-  { href: "/admin", label: "홈" },
-  { href: "/admin/ads", label: "광고 운영" },
-  { href: "/admin/cms", label: "CMS" },
-  { href: "/admin/audit-logs", label: "감사 로그" },
-];
 
 type CampaignKind = "SPONSORED_FEED" | "SEARCH" | "CRM" | "GUARANTEED";
 
@@ -41,13 +30,22 @@ export function SellerAdvertisingPage() {
   const session = useAdSession();
   const queryClient = useQueryClient();
   const [form, setForm] = useState(emptyCampaignForm());
+  const [createOpen, setCreateOpen] = useState(false);
+  const [productQuery, setProductQuery] = useState("");
+  const debouncedProductQuery = useDebouncedValue(productQuery);
   const enabled = Boolean(session.sellerToken);
-  const { data: products = [] } = useQuery({
-    queryKey: ["seller-products", session.marketID],
-    queryFn: () => api.sellerProducts(session.sellerToken ?? "", session.marketID),
-    enabled,
-    meta: { consoleDataRole: "primary" },
+  const productsQuery = useQuery({
+    queryKey: ["seller-ad-products", session.marketID, debouncedProductQuery],
+    queryFn: () => sellerConsoleApi.products(session.sellerToken ?? "", {
+      market_id: session.marketID,
+      page: 1,
+      page_size: 20,
+      q: debouncedProductQuery || undefined,
+      status: "SELLING",
+    }),
+    enabled: Boolean(enabled && createOpen),
   });
+  const products = productsQuery.data?.items ?? [];
   const { data: campaigns = [] } = useQuery({
     queryKey: ["seller-ad-campaigns", session.marketID],
     queryFn: () => api.sellerAdCampaigns(session.sellerToken ?? "", session.marketID),
@@ -64,7 +62,9 @@ export function SellerAdvertisingPage() {
     mutationFn: () => api.createSellerAdCampaign(session.sellerToken ?? "", session.marketID, campaignPayload(form)),
     onSuccess: () => {
       setForm(emptyCampaignForm());
+      setCreateOpen(false);
       void invalidate();
+      setProductQuery("");
     },
   });
   const transition = useMutation({
@@ -83,25 +83,54 @@ export function SellerAdvertisingPage() {
   }
 
   return (
-    <ConsoleLayout title="Seller" subtitle="마켓 광고센터" links={sellerAdLinks}>
-      <ConsoleHeader title="광고 캠페인" description="상품, 지면, 일예산을 선택해 검수 후 집행합니다. CPM 캠페인은 균등 분배로 일예산을 보호합니다." />
+    <ConsoleLayout title="Seller" subtitle="마켓 광고센터" links={sellerLinks}>
+      <ConsoleHeader
+        title="광고 캠페인"
+        description="상품, 지면, 일예산을 선택해 검수 후 집행합니다. CPM 캠페인은 균등 분배로 일예산을 보호합니다."
+        action={<Button type="button" onClick={() => setCreateOpen(true)}>캠페인 생성</Button>}
+      />
 		{create.isError || transition.isError ? <p className="mt-3 text-sm font-bold text-brand">{apiErrorMessage(create.error ?? transition.error)}</p> : null}
       <div className="mt-5"><MetricGrid metrics={metrics} /></div>
       <ConsoleSection className="mt-5" title="성과 리포트" description="유효 노출, 클릭, 과금, 주문 기여는 지연 이벤트 보정 후 집계됩니다.">
         <DataTable columns={["캠페인", "노출", "클릭", "광고비", "기여 주문", "기여 매출"]} rows={reports.map((report) => [campaignName(campaigns.find((campaign) => campaignID(campaign) === report.campaign_id) ?? {}), report.impressions.toLocaleString("ko-KR"), report.clicks.toLocaleString("ko-KR"), formatWon(report.spend_micros), report.attributed_orders.toLocaleString("ko-KR"), formatWon(report.revenue_micros)])} emptyText="집계된 광고 성과가 없습니다." />
       </ConsoleSection>
-      <ConsoleSection className="mt-5" title="캠페인 생성" description="구좌 단가는 운영자가 관리한 가격표를 사용하며, 셀러 입력값으로 바꾸지 않습니다.">
+      <ConsoleModal
+        open={createOpen}
+        title="광고 캠페인 생성"
+        description="구좌 단가는 운영자가 관리한 가격표를 사용하며, 셀러 입력값으로 바꾸지 않습니다."
+        size="xl"
+        onClose={() => setCreateOpen(false)}
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>취소</Button>
+            <Button type="button" disabled={create.isPending || !canCreateCampaign(form)} onClick={() => create.mutate()}>
+              {create.isPending ? "생성 중" : "초안 만들기"}
+            </Button>
+          </>
+        }
+      >
         <div className="grid gap-3 lg:grid-cols-3">
           <Field label="캠페인 이름"><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className={inputClass} placeholder="가을 신상품 피드 광고" /></Field>
-          <Field label="광고 상품"><select value={form.productID} onChange={(event) => setForm({ ...form, productID: event.target.value })} className={inputClass}><option value="">상품 선택</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></Field>
+          <Field label="상품 검색">
+            <input
+              value={productQuery}
+              onChange={(event) => {
+                setProductQuery(event.target.value);
+                setForm({ ...form, productID: "" });
+              }}
+              className={inputClass}
+              placeholder="상품명 검색"
+            />
+          </Field>
+          <Field label="광고 상품"><select value={form.productID} onChange={(event) => setForm({ ...form, productID: event.target.value })} className={inputClass}><option value="">{productsQuery.isFetching ? "상품 검색 중" : products.length ? "상품 선택" : "검색 결과 없음"}</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></Field>
           <Field label="광고 유형"><select value={form.campaignType} onChange={(event) => setForm({ ...form, campaignType: event.target.value as CampaignKind })} className={inputClass}><option value="SPONSORED_FEED">추천 피드 CPM</option><option value="SEARCH">검색 CPM</option><option value="CRM">CRM 알림 CPM</option><option value="GUARANTEED">메인 배너 일 임대</option></select></Field>
           <Field label="노출 구좌"><select value={form.placementKey} onChange={(event) => setForm({ ...form, placementKey: event.target.value })} className={inputClass}>{placementOptions(form.campaignType).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field>
           {form.campaignType === "GUARANTEED" ? null : <Field label="일예산 (원)"><input type="number" min="1" value={form.dailyBudgetWon} onChange={(event) => setForm({ ...form, dailyBudgetWon: event.target.value })} className={inputClass} /></Field>}
           <Field label="시작 일시"><input type="datetime-local" value={form.startsAt} onChange={(event) => setForm({ ...form, startsAt: event.target.value })} className={inputClass} /></Field>
           <Field label="종료 일시"><input type="datetime-local" value={form.endsAt} onChange={(event) => setForm({ ...form, endsAt: event.target.value })} className={inputClass} /></Field>
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-3"><Button disabled={create.isPending || !canCreateCampaign(form)} onClick={() => create.mutate()}>{create.isPending ? "생성 중" : "초안 만들기"}</Button><p className="text-xs font-bold text-muted">초안을 만든 후 검수 요청을 하면 운영자 승인 전까지 노출되지 않습니다.</p></div>
-      </ConsoleSection>
+        <p className="mt-4 text-xs font-bold text-muted">초안을 만든 후 검수 요청을 하면 운영자 승인 전까지 노출되지 않습니다.</p>
+      </ConsoleModal>
       <ConsoleSection className="mt-5" title="내 캠페인" description="일예산 소진, 검수, 일시중지는 서버 상태를 기준으로 반영됩니다.">
         <DataTable
           columns={["캠페인", "유형/구좌", "오늘 예산", "상태", "작업"]}
@@ -134,7 +163,7 @@ export function AdminAdvertisingPage() {
   }
 
   return (
-    <ConsoleLayout title="Admin" subtitle="광고 운영 콘솔" links={adminAdLinks}>
+    <ConsoleLayout title="Admin" subtitle="광고 운영 콘솔" links={adminLinks}>
       <ConsoleHeader title="광고 운영" description="지면 가격표를 관리하고 셀러 캠페인의 검수·집행 상태를 통제합니다." />
 		{createRate.isError || review.isError || adminTransition.isError ? <p className="mt-3 text-sm font-bold text-brand">{apiErrorMessage(createRate.error ?? review.error ?? adminTransition.error)}</p> : null}
       <ConsoleSection className="mt-5" title="지면 가격표 등록" description="CPM은 1,000회 노출당 원화, 일 임대는 하루 원화 기준으로 입력합니다.">
@@ -199,7 +228,7 @@ function campaignRow(campaign: AdCampaign, transition: { mutate: (input: { id: n
 }
 
 function AdsAccessRequired({ role }: { role: string }) {
-  return <ConsoleLayout title="Ads" subtitle="광고센터" links={role === "관리자" ? adminAdLinks : sellerAdLinks}><ConsoleSection><h2 className="text-xl font-black">{role} 권한이 필요합니다</h2><p className="mt-2 text-sm text-muted">광고 캠페인과 가격표는 권한이 확인된 계정에서만 관리할 수 있습니다.</p></ConsoleSection></ConsoleLayout>;
+  return <ConsoleLayout title="Ads" subtitle="광고센터" links={role === "관리자" ? adminLinks : sellerLinks}><ConsoleSection><h2 className="text-xl font-black">{role} 권한이 필요합니다</h2><p className="mt-2 text-sm text-muted">광고 캠페인과 가격표는 권한이 확인된 계정에서만 관리할 수 있습니다.</p></ConsoleSection></ConsoleLayout>;
 }
 
 function useAdSession() {
