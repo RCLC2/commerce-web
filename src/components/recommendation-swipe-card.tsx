@@ -22,26 +22,29 @@ export function RecommendationSwipeCard({
   onChoose: (choice: RecommendationChoice, inputMethod: RecommendationInputMethod) => void;
 }) {
   const startX = useRef<number | null>(null);
+  const offsetXRef = useRef(0);
   const [offsetX, setOffsetX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const price = item.product.discount_price > 0 ? item.product.discount_price : item.product.base_price;
   const likeOpacity = Math.min(1, Math.max(0, offsetX / swipeThreshold));
   const dislikeOpacity = Math.min(1, Math.max(0, -offsetX / swipeThreshold));
 
-  function completePointer(pointerID: number) {
-    const choice = swipeChoiceForDistance(offsetX);
+  function resetPointer(target: HTMLElement, pointerID: number) {
     startX.current = null;
+    offsetXRef.current = 0;
     setDragging(false);
-    if (choice) {
-      onChoose(choice, "SWIPE");
-    }
     setOffsetX(0);
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     try {
-      document.querySelector<HTMLElement>(`[data-onboarding-card="${item.product.id}"]`)?.releasePointerCapture(pointerID);
+      target.releasePointerCapture(pointerID);
     } catch {
       // Pointer capture may already be released by the browser.
     }
+  }
+
+  function completePointer(target: HTMLElement, pointerID: number) {
+    const choice = swipeChoiceForDistance(offsetXRef.current);
+    resetPointer(target, pointerID);
+    if (choice) onChoose(choice, "SWIPE");
   }
 
   return (
@@ -61,10 +64,12 @@ export function RecommendationSwipeCard({
       }}
       onPointerMove={(event) => {
         if (startX.current === null) return;
-        setOffsetX(Math.max(-160, Math.min(160, event.clientX - startX.current)));
+        const nextOffset = Math.max(-160, Math.min(160, event.clientX - startX.current));
+        offsetXRef.current = nextOffset;
+        setOffsetX(nextOffset);
       }}
-      onPointerUp={(event) => completePointer(event.pointerId)}
-      onPointerCancel={(event) => completePointer(event.pointerId)}
+      onPointerUp={(event) => completePointer(event.currentTarget, event.pointerId)}
+      onPointerCancel={(event) => resetPointer(event.currentTarget, event.pointerId)}
       onKeyDown={(event) => {
         if (event.key === "ArrowLeft") {
           event.preventDefault();
