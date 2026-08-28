@@ -1,121 +1,142 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { Camera, ExternalLink, Hash } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowDown, ArrowUp, Flame, Minus, Search } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { ApiHttpError, apiErrorMessage } from "@/lib/api-client";
-import type { InstagramTrendItem } from "@/lib/types";
-import { SafeImage } from "@/components/safe-image";
+import { apiErrorMessage } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
+import { cn } from "@/lib/utils";
 
-const HASHTAG = "COMMERCE";
-const PAGE_SIZE = 12;
+type Audience = "women" | "men";
+type TrendDirection = "UP" | "DOWN" | "SAME";
+
+const audienceTabs: Array<{ id: Audience; label: string }> = [
+  { id: "women", label: "여성" },
+  { id: "men", label: "남성" },
+];
 
 export default function Snapshot() {
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ["instagram-trends", HASHTAG],
-    initialPageParam: "",
-    queryFn: ({ pageParam }) => api.listTrendPosts({ hashtag: HASHTAG, limit: PAGE_SIZE, after: pageParam || undefined }),
-    getNextPageParam: (lastPage) => (lastPage.paging.has_next ? lastPage.paging.next_cursor ?? "" : undefined),
-    retry: (failureCount, queryError) =>
-      !(queryError instanceof ApiHttpError && queryError.status === 404)
-      && failureCount < 1,
+  const [audience, setAudience] = useState<Audience>("women");
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
+    queryKey: queryKeys.trendingSearches(audience),
+    queryFn: () => api.trendingSearches(audience),
   });
-  const items = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data]);
-  const isInitialQueryError = Boolean(error) && data === undefined;
-  const isDataUnavailable = isInitialQueryError
-    && error instanceof ApiHttpError
-    && error.status === 404;
-
-  useEffect(() => {
-    const node = sentinelRef.current;
-    if (!node || !hasNextPage) return;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
-        fetchNextPage();
-      }
-    }, { rootMargin: "500px 0px" });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-24 pt-8">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+    <main className="mx-auto min-h-[70vh] max-w-4xl px-4 pb-28 pt-8">
+      <header className="flex flex-col gap-5 border-b border-line pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-black">트렌드관</h1>
-          <p className="mt-1 text-sm text-muted">인스타그램에서 #{HASHTAG} 해시태그가 달린 피드와 스토리를 모아 보여드립니다.</p>
-        </div>
-        <div className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-black text-foreground md:self-start">
-          <Hash size={16} />
-          {HASHTAG}
-        </div>
-      </div>
-
-      {isInitialQueryError ? (
-        <div
-          className="mt-6 rounded-md border border-line bg-white p-4 text-sm"
-          role="status"
-        >
-          <p className="font-bold text-brand">
-            {isDataUnavailable
-              ? "현재 트렌드 데이터를 불러올 수 없습니다."
-              : apiErrorMessage(error)}
+          <div className="flex items-center gap-2">
+            <span className="grid h-10 w-10 place-items-center rounded-full bg-orange-50 text-orange-500">
+              <Flame size={21} aria-hidden="true" />
+            </span>
+            <h1 className="text-2xl font-black">트렌드관</h1>
+          </div>
+          <p className="mt-3 text-sm leading-6 text-muted">
+            지금 가장 많이 찾는 스타일 키워드를 순위와 움직임으로 확인해 보세요.
           </p>
-          {isDataUnavailable ? (
-            <p className="mt-1 text-muted">
-              데이터 제공이 시작되면 이 화면에 콘텐츠가 표시됩니다.
-            </p>
-          ) : null}
         </div>
-      ) : null}
-      {error && !isInitialQueryError ? (
-        <p className="mt-4 text-center text-sm font-bold text-brand" role="status">
-          다음 트렌드 콘텐츠를 불러오지 못했습니다.
-        </p>
-      ) : null}
-      {isLoading ? <p className="mt-6 text-sm text-muted">인스타그램 트렌드를 불러오는 중입니다.</p> : null}
-      {!isLoading && !error && !items.length ? <div className="mt-6 rounded-md border border-line bg-white p-8 text-center text-sm font-bold text-muted">아직 노출할 인스타그램 콘텐츠가 없습니다.</div> : null}
 
-      <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {items.map((item) => <TrendCard key={item.id} item={item} />)}
+        <div className="inline-flex w-fit rounded-full bg-zinc-100 p-1" role="tablist" aria-label="트렌드 대상">
+          {audienceTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={audience === tab.id}
+              onClick={() => setAudience(tab.id)}
+              className={cn(
+                "rounded-full px-5 py-2 text-sm font-black transition",
+                audience === tab.id ? "bg-white text-foreground shadow-sm" : "text-muted hover:text-foreground",
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      <section className="mt-6" aria-label={`${audience === "women" ? "여성" : "남성"} 인기 검색어`}>
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-brand">Realtime ranking</p>
+            <h2 className="mt-1 text-lg font-black">실시간 인기 검색어</h2>
+          </div>
+          {isFetching && !isLoading ? <span className="text-xs font-bold text-muted">업데이트 중</span> : null}
+        </div>
+
+        {isLoading ? (
+          <div className="grid gap-2 sm:grid-cols-2" aria-label="트렌드 불러오는 중">
+            {Array.from({ length: 10 }, (_, index) => (
+              <div key={index} className="h-[74px] animate-pulse rounded-xl bg-zinc-100" />
+            ))}
+          </div>
+        ) : null}
+
+        {error ? (
+          <div className="rounded-xl border border-line bg-white p-8 text-center" role="status">
+            <p className="font-black text-brand">트렌드를 불러오지 못했습니다.</p>
+            <p className="mt-2 text-sm text-muted">{apiErrorMessage(error)}</p>
+            <Button className="mt-5" variant="secondary" onClick={() => refetch()}>
+              다시 불러오기
+            </Button>
+          </div>
+        ) : null}
+
+        {!isLoading && !error && data?.items.length === 0 ? (
+          <div className="rounded-xl border border-line bg-white p-8 text-center text-sm font-bold text-muted">
+            아직 집계된 검색어가 없습니다.
+          </div>
+        ) : null}
+
+        {!isLoading && !error && data?.items.length ? (
+          <ol className="grid gap-2 sm:grid-cols-2">
+            {data.items.map((item) => (
+              <li key={item.keyword}>
+                <Link
+                  href={`/search?q=${encodeURIComponent(item.keyword)}&audience=${audience}`}
+                  className="group grid min-h-[74px] grid-cols-[2rem_1fr_auto_auto] items-center gap-3 rounded-xl border border-line bg-white px-4 transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md"
+                >
+                  <span className={cn("text-lg font-black", item.rank <= 3 ? "text-brand" : "text-foreground")}>
+                    {String(item.rank).padStart(2, "0")}
+                  </span>
+                  <span className="min-w-0 truncate font-black">{item.keyword}</span>
+                  <TrendIcon direction={item.trend} />
+                  <Search size={16} className="text-zinc-300 transition group-hover:text-brand" aria-hidden="true" />
+                </Link>
+              </li>
+            ))}
+          </ol>
+        ) : null}
       </section>
-      <div ref={sentinelRef} className="h-12" />
-      {isFetchingNextPage ? <p className="text-center text-sm font-bold text-muted">다음 트렌드를 불러오는 중입니다.</p> : null}
     </main>
   );
 }
 
-function TrendCard({ item }: { item: InstagramTrendItem }) {
-  const tags = item.tags ?? [];
-
+function TrendIcon({ direction }: { direction: TrendDirection }) {
+  if (direction === "UP") {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-xs font-black text-red-500" aria-label="순위 상승">
+        <ArrowUp size={14} aria-hidden="true" />
+        UP
+      </span>
+    );
+  }
+  if (direction === "DOWN") {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-xs font-black text-blue-500" aria-label="순위 하락">
+        <ArrowDown size={14} aria-hidden="true" />
+        DOWN
+      </span>
+    );
+  }
   return (
-    <article className="overflow-hidden rounded-md border border-line bg-white">
-      <Link href={item.sns_url} target="_blank" className="group block">
-        <div className="relative aspect-[4/5] bg-zinc-100">
-          <SafeImage src={item.media_url} alt={item.caption ?? "instagram trend"} fill sizes="(max-width: 768px) 50vw, 33vw" className="object-cover transition duration-300 group-hover:scale-[1.03]" />
-          <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/60 px-3 py-1 text-xs font-black text-white">
-            <Camera size={14} />
-            {item.content_type}
-          </div>
-        </div>
-      </Link>
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold text-muted">@{item.username || "instagram"}</p>
-            <h2 className="mt-1 line-clamp-2 min-h-10 font-black leading-5">{item.caption || "Instagram trend post"}</h2>
-          </div>
-          <span className="inline-flex shrink-0 rounded-md bg-zinc-100 px-2 py-1 text-xs font-black text-zinc-700">{item.platform}</span>
-        </div>
-        {tags.length ? <div className="mt-3 flex flex-wrap gap-1">{tags.slice(0, 4).map((tag) => <span key={tag} className="rounded-sm bg-zinc-100 px-2 py-1 text-xs font-bold text-zinc-600">#{tag}</span>)}</div> : null}
-        <Link href={item.sns_url} target="_blank" className="mt-4 inline-flex items-center gap-1 text-sm font-black text-brand">
-          인스타그램에서 보기
-          <ExternalLink size={14} />
-        </Link>
-      </div>
-    </article>
+    <span className="inline-flex items-center gap-0.5 text-xs font-black text-muted" aria-label="순위 유지">
+      <Minus size={14} aria-hidden="true" />
+      SAME
+    </span>
   );
 }

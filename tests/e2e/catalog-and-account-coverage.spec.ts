@@ -76,7 +76,9 @@ test.describe("remaining public catalog routes against backend origin/main", () 
     const categoriesResponse = page.waitForResponse((response) =>
       response.url().includes("/api/v1/category-information"));
     await page.goto("/categories");
-    expect((await categoriesResponse).ok()).toBeTruthy();
+    const initialCategoriesResponse = await categoriesResponse;
+    expect(initialCategoriesResponse.ok()).toBeTruthy();
+    expect(new URL(initialCategoriesResponse.url()).searchParams.has("category")).toBeFalsy();
 
     await expect(page.getByRole("heading", { name: "카테고리관", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "상의", exact: true }).first().click();
@@ -150,31 +152,25 @@ test.describe("remaining public catalog routes against backend origin/main", () 
     await expect(page.locator('a[href^="/products/"]').first()).toBeVisible();
   });
 
-  test("snapshot keeps its UI while origin/main cannot provide trend data", async ({ page }) => {
-    let trendsRequestCount = 0;
+  test("snapshot uses supported search trends without requesting removed social posts", async ({ page }) => {
+    let removedTrendPostsRequestCount = 0;
     page.on("request", (request) => {
       if (request.url().includes("/api/v1/trends/posts")) {
-        trendsRequestCount += 1;
+        removedTrendPostsRequestCount += 1;
       }
     });
     const trendsResponse = page.waitForResponse((response) =>
-      response.url().includes("/api/v1/trends/posts"));
+      response.url().includes("/api/v1/search/trending?segment=women"));
     await page.goto("/snapshot");
     const response = await trendsResponse;
-    expect(response.status()).toBe(404);
+    expect(response.ok(), `search trends: ${response.status()}`).toBeTruthy();
 
     await expect(page.getByRole("heading", { name: "트렌드관", exact: true })).toBeVisible();
-    await expect(page.getByRole("status")).toContainText("현재 트렌드 데이터를 불러올 수 없습니다.");
-    await expect(page.getByText(
-      "데이터 제공이 시작되면 이 화면에 콘텐츠가 표시됩니다.",
-      { exact: true },
+    await expect(page.getByRole("heading", { name: "실시간 인기 검색어", exact: true })).toBeVisible();
+    await expect(page.locator('a[href^="/search?q="]').first().or(
+      page.getByText("아직 집계된 검색어가 없습니다.", { exact: true }),
     )).toBeVisible();
-    await expect(page.getByText("404 page not found", { exact: true })).toHaveCount(0);
-    await expect(page.getByText(
-      "아직 노출할 인스타그램 콘텐츠가 없습니다.",
-      { exact: true },
-    )).toHaveCount(0);
-    expect(trendsRequestCount).toBe(1);
+    expect(removedTrendPostsRequestCount).toBe(0);
   });
 });
 
