@@ -35,7 +35,7 @@
 ### 가입 직후
 
 1. 고객이 회원가입 양식을 제출한다.
-2. 서버가 회원과 `NOT_STARTED` 온보딩 세션을 생성하고 액세스 토큰을 함께 반환한다.
+2. 서버가 기능 노출 대상으로 선정된 회원에게 `NOT_STARTED` 온보딩 세션을 생성하고 액세스 토큰을 함께 반환한다.
 3. 프론트엔드는 기존 인증 토큰 저장소에 토큰을 저장한다.
 4. 프론트엔드는 `/onboarding/preferences`로 이동한다.
 5. 페이지는 세션에 고정된 상품 10개와 기존 응답을 조회한다.
@@ -43,6 +43,8 @@
 7. 10개가 모두 평가되면 완료 요청을 보내고 홈으로 이동한다.
 
 가입 자체는 온보딩 세션 생성 실패 때문에 롤백하지 않는다. 세션을 만들 수 없으면 회원가입 응답의 온보딩 상태를 `UNAVAILABLE`로 반환하고 홈으로 이동시킨다. 서버는 오류를 기록하고 사용자는 인기 상품 추천을 받는다.
+
+기능 플래그가 꺼져 있거나 rollout 대상이 아닌 신규 회원은 `NOT_ELIGIBLE`이며 토큰 확장 필드를 받지 않는다. 이 회원은 기존과 같이 가입 후 로그인 화면으로 이동한다. 따라서 단계적 출시가 비대상 회원의 인증 흐름을 바꾸지 않는다.
 
 ### 중단과 재개
 
@@ -156,8 +158,8 @@ NOT_STARTED ──첫 후보 조회──> IN_PROGRESS ──모두 응답──
 {
   "id": 123,
   "email": "user@example.com",
-  "type": "CUSTOMER",
-  "role": "CUSTOMER",
+  "type": "MEMBER",
+  "role": "MEMBER",
   "status": "ACTIVE",
   "accessToken": "...",
   "tokenType": "Bearer",
@@ -167,6 +169,8 @@ NOT_STARTED ──첫 후보 조회──> IN_PROGRESS ──모두 응답──
 ```
 
 기존 `id`, `email`, `type`, `role`, `status` 필드를 유지하면서 로그인 응답과 동일한 토큰 필드를 추가한다. 신규 프론트엔드는 확장 스키마를 사용하고, 알 수 없는 필드를 무시하는 기존 클라이언트는 계속 동작한다.
+
+위 예시는 rollout 대상의 성공 응답이다. `NOT_ELIGIBLE` 응답은 기존 회원 필드와 `recommendationOnboardingStatus`만 반환하며 토큰 필드는 생략한다. rollout 대상으로 선정됐지만 세션 생성이 실패한 `UNAVAILABLE` 응답은 사용자가 로그인 화면에 갇히지 않도록 토큰 필드를 반환하고 홈 fallback을 허용한다.
 
 ### 세션 조회 또는 시작
 
@@ -249,6 +253,20 @@ NOT_STARTED ──첫 후보 조회──> IN_PROGRESS ──모두 응답──
 `POST /api/v1/me/recommendation-onboarding/restart`
 
 종료된 최신 세션이 있을 때만 generation을 증가시킨 `NOT_STARTED` 세션을 만든다. 이미 활성 세션이 있으면 그 세션을 반환한다.
+
+### best-effort 화면 이벤트
+
+`POST /api/v1/me/recommendation-onboarding/events`
+
+```json
+{
+  "event": "recommendation_onboarding_product_impression",
+  "product_id": 51,
+  "position": 3
+}
+```
+
+서버의 상태 변경 API에서 알 수 없는 `viewed`, `product_impression`, `resumed`, `save_failed` 화면 이벤트만 받는다. 이벤트 이름은 allow-list로 제한하고 product가 현재 세션 item인지 검증한다. 저장 실패가 사용자 흐름을 막지 않도록 클라이언트는 이 API를 best-effort로 호출하며 실패를 재전파하지 않는다. rated, undo, skipped, completed는 해당 상태 변경 API가 서버에서 직접 기록한다.
 
 ## 데이터 모델
 
@@ -387,6 +405,7 @@ effective_weight = base_weight × age_decay × behavior_decay
 - 모든 `/me/recommendation-onboarding` API는 인증 미들웨어 뒤에 둔다.
 - member ID는 토큰 컨텍스트에서만 가져오며 요청 body나 path로 받지 않는다.
 - 응답 상품이 현재 활성 세션에 속하는지 검증한다.
+- best-effort 화면 이벤트 이름과 product·position의 현재 세션 소속을 검증한다.
 - choice, input method, 상태 전이는 allow-list로 검증한다.
 - 종료 및 restart는 행 잠금 또는 동등한 낙관적 동시성 제어로 중복 활성 세션을 방지한다.
 - 회원가입 요청의 기존 크기 제한과 role/status 필드 거부 규칙을 유지한다.
