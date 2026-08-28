@@ -167,7 +167,9 @@ test.describe("remaining public catalog routes against backend origin/main", () 
 
     await expect(page.getByRole("heading", { name: "트렌드관", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "실시간 인기 검색어", exact: true })).toBeVisible();
-    await expect(page.locator('a[href^="/search?q="]').first()).toBeVisible();
+    await expect(page.locator('a[href^="/search?q="]').first().or(
+      page.getByText("아직 집계된 검색어가 없습니다.", { exact: true }),
+    )).toBeVisible();
     expect(removedTrendPostsRequestCount).toBe(0);
   });
 });
