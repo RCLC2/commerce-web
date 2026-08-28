@@ -93,10 +93,24 @@ export type PLPMarketSummary = {
   profile_image_url?: string;
 };
 
+export type ProductBadgeTone = "shipping" | "delivery" | "exclusive" | "new" | "default";
+
+export type ApiErrorDetail = {
+  code: string;
+  message: string;
+  request_id: string;
+  details?: Record<string, unknown>;
+};
+
+export type ApiErrorEnvelope = {
+  success: false;
+  error: ApiErrorDetail;
+};
+
 export type PLPTagChip = {
   code: string;
   label: string;
-  tone: "shipping" | "delivery" | "exclusive" | "new" | "default" | string;
+  tone: ProductBadgeTone;
 };
 
 export type ProductCouponOffer = {

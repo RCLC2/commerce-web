@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getApiBaseUrl } from "./api-base-url";
+import { logClientApiError } from "./client-error-logger";
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -7,7 +8,7 @@ export type RequestOptions = RequestInit & {
   token?: string | null;
 };
 
-export type ApiErrorKind = "http" | "parse" | "contract" | "application";
+export type ApiErrorKind = "network" | "http" | "parse" | "contract" | "application";
 
 export class ApiError extends Error {
   constructor(
@@ -15,6 +16,8 @@ export class ApiError extends Error {
     readonly kind: ApiErrorKind,
     readonly status?: number,
     readonly details?: unknown,
+    readonly code = "UNKNOWN_ERROR",
+    readonly requestID?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -22,22 +25,28 @@ export class ApiError extends Error {
 }
 
 export class ApiHttpError extends ApiError {
-  constructor(message: string, status: number, details?: unknown) {
-    super(message, "http", status, details);
+  constructor(message: string, status: number, details?: unknown, code?: string, requestID?: string) {
+    super(message, "http", status, details, code ?? "HTTP_REQUEST_FAILED", requestID);
     this.name = "ApiHttpError";
   }
 }
 
 export class ApiParseError extends ApiError {
   constructor(message: string, details?: unknown) {
-    super(message, "parse", undefined, details);
+    super(message, "parse", undefined, details, "API_RESPONSE_PARSE_FAILED");
     this.name = "ApiParseError";
   }
 }
 
 export class ApiContractError extends ApiError {
-  constructor(readonly endpoint: string, details?: unknown) {
-    super(`서버 응답 계약이 올바르지 않습니다: ${endpoint}`, "contract", undefined, details);
+  constructor(readonly endpoint: string, readonly issues: z.ZodIssue[]) {
+    super(
+      `서버 응답 계약이 올바르지 않습니다: ${endpoint}`,
+      "contract",
+      undefined,
+      undefined,
+      "API_RESPONSE_CONTRACT_INVALID",
+    );
     this.name = "ApiContractError";
   }
 }
@@ -46,6 +55,16 @@ const envelopeSchema = z.strictObject({
   success: z.boolean(),
   data: z.unknown().optional(),
   error: z.unknown().optional(),
+});
+
+const commonErrorEnvelopeSchema = z.object({
+  success: z.literal(false),
+  error: z.object({
+    code: z.string().min(1),
+    message: z.string().min(1),
+    request_id: z.string().min(1),
+    details: z.record(z.string(), z.unknown()).optional(),
+  }),
 });
 
 export async function request(path: string, options: RequestOptions = {}): Promise<unknown> {
@@ -58,12 +77,31 @@ export async function request(path: string, options: RequestOptions = {}): Promi
     headers.set("Authorization", `Bearer ${options.token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch {
+    const error = new ApiError(
+      "서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.",
+      "network",
+      undefined,
+      undefined,
+      "API_NETWORK_ERROR",
+    );
+    logClientApiError(path, error);
+    throw error;
+  }
   const text = await response.text();
-  const payload = parseResponseText(text, response);
+  let payload: unknown;
+  try {
+    payload = parseResponseText(text, response);
+  } catch (error) {
+    logClientApiError(path, error as ApiParseError);
+    throw error;
+  }
 
   if (!response.ok) {
     if (response.status === 401 && options.token && typeof window !== "undefined") {
@@ -73,16 +111,20 @@ export async function request(path: string, options: RequestOptions = {}): Promi
       window.localStorage.removeItem("commerce.sellerContext");
       window.dispatchEvent(new CustomEvent("commerce:unauthorized"));
     }
-    throw new ApiHttpError(errorMessage(payload, text, response.status), response.status, payload);
+    const error = httpError(payload, text, response.status);
+    logClientApiError(path, error);
+    throw error;
   }
 
-  return unwrapKnownEnvelope(payload, response.status);
+  return unwrapKnownEnvelope(payload, response.status, path);
 }
 
 export function parseContract<T>(schema: z.ZodType<T>, payload: unknown, endpoint: string): T {
   const result = schema.safeParse(payload);
   if (!result.success) {
-    throw new ApiContractError(endpoint, result.error.flatten());
+    const error = new ApiContractError(endpoint, result.error.issues);
+    logClientApiError(endpoint, error);
+    throw error;
   }
   return result.data;
 }
@@ -109,7 +151,9 @@ export function parseVoid(payload: unknown, endpoint: string): void {
     error: z.unknown().optional(),
   }).safeParse(payload);
   if (!result.success) {
-    throw new ApiContractError(endpoint, result.error.flatten());
+    const error = new ApiContractError(endpoint, result.error.issues);
+    logClientApiError(endpoint, error);
+    throw error;
   }
 
   const failedStatus = result.data.status?.toUpperCase();
@@ -119,7 +163,9 @@ export function parseVoid(payload: unknown, endpoint: string): void {
     || failedStatus === "FAILURE"
     || failedStatus === "ERROR"
   ) {
-    throw new ApiError(errorMessage(payload, "", 200), "application", 200, payload);
+    const error = new ApiError(errorMessage(payload, "", 200), "application", 200, payload, "APPLICATION_ERROR");
+    logClientApiError(endpoint, error);
+    throw error;
   }
 }
 
@@ -138,7 +184,7 @@ function parseResponseText(text: string, response: Response): unknown {
   }
 }
 
-function unwrapKnownEnvelope(payload: unknown, status: number): unknown {
+function unwrapKnownEnvelope(payload: unknown, status: number, endpoint: string): unknown {
   if (
     !payload
     || typeof payload !== "object"
@@ -156,7 +202,31 @@ function unwrapKnownEnvelope(payload: unknown, status: number): unknown {
   if (envelope.data.success) {
     return envelope.data.data;
   }
-  throw new ApiError(errorMessage(envelope.data.error, "", status), "application", status, envelope.data.error);
+  const commonError = commonErrorEnvelopeSchema.safeParse(payload);
+  if (commonError.success) {
+    const error = new ApiError(
+      commonError.data.error.message,
+      "application",
+      status,
+      commonError.data.error.details,
+      commonError.data.error.code,
+      commonError.data.error.request_id,
+    );
+    logClientApiError(endpoint, error);
+    throw error;
+  }
+  const error = new ApiError(errorMessage(envelope.data.error, "", status), "application", status, envelope.data.error, "APPLICATION_ERROR");
+  logClientApiError(endpoint, error);
+  throw error;
+}
+
+function httpError(payload: unknown, fallback: string, status: number): ApiHttpError {
+  const commonError = commonErrorEnvelopeSchema.safeParse(payload);
+  if (commonError.success) {
+    const error = commonError.data.error;
+    return new ApiHttpError(error.message, status, error.details, error.code, error.request_id);
+  }
+  return new ApiHttpError(errorMessage(payload, fallback, status), status, payload);
 }
 
 function errorMessage(payload: unknown, fallback: string, status: number): string {
@@ -185,4 +255,8 @@ export function apiErrorMessage(error: unknown): string {
     return error.message;
   }
   return error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
+}
+
+export function shouldRetryApiError(failureCount: number, error: unknown): boolean {
+  return !(error instanceof ApiContractError) && failureCount < 1;
 }

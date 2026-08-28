@@ -18,6 +18,7 @@ import { useSessionStore } from "@/lib/session-store";
 import { formatFollowerCount } from "@/lib/utils";
 import { EventBenefitTicket } from "./event-benefit-ticket";
 import { ProductCard } from "./product-card";
+import { ApiErrorState } from "./api-error-state";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
@@ -137,7 +138,7 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
   });
 
   if (eventQuery.isError) {
-    return <main className="mx-auto max-w-6xl px-4 py-8 text-sm"><p className="font-bold text-brand">{apiErrorMessage(eventQuery.error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void eventQuery.refetch()}>다시 시도</Button></main>;
+    return <main className="mx-auto max-w-6xl px-4 py-8 text-sm"><ApiErrorState error={eventQuery.error} onRetry={() => void eventQuery.refetch()} /></main>;
   }
   if (eventQuery.isLoading || !event) {
     return <main className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted">이벤트를 불러오는 중입니다.</main>;
@@ -219,7 +220,7 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
             </div>
           </div>
 
-          {productsQuery.isError ? <div className="rounded-md border border-brand/30 bg-red-50 p-4 text-sm"><p className="font-bold text-brand">{apiErrorMessage(productsQuery.error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void productsQuery.refetch()}>이벤트 상품 다시 시도</Button></div> : productsQuery.isLoading ? <ProductSkeleton /> : products.length === 0 ? (
+          {productsQuery.isError ? <ApiErrorState error={productsQuery.error} onRetry={() => void productsQuery.refetch()} retryLabel="이벤트 상품 다시 시도" /> : productsQuery.isLoading ? <ProductSkeleton /> : products.length === 0 ? (
             <p className="rounded-md border border-line bg-white p-8 text-center text-sm text-muted">표시할 이벤트 상품이 없습니다.</p>
           ) : event.product_display.mode === "MARKET_CAROUSELS" ? (
             <MarketCarousels products={products} />
