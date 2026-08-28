@@ -6,6 +6,7 @@ type SessionState = {
   accessToken: string | null;
   memberID: number | null;
   role: string | null;
+  hydrated: boolean;
   sellerContext: { marketID: number; marketName: string; token: string; expiresAt?: string } | null;
   hydrate: () => void;
   setSession: (session: { accessToken: string; memberID: number; role: string }) => void;
@@ -18,6 +19,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   accessToken: null,
   memberID: null,
   role: null,
+  hydrated: false,
   sellerContext: null,
   hydrate: () => {
     if (typeof window === "undefined") {
@@ -27,6 +29,7 @@ export const useSessionStore = create<SessionState>((set) => ({
       accessToken: window.localStorage.getItem("commerce.accessToken"),
       memberID: Number(window.localStorage.getItem("commerce.memberID")) || null,
       role: window.localStorage.getItem("commerce.role"),
+      hydrated: true,
       sellerContext: parseSellerContext(window.localStorage.getItem("commerce.sellerContext")),
     });
   },
@@ -34,7 +37,7 @@ export const useSessionStore = create<SessionState>((set) => ({
     window.localStorage.setItem("commerce.accessToken", accessToken);
     window.localStorage.setItem("commerce.memberID", String(memberID));
     window.localStorage.setItem("commerce.role", role);
-    set({ accessToken, memberID, role });
+    set({ accessToken, memberID, role, hydrated: true });
   },
   setSellerContext: (context) => {
     window.localStorage.setItem("commerce.sellerContext", JSON.stringify(context));

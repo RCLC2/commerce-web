@@ -49,6 +49,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isActive = (href: string) => (href === "/" ? pathname === href : pathname.startsWith(href));
   const showSuggestions = searchFocused && suggestions.length > 0;
   const searchPage = pathname.startsWith("/search");
+  const onboardingPage = pathname.startsWith("/onboarding/");
   const rootCategories = categories.filter((category) => !category.parent_id && category.level === 1);
 
   useEffect(() => {
@@ -75,6 +76,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const query = search.trim();
     router.push(query ? `/search?q=${encodeURIComponent(query)}` : "/search");
     setSearchFocused(false);
+  }
+
+  if (onboardingPage) {
+    return <div className="min-h-screen bg-background">{children}</div>;
   }
 
   return (

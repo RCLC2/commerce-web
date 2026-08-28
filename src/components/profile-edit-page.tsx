@@ -1,8 +1,9 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
@@ -13,10 +14,17 @@ import { Button } from "./ui/button";
 type ProfileForm = { notification_type: string; marketing_consent: boolean; nighttime_consent: boolean; height: number; weight: number };
 
 export function ProfileEditPage() {
+  const router = useRouter();
   const token = useSessionStore((state) => state.accessToken) ?? "";
   const memberID = useSessionStore((state) => state.memberID);
   const queryClient = useQueryClient();
   const profile = useQuery({ queryKey: queryKeys.me(memberID), queryFn: () => api.me(token), enabled: Boolean(token) });
+  const onboardingPreference = useQuery({
+    queryKey: queryKeys.recommendationOnboarding(memberID),
+    queryFn: () => api.getRecommendationOnboarding(token),
+    enabled: Boolean(token),
+    retry: false,
+  });
   const [edited, setEdited] = useState<{ memberID: number | null; values: ProfileForm } | null>(null);
   const editedValues = edited?.memberID === memberID ? edited.values : null;
   const values: ProfileForm | null = editedValues ?? (profile.data ? {
@@ -39,6 +47,10 @@ export function ProfileEditPage() {
       queryClient.setQueryData(queryKeys.me(memberID), data);
       setEdited(null);
     },
+  });
+  const restartOnboarding = useMutation({
+    mutationFn: () => api.restartRecommendationOnboarding(token),
+    onSuccess: () => router.push("/onboarding/preferences"),
   });
 
   if (!token) return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-black">로그인이 필요합니다</h1><Link href="/login"><Button className="mt-5">로그인하기</Button></Link></main>;
@@ -67,6 +79,19 @@ export function ProfileEditPage() {
         {save.isSuccess ? <p className="text-sm font-bold text-emerald-700">저장했습니다.</p> : null}
         <Button type="submit" disabled={save.isPending}>{save.isPending ? "저장 중" : "변경사항 저장"}</Button>
       </form>
+      {onboardingPreference.data && onboardingPreference.data.status !== "NOT_ELIGIBLE" ? <section className="mt-5 rounded-2xl border border-line bg-white p-5">
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand"><Sparkles size={19} /></span>
+          <div>
+            <h2 className="font-black">상품 취향 다시 고르기</h2>
+            <p className="mt-1 text-sm leading-6 text-muted">10개 상품을 다시 보고 추천 취향을 새로 설정합니다.</p>
+          </div>
+        </div>
+        {restartOnboarding.error ? <p className="mt-3 text-sm font-bold text-brand">{apiErrorMessage(restartOnboarding.error)}</p> : null}
+        <Button className="mt-4" variant="secondary" onClick={() => restartOnboarding.mutate()} disabled={restartOnboarding.isPending}>
+          다시 선택하기
+        </Button>
+      </section> : null}
     </main>
   );
 }
