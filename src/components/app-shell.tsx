@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Flame, Grid2X2, Heart, Home, Menu, Search, ShieldCheck, ShoppingBag, Star, Store, User, X } from "lucide-react";
+import { Flame, Grid2X2, Heart, Home, Menu, Search, ShieldCheck, Shirt, ShoppingBag, Star, Store, User, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -14,8 +14,10 @@ import { Button } from "./ui/button";
 const nav = [
   { href: "/categories", label: "카테고리", icon: Grid2X2 },
   { href: "/snapshot", label: "트렌드관", icon: Flame },
+  { href: "/today-outfit", label: "오늘의 코디", icon: Shirt },
   { href: "/", label: "홈", icon: Home, primary: true },
   { href: "/likes", label: "좋아요", icon: Heart },
+  { href: "/cart", label: "장바구니", icon: ShoppingBag },
   { href: "/mypage", label: "마이페이지", icon: User },
 ];
 
@@ -200,7 +202,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
       {children}
-      <footer className="border-t border-line bg-white pb-20 md:pb-0">
+      <footer className="border-t border-line bg-white pb-20">
         <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 text-sm text-muted md:grid-cols-[1.2fr_1fr_1fr]">
           <div>
             <p className="text-lg font-black text-foreground">commerce</p>
@@ -230,8 +232,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
-      <nav className="fixed inset-x-0 bottom-0 z-50 isolate border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur md:hidden" aria-label="하단 주요 메뉴">
-        <div className="mx-auto grid h-16 max-w-6xl grid-cols-5 px-1" data-session-role={role ?? "guest"}>
+      <nav className="fixed inset-x-0 bottom-0 z-50 isolate border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur" aria-label="하단 주요 메뉴">
+        <div className="mx-auto grid h-16 max-w-6xl grid-cols-7 px-1" data-session-role={role ?? "guest"}>
           {nav.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
@@ -240,14 +242,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1 rounded-md text-xs font-bold text-muted transition hover:text-foreground",
-                  item.primary && "mx-auto -mt-4 h-16 w-16 rounded-full border border-line bg-white text-muted shadow-lg",
+                  "min-w-0 flex flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[9px] font-bold text-muted transition hover:text-foreground sm:text-xs",
+                  item.primary && "mx-auto -mt-4 h-14 w-14 rounded-full border border-line bg-white text-muted shadow-lg sm:h-16 sm:w-16",
                   active && !item.primary && "text-brand",
                   active && item.primary && "bg-brand text-white",
                 )}
               >
                 <Icon size={20} />
-                {item.label}
+                <span className="w-full truncate text-center">{item.label}</span>
               </Link>
             );
           })}

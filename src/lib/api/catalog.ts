@@ -8,7 +8,6 @@ import {
   eventSchema,
   homeCategoryChipSchema,
   homeSectionSchema,
-  instagramTrendPageSchema,
   marketSchema,
   plpInformationSchema,
   plpProductPageSchema,
@@ -70,17 +69,6 @@ export const catalogApi = {
   listEvents: () => requestParsed(z.array(eventSchema), "/api/v1/events"),
   listHomeSections: () => requestParsed(z.array(homeSectionSchema), "/api/v1/home/sections"),
   listHomeCategoryChips: () => requestParsed(z.array(homeCategoryChipSchema), "/api/v1/home/category-chips"),
-  listTrendPosts: (params?: { limit?: number; after?: string; hashtag?: string }) => {
-    const search = new URLSearchParams();
-    if (params?.limit) search.set("limit", String(params.limit));
-    if (params?.after) search.set("after", params.after);
-    if (params?.hashtag) search.set("hashtag", params.hashtag);
-    const query = search.toString();
-    return requestParsed(
-      instagramTrendPageSchema,
-      `/api/v1/trends/posts${query ? `?${query}` : ""}`,
-    );
-  },
   getEvent: (id: number) => requestParsed(eventSchema, `/api/v1/events/${id}`),
   listProducts: (params?: { categoryID?: number; marketID?: number; sort?: string; q?: string }) => {
     const search = new URLSearchParams();

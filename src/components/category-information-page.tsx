@@ -14,11 +14,11 @@ import { Button } from "./ui/button";
 const PAGE_SIZE = 8;
 
 export function CategoryInformationPage() {
-  const [selectedSlug, setSelectedSlug] = useState("outer");
+  const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const informationQuery = useQuery({
-    queryKey: ["category-information", selectedSlug, page, PAGE_SIZE],
-    queryFn: () => api.getCategoryInformation({ category: selectedSlug, page, pageSize: PAGE_SIZE }),
+    queryKey: ["category-information", selectedSlug ?? "server-default", page, PAGE_SIZE],
+    queryFn: () => api.getCategoryInformation({ category: selectedSlug ?? undefined, page, pageSize: PAGE_SIZE }),
     placeholderData: (previous) => previous,
   });
 
@@ -28,7 +28,7 @@ export function CategoryInformationPage() {
     [information?.categories],
   );
   const selected = information?.selected_category;
-  const selectedRoot = roots.find((category) => containsCategory(category, selected?.slug ?? selectedSlug)) ?? roots[0];
+  const selectedRoot = roots.find((category) => containsCategory(category, selected?.slug ?? selectedSlug ?? "")) ?? roots[0];
   const filters = selectedRoot ? [selectedRoot, ...flattenChildren(selectedRoot)] : [];
   const products = information?.products ?? [];
   const carousel = information?.realtime_popular_carousel;

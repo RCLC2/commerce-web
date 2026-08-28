@@ -186,27 +186,6 @@ export const homeCategoryChipSchema = z.object({
 });
 
 
-export const instagramTrendItemSchema = z.object({
-  id: z.string(),
-  platform: z.string(),
-  content_type: z.string(),
-  sns_url: z.string(),
-  media_url: z.string().optional(),
-  caption: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  username: z.string().optional(),
-  timestamp: dateStringSchema.optional(),
-});
-
-export const instagramTrendPageSchema = z.object({
-  hashtag: z.string(),
-  items: z.array(instagramTrendItemSchema),
-  paging: z.object({
-    next_cursor: z.string().optional(),
-    has_next: z.boolean(),
-  }),
-});
-
 export const reviewImageSchema = z.object({
   id: identifierSchema,
   media_asset_id: identifierSchema,
