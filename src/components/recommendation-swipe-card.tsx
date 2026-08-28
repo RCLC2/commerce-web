@@ -58,7 +58,9 @@ export function RecommendationSwipeCard({
         transition: dragging ? "none" : "transform 180ms ease",
       }}
       onPointerDown={(event) => {
+        if ((event.target as HTMLElement).closest("button")) return;
         startX.current = event.clientX;
+        offsetXRef.current = 0;
         setDragging(true);
         event.currentTarget.setPointerCapture(event.pointerId);
       }}
@@ -68,8 +70,12 @@ export function RecommendationSwipeCard({
         offsetXRef.current = nextOffset;
         setOffsetX(nextOffset);
       }}
-      onPointerUp={(event) => completePointer(event.currentTarget, event.pointerId)}
-      onPointerCancel={(event) => resetPointer(event.currentTarget, event.pointerId)}
+      onPointerUp={(event) => {
+        if (startX.current !== null) completePointer(event.currentTarget, event.pointerId);
+      }}
+      onPointerCancel={(event) => {
+        if (startX.current !== null) resetPointer(event.currentTarget, event.pointerId);
+      }}
       onKeyDown={(event) => {
         if (event.key === "ArrowLeft") {
           event.preventDefault();
