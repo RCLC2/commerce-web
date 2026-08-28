@@ -13,7 +13,7 @@ import { useSessionStore } from "@/lib/session-store";
 import { ApiErrorState } from "./api-error-state";
 import { ProductCard } from "./product-card";
 import { ProductCardPrice } from "./product-card-price";
-import { SponsoredProductSlot } from "./sponsored-product-slot";
+import { SponsoredPlacement } from "./advertising/sponsored-placement";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
@@ -163,10 +163,10 @@ export function HomePage() {
       </section>
 
       <section className="py-3" aria-label="메인 보장형 광고">
-        <SponsoredProductSlot placementKey="home.main_banner" className="border-2 shadow-sm" />
+        <SponsoredPlacement placementKey="home.main_banner" />
       </section>
 		<section className="py-2" aria-label="인앱 광고 알림">
-			<SponsoredProductSlot placementKey="crm.in_app_notification" impressionEventType="IN_APP_IMPRESSION" />
+			<SponsoredPlacement placementKey="crm.in_app_notification" />
 		</section>
       {homeSectionsQuery.isError ? <ApiErrorState className="my-7" error={homeSectionsQuery.error} onRetry={() => void homeSectionsQuery.refetch()} retryLabel="홈 구좌 다시 시도" /> : null}
       {homeSectionsQuery.isLoading ? <p className="py-7 text-sm text-muted">홈 상품 구좌를 불러오는 중입니다.</p> : null}
@@ -184,7 +184,7 @@ export function HomePage() {
         />
       ))}
       <section className="py-3" aria-label="스폰서드 상품">
-        <SponsoredProductSlot placementKey="home_feed.sponsored_card" />
+        <SponsoredPlacement placementKey="home_feed.sponsored_card" />
       </section>
 
       <section className="py-7">

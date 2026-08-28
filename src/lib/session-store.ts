@@ -3,6 +3,7 @@
 import { create } from "zustand";
 
 type SessionState = {
+  hasHydrated: boolean;
   accessToken: string | null;
   memberID: number | null;
   role: string | null;
@@ -15,6 +16,7 @@ type SessionState = {
 };
 
 export const useSessionStore = create<SessionState>((set) => ({
+  hasHydrated: false,
   accessToken: null,
   memberID: null,
   role: null,
@@ -24,6 +26,7 @@ export const useSessionStore = create<SessionState>((set) => ({
       return;
     }
     set({
+      hasHydrated: true,
       accessToken: window.localStorage.getItem("commerce.accessToken"),
       memberID: Number(window.localStorage.getItem("commerce.memberID")) || null,
       role: window.localStorage.getItem("commerce.role"),
@@ -34,7 +37,7 @@ export const useSessionStore = create<SessionState>((set) => ({
     window.localStorage.setItem("commerce.accessToken", accessToken);
     window.localStorage.setItem("commerce.memberID", String(memberID));
     window.localStorage.setItem("commerce.role", role);
-    set({ accessToken, memberID, role });
+    set({ hasHydrated: true, accessToken, memberID, role });
   },
   setSellerContext: (context) => {
     window.localStorage.setItem("commerce.sellerContext", JSON.stringify(context));

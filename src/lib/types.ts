@@ -210,25 +210,8 @@ export type PLPProductParams = {
   pageSize?: number;
 };
 
-export type PdpCardAd = {
-  campaign_id: number;
-  title: string;
-  image_url?: string;
-  link_url: string;
-  disclosure: "AD" | string;
-};
-
-export type SponsoredMarketShelf = {
-  campaign_id: number;
-  market: Pick<Market, "id" | "name" | "description" | "profile_image_url">;
-  products: Product[];
-  disclosure: "SPONSORED" | string;
-};
-
 export type PdpMerchandising = {
   also_viewed: Product[];
-  card_ad: PdpCardAd | null;
-  sponsored_market: SponsoredMarketShelf | null;
 };
 
 export type SearchSuggestion = {

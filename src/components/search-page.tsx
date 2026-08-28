@@ -13,7 +13,7 @@ import { formatFollowerCount } from "@/lib/utils";
 import { ProductCard } from "./product-card";
 import { ProductCardPrice } from "./product-card-price";
 import { ApiErrorState } from "./api-error-state";
-import { SponsoredProductSlot } from "./sponsored-product-slot";
+import { SponsoredPlacement } from "./advertising/sponsored-placement";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
@@ -148,7 +148,7 @@ function SearchExperience({
       ) : (
         <div className="mx-auto max-w-4xl">
           <section className="mb-5" aria-label="검색 스폰서드 상품">
-            <SponsoredProductSlot placementKey="search.sponsored_top" />
+            <SponsoredPlacement placementKey="search.sponsored_top" />
           </section>
           <ResultListHeader title="상품" total={results?.products.total ?? 0} />
           <div className="space-y-7">
