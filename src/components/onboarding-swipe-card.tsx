@@ -3,23 +3,23 @@
 import { Check, X } from "lucide-react";
 import Image from "next/image";
 import { useRef, useState } from "react";
-import type { RecommendationChoice, RecommendationInputMethod, RecommendationOnboardingItem } from "@/lib/api/recommendation-onboarding";
+import type { OnboardingChoice, OnboardingInputMethod, OnboardingItem } from "@/lib/api/onboarding";
 import { cn } from "@/lib/utils";
 
 const swipeThreshold = 88;
 
-export function swipeChoiceForDistance(distance: number, threshold = swipeThreshold): RecommendationChoice | null {
+export function swipeChoiceForDistance(distance: number, threshold = swipeThreshold): OnboardingChoice | null {
   if (distance >= threshold) return "LIKE";
   if (distance <= -threshold) return "DISLIKE";
   return null;
 }
 
-export function RecommendationSwipeCard({
+export function OnboardingSwipeCard({
   item,
   onChoose,
 }: {
-  item: RecommendationOnboardingItem;
-  onChoose: (choice: RecommendationChoice, inputMethod: RecommendationInputMethod) => void;
+  item: OnboardingItem;
+  onChoose: (choice: OnboardingChoice, inputMethod: OnboardingInputMethod) => void;
 }) {
   const startX = useRef<number | null>(null);
   const offsetXRef = useRef(0);

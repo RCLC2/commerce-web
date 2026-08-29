@@ -1,5 +1,5 @@
-import { RecommendationOnboardingPage } from "@/components/recommendation-onboarding-page";
+import { OnboardingPage } from "@/components/onboarding-page";
 
 export default function PreferencesOnboarding() {
-  return <RecommendationOnboardingPage />;
+  return <OnboardingPage />;
 }

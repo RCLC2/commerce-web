@@ -7,26 +7,26 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
-import type { RecommendationChoice, RecommendationInputMethod } from "@/lib/api/recommendation-onboarding";
+import type { OnboardingChoice, OnboardingInputMethod } from "@/lib/api/onboarding";
 import { queryKeys } from "@/lib/query-keys";
 import { SerialTaskQueue } from "@/lib/serial-task-queue";
 import { useSessionStore } from "@/lib/session-store";
 import { Button } from "./ui/button";
-import { RecommendationSwipeCard } from "./recommendation-swipe-card";
+import { OnboardingSwipeCard } from "./onboarding-swipe-card";
 
 type FailedResponse = {
   productID: number;
-  choice: RecommendationChoice;
-  inputMethod: RecommendationInputMethod;
+  choice: OnboardingChoice;
+  inputMethod: OnboardingInputMethod;
 };
 
-export function RecommendationOnboardingPage() {
+export function OnboardingPage() {
   const router = useRouter();
   const token = useSessionStore((state) => state.accessToken);
   const memberID = useSessionStore((state) => state.memberID);
   const hydrate = useSessionStore((state) => state.hydrate);
   const sessionReady = useSessionStore((state) => state.hydrated);
-  const [answers, setAnswers] = useState<Record<number, RecommendationChoice>>({});
+  const [answers, setAnswers] = useState<Record<number, OnboardingChoice>>({});
   const [history, setHistory] = useState<number[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -47,8 +47,8 @@ export function RecommendationOnboardingPage() {
   }, [router, sessionReady, token]);
 
   const onboarding = useQuery({
-    queryKey: queryKeys.recommendationOnboarding(memberID),
-    queryFn: () => api.getRecommendationOnboarding(token ?? ""),
+    queryKey: queryKeys.onboarding(memberID),
+    queryFn: () => api.getOnboarding(token ?? ""),
     enabled: sessionReady && Boolean(token),
     retry: 1,
   });
@@ -64,7 +64,7 @@ export function RecommendationOnboardingPage() {
     }
     if (!data.session_id || initializedSession.current === data.session_id) return;
     initializedSession.current = data.session_id;
-    const initialAnswers: Record<number, RecommendationChoice> = {};
+    const initialAnswers: Record<number, OnboardingChoice> = {};
     const initialHistory: number[] = [];
     data.items.forEach((item) => {
       if (item.choice) {
@@ -81,15 +81,15 @@ export function RecommendationOnboardingPage() {
   useEffect(() => {
     if (!token || !data?.session_id || viewedSession.current === data.session_id) return;
     viewedSession.current = data.session_id;
-    void api.recordRecommendationOnboardingEvent(token, { event: "recommendation_onboarding_viewed" }).catch(() => undefined);
+    void api.recordOnboardingEvent(token, { event: "onboarding_viewed" }).catch(() => undefined);
   }, [data?.session_id, token]);
 
   const currentItem = items[currentIndex];
 
   useEffect(() => {
     if (!token || !currentItem) return;
-    void api.recordRecommendationOnboardingEvent(token, {
-      event: "recommendation_onboarding_product_impression",
+    void api.recordOnboardingEvent(token, {
+      event: "onboarding_product_impression",
       product_id: currentItem.product.id,
       position: currentItem.position,
     }).catch(() => undefined);
@@ -107,7 +107,7 @@ export function RecommendationOnboardingPage() {
     updateFailures(nextFailures);
     void queue.current.enqueue(async () => {
       try {
-        await api.saveRecommendationOnboardingResponse(token, response.productID, response.choice, response.inputMethod);
+        await api.saveOnboardingResponse(token, response.productID, response.choice, response.inputMethod);
         const cleared = new Map(failedResponses.current);
         cleared.delete(response.productID);
         updateFailures(cleared);
@@ -116,8 +116,8 @@ export function RecommendationOnboardingPage() {
         failed.set(response.productID, response);
         updateFailures(failed);
         setSyncError(apiErrorMessage(error));
-        void api.recordRecommendationOnboardingEvent(token, {
-          event: "recommendation_onboarding_save_failed",
+        void api.recordOnboardingEvent(token, {
+          event: "onboarding_save_failed",
           product_id: response.productID,
           position: items.find((item) => item.product.id === response.productID)?.position,
         }).catch(() => undefined);
@@ -126,7 +126,7 @@ export function RecommendationOnboardingPage() {
     }).catch(() => undefined);
   }
 
-  function choose(choice: RecommendationChoice, inputMethod: RecommendationInputMethod) {
+  function choose(choice: OnboardingChoice, inputMethod: OnboardingInputMethod) {
     if (!currentItem) return;
     const productID = currentItem.product.id;
     setAnswers((previous) => ({ ...previous, [productID]: choice }));
@@ -156,7 +156,7 @@ export function RecommendationOnboardingPage() {
     const failures = new Map(failedResponses.current);
     failures.delete(productID);
     updateFailures(failures);
-    void queue.current.enqueue(() => api.undoRecommendationOnboardingResponse(token, productID)).catch((error: unknown) => {
+    void queue.current.enqueue(() => api.undoOnboardingResponse(token, productID)).catch((error: unknown) => {
       setSyncError(apiErrorMessage(error));
     });
   }
@@ -167,7 +167,7 @@ export function RecommendationOnboardingPage() {
     await Promise.all(pending.map(async (response) => {
       if (!token) return;
       try {
-        await queue.current.enqueue(() => api.saveRecommendationOnboardingResponse(
+        await queue.current.enqueue(() => api.saveOnboardingResponse(
           token,
           response.productID,
           response.choice,
@@ -192,7 +192,7 @@ export function RecommendationOnboardingPage() {
         setSyncError("저장하지 못한 선택이 있습니다. 다시 저장한 뒤 완료해주세요.");
         return;
       }
-      await api.finishRecommendationOnboarding(token, status);
+      await api.finishOnboarding(token, status);
       if (status === "COMPLETED") {
         setCompleted(true);
       } else {
@@ -279,7 +279,7 @@ export function RecommendationOnboardingPage() {
             </button>
           </section>
         ) : currentItem ? (
-          <RecommendationSwipeCard key={currentItem.product.id} item={currentItem} onChoose={choose} />
+          <OnboardingSwipeCard key={currentItem.product.id} item={currentItem} onChoose={choose} />
         ) : (
           <OnboardingMessage>추천 상품을 충분히 준비하지 못했어요.</OnboardingMessage>
         )}

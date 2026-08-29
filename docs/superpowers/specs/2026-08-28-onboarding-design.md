@@ -164,17 +164,17 @@ NOT_STARTED ──첫 후보 조회──> IN_PROGRESS ──모두 응답──
   "accessToken": "...",
   "tokenType": "Bearer",
   "expiresIn": 3600,
-  "recommendationOnboardingStatus": "NOT_STARTED"
+  "onboardingStatus": "NOT_STARTED"
 }
 ```
 
 기존 `id`, `email`, `type`, `role`, `status` 필드를 유지하면서 로그인 응답과 동일한 토큰 필드를 추가한다. 신규 프론트엔드는 확장 스키마를 사용하고, 알 수 없는 필드를 무시하는 기존 클라이언트는 계속 동작한다.
 
-위 예시는 rollout 대상의 성공 응답이다. `NOT_ELIGIBLE` 응답은 기존 회원 필드와 `recommendationOnboardingStatus`만 반환하며 토큰 필드는 생략한다. rollout 대상으로 선정됐지만 세션 생성이 실패한 `UNAVAILABLE` 응답은 사용자가 로그인 화면에 갇히지 않도록 토큰 필드를 반환하고 홈 fallback을 허용한다.
+위 예시는 rollout 대상의 성공 응답이다. `NOT_ELIGIBLE` 응답은 기존 회원 필드와 `onboardingStatus`만 반환하며 토큰 필드는 생략한다. rollout 대상으로 선정됐지만 세션 생성이 실패한 `UNAVAILABLE` 응답은 사용자가 로그인 화면에 갇히지 않도록 토큰 필드를 반환하고 홈 fallback을 허용한다.
 
 ### 세션 조회 또는 시작
 
-`GET /api/v1/me/recommendation-onboarding`
+`GET /api/v1/me/onboarding`
 
 ```json
 {
@@ -205,7 +205,7 @@ NOT_STARTED ──첫 후보 조회──> IN_PROGRESS ──모두 응답──
 
 ### 응답 저장
 
-`PUT /api/v1/me/recommendation-onboarding/responses/{productId}`
+`PUT /api/v1/me/onboarding/responses/{productId}`
 
 ```json
 {
@@ -222,13 +222,13 @@ NOT_STARTED ──첫 후보 조회──> IN_PROGRESS ──모두 응답──
 
 ### 응답 취소
 
-`DELETE /api/v1/me/recommendation-onboarding/responses/{productId}`
+`DELETE /api/v1/me/onboarding/responses/{productId}`
 
 현재 활성 세션의 응답만 삭제한다. 이미 없는 응답의 삭제도 성공으로 처리해 멱등성을 보장한다.
 
 ### 완료 또는 건너뛰기
 
-`POST /api/v1/me/recommendation-onboarding/finish`
+`POST /api/v1/me/onboarding/finish`
 
 ```json
 {
@@ -250,17 +250,17 @@ NOT_STARTED ──첫 후보 조회──> IN_PROGRESS ──모두 응답──
 
 ### 취향 다시 설정
 
-`POST /api/v1/me/recommendation-onboarding/restart`
+`POST /api/v1/me/onboarding/restart`
 
 종료된 최신 세션이 있을 때만 generation을 증가시킨 `NOT_STARTED` 세션을 만든다. 이미 활성 세션이 있으면 그 세션을 반환한다.
 
 ### best-effort 화면 이벤트
 
-`POST /api/v1/me/recommendation-onboarding/events`
+`POST /api/v1/me/onboarding/events`
 
 ```json
 {
-  "event": "recommendation_onboarding_product_impression",
+  "event": "onboarding_product_impression",
   "product_id": 51,
   "position": 3
 }
@@ -270,7 +270,7 @@ NOT_STARTED ──첫 후보 조회──> IN_PROGRESS ──모두 응답──
 
 ## 데이터 모델
 
-### `recommendation_onboarding_sessions`
+### `onboarding_sessions`
 
 | 컬럼 | 타입 | 규칙 |
 |---|---|---|
@@ -292,7 +292,7 @@ NOT_STARTED ──첫 후보 조회──> IN_PROGRESS ──모두 응답──
 - `INDEX(member_id, status)`
 - 한 회원의 활성 세션은 서비스 트랜잭션과 잠금으로 하나만 허용한다.
 
-### `recommendation_onboarding_items`
+### `onboarding_items`
 
 | 컬럼 | 타입 | 규칙 |
 |---|---|---|
@@ -371,14 +371,14 @@ effective_weight = base_weight × age_decay × behavior_decay
 
 | 이벤트 | 주요 속성 |
 |---|---|
-| `recommendation_onboarding_viewed` | session, candidate version, total count |
-| `recommendation_onboarding_product_impression` | product, position |
-| `recommendation_onboarding_rated` | product, position, choice, input method |
-| `recommendation_onboarding_undo` | product, position |
-| `recommendation_onboarding_skipped` | responded count, elapsed time |
-| `recommendation_onboarding_completed` | O/X 수, elapsed time |
-| `recommendation_onboarding_resumed` | responded count |
-| `recommendation_onboarding_save_failed` | operation, HTTP status, retry count |
+| `onboarding_viewed` | session, candidate version, total count |
+| `onboarding_product_impression` | product, position |
+| `onboarding_rated` | product, position, choice, input method |
+| `onboarding_undo` | product, position |
+| `onboarding_skipped` | responded count, elapsed time |
+| `onboarding_completed` | O/X 수, elapsed time |
+| `onboarding_resumed` | responded count |
+| `onboarding_save_failed` | operation, HTTP status, retry count |
 
 이벤트에는 이메일, 토큰, 비밀번호, 자유 입력 정보가 포함되지 않는다. session과 member 식별자는 분석 시스템의 기존 가명화 정책을 따른다.
 
@@ -402,7 +402,7 @@ effective_weight = base_weight × age_decay × behavior_decay
 
 ## 보안과 무결성
 
-- 모든 `/me/recommendation-onboarding` API는 인증 미들웨어 뒤에 둔다.
+- 모든 `/me/onboarding` API는 인증 미들웨어 뒤에 둔다.
 - member ID는 토큰 컨텍스트에서만 가져오며 요청 body나 path로 받지 않는다.
 - 응답 상품이 현재 활성 세션에 속하는지 검증한다.
 - best-effort 화면 이벤트 이름과 product·position의 현재 세션 소속을 검증한다.
@@ -470,7 +470,7 @@ effective_weight = base_weight × age_decay × behavior_decay
 - 회원가입 응답 토큰 발급과 신규 세션 생성 orchestration
 - 온보딩 세션·아이템 migration
 - 후보 선정, 응답 저장, 상태 전이 서비스
-- 인증된 `/me/recommendation-onboarding` 핸들러와 라우트
+- 인증된 `/me/onboarding` 핸들러와 라우트
 - 온보딩 신호를 포함하는 추천 프로필과 scoring 확장
 - 회원 단위 즉시 갱신 및 Temporal 재시도
 - 서비스, repository, handler, migration 계약 테스트

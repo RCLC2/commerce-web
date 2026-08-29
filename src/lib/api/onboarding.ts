@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { requestParsed, requestVoid } from "../api-client";
 
-export const recommendationOnboardingStatusSchema = z.enum([
+export const onboardingStatusSchema = z.enum([
   "NOT_ELIGIBLE",
   "NOT_STARTED",
   "IN_PROGRESS",
@@ -26,10 +26,10 @@ const itemSchema = z.object({
   product: productSchema,
 });
 
-export const recommendationOnboardingSchema = z.object({
+export const onboardingSchema = z.object({
   session_id: z.number().int().positive().optional(),
   generation: z.number().int().positive().optional(),
-  status: recommendationOnboardingStatusSchema,
+  status: onboardingStatusSchema,
   candidate_version: z.string().optional(),
   total_count: z.number().int().nonnegative(),
   responded_count: z.number().int().nonnegative(),
@@ -43,37 +43,37 @@ const finishSchema = z.object({
   generation: z.number().int().positive(),
 });
 
-export type RecommendationOnboarding = z.infer<typeof recommendationOnboardingSchema>;
-export type RecommendationOnboardingItem = z.infer<typeof itemSchema>;
-export type RecommendationOnboardingStatus = z.infer<typeof recommendationOnboardingStatusSchema>;
-export type RecommendationChoice = "LIKE" | "DISLIKE";
-export type RecommendationInputMethod = "SWIPE" | "BUTTON" | "KEYBOARD";
+export type Onboarding = z.infer<typeof onboardingSchema>;
+export type OnboardingItem = z.infer<typeof itemSchema>;
+export type OnboardingStatus = z.infer<typeof onboardingStatusSchema>;
+export type OnboardingChoice = "LIKE" | "DISLIKE";
+export type OnboardingInputMethod = "SWIPE" | "BUTTON" | "KEYBOARD";
 
-const root = "/api/v1/me/recommendation-onboarding";
+const root = "/api/v1/me/onboarding";
 
-export const recommendationOnboardingApi = {
-  getRecommendationOnboarding: (token: string) => requestParsed(recommendationOnboardingSchema, root, { token }),
-  saveRecommendationOnboardingResponse: (
+export const onboardingApi = {
+  getOnboarding: (token: string) => requestParsed(onboardingSchema, root, { token }),
+  saveOnboardingResponse: (
     token: string,
     productID: number,
-    choice: RecommendationChoice,
-    inputMethod: RecommendationInputMethod,
-  ) => requestParsed(recommendationOnboardingSchema, `${root}/responses/${productID}`, {
+    choice: OnboardingChoice,
+    inputMethod: OnboardingInputMethod,
+  ) => requestParsed(onboardingSchema, `${root}/responses/${productID}`, {
     method: "PUT",
     token,
     body: JSON.stringify({ choice, input_method: inputMethod }),
   }),
-  undoRecommendationOnboardingResponse: (token: string, productID: number) =>
-    requestParsed(recommendationOnboardingSchema, `${root}/responses/${productID}`, { method: "DELETE", token }),
-  finishRecommendationOnboarding: (token: string, status: "COMPLETED" | "SKIPPED") =>
+  undoOnboardingResponse: (token: string, productID: number) =>
+    requestParsed(onboardingSchema, `${root}/responses/${productID}`, { method: "DELETE", token }),
+  finishOnboarding: (token: string, status: "COMPLETED" | "SKIPPED") =>
     requestParsed(finishSchema, `${root}/finish`, {
       method: "POST",
       token,
       body: JSON.stringify({ status }),
     }),
-  restartRecommendationOnboarding: (token: string) =>
-    requestParsed(recommendationOnboardingSchema, `${root}/restart`, { method: "POST", token }),
-  recordRecommendationOnboardingEvent: (
+  restartOnboarding: (token: string) =>
+    requestParsed(onboardingSchema, `${root}/restart`, { method: "POST", token }),
+  recordOnboardingEvent: (
     token: string,
     payload: { event: string; product_id?: number; position?: number },
   ) => requestVoid(`${root}/events`, { method: "POST", token, body: JSON.stringify(payload) }),

@@ -42,7 +42,7 @@ export function RegisterPage() {
         return;
       }
       setSession({ accessToken: data.accessToken, memberID: data.id, role: data.role });
-      if (["NOT_STARTED", "IN_PROGRESS"].includes(data.recommendationOnboardingStatus)) {
+      if (["NOT_STARTED", "IN_PROGRESS"].includes(data.onboardingStatus)) {
         router.replace("/onboarding/preferences");
         return;
       }

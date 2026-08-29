@@ -20,8 +20,8 @@ export function ProfileEditPage() {
   const queryClient = useQueryClient();
   const profile = useQuery({ queryKey: queryKeys.me(memberID), queryFn: () => api.me(token), enabled: Boolean(token) });
   const onboardingPreference = useQuery({
-    queryKey: queryKeys.recommendationOnboarding(memberID),
-    queryFn: () => api.getRecommendationOnboarding(token),
+    queryKey: queryKeys.onboarding(memberID),
+    queryFn: () => api.getOnboarding(token),
     enabled: Boolean(token),
     retry: false,
   });
@@ -49,7 +49,7 @@ export function ProfileEditPage() {
     },
   });
   const restartOnboarding = useMutation({
-    mutationFn: () => api.restartRecommendationOnboarding(token),
+    mutationFn: () => api.restartOnboarding(token),
     onSuccess: () => router.push("/onboarding/preferences"),
   });
 

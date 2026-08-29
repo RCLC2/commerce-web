@@ -4,7 +4,7 @@ const pixel = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAw
 
 test.setTimeout(90_000);
 
-test("member rates ten products and completes recommendation onboarding", async ({ page }) => {
+test("member rates ten products and completes onboarding", async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem("commerce.accessToken", "onboarding-token");
     window.localStorage.setItem("commerce.memberID", "7");
@@ -38,11 +38,11 @@ test("member rates ten products and completes recommendation onboarding", async 
   await page.route("**/api/v1/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
-    if (path === "/api/v1/me/recommendation-onboarding" && request.method() === "GET") {
+    if (path === "/api/v1/me/onboarding" && request.method() === "GET") {
       await route.fulfill({ status: 200, json: session() });
       return;
     }
-    const responseMatch = path.match(/\/api\/v1\/me\/recommendation-onboarding\/responses\/(\d+)$/);
+    const responseMatch = path.match(/\/api\/v1\/me\/onboarding\/responses\/(\d+)$/);
     if (responseMatch && request.method() === "PUT") {
       const productID = Number(responseMatch[1]);
       const payload = request.postDataJSON() as { choice: "LIKE" | "DISLIKE"; input_method: string };

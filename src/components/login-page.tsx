@@ -36,7 +36,7 @@ export function LoginPage() {
       setSession({ accessToken: data.accessToken, memberID: data.memberID, role: data.role });
       if (data.role === "MEMBER") {
         try {
-          const onboarding = await api.getRecommendationOnboarding(data.accessToken);
+          const onboarding = await api.getOnboarding(data.accessToken);
           if (["NOT_STARTED", "IN_PROGRESS"].includes(onboarding.status)) {
             router.replace("/onboarding/preferences");
             return;

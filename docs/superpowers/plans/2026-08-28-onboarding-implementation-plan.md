@@ -2,7 +2,7 @@
 
 ## 목적
 
-승인된 [추천 취향 온보딩 설계](../specs/2026-08-28-recommendation-onboarding-design.md)를 `commerce-server`와 `commerce-web`에 구현한다. 신규 일반 회원은 가입과 동시에 인증되고, 균형 상품 최대 10개를 O/X로 평가하거나 건너뛴 뒤 초기 추천을 받는다.
+승인된 [추천 취향 온보딩 설계](../specs/2026-08-28-onboarding-design.md)를 `commerce-server`와 `commerce-web`에 구현한다. 신규 일반 회원은 가입과 동시에 인증되고, 균형 상품 최대 10개를 O/X로 평가하거나 건너뛴 뒤 초기 추천을 받는다.
 
 구현은 서버 계약과 migration을 먼저 배포하고 웹을 뒤따르게 한다. 서버 기능 플래그를 끈 상태에서는 기존 가입·로그인·추천 동작이 유지되어야 한다.
 
@@ -10,8 +10,8 @@
 
 구현 시 현재의 관련 없는 작업 트리를 재사용하지 않고 각 저장소의 최신 `origin/main`에서 별도 작업 트리를 만든다.
 
-- `commerce-server`: `feat/recommendation-onboarding-api`
-- `commerce-web`: `feat/recommendation-onboarding-ui`
+- `commerce-server`: `feat/onboarding-api`
+- `commerce-web`: `feat/onboarding-ui`
 
 두 브랜치는 각각 독립 PR로 만든다. 서버 PR을 먼저 준비하되 병합과 배포는 사용자 소유 작업으로 남긴다. 웹 PR은 서버 계약을 Zod 스키마와 E2E에서 검증한다.
 
@@ -23,14 +23,14 @@
 - 신규 `MEMBER`만 자동 온보딩 대상이다. 승인 대기 `SELLER`와 기존 회원은 대상이 아니다.
 - 클라이언트 카드는 별도 모션 의존성을 추가하지 않고 React 포인터 이벤트와 CSS transform으로 구현한다.
 - 서버 세션이 진실의 원천이며 클라이언트는 응답만 낙관적으로 반영한다.
-- 배포 전까지 `RECOMMENDATION_ONBOARDING_ENABLED=false`를 기본값으로 둔다.
+- 배포 전까지 `ONBOARDING_ENABLED=false`를 기본값으로 둔다.
 - 기능 플래그가 꺼졌거나 rollout 비대상인 가입은 토큰을 확장 반환하지 않고 기존 로그인 이동을 유지한다.
 
 ## 단계 0: 구현 작업 트리와 기준선 준비
 
 ### 서버
 
-1. 최신 원격 상태를 확인하고 `origin/main`에서 `feat/recommendation-onboarding-api` 작업 트리를 만든다.
+1. 최신 원격 상태를 확인하고 `origin/main`에서 `feat/onboarding-api` 작업 트리를 만든다.
 2. 다음 기준 검증을 먼저 실행한다.
 
 ```powershell
@@ -42,7 +42,7 @@ go build ./cmd/api ./cmd/worker
 
 ### 웹
 
-1. 최신 `origin/main`에서 `feat/recommendation-onboarding-ui` 작업 트리를 만든다.
+1. 최신 `origin/main`에서 `feat/onboarding-ui` 작업 트리를 만든다.
 2. `node_modules/next/dist/docs/`에서 현재 Next 16.3의 App Router, client navigation, client component 문서를 확인한다.
 3. 다음 기준 검증을 실행한다.
 
@@ -56,15 +56,15 @@ npm run build
 
 ### 파일
 
-- 생성: `commerce-server/migrations/20260828003_recommendation_onboarding.sql`
-- 생성: `commerce-server/pkg/migrations/recommendation_onboarding_contract_test.go`
+- 생성: `commerce-server/migrations/20260828003_onboarding.sql`
+- 생성: `commerce-server/pkg/migrations/onboarding_contract_test.go`
 
 ### 테스트 우선
 
 계약 테스트는 migration에 다음 요소가 있는지 검증한다.
 
-- `recommendation_onboarding_sessions`
-- `recommendation_onboarding_items`
+- `onboarding_sessions`
+- `onboarding_items`
 - `UNIQUE(member_id, generation)`
 - `UNIQUE(session_id, product_id)`
 - `UNIQUE(session_id, position)`
@@ -93,9 +93,9 @@ go test ./pkg/migrations
 
 ### 파일
 
-- 생성: `commerce-server/internal/recommendation/onboarding_entity.go`
-- 생성: `commerce-server/internal/recommendation/onboarding_repository.go`
-- 생성: `commerce-server/internal/recommendation/onboarding_repository_test.go`
+- 생성: `commerce-server/internal/recommendation/onboarding/entity.go`
+- 생성: `commerce-server/internal/recommendation/onboarding/repository.go`
+- 생성: `commerce-server/internal/recommendation/onboarding/repository_test.go`
 
 ### 모델과 인터페이스
 
@@ -155,8 +155,8 @@ go test ./internal/recommendation -run OnboardingRepository
 
 ### 파일
 
-- 생성: `commerce-server/internal/recommendation/onboarding_service.go`
-- 생성: `commerce-server/internal/recommendation/onboarding_service_test.go`
+- 생성: `commerce-server/internal/recommendation/onboarding/service.go`
+- 생성: `commerce-server/internal/recommendation/onboarding/service_test.go`
 
 ### 서비스 경계
 
@@ -220,8 +220,8 @@ go test ./internal/recommendation -run Onboarding
 
 ### 파일
 
-- 생성: `commerce-server/internal/recommendation/onboarding_handler.go`
-- 생성: `commerce-server/internal/recommendation/onboarding_handler_test.go`
+- 생성: `commerce-server/internal/recommendation/onboarding/handler.go`
+- 생성: `commerce-server/internal/recommendation/onboarding/handler_test.go`
 - 수정: `commerce-server/cmd/api/main.go`
 
 ### 테스트 우선
@@ -241,12 +241,12 @@ go test ./internal/recommendation -run Onboarding
 
 `cmd/api/main.go`의 기존 `withAuth` 그룹에 다음을 연결한다.
 
-- `GET /api/v1/me/recommendation-onboarding`
-- `PUT /api/v1/me/recommendation-onboarding/responses/:productID`
-- `DELETE /api/v1/me/recommendation-onboarding/responses/:productID`
-- `POST /api/v1/me/recommendation-onboarding/finish`
-- `POST /api/v1/me/recommendation-onboarding/restart`
-- `POST /api/v1/me/recommendation-onboarding/events`
+- `GET /api/v1/me/onboarding`
+- `PUT /api/v1/me/onboarding/responses/:productID`
+- `DELETE /api/v1/me/onboarding/responses/:productID`
+- `POST /api/v1/me/onboarding/finish`
+- `POST /api/v1/me/onboarding/restart`
+- `POST /api/v1/me/onboarding/events`
 
 핸들러는 member ID를 인증 컨텍스트에서만 읽고 session ID를 외부 입력으로 받지 않는다.
 화면 이벤트 API는 viewed, product impression, resumed, save failed만 best-effort 구조화 로그로 기록한다. rated, undo, skipped, completed는 상태 변경 핸들러에서 직접 기록한다.
@@ -276,10 +276,10 @@ go test ./internal/recommendation -run OnboardingHandler
 
 다음 설정을 추가한다.
 
-- `RECOMMENDATION_ONBOARDING_ENABLED`: 기본값 `false`
-- `RECOMMENDATION_ONBOARDING_ROLLOUT_PERCENT`: 기본값 `0`, 범위 0~100
+- `ONBOARDING_ENABLED`: 기본값 `false`
+- `ONBOARDING_ROLLOUT_PERCENT`: 기본값 `0`, 범위 0~100
 
-노출 여부는 `hash("recommendation-onboarding-v1:" + member_id) % 100 < rollout_percent`로 결정해 재시도에도 안정적으로 유지한다. 로컬 E2E 프로필은 enabled=true, percent=100을 명시한다.
+노출 여부는 `hash("onboarding-v1:" + member_id) % 100 < rollout_percent`로 결정해 재시도에도 안정적으로 유지한다. 로컬 E2E 프로필은 enabled=true, percent=100을 명시한다.
 
 ### 테스트 우선
 
@@ -297,7 +297,7 @@ go test ./internal/recommendation -run OnboardingHandler
 
 1. member handler에 작은 `SignupOnboardingProvisioner` 인터페이스를 주입해 member 패키지가 추천 구현 세부사항을 알지 않게 한다.
 2. 회원 생성 성공 후 역할이 `MEMBER`이고 노출 정책이 true일 때 세션을 best-effort Provision한다.
-3. rollout 대상으로 Provision된 활성 MEMBER에게 액세스 토큰을 발급하고 signup 응답에 `accessToken`, `tokenType`, `expiresIn`, `recommendationOnboardingStatus`를 추가한다.
+3. rollout 대상으로 Provision된 활성 MEMBER에게 액세스 토큰을 발급하고 signup 응답에 `accessToken`, `tokenType`, `expiresIn`, `onboardingStatus`를 추가한다.
 4. rollout 비대상은 `NOT_ELIGIBLE` 상태와 기존 회원 필드만 반환한다. 새 웹은 토큰이 없으면 기존처럼 로그인 화면으로 이동한다.
 5. rollout 대상으로 선정된 뒤 Provision이 실패하면 오류를 기록하고 `UNAVAILABLE`과 토큰을 반환한다. 회원 생성과 자동 로그인 fallback은 유지한다.
 
@@ -368,8 +368,8 @@ go test ./internal/recommendation
 - 수정: `commerce-server/internal/recommendation/activities.go`
 - 수정: `commerce-server/internal/recommendation/workflow.go`
 - 생성: `commerce-server/internal/recommendation/workflow_test.go`
-- 수정: `commerce-server/internal/recommendation/onboarding_service.go`
-- 수정: `commerce-server/internal/recommendation/onboarding_service_test.go`
+- 수정: `commerce-server/internal/recommendation/onboarding/service.go`
+- 수정: `commerce-server/internal/recommendation/onboarding/service_test.go`
 - 수정: `commerce-server/cmd/api/main.go`
 - 수정: `commerce-server/cmd/worker/main.go`
 
@@ -386,7 +386,7 @@ go test ./internal/recommendation
 
 1. `MemberRefreshWorkflowName`과 member ID 입력을 받는 workflow를 추가한다.
 2. API 프로세스의 Temporal client를 감싼 `MemberRefreshScheduler` adapter를 만든다.
-3. workflow ID는 `recommendation-onboarding-member-{memberID}-generation-{generation}`으로 고정해 멱등성을 확보한다.
+3. workflow ID는 `onboarding-member-{memberID}-generation-{generation}`으로 고정해 멱등성을 확보한다.
 4. 온보딩 finish orchestration은 종료 commit과 추천 생성의 실패 경계를 분리한다.
 5. Temporal 연결 자체가 실패해도 응답은 완료 상태와 `recommendation_ready=false`를 반환하고 오류를 기록한다.
 
@@ -408,7 +408,7 @@ go build ./cmd/api ./cmd/worker
 - 수정: `commerce-server/pkg/observability/observability.go`
 - 수정: `commerce-server/pkg/observability/observability_test.go`
 - 수정: `commerce-server/README.md`
-- 생성 또는 수정: `commerce-server/tests/e2e/recommendation_onboarding_e2e_test.go`
+- 생성 또는 수정: `commerce-server/tests/e2e/onboarding_e2e_test.go`
 
 ### 구현
 
@@ -454,8 +454,8 @@ make test-e2e
 ### 파일
 
 - 수정: `commerce-web/src/lib/api/auth.ts`
-- 생성: `commerce-web/src/lib/api/recommendation-onboarding.ts`
-- 생성: `commerce-web/src/lib/api/recommendation-onboarding.test.ts`
+- 생성: `commerce-web/src/lib/api/onboarding.ts`
+- 생성: `commerce-web/src/lib/api/onboarding.test.ts`
 - 수정: `commerce-web/src/lib/api.ts`
 - 수정: `commerce-web/src/lib/query-keys.ts`
 - 수정: `commerce-web/src/components/register-page.tsx`
@@ -487,7 +487,7 @@ make test-e2e
 ### 검증
 
 ```powershell
-npm test -- --run src/lib/api/recommendation-onboarding.test.ts src/lib/onboarding-navigation.test.ts
+npm test -- --run src/lib/api/onboarding.test.ts src/lib/onboarding-navigation.test.ts
 ```
 
 ### 커밋
@@ -500,8 +500,8 @@ npm test -- --run src/lib/api/recommendation-onboarding.test.ts src/lib/onboardi
 
 - 생성: `commerce-web/src/lib/onboarding-response-queue.ts`
 - 생성: `commerce-web/src/lib/onboarding-response-queue.test.ts`
-- 생성: `commerce-web/src/hooks/use-recommendation-onboarding.ts`
-- 생성: `commerce-web/src/hooks/use-recommendation-onboarding.test.tsx`
+- 생성: `commerce-web/src/hooks/use-onboarding.ts`
+- 생성: `commerce-web/src/hooks/use-onboarding.test.tsx`
 
 ### 테스트 우선
 
@@ -526,7 +526,7 @@ npm test -- --run src/lib/api/recommendation-onboarding.test.ts src/lib/onboardi
 ### 검증
 
 ```powershell
-npm test -- --run src/lib/onboarding-response-queue.test.ts src/hooks/use-recommendation-onboarding.test.tsx
+npm test -- --run src/lib/onboarding-response-queue.test.ts src/hooks/use-onboarding.test.tsx
 ```
 
 ### 커밋
@@ -537,8 +537,8 @@ npm test -- --run src/lib/onboarding-response-queue.test.ts src/hooks/use-recomm
 
 ### 파일
 
-- 생성: `commerce-web/src/components/recommendation-onboarding-card.tsx`
-- 생성: `commerce-web/src/components/recommendation-onboarding-card.test.tsx`
+- 생성: `commerce-web/src/components/onboarding-card.tsx`
+- 생성: `commerce-web/src/components/onboarding-card.test.tsx`
 - 수정: `commerce-web/src/app/globals.css`
 
 ### 테스트 우선
@@ -564,7 +564,7 @@ npm test -- --run src/lib/onboarding-response-queue.test.ts src/hooks/use-recomm
 ### 검증
 
 ```powershell
-npm test -- --run src/components/recommendation-onboarding-card.test.tsx
+npm test -- --run src/components/onboarding-card.test.tsx
 ```
 
 ### 커밋
@@ -576,8 +576,8 @@ npm test -- --run src/components/recommendation-onboarding-card.test.tsx
 ### 파일
 
 - 생성: `commerce-web/src/app/onboarding/preferences/page.tsx`
-- 생성: `commerce-web/src/components/recommendation-onboarding-page.tsx`
-- 생성: `commerce-web/src/components/recommendation-onboarding-page.test.tsx`
+- 생성: `commerce-web/src/components/onboarding-page.tsx`
+- 생성: `commerce-web/src/components/onboarding-page.test.tsx`
 - 수정: `commerce-web/src/components/app-shell.tsx`
 - 수정: `commerce-web/src/components/profile-edit-page.tsx`
 
@@ -608,7 +608,7 @@ npm test -- --run src/components/recommendation-onboarding-card.test.tsx
 ### 검증
 
 ```powershell
-npm test -- --run src/components/recommendation-onboarding-page.test.tsx
+npm test -- --run src/components/onboarding-page.test.tsx
 ```
 
 ### 커밋
@@ -619,7 +619,7 @@ npm test -- --run src/components/recommendation-onboarding-page.test.tsx
 
 ### 파일
 
-- 생성: `commerce-web/tests/e2e/recommendation-onboarding.spec.ts`
+- 생성: `commerce-web/tests/e2e/onboarding.spec.ts`
 - 수정: `commerce-web/tests/support/live-backend.ts`
 - 수정: `commerce-web/tests/e2e/catalog-and-account-coverage.spec.ts`
 
@@ -643,7 +643,7 @@ npm test -- --run src/components/recommendation-onboarding-page.test.tsx
 npm test -- --run
 npm run lint
 npm run build
-npm run test:e2e:ui -- tests/e2e/recommendation-onboarding.spec.ts
+npm run test:e2e:ui -- tests/e2e/onboarding.spec.ts
 ```
 
 ### 커밋
@@ -657,7 +657,7 @@ npm run test:e2e:ui -- tests/e2e/recommendation-onboarding.spec.ts
 1. server migration 적용
 2. server API와 worker 실행
 3. onboarding enabled=true, rollout=100으로 웹 E2E 실행
-4. 완료 회원의 `recommendation_onboarding_sessions`, items, user profile, result를 확인
+4. 완료 회원의 `onboarding_sessions`, items, user profile, result를 확인
 5. 서버를 재시작하고 같은 회원의 세션·추천이 유지되는지 확인
 6. Temporal을 일시 중단한 상태에서 finish fallback을 확인
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { swipeChoiceForDistance } from "./recommendation-swipe-card";
+import { swipeChoiceForDistance } from "./onboarding-swipe-card";
 
 describe("swipeChoiceForDistance", () => {
   it("maps right to O, left to X, and snaps short gestures back", () => {
