@@ -32,8 +32,19 @@ export function LoginPage() {
 
   const login = useMutation({
     mutationFn: api.signin,
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       setSession({ accessToken: data.accessToken, memberID: data.memberID, role: data.role });
+      if (data.role === "MEMBER") {
+        try {
+          const onboarding = await api.getOnboarding(data.accessToken);
+          if (["NOT_STARTED", "IN_PROGRESS"].includes(onboarding.status)) {
+            router.replace("/onboarding/preferences");
+            return;
+          }
+        } catch {
+          // Login must remain available when the optional onboarding endpoint is unavailable.
+        }
+      }
       router.push(safeInternalPath(next));
     },
   });

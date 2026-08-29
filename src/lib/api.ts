@@ -8,6 +8,7 @@ import { mediaApi } from "./api/media";
 import { searchApi } from "./api/search";
 import { sellerApi } from "./api/seller";
 import { experimentApi } from "./api/experiment";
+import { onboardingApi } from "./api/onboarding";
 
 export const api = {
   ...catalogApi,
@@ -20,4 +21,5 @@ export const api = {
   ...sellerApi,
   ...adminApi,
   ...experimentApi,
+  ...onboardingApi,
 };
