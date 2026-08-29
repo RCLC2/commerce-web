@@ -56,7 +56,7 @@ npm run build
 
 ### 파일
 
-- 생성: `commerce-server/migrations/20260828003_onboarding.sql`
+- 생성: `commerce-server/migrations/20260829001_onboarding.sql`
 - 생성: `commerce-server/pkg/migrations/onboarding_contract_test.go`
 
 ### 테스트 우선
