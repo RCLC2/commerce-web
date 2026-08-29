@@ -20,7 +20,7 @@ class NoopIntersectionObserver implements IntersectionObserver {
 
 beforeEach(() => {
   resetAdImpressionRegistryForTests();
-  useSessionStore.setState({ hasHydrated: true, accessToken: null, memberID: null, role: null, sellerContext: null });
+  useSessionStore.setState({ hydrated: true, accessToken: null, memberID: null, role: null, sellerContext: null });
   vi.stubGlobal("IntersectionObserver", NoopIntersectionObserver);
 });
 
@@ -32,12 +32,12 @@ afterEach(() => {
 
 describe("SponsoredPlacement", () => {
   it("waits for session hydration and then sends the optional member token", async () => {
-    useSessionStore.setState({ hasHydrated: false, accessToken: "member-token" });
+    useSessionStore.setState({ hydrated: false, accessToken: "member-token" });
     const decision = vi.spyOn(api, "adDecision").mockResolvedValue(null);
     renderPlacement("home.main_banner");
 
     expect(decision).not.toHaveBeenCalled();
-    useSessionStore.setState({ hasHydrated: true });
+    useSessionStore.setState({ hydrated: true });
 
     await waitFor(() => expect(decision).toHaveBeenCalledWith(expect.objectContaining({ placement_key: "home.main_banner" }), "member-token"));
   });

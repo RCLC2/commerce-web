@@ -13,13 +13,13 @@ import { SponsoredMarketShelf } from "./sponsored-market-shelf";
 import { SponsoredProductCard } from "./sponsored-product-card";
 
 export function SponsoredPlacement({ placementKey, className = "" }: { placementKey: AdPlacement; className?: string }) {
-  const hasHydrated = useSessionStore((state) => state.hasHydrated);
+  const hydrated = useSessionStore((state) => state.hydrated);
   const token = useSessionStore((state) => state.accessToken);
   const [requestID] = useState(() => `ads-${cryptoSafeID()}`);
   const query = useQuery({
     queryKey: ["ad-decision", placementKey, requestID, token ?? "anonymous"],
     queryFn: () => api.adDecision({ request_id: requestID, placement_key: placementKey }, token),
-    enabled: hasHydrated,
+    enabled: hydrated,
     retry: false,
   });
 
