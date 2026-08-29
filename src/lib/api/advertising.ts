@@ -1,77 +1,199 @@
 import { z } from "zod";
-import { request, requestParsed } from "../api-client";
+import { parseContract, request, requestParsed } from "../api-client";
 
-const campaignTypeSchema = z.enum(["SPONSORED_FEED", "SEARCH", "CRM", "GUARANTEED"]);
+export const adPlacementSchema = z.enum([
+  "home.main_banner",
+  "home_feed.sponsored_card",
+  "search.sponsored_top",
+  "pdp.card_banner",
+  "pdp.sponsored_market",
+  "crm.in_app_notification",
+  "crm.push_notification",
+]);
+export const creativeFormatSchema = z.enum(["PRODUCT_CARD", "BANNER", "MARKET_SHELF", "IN_APP", "PUSH"]);
 const pricingModelSchema = z.enum(["CPM", "DAILY_FLAT"]);
+const dateStringSchema = z.string().min(1).refine((value) => !Number.isNaN(Date.parse(value)), "유효한 날짜 문자열이어야 합니다.");
 
-export const adCampaignSchema = z.looseObject({
-  ID: z.number().int().positive().optional(),
-  id: z.number().int().positive().optional(),
-  MarketID: z.number().int().positive().optional(),
-  market_id: z.number().int().positive().optional(),
-  ProductID: z.number().int().positive().optional(),
-  product_id: z.number().int().positive().optional(),
-  Name: z.string().optional(),
-  name: z.string().optional(),
-  CampaignType: campaignTypeSchema.optional(),
-  campaign_type: campaignTypeSchema.optional(),
-  PricingModel: pricingModelSchema.optional(),
-  pricing_model: pricingModelSchema.optional(),
-  PlacementKey: z.string().optional(),
-  placement_key: z.string().optional(),
-  Status: z.string().optional(),
+const adProductSummarySchema = z.strictObject({
+  id: z.number().int().positive(),
+  market_id: z.number().int().positive(),
+  market_name: z.string().min(1),
+  name: z.string().min(1),
+  image_url: z.string().min(1).optional(),
+  base_price: z.number().int().nonnegative(),
+  discount_price: z.number().int().nonnegative(),
+});
+
+const adMarketSummarySchema = z.strictObject({
+  id: z.number().int().positive(),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  profile_image_url: z.string().min(1).optional(),
+  cover_image_url: z.string().min(1).optional(),
+  products: z.array(adProductSummarySchema),
+});
+
+const deliveryTargetSchema = z.discriminatedUnion("type", [
+  z.strictObject({ type: z.literal("PRODUCT"), product: adProductSummarySchema }),
+  z.strictObject({ type: z.literal("MARKET"), market: adMarketSummarySchema }),
+]);
+
+const pexelsShape = {
+  pexels_photo_id: z.number().int().positive().optional(),
+  pexels_photographer: z.string().min(1).optional(),
+  pexels_photographer_url: z.string().url().optional(),
+  pexels_photo_url: z.string().url().optional(),
+};
+
+function requireCompletePexelsAttribution(value: Record<string, unknown>, context: z.core.$RefinementCtx<Record<string, unknown>>) {
+  const fields = ["pexels_photo_id", "pexels_photographer", "pexels_photographer_url", "pexels_photo_url"];
+  const provided = fields.filter((field) => value[field] !== undefined).length;
+  if (provided !== 0 && provided !== fields.length) {
+    context.addIssue({ code: "custom", message: "Pexels 출처 필드는 모두 함께 제공되어야 합니다.", path: ["pexels_photo_id"] });
+  }
+}
+
+const optionalCreativeShape = {
+  id: z.number().int().positive(),
+  headline: z.string().min(1).optional(),
+  body: z.string().min(1).optional(),
+  image_url: z.string().min(1).optional(),
+  landing_url: z.string().min(1),
+  cta_label: z.string().min(1).optional(),
+  ...pexelsShape,
+};
+
+const productCardCreativeSchema = z.strictObject({ ...optionalCreativeShape, format: z.literal("PRODUCT_CARD") }).superRefine(requireCompletePexelsAttribution);
+const bannerCreativeSchema = z.strictObject({
+  ...optionalCreativeShape,
+  format: z.literal("BANNER"),
+  headline: z.string().min(1),
+  image_url: z.string().min(1),
+  cta_label: z.string().min(1),
+}).superRefine(requireCompletePexelsAttribution);
+const marketShelfCreativeSchema = z.strictObject({ ...optionalCreativeShape, format: z.literal("MARKET_SHELF") }).superRefine(requireCompletePexelsAttribution);
+const inAppCreativeSchema = z.strictObject({
+  ...optionalCreativeShape,
+  format: z.literal("IN_APP"),
+  headline: z.string().min(1),
+  body: z.string().min(1),
+}).superRefine(requireCompletePexelsAttribution);
+const pushCreativeSchema = z.strictObject({
+  ...optionalCreativeShape,
+  format: z.literal("PUSH"),
+  headline: z.string().min(1),
+  body: z.string().min(1),
+}).superRefine(requireCompletePexelsAttribution);
+
+export const adCreativeSchema = z.discriminatedUnion("format", [
+  productCardCreativeSchema,
+  bannerCreativeSchema,
+  marketShelfCreativeSchema,
+  inAppCreativeSchema,
+  pushCreativeSchema,
+]);
+
+export const adDecisionSchema = z.strictObject({
+  decision_id: z.string().min(1),
+  request_id: z.string().min(1),
+  campaign_id: z.number().int().positive(),
+  placement_key: adPlacementSchema,
+  target: deliveryTargetSchema,
+  creative: adCreativeSchema,
+  decided_at: dateStringSchema,
+  expires_at: dateStringSchema,
+}).superRefine((value, context) => {
+  const contract: Record<AdPlacement, { format: z.infer<typeof creativeFormatSchema>; targets: readonly ("PRODUCT" | "MARKET")[] }> = {
+    "home.main_banner": { format: "BANNER", targets: ["PRODUCT", "MARKET"] },
+    "home_feed.sponsored_card": { format: "PRODUCT_CARD", targets: ["PRODUCT"] },
+    "search.sponsored_top": { format: "PRODUCT_CARD", targets: ["PRODUCT"] },
+    "pdp.card_banner": { format: "BANNER", targets: ["PRODUCT", "MARKET"] },
+    "pdp.sponsored_market": { format: "MARKET_SHELF", targets: ["MARKET"] },
+    "crm.in_app_notification": { format: "IN_APP", targets: ["PRODUCT", "MARKET"] },
+    "crm.push_notification": { format: "PUSH", targets: ["PRODUCT", "MARKET"] },
+  };
+  const expected = contract[value.placement_key];
+  if (value.creative.format !== expected.format) {
+    context.addIssue({ code: "custom", message: "광고 지면과 크리에이티브 형식이 일치하지 않습니다.", path: ["creative", "format"] });
+  }
+  if (!expected.targets.includes(value.target.type)) {
+    context.addIssue({ code: "custom", message: "광고 지면에서 지원하지 않는 타깃입니다.", path: ["target", "type"] });
+  }
+});
+
+export type AdDecision = z.infer<typeof adDecisionSchema>;
+export type AdCreative = z.infer<typeof adCreativeSchema>;
+export type AdPlacement = z.infer<typeof adPlacementSchema>;
+export type AdProductSummary = z.infer<typeof adProductSummarySchema>;
+export type AdMarketSummary = z.infer<typeof adMarketSummarySchema>;
+
+const campaignTargetSchema = z.discriminatedUnion("type", [
+  z.strictObject({ type: z.literal("PRODUCT"), product_id: z.number().int().positive() }),
+  z.strictObject({ type: z.literal("MARKET"), market_id: z.number().int().positive() }),
+]);
+
+const managementCreativeSchema = z.strictObject({
+  ...optionalCreativeShape,
+  format: creativeFormatSchema,
   status: z.string().optional(),
-  DailyBudgetMicros: z.number().int().nonnegative().optional(),
-  daily_budget_micros: z.number().int().nonnegative().optional(),
-  DailySpendMicros: z.number().int().nonnegative().optional(),
-  daily_spend_micros: z.number().int().nonnegative().optional(),
-  CPMMicros: z.number().int().nonnegative().optional(),
-  cpm_micros: z.number().int().nonnegative().optional(),
-  RejectionReason: z.string().optional(),
+  synthetic_key: z.string().optional(),
+}).superRefine((value, context) => {
+  requireCompletePexelsAttribution(value, context);
+  if (value.format === "BANNER" && (!value.headline || !value.image_url || !value.cta_label)) {
+    context.addIssue({ code: "custom", message: "배너에는 제목·이미지·행동 문구가 필요합니다.", path: ["format"] });
+  }
+  if ((value.format === "IN_APP" || value.format === "PUSH") && (!value.headline || !value.body)) {
+    context.addIssue({ code: "custom", message: "알림 광고에는 제목과 본문이 필요합니다.", path: ["format"] });
+  }
+});
+
+export const adCampaignSchema = z.strictObject({
+  id: z.number().int().positive(),
+  advertiser_market_id: z.number().int().positive(),
+  target: campaignTargetSchema,
+  creative: managementCreativeSchema,
+  name: z.string().min(1),
+  pricing_model: pricingModelSchema,
+  placement_key: adPlacementSchema,
+  origin: z.enum(["ADMIN", "SYNTHETIC"]),
+  synthetic_key: z.string().optional(),
+  synthetic_batch_key: z.string().optional(),
+  status: z.string().min(1),
+  pacing_mode: z.string().min(1),
+  daily_budget_micros: z.number().int().nonnegative(),
+  total_budget_micros: z.number().int().nonnegative(),
+  daily_spend_micros: z.number().int().nonnegative(),
+  daily_reserved_micros: z.number().int().nonnegative(),
+  cpm_micros: z.number().int().nonnegative(),
+  daily_flat_price_micros: z.number().int().nonnegative(),
+  pacing_burst_micros: z.number().int().nonnegative(),
+  advertiser_timezone: z.string().min(1),
+  starts_at: dateStringSchema.optional(),
+  ends_at: dateStringSchema.optional(),
+  submitted_at: dateStringSchema.optional(),
+  reviewed_at: dateStringSchema.optional(),
+  reviewed_by_member_id: z.number().int().positive().optional(),
   rejection_reason: z.string().optional(),
-  StartsAt: z.string().optional(),
-  starts_at: z.string().optional(),
-  EndsAt: z.string().optional(),
-  ends_at: z.string().optional(),
 });
 
 export type AdCampaign = z.infer<typeof adCampaignSchema>;
 
-const placementRateSchema = z.looseObject({
-  ID: z.number().int().positive().optional(),
-  id: z.number().int().positive().optional(),
-  PlacementKey: z.string().optional(),
-  placement_key: z.string().optional(),
-  CampaignType: campaignTypeSchema.optional(),
-  campaign_type: campaignTypeSchema.optional(),
-  PricingModel: pricingModelSchema.optional(),
-  pricing_model: pricingModelSchema.optional(),
-  CPMMicros: z.number().int().nonnegative().optional(),
-  cpm_micros: z.number().int().nonnegative().optional(),
-  DailyFlatPriceMicros: z.number().int().nonnegative().optional(),
-  daily_flat_price_micros: z.number().int().nonnegative().optional(),
-  EffectiveFrom: z.string().optional(),
-  effective_from: z.string().optional(),
-  Status: z.string().optional(),
-  status: z.string().optional(),
+const placementRateSchema = z.strictObject({
+  id: z.number().int().positive(),
+  placement_key: adPlacementSchema,
+  pricing_model: pricingModelSchema,
+  rate_source: z.enum(["ADMIN", "SYNTHETIC_DEFAULT"]),
+  cpm_micros: z.number().int().nonnegative(),
+  daily_flat_price_micros: z.number().int().nonnegative(),
+  effective_from: dateStringSchema,
+  effective_to: dateStringSchema.optional(),
+  status: z.string().min(1),
+  synthetic_key: z.string().optional(),
 });
 
 export type PlacementRate = z.infer<typeof placementRateSchema>;
 
-const decisionSchema = z.object({
-  decision_id: z.string().min(1),
-  request_id: z.string().min(1),
-  campaign_id: z.number().int().positive(),
-  product_id: z.number().int().positive(),
-  placement_key: z.string().min(1),
-  reserved_cost_micros: z.number().int().nonnegative(),
-  decided_at: z.string(),
-  expires_at: z.string(),
-});
-
-export type AdDecision = z.infer<typeof decisionSchema>;
-
-const eventReceiptSchema = z.object({
+const eventReceiptSchema = z.strictObject({
   duplicate: z.boolean(),
   billable: z.boolean(),
   charge_micros: z.number().int().nonnegative(),
@@ -104,14 +226,26 @@ export const advertisingApi = {
   placementRates: (token: string) => requestParsed(z.array(placementRateSchema), "/api/v1/admin/ads/rates", { token }),
   createPlacementRate: (token: string, payload: Record<string, unknown>) =>
     requestParsed(placementRateSchema, "/api/v1/admin/ads/rates", { method: "POST", token, body: JSON.stringify(payload) }),
-	adDecision: async (payload: { request_id: string; placement_key: string }, token?: string | null): Promise<AdDecision | null> => {
-		const response = await request("/api/v1/ads/decisions", { method: "POST", token: token ?? undefined, body: JSON.stringify(payload) });
-    return response === undefined ? null : decisionSchema.parse(response);
+  adDecision: async (payload: { request_id: string; placement_key: AdPlacement }, token?: string | null): Promise<AdDecision | null> => {
+    const endpoint = "/api/v1/ads/decisions";
+    const response = await request(endpoint, {
+      method: "POST",
+      token: token ?? undefined,
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+    return response === undefined ? null : parseContract(adDecisionSchema, response, endpoint);
   },
   sellerAdReports: (token: string, marketID?: number | null) => requestParsed(z.array(z.object({
     campaign_id: z.number().int().positive(), impressions: z.number().int().nonnegative(), clicks: z.number().int().nonnegative(),
     spend_micros: z.number().int().nonnegative(), attributed_orders: z.number().int().nonnegative(), revenue_micros: z.number().int().nonnegative(),
   })), `/api/v1/seller/ads/reports${marketQuery(marketID)}`, { token }),
-	recordAdEvent: (payload: { event_id: string; decision_id: string; type: string; occurred_at: string }, token?: string | null) =>
-		requestParsed(eventReceiptSchema, "/api/v1/ads/events", { method: "POST", token: token ?? undefined, keepalive: true, body: JSON.stringify(payload) }),
+  recordAdEvent: (payload: { event_id: string; decision_id: string; type: "IMPRESSION" | "CLICK" | "IN_APP_IMPRESSION"; occurred_at: string }, token?: string | null) =>
+    requestParsed(eventReceiptSchema, "/api/v1/ads/events", {
+      method: "POST",
+      token: token ?? undefined,
+      credentials: "include",
+      keepalive: true,
+      body: JSON.stringify(payload),
+    }),
 };

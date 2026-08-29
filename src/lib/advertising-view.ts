@@ -1,37 +1,37 @@
 import type { AdCampaign, PlacementRate } from "./api/advertising";
 
 export function campaignID(campaign: AdCampaign) {
-  return campaign.id ?? campaign.ID ?? 0;
+  return campaign.id;
 }
 
 export function campaignName(campaign: AdCampaign) {
-  return campaign.name ?? campaign.Name ?? "이름 없는 캠페인";
+  return campaign.name;
 }
 
 export function campaignStatus(campaign: AdCampaign) {
-  return campaign.status ?? campaign.Status ?? "DRAFT";
+  return campaign.status;
 }
 
-export function campaignType(campaign: AdCampaign) {
-  return campaign.campaign_type ?? campaign.CampaignType ?? "SPONSORED_FEED";
+export function campaignFormat(campaign: AdCampaign) {
+  return campaign.creative.format;
 }
 
 export function campaignBudgetMicros(campaign: AdCampaign) {
-  return campaign.daily_budget_micros ?? campaign.DailyBudgetMicros ?? 0;
+  return campaign.daily_budget_micros;
 }
 
 export function campaignSpendMicros(campaign: AdCampaign) {
-  return campaign.daily_spend_micros ?? campaign.DailySpendMicros ?? 0;
+  return campaign.daily_spend_micros;
 }
 
 export function ratePlacement(rate: PlacementRate) {
-  return rate.placement_key ?? rate.PlacementKey ?? "";
+  return rate.placement_key;
 }
 
-export function rateCampaignType(rate: PlacementRate) {
-  return rate.campaign_type ?? rate.CampaignType ?? "";
+export function ratePricingModel(rate: PlacementRate) {
+  return rate.pricing_model;
 }
 
-export function rateCPMMicros(rate: PlacementRate) {
-  return rate.cpm_micros ?? rate.CPMMicros ?? 0;
+export function ratePriceMicros(rate: PlacementRate) {
+  return rate.pricing_model === "DAILY_FLAT" ? rate.daily_flat_price_micros : rate.cpm_micros;
 }

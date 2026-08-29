@@ -5,14 +5,15 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { apiErrorMessage } from "@/lib/api-client";
 import { getEffectiveToken } from "@/lib/auth-token";
+import { couponPriceForProduct } from "@/lib/product-card-pricing";
 import { queryKeys } from "@/lib/query-keys";
 import type { CMSHomeSection, Product } from "@/lib/types";
 import { useSessionStore } from "@/lib/session-store";
-import { formatPrice } from "@/lib/utils";
+import { ApiErrorState } from "./api-error-state";
 import { ProductCard } from "./product-card";
-import { SponsoredProductSlot } from "./sponsored-product-slot";
+import { ProductCardPrice } from "./product-card-price";
+import { SponsoredPlacement } from "./advertising/sponsored-placement";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
@@ -104,7 +105,7 @@ export function HomePage() {
     <main className="mx-auto max-w-6xl px-4 pb-24">
       <section className="py-5">
         {eventsQuery.isError ? (
-          <div className="rounded-md border border-brand/30 bg-red-50 p-4 text-sm"><p className="font-bold text-brand">{apiErrorMessage(eventsQuery.error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void eventsQuery.refetch()}>이벤트 다시 시도</Button></div>
+          <ApiErrorState error={eventsQuery.error} onRetry={() => void eventsQuery.refetch()} retryLabel="이벤트 다시 시도" />
         ) : events.length ? (
           <div className="relative overflow-hidden rounded-md border border-line bg-white">
             <div
@@ -145,7 +146,7 @@ export function HomePage() {
       </section>
 
       <section className="rounded-2xl border border-line bg-white p-3 shadow-sm" aria-label="홈 카테고리와 이벤트">
-        {homeCategoryChipsQuery.isError ? <div className="p-3 text-sm"><p className="font-bold text-brand">{apiErrorMessage(homeCategoryChipsQuery.error)}</p><Button className="mt-2" size="sm" variant="secondary" onClick={() => void homeCategoryChipsQuery.refetch()}>카테고리 다시 시도</Button></div> : null}
+        {homeCategoryChipsQuery.isError ? <ApiErrorState className="m-3" error={homeCategoryChipsQuery.error} onRetry={() => void homeCategoryChipsQuery.refetch()} retryLabel="카테고리 다시 시도" /> : null}
         {homeCategoryChipsQuery.isLoading ? <p className="p-3 text-sm text-muted">카테고리를 불러오는 중입니다.</p> : null}
         {homeCategoryChipsQuery.isSuccess && displayHomeCategoryChips.length === 0 ? <p className="p-3 text-sm text-muted">표시할 홈 카테고리가 없습니다.</p> : null}
         <div className="grid grid-cols-[repeat(auto-fit,minmax(72px,1fr))] gap-1.5">
@@ -162,12 +163,12 @@ export function HomePage() {
       </section>
 
       <section className="py-3" aria-label="메인 보장형 광고">
-        <SponsoredProductSlot placementKey="home.main_banner" className="border-2 shadow-sm" />
+        <SponsoredPlacement placementKey="home.main_banner" />
       </section>
 		<section className="py-2" aria-label="인앱 광고 알림">
-			<SponsoredProductSlot placementKey="crm.in_app_notification" impressionEventType="IN_APP_IMPRESSION" />
+			<SponsoredPlacement placementKey="crm.in_app_notification" />
 		</section>
-      {homeSectionsQuery.isError ? <div className="my-7 rounded-md border border-brand/30 bg-red-50 p-4 text-sm"><p className="font-bold text-brand">{apiErrorMessage(homeSectionsQuery.error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void homeSectionsQuery.refetch()}>홈 구좌 다시 시도</Button></div> : null}
+      {homeSectionsQuery.isError ? <ApiErrorState className="my-7" error={homeSectionsQuery.error} onRetry={() => void homeSectionsQuery.refetch()} retryLabel="홈 구좌 다시 시도" /> : null}
       {homeSectionsQuery.isLoading ? <p className="py-7 text-sm text-muted">홈 상품 구좌를 불러오는 중입니다.</p> : null}
       {homeSectionsQuery.isSuccess && displayHomeSections.length === 0 ? <p className="py-7 text-sm text-muted">표시할 홈 상품 구좌가 없습니다.</p> : null}
       {displayHomeSections.map((section, index) => (
@@ -183,7 +184,7 @@ export function HomePage() {
         />
       ))}
       <section className="py-3" aria-label="스폰서드 상품">
-        <SponsoredProductSlot placementKey="home_feed.sponsored_card" />
+        <SponsoredPlacement placementKey="home_feed.sponsored_card" />
       </section>
 
       <section className="py-7">
@@ -194,7 +195,7 @@ export function HomePage() {
           </div>
         </div>
         {recommendationQuery.isError ? (
-          <div className="rounded-md border border-brand/30 bg-red-50 p-4 text-sm"><p className="font-bold text-brand">{apiErrorMessage(recommendationQuery.error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void recommendationQuery.refetch()}>추천 다시 시도</Button></div>
+          <ApiErrorState error={recommendationQuery.error} onRetry={() => void recommendationQuery.refetch()} retryLabel="추천 다시 시도" />
         ) : recommendationQuery.isLoading ? (
           <div className="grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
             {Array.from({ length: 4 }).map((_, index) => (
@@ -267,7 +268,7 @@ function ProductCarouselSection({
           ))}
         </div>
       ) : error ? (
-        <div className="rounded-md border border-brand/30 bg-red-50 p-4 text-sm"><p className="font-bold text-brand">{apiErrorMessage(error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={onRetry}>다시 시도</Button></div>
+        <ApiErrorState error={error} onRetry={onRetry} />
       ) : (
         <div ref={carouselRef} className="no-scrollbar flex snap-x gap-3 overflow-x-auto scroll-smooth pb-1 md:gap-4">
           {products.map((product) => (
@@ -282,8 +283,6 @@ function ProductCarouselSection({
   );
 }
 function PopularSquareCard({ product }: { product: Product }) {
-  const price = product.discount_price || product.base_price;
-
   return (
     <Link href={`/products/${product.id}`} className="group relative block aspect-square overflow-hidden rounded-md bg-zinc-100">
       <SafeImage
@@ -297,7 +296,12 @@ function PopularSquareCard({ product }: { product: Product }) {
       <div className="absolute inset-x-0 bottom-0 p-3 text-white">
         <p className="truncate text-xs font-bold text-white/80">{product.market_name}</p>
         <h3 className="mt-1 line-clamp-2 text-sm font-black leading-5">{product.name}</h3>
-        <p className="mt-1 text-sm font-black">{formatPrice(price)}</p>
+        <ProductCardPrice
+          variant="overlay"
+          basePrice={product.base_price}
+          discountPrice={product.discount_price}
+          couponPrice={couponPriceForProduct(product)}
+        />
       </div>
     </Link>
   );

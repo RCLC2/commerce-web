@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import type { PLPInformation, PLPProductParams } from "@/lib/types";
+import { ApiErrorState } from "./api-error-state";
 import { ProductCard } from "./product-card";
 
 function positivePage(raw: string | null) {
@@ -137,7 +138,14 @@ export function ProductListPage() {
         {activeFilters.length ? <button type="button" className="inline-flex h-8 items-center gap-1 px-2 text-xs font-bold text-muted hover:text-foreground" onClick={clearFilters}><X size={14} /> 초기화</button> : null}
       </div>
 
-      {informationQuery.error || productsQuery.error ? <p className="mt-8 rounded-md border border-red-200 bg-red-50 p-4 text-sm font-bold text-brand">PLP 정보를 불러오지 못했습니다.</p> : null}
+      {informationQuery.error || productsQuery.error ? (
+        <ApiErrorState
+          className="mt-8"
+          error={informationQuery.error ?? productsQuery.error}
+          onRetry={() => void (informationQuery.error ? informationQuery.refetch() : productsQuery.refetch())}
+          retryLabel="상품 목록 다시 시도"
+        />
+      ) : null}
       {productsQuery.isLoading ? <p className="mt-8 text-sm text-muted">상품을 불러오는 중입니다.</p> : null}
       {!productsQuery.isLoading && productPage && !productPage.items.length ? (
         <div className="mt-8 rounded-md border border-line bg-white p-10 text-center"><p className="font-black">조건에 맞는 상품이 없습니다.</p><p className="mt-1 text-sm text-muted">필터를 조정해보세요.</p></div>

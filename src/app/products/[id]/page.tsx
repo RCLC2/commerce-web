@@ -7,9 +7,7 @@ export default async function ProductDetail({ params }: { params: Promise<{ id: 
   const productId = Number(id);
   const [initialProduct, merchandising] = await Promise.all([
     api.getProduct(productId).catch(() => undefined),
-    getPdpMerchandising(productId).catch(() => ({
-      also_viewed: [], card_ad: null, sponsored_market: null,
-    })),
+    getPdpMerchandising(productId).catch(() => ({ also_viewed: [] })),
   ]);
 
   return <ProductDetailExperience productId={productId} initialProduct={initialProduct} initialMerchandising={merchandising} />;

@@ -8,9 +8,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import type { Market, Product, SearchResultSection } from "@/lib/types";
-import { formatFollowerCount, formatPrice } from "@/lib/utils";
+import { couponPriceForProduct } from "@/lib/product-card-pricing";
+import { formatFollowerCount } from "@/lib/utils";
 import { ProductCard } from "./product-card";
-import { SponsoredProductSlot } from "./sponsored-product-slot";
+import { ProductCardPrice } from "./product-card-price";
+import { ApiErrorState } from "./api-error-state";
+import { SponsoredPlacement } from "./advertising/sponsored-placement";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
@@ -145,13 +148,13 @@ function SearchExperience({
       ) : (
         <div className="mx-auto max-w-4xl">
           <section className="mb-5" aria-label="검색 스폰서드 상품">
-            <SponsoredProductSlot placementKey="search.sponsored_top" />
+            <SponsoredPlacement placementKey="search.sponsored_top" />
           </section>
           <ResultListHeader title="상품" total={results?.products.total ?? 0} />
           <div className="space-y-7">
             {productSections.map((section) => <SearchCarousel key={section.id} section={section} setRef={(node) => { if (node) carouselRefs.current.set(section.id, node); else carouselRefs.current.delete(section.id); }} onSlide={(direction) => slide(section.id, direction)} />)}
           </div>
-          {error ? <ErrorBox message={error.message} onRetry={() => void refetchResults()} /> : null}
+          {error ? <ErrorBox error={error} onRetry={() => void refetchResults()} /> : null}
           {isLoading ? <LoadingGrid /> : null}
           {!isLoading && !error && !results?.products.items.length ? <EmptyBox message="검색된 상품이 없습니다." /> : null}
           {results?.products.items.length ? <div className="mt-7 grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">{results.products.items.map((product) => <ProductCard key={product.id} product={product} />)}</div> : null}
@@ -194,10 +197,6 @@ function SearchCarousel({ section, setRef, onSlide }: { section: SearchResultSec
 }
 
 function CompactProductCard({ product }: { product: Product }) {
-  const price = product.discount_price || product.base_price;
-  const couponPrice = product.coupon_lowest_price || product.coupon_offer?.discounted_amount;
-  const hasDiscount = price < product.base_price;
-  const hasCoupon = Boolean(couponPrice && couponPrice > 0);
   return (
     <Link href={"/products/" + product.id} className="flex h-36 w-[72vw] max-w-72 shrink-0 snap-start gap-3 rounded-md border border-line bg-white p-3">
       <div className="relative aspect-square h-full shrink-0 overflow-hidden rounded-md bg-zinc-100">
@@ -206,16 +205,7 @@ function CompactProductCard({ product }: { product: Product }) {
       <div className="min-w-0 py-1">
         <p className="text-xs font-bold text-muted">{product.market_name ?? "마켓 " + product.market_id}</p>
         <p className="mt-2 line-clamp-2 text-sm font-black leading-5">{product.name}</p>
-        <div className="mt-3 flex items-baseline justify-between gap-2">
-          {hasDiscount || hasCoupon ? (
-            <del className="truncate text-[11px] text-muted">{formatPrice(hasCoupon ? price : product.base_price)}</del>
-          ) : (
-            <span className="text-[11px] text-muted">판매가</span>
-          )}
-          <span className={hasCoupon ? "shrink-0 text-xs font-black text-violet-700" : "shrink-0 text-sm font-black text-brand"}>
-            {hasCoupon ? "쿠폰 최적가 " + formatPrice(couponPrice ?? 0) : hasDiscount ? "할인가 " + formatPrice(price) : formatPrice(price)}
-          </span>
-        </div>
+        <ProductCardPrice variant="compact" basePrice={product.base_price} discountPrice={product.discount_price} couponPrice={couponPriceForProduct(product)} />
       </div>
     </Link>
   );
@@ -246,7 +236,6 @@ function MarketCard({ market }: { market: Market }) {
 }
 
 function MarketPopularProductCard({ product }: { product: Product }) {
-  const price = product.discount_price || product.base_price;
   return (
     <Link href={`/products/${product.id}`} className="group relative block aspect-square overflow-hidden rounded-md bg-zinc-100">
       <SafeImage src={product.image_url} alt={product.name} fill sizes="128px" className="object-cover transition duration-300 group-hover:scale-[1.03]" />
@@ -254,7 +243,7 @@ function MarketPopularProductCard({ product }: { product: Product }) {
       <div className="absolute inset-x-0 bottom-0 p-2 text-white">
         <p className="truncate text-[10px] font-bold text-white/80">{product.market_name}</p>
         <h4 className="mt-0.5 line-clamp-2 text-xs font-black leading-4">{product.name}</h4>
-        <p className="mt-0.5 text-xs font-black">{formatPrice(price)}</p>
+        <ProductCardPrice variant="overlay" basePrice={product.base_price} discountPrice={product.discount_price} couponPrice={couponPriceForProduct(product)} />
       </div>
     </Link>
   );
@@ -272,7 +261,7 @@ function Pagination({ page, totalPages, onChange, label }: { page: number; total
 
 function ResultListHeader({ title, total }: { title: string; total: number }) { return <div className="mb-4 mt-8 flex items-center justify-between"><h2 className="text-xl font-black">{title}</h2><span className="text-sm font-bold text-muted">총 {total.toLocaleString("ko-KR")}개</span></div>; }
 function EmptyBox({ message }: { message: string }) { return <p className="rounded-md border border-line bg-white p-5 text-sm text-muted">{message}</p>; }
-function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }) { return <div className="rounded-md border border-brand/30 bg-red-50 p-5 text-sm"><p className="font-bold text-brand">{message}</p><Button className="mt-3" size="sm" variant="secondary" onClick={onRetry}>검색 다시 시도</Button></div>; }
+function ErrorBox({ error, onRetry }: { error: unknown; onRetry: () => void }) { return <ApiErrorState error={error} onRetry={onRetry} retryLabel="검색 다시 시도" />; }
 function LoadingGrid() { return <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="aspect-square animate-pulse rounded-md bg-zinc-200" />)}</div>; }
 function TrendIcon({ trend }: { trend: "UP" | "DOWN" | "SAME" }) { if (trend === "UP") return <ArrowUp size={18} className="text-red-500" />; if (trend === "DOWN") return <ArrowDown size={18} className="text-blue-500" />; return <Minus size={18} className="text-muted" />; }
 function positivePage(value: string | null) { const parsed = Number(value); return Number.isInteger(parsed) && parsed > 0 ? parsed : 1; }
