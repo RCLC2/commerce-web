@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { couponPriceForProduct } from "@/lib/product-card-pricing";
 import { queryKeys } from "@/lib/query-keys";
-import type { CMSHomeSection, Product } from "@/lib/types";
+import type { CMSHomeSection, CommerceEvent, Product } from "@/lib/types";
 import { useSessionStore } from "@/lib/session-store";
 import { ApiErrorState } from "./api-error-state";
 import { ProductCard } from "./product-card";
@@ -31,7 +31,6 @@ function productsForHomeSection(section: CMSHomeSection) {
 export function HomePage() {
   const token = useSessionStore((state) => state.accessToken);
   const memberID = useSessionStore((state) => state.memberID);
-  const [eventIndex, setEventIndex] = useState(0);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const effectiveToken = getEffectiveToken(token);
   const eventsQuery = useQuery({
@@ -89,57 +88,13 @@ export function HomePage() {
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  function moveEvent(direction: "prev" | "next") {
-    if (!events.length) {
-      return;
-    }
-    setEventIndex((current) => {
-      if (direction === "prev") {
-        return current === 0 ? events.length - 1 : current - 1;
-      }
-      return current === events.length - 1 ? 0 : current + 1;
-    });
-  }
-
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24">
       <section className="py-5">
         {eventsQuery.isError ? (
           <ApiErrorState error={eventsQuery.error} onRetry={() => void eventsQuery.refetch()} retryLabel="이벤트 다시 시도" />
         ) : events.length ? (
-          <div className="relative overflow-hidden rounded-md border border-line bg-white">
-            <div
-              className="flex transition-transform duration-500 ease-out"
-              style={{ transform: `translateX(-${eventIndex * 100}%)` }}
-            >
-              {events.map((event, index) => (
-                <Link key={event.id} href={`/events/${event.id}`} className="block min-w-full">
-                  <div className="relative h-64 bg-zinc-100 md:h-[380px]">
-                    <SafeImage src={event.image_url} alt={event.title} fill sizes="100vw" className="object-cover" priority={index === 0} />
-                    <div className="absolute inset-0 bg-black/30" />
-                    <div className="absolute bottom-0 left-0 max-w-lg p-5 text-white md:p-8">
-                      <p className="text-sm font-bold">진행중인 이벤트</p>
-                      <h1 className="mt-2 text-3xl font-black md:text-5xl">{event.title}</h1>
-                      <p className="mt-2 text-sm text-white/90">{event.subtitle}</p>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-            <div className="absolute right-4 top-4 rounded-full bg-black/55 px-3 py-1 text-xs font-bold text-white">
-              {eventIndex + 1}/{events.length}
-            </div>
-            <div className="absolute inset-y-0 left-0 flex items-center px-2">
-              <Button variant="secondary" size="icon" aria-label="이전 이벤트" onClick={() => moveEvent("prev")}>
-                <ChevronLeft size={18} />
-              </Button>
-            </div>
-            <div className="absolute inset-y-0 right-0 flex items-center px-2">
-              <Button variant="secondary" size="icon" aria-label="다음 이벤트" onClick={() => moveEvent("next")}>
-                <ChevronRight size={18} />
-              </Button>
-            </div>
-          </div>
+          <EventCarousel events={events} />
         ) : eventsQuery.isLoading ? (
           <div className="h-64 animate-pulse rounded-md bg-zinc-200" />
         ) : <p className="rounded-md border border-line bg-white p-6 text-sm text-muted">진행 중인 이벤트가 없습니다.</p>}
@@ -216,6 +171,93 @@ export function HomePage() {
         ) : null}
       </section>
     </main>
+  );
+}
+
+const EVENT_AUTOPLAY_INTERVAL_MS = 3_000;
+
+export function EventCarousel({ events }: { events: CommerceEvent[] }) {
+  const [eventIndex, setEventIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocusWithin, setIsFocusWithin] = useState(false);
+  const currentEventIndex = events.length ? eventIndex % events.length : 0;
+  const isAutoplayPaused = isHovered || isFocusWithin;
+
+  useEffect(() => {
+    if (events.length < 2 || isAutoplayPaused) {
+      return;
+    }
+
+    const timeoutID = window.setTimeout(() => {
+      setEventIndex((current) => (current + 1) % events.length);
+    }, EVENT_AUTOPLAY_INTERVAL_MS);
+
+    return () => window.clearTimeout(timeoutID);
+  }, [eventIndex, events.length, isAutoplayPaused]);
+
+  function moveEvent(direction: "prev" | "next") {
+    if (!events.length) {
+      return;
+    }
+    setEventIndex((current) => {
+      const normalizedIndex = current % events.length;
+      if (direction === "prev") {
+        return normalizedIndex === 0 ? events.length - 1 : normalizedIndex - 1;
+      }
+      return normalizedIndex === events.length - 1 ? 0 : normalizedIndex + 1;
+    });
+  }
+
+  if (!events.length) {
+    return null;
+  }
+
+  return (
+    <div
+      className="relative overflow-hidden rounded-md border border-line bg-white"
+      role="region"
+      aria-label="진행 중인 이벤트"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onFocus={() => setIsFocusWithin(true)}
+      onBlur={(event) => {
+        if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) {
+          setIsFocusWithin(false);
+        }
+      }}
+    >
+      <div
+        className="flex transition-transform duration-500 ease-out"
+        style={{ transform: `translateX(-${currentEventIndex * 100}%)` }}
+      >
+        {events.map((event, index) => (
+          <Link key={event.id} href={`/events/${event.id}`} className="block min-w-full">
+            <div className="relative h-64 bg-zinc-100 md:h-[380px]">
+              <SafeImage src={event.image_url} alt={event.title} fill sizes="100vw" className="object-cover" priority={index === 0} />
+              <div className="absolute inset-0 bg-black/30" />
+              <div className="absolute bottom-0 left-0 max-w-lg p-5 text-white md:p-8">
+                <p className="text-sm font-bold">진행중인 이벤트</p>
+                <h1 className="mt-2 text-3xl font-black md:text-5xl">{event.title}</h1>
+                <p className="mt-2 text-sm text-white/90">{event.subtitle}</p>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+      <div className="absolute right-4 top-4 rounded-full bg-black/55 px-3 py-1 text-xs font-bold text-white">
+        {currentEventIndex + 1}/{events.length}
+      </div>
+      <div className="absolute inset-y-0 left-0 flex items-center px-2">
+        <Button variant="secondary" size="icon" aria-label="이전 이벤트" onClick={() => moveEvent("prev")}>
+          <ChevronLeft size={18} />
+        </Button>
+      </div>
+      <div className="absolute inset-y-0 right-0 flex items-center px-2">
+        <Button variant="secondary" size="icon" aria-label="다음 이벤트" onClick={() => moveEvent("next")}>
+          <ChevronRight size={18} />
+        </Button>
+      </div>
+    </div>
   );
 }
 
