@@ -174,7 +174,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
                 const completed = item.status === "COMPLETED" || Boolean(item.purchase_confirmed_at);
                 const serverReviewed = reviewedLineItemIDs.has(item.id);
                 const reviewEligible = canWriteOrderLineReview({
-                  reviewable: item.reviewable ?? completed,
+                  reviewable: item.reviewable,
                   reviewStatusLoaded: myReviews.isSuccess,
                   serverReviewed,
                   submitted: submittedLineItemIDs.has(item.id),
