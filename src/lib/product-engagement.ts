@@ -71,10 +71,10 @@ export function canWriteOrderLineReview({
   serverReviewed,
   submitted,
 }: {
-  reviewable: boolean;
+  reviewable: boolean | undefined;
   reviewStatusLoaded: boolean;
   serverReviewed: boolean;
   submitted: boolean;
 }) {
-  return reviewable && reviewStatusLoaded && !serverReviewed && !submitted;
+  return reviewable === true && reviewStatusLoaded && !serverReviewed && !submitted;
 }
