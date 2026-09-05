@@ -21,6 +21,8 @@ import { useSessionStore } from "@/lib/session-store";
 import type { PdpMerchandising, Product, ProductOption } from "@/lib/types";
 import { discountRate, formatPrice } from "@/lib/utils";
 import { SponsoredPlacement } from "./advertising/sponsored-placement";
+import { CollapsibleProductDetail } from "./collapsible-product-detail";
+import { PageJumpControls } from "./page-jump-controls";
 import { AlsoViewedSection } from "./pdp-merchandising-sections";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
@@ -498,14 +500,17 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
       <section className="pt-10">
         <div className="mx-auto max-w-3xl">
           <h2 className="text-2xl font-black">상품 상세 정보</h2>
-          <div
+          <CollapsibleProductDetail
+            key={product.id}
+            html={detailHtml}
             className="mt-6 overflow-hidden rounded-xl bg-white text-zinc-800 [&_.detail-band]:px-5 [&_.detail-band]:py-12 [&_.detail-center]:mx-auto [&_.detail-center]:max-w-2xl [&_.detail-center-text]:text-center [&_.detail-hero]:bg-zinc-50 [&_.detail-eyebrow]:mt-0 [&_.detail-eyebrow]:text-xs [&_.detail-eyebrow]:font-black [&_.detail-eyebrow]:tracking-[0.16em] [&_.detail-eyebrow]:text-brand [&_.detail-features_ul]:mt-5 [&_.detail-features_ul]:space-y-2 [&_.detail-features_li]:border-l-2 [&_.detail-features_li]:border-brand [&_.detail-features_li]:pl-3 [&_.detail-notice_.detail-center]:rounded-xl [&_.detail-notice_.detail-center]:bg-zinc-100 [&_.detail-notice_.detail-center]:p-5 [&_.detail-divider]:mx-auto [&_.detail-divider]:h-px [&_.detail-divider]:max-w-2xl [&_.detail-divider]:bg-zinc-200 [&_.detail-button]:inline-flex [&_.detail-button]:rounded-full [&_.detail-button]:bg-zinc-900 [&_.detail-button]:px-5 [&_.detail-button]:py-3 [&_.detail-button]:font-black [&_.detail-button]:text-white [&_h3]:text-2xl [&_h3]:font-black [&_h4]:text-lg [&_h4]:font-black [&_img]:w-full [&_p]:mt-3 [&_p]:leading-7 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-line [&_td]:p-3 [&_th]:border [&_th]:border-line [&_th]:bg-zinc-50 [&_th]:p-3"
-            dangerouslySetInnerHTML={{ __html: detailHtml }}
           />
         </div>
       </section>
 
       <AlsoViewedSection products={initialMerchandising.also_viewed} />
+
+      <PageJumpControls />
 
       <div
         className={`fixed inset-x-0 bottom-16 z-40 border-t border-line bg-white/95 px-4 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] backdrop-blur transition md:bottom-0 ${showFloatingPurchase ? "opacity-100" : "pointer-events-none translate-y-full opacity-0"}`}
