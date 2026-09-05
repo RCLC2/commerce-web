@@ -7,10 +7,10 @@ export const adPlacementSchema = z.enum([
   "search.sponsored_top",
   "pdp.card_banner",
   "pdp.sponsored_market",
-  "crm.in_app_notification",
+  "home.promotion_card",
   "crm.push_notification",
 ]);
-export const creativeFormatSchema = z.enum(["PRODUCT_CARD", "BANNER", "MARKET_SHELF", "IN_APP", "PUSH"]);
+export const creativeFormatSchema = z.enum(["PRODUCT_CARD", "BANNER", "MARKET_SHELF", "PROMOTION_CARD", "PUSH"]);
 const pricingModelSchema = z.enum(["CPM", "DAILY_FLAT"]);
 const dateStringSchema = z.string().min(1).refine((value) => !Number.isNaN(Date.parse(value)), "유효한 날짜 문자열이어야 합니다.");
 
@@ -72,9 +72,9 @@ const bannerCreativeSchema = z.strictObject({
   cta_label: z.string().min(1),
 }).superRefine(requireCompletePexelsAttribution);
 const marketShelfCreativeSchema = z.strictObject({ ...optionalCreativeShape, format: z.literal("MARKET_SHELF") }).superRefine(requireCompletePexelsAttribution);
-const inAppCreativeSchema = z.strictObject({
+const promotionCardCreativeSchema = z.strictObject({
   ...optionalCreativeShape,
-  format: z.literal("IN_APP"),
+  format: z.literal("PROMOTION_CARD"),
   headline: z.string().min(1),
   body: z.string().min(1),
 }).superRefine(requireCompletePexelsAttribution);
@@ -89,7 +89,7 @@ export const adCreativeSchema = z.discriminatedUnion("format", [
   productCardCreativeSchema,
   bannerCreativeSchema,
   marketShelfCreativeSchema,
-  inAppCreativeSchema,
+  promotionCardCreativeSchema,
   pushCreativeSchema,
 ]);
 
@@ -109,7 +109,7 @@ export const adDecisionSchema = z.strictObject({
     "search.sponsored_top": { format: "PRODUCT_CARD", targets: ["PRODUCT"] },
     "pdp.card_banner": { format: "BANNER", targets: ["PRODUCT", "MARKET"] },
     "pdp.sponsored_market": { format: "MARKET_SHELF", targets: ["MARKET"] },
-    "crm.in_app_notification": { format: "IN_APP", targets: ["PRODUCT", "MARKET"] },
+    "home.promotion_card": { format: "PROMOTION_CARD", targets: ["PRODUCT", "MARKET"] },
     "crm.push_notification": { format: "PUSH", targets: ["PRODUCT", "MARKET"] },
   };
   const expected = contract[value.placement_key];
@@ -142,8 +142,8 @@ const managementCreativeSchema = z.strictObject({
   if (value.format === "BANNER" && (!value.headline || !value.image_url || !value.cta_label)) {
     context.addIssue({ code: "custom", message: "배너에는 제목·이미지·행동 문구가 필요합니다.", path: ["format"] });
   }
-  if ((value.format === "IN_APP" || value.format === "PUSH") && (!value.headline || !value.body)) {
-    context.addIssue({ code: "custom", message: "알림 광고에는 제목과 본문이 필요합니다.", path: ["format"] });
+  if ((value.format === "PROMOTION_CARD" || value.format === "PUSH") && (!value.headline || !value.body)) {
+    context.addIssue({ code: "custom", message: "홈 프로모션 카드와 푸시에는 제목과 본문이 필요합니다.", path: ["format"] });
   }
 });
 
@@ -240,7 +240,7 @@ export const advertisingApi = {
     campaign_id: z.number().int().positive(), impressions: z.number().int().nonnegative(), clicks: z.number().int().nonnegative(),
     spend_micros: z.number().int().nonnegative(), attributed_orders: z.number().int().nonnegative(), revenue_micros: z.number().int().nonnegative(),
   })), `/api/v1/seller/ads/reports${marketQuery(marketID)}`, { token }),
-  recordAdEvent: (payload: { event_id: string; decision_id: string; type: "IMPRESSION" | "CLICK" | "IN_APP_IMPRESSION"; occurred_at: string }, token?: string | null) =>
+  recordAdEvent: (payload: { event_id: string; decision_id: string; type: "IMPRESSION" | "CLICK" | "PROMOTION_CARD_IMPRESSION"; occurred_at: string }, token?: string | null) =>
     requestParsed(eventReceiptSchema, "/api/v1/ads/events", {
       method: "POST",
       token: token ?? undefined,

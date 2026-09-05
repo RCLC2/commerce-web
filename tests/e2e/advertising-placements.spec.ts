@@ -7,16 +7,19 @@ const visualPlacements: AdPlacement[] = [
   "search.sponsored_top",
   "pdp.card_banner",
   "pdp.sponsored_market",
+  "home.promotion_card",
 ];
 
-test("five visual placements disclose sponsorship and preserve decision event identity", async ({ page }) => {
+test("six home and commerce placements disclose sponsorship and preserve decision event identity", async ({ page }) => {
+  test.setTimeout(60_000);
+
   const decisionRequests = new Map<AdPlacement, string>();
   const events: Array<{ decision_id: string; type: string }> = [];
 
   await page.route("**/api/v1/ads/decisions", async (route) => {
     const request = route.request().postDataJSON() as { request_id: string; placement_key: AdPlacement };
     decisionRequests.set(request.placement_key, request.request_id);
-    if (request.placement_key === "crm.in_app_notification" || request.placement_key === "crm.push_notification") {
+    if (request.placement_key === "crm.push_notification") {
       await route.fulfill({ status: 204, body: "" });
       return;
     }
@@ -30,6 +33,7 @@ test("five visual placements disclose sponsorship and preserve decision event id
   await page.goto("/");
   await exposePlacement(page, "home.main_banner");
   await exposePlacement(page, "home_feed.sponsored_card");
+  await exposePlacement(page, "home.promotion_card");
 
   await page.goto("/search?q=셔츠");
   const searchAd = await exposePlacement(page, "search.sponsored_top");
@@ -43,7 +47,8 @@ test("five visual placements disclose sponsorship and preserve decision event id
   expect([...decisionRequests.keys()]).toEqual(expect.arrayContaining(visualPlacements));
   for (const placement of visualPlacements) {
     expect(decisionRequests.get(placement)).toMatch(/^ads-/);
-    await expect.poll(() => events.filter((event) => event.decision_id === decisionID(placement) && event.type === "IMPRESSION").length).toBe(1);
+    const impressionType = placement === "home.promotion_card" ? "PROMOTION_CARD_IMPRESSION" : "IMPRESSION";
+    await expect.poll(() => events.filter((event) => event.decision_id === decisionID(placement) && event.type === impressionType).length).toBe(1);
   }
 });
 
@@ -93,6 +98,13 @@ function decisionFor(placement: AdPlacement, requestID: string) {
         landing_url: "/products/1",
         cta_label: "자세히 보기",
       },
+    };
+  }
+  if (placement === "home.promotion_card") {
+    return {
+      ...common,
+      target: { type: "PRODUCT", product },
+      creative: { id: 106, format: "PROMOTION_CARD", headline: "오늘의 추천", body: "광고 상품을 확인해 보세요", landing_url: "/products/1" },
     };
   }
   return {

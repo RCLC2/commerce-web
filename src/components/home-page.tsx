@@ -128,9 +128,9 @@ export function HomePage() {
       <section className="py-3" aria-label="메인 보장형 광고">
         <SponsoredPlacement placementKey="home.main_banner" />
       </section>
-		<section className="py-2" aria-label="인앱 광고 알림">
-			<SponsoredPlacement placementKey="crm.in_app_notification" />
-		</section>
+      <section className="py-2" aria-label="홈 프로모션 카드">
+        <SponsoredPlacement placementKey="home.promotion_card" />
+      </section>
       {homeSectionsQuery.isError ? <ApiErrorState className="my-7" error={homeSectionsQuery.error} onRetry={() => void homeSectionsQuery.refetch()} retryLabel="홈 구좌 다시 시도" /> : null}
       {homeSectionsQuery.isLoading ? <p className="py-7 text-sm text-muted">홈 상품 구좌를 불러오는 중입니다.</p> : null}
       {homeSectionsQuery.isSuccess && displayHomeSections.length === 0 ? <p className="py-7 text-sm text-muted">표시할 홈 상품 구좌가 없습니다.</p> : null}
