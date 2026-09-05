@@ -80,8 +80,24 @@ describe("SponsoredDecision", () => {
     render(<SponsoredDecision decision={bannerDecision()} />);
 
     expect(screen.getByRole("img", { name: "테스트 상품 스폰서드 배너" })).toHaveClass("object-cover");
+    expect(screen.getByRole("img", { name: "테스트 상품 스폰서드 배너" }).parentElement).toHaveClass("h-44", "md:h-56");
     expect(screen.getByRole("link", { name: "Jane Doe" })).toHaveAttribute("href", "https://www.pexels.com/@jane");
     expect(screen.getByRole("link", { name: "Pexels" })).toHaveAttribute("href", "https://www.pexels.com/photo/88");
+  });
+
+  it("uses a shorter banner on PDP", () => {
+    render(<SponsoredDecision decision={pdpBannerDecision()} />);
+
+    expect(screen.getByRole("img", { name: "테스트 상품 스폰서드 배너" }).parentElement).toHaveClass("h-36", "md:h-44");
+  });
+
+  it("uses compact cards for home feed and PDP market placements", () => {
+    const product = render(<SponsoredDecision decision={productCardDecision()} />);
+    expect(screen.getByRole("link", { name: /테스트 상품/ })).toHaveClass("min-h-32", "grid-cols-[104px_1fr]");
+    product.unmount();
+
+    render(<SponsoredDecision decision={marketShelfDecision()} />);
+    expect(screen.getByRole("link", { name: /마켓 상품/ })).toHaveClass("w-32", "md:w-36");
   });
 
   it("keeps market carousel controls separate and keyboard-labelled", () => {
@@ -125,6 +141,21 @@ function bannerDecision(): AdDecision {
       pexels_photographer: "Jane Doe",
       pexels_photographer_url: "https://www.pexels.com/@jane",
       pexels_photo_url: "https://www.pexels.com/photo/88",
+    },
+  });
+}
+
+function pdpBannerDecision(): AdDecision {
+  return baseDecision({
+    placement_key: "pdp.card_banner",
+    target: productTarget(),
+    creative: {
+      id: 5,
+      format: "BANNER",
+      headline: "상세 추천",
+      image_url: "https://images.pexels.com/pdp-banner.jpg",
+      landing_url: "/products/7",
+      cta_label: "자세히 보기",
     },
   });
 }

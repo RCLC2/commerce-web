@@ -33,9 +33,9 @@ describe("customer discovery contracts", () => {
     }]), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    const recommendations = await customerApi.listMyRecommendations("token", 12);
+    const recommendations = await customerApi.listMyRecommendations("token", { limit: 12, offset: 24 });
 
-    expect(fetchMock.mock.calls[0][0]).toContain("/api/v1/me/recommendations?limit=12");
+    expect(fetchMock.mock.calls[0][0]).toContain("/api/v1/me/recommendations?limit=12&offset=24");
     expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get("Authorization")).toBe("Bearer token");
     expect(recommendations[0]).toMatchObject({ source: "BATCH", product: { id: 31 } });
   });

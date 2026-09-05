@@ -1,6 +1,6 @@
 "use client";
 
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueries, useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -32,10 +32,28 @@ function isLegacyRecommendationSection(section: CMSHomeSection) {
   return section.api_url.includes("/products/recommendations");
 }
 
+const HOME_RECOMMENDATION_PAGE_SIZE = 12;
+
+function nextRecommendationOffset(lastPage: { products: Product[] }, pages: Array<{ products: Product[] }>) {
+  if (lastPage.products.length < HOME_RECOMMENDATION_PAGE_SIZE) {
+    return undefined;
+  }
+
+  const previousProductIDs = new Set(
+    pages.slice(0, -1).flatMap((page) => page.products.map((product) => product.id)),
+  );
+  if (lastPage.products.every((product) => previousProductIDs.has(product.id))) {
+    return undefined;
+  }
+
+  return pages.length * HOME_RECOMMENDATION_PAGE_SIZE;
+}
+
 export function HomePage() {
   const token = useSessionStore((state) => state.accessToken);
   const memberID = useSessionStore((state) => state.memberID);
   const hydrated = useSessionStore((state) => state.hydrated);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const effectiveToken = getEffectiveToken(token);
   const eventsQuery = useQuery({
     queryKey: queryKeys.events,
@@ -52,21 +70,34 @@ export function HomePage() {
     queryFn: api.listHomeSections,
   });
   const homeSections = homeSectionsQuery.data ?? [];
-  const recommendationQuery = useQuery({
+  const recommendationQuery = useInfiniteQuery({
     queryKey: queryKeys.homeRecommendations(memberID),
-    queryFn: async () => {
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
       if (!effectiveToken) {
-        return { source: "GUEST" as const, products: await api.listPopularProducts() };
+        return {
+          source: "GUEST" as const,
+          products: await api.listPopularProducts({ limit: HOME_RECOMMENDATION_PAGE_SIZE, offset: pageParam }),
+        };
       }
-      const recommendations = await api.listMyRecommendations(effectiveToken, 12);
+      const recommendations = await api.listMyRecommendations(effectiveToken, {
+        limit: HOME_RECOMMENDATION_PAGE_SIZE,
+        offset: pageParam,
+      });
       return {
         source: recommendations[0]?.source ?? "BATCH",
         products: recommendations.map((recommendation) => recommendation.product),
       };
     },
+    getNextPageParam: nextRecommendationOffset,
     enabled: hydrated,
   });
-  const recommendationProducts = recommendationQuery.data?.products ?? [];
+  const recommendationProducts = Array.from(
+    new Map(
+      (recommendationQuery.data?.pages.flatMap((page) => page.products) ?? [])
+        .map((product) => [product.id, product] as const),
+    ).values(),
+  );
   const profileQuery = useQuery({
     queryKey: queryKeys.homeMe(memberID),
     queryFn: () => api.me(effectiveToken ?? ""),
@@ -74,7 +105,7 @@ export function HomePage() {
   });
   const profile = profileQuery.data;
   const profileName = profile?.email?.split("@")[0] || "회원";
-  const recommendationSource = recommendationQuery.data?.source ?? (hydrated && !effectiveToken ? "GUEST" : undefined);
+  const recommendationSource = recommendationQuery.data?.pages[0]?.source ?? (hydrated && !effectiveToken ? "GUEST" : undefined);
   const recommendationTitle = recommendationSource === "GUEST"
     ? "지금 많이 보는 상품"
     : recommendationSource === "FALLBACK"
@@ -95,6 +126,19 @@ export function HomePage() {
       queryFn: () => productsForHomeSection(section),
     })),
   });
+
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = recommendationQuery;
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+        void fetchNextPage();
+      }
+    }, { rootMargin: "320px 0px" });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24">
@@ -125,7 +169,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="py-3" aria-label="메인 보장형 광고">
+      <section className="py-2" aria-label="메인 보장형 광고">
         <SponsoredPlacement placementKey="home.main_banner" />
       </section>
       <section className="py-2" aria-label="홈 프로모션 카드">
@@ -146,7 +190,7 @@ export function HomePage() {
           onRetry={() => void homeSectionQueries[index]?.refetch()}
         />
       ))}
-      <section className="py-3" aria-label="스폰서드 상품">
+      <section className="py-2" aria-label="스폰서드 상품">
         <SponsoredPlacement placementKey="home_feed.sponsored_card" />
       </section>
 
@@ -174,6 +218,10 @@ export function HomePage() {
           </div>
         )}
         {recommendationQuery.isSuccess && recommendationProducts.length === 0 ? <p className="text-sm text-muted">표시할 추천 상품이 없습니다.</p> : null}
+        <div ref={loadMoreRef} className="h-8" aria-hidden="true" />
+        {recommendationQuery.hasNextPage || recommendationQuery.isFetchingNextPage ? (
+          <p className="text-center text-xs text-muted">추천 상품을 더 불러오는 중입니다.</p>
+        ) : null}
       </section>
     </main>
   );
