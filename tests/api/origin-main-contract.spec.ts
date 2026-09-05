@@ -34,7 +34,7 @@ test.describe("backend origin/main live API contract", () => {
       "/api/v1/products",
       "/api/v1/products/popular",
       "/api/v1/products/promotions",
-      "/api/v1/products/recommendations",
+      "/api/v1/products/latest",
     ]) {
       const body = await getJSON(request, endpoint);
       expect(Array.isArray(body), endpoint).toBeTruthy();
@@ -81,6 +81,25 @@ test.describe("backend origin/main live API contract", () => {
     ]) {
       expect(Array.isArray(await getJSON(request, endpoint, session.accessToken)), endpoint).toBeTruthy();
     }
+
+    const recommendations = await getJSON(
+      request,
+      "/api/v1/me/recommendations?limit=12",
+      session.accessToken,
+    ) as Array<{ product?: { id?: number }; source?: string }>;
+    expect(recommendations.length).toBeGreaterThan(0);
+    expect(recommendations[0]).toEqual(expect.objectContaining({
+      source: expect.stringMatching(/^(BATCH|FALLBACK)$/),
+      product: expect.objectContaining({ id: expect.any(Number) }),
+    }));
+
+    const marketFeed = await getJSON(
+      request,
+      "/api/v1/me/market-feed?limit=20",
+      session.accessToken,
+    ) as { items?: unknown[]; next_cursor?: string };
+    expect(Array.isArray(marketFeed.items)).toBeTruthy();
+    if (marketFeed.next_cursor !== undefined) expect(marketFeed.next_cursor).toEqual(expect.any(String));
 
     const unauthorized = await request.get(`${backendBaseURL}/api/v1/me`);
     expect(unauthorized.status()).toBe(401);

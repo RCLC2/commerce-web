@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Flame, Grid2X2, Heart, Home, Menu, Search, ShieldCheck, Shirt, ShoppingBag, Star, Store, User, X } from "lucide-react";
+import { Grid2X2, Heart, Home, Menu, Search, ShieldCheck, Shirt, ShoppingBag, Star, Store, User, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -13,7 +13,7 @@ import { Button } from "./ui/button";
 
 const nav = [
   { href: "/categories", label: "카테고리", icon: Grid2X2 },
-  { href: "/snapshot", label: "트렌드관", icon: Flame },
+  { href: "/market-feed", label: "마켓 피드", icon: Store },
   { href: "/today-outfit", label: "오늘의 코디", icon: Shirt },
   { href: "/", label: "홈", icon: Home, primary: true },
   { href: "/likes", label: "좋아요", icon: Heart },
@@ -24,7 +24,6 @@ const nav = [
 const primaryMenuItems = [
   { href: "/popular-products", label: "인기 상품" },
   { href: "/popular-markets", label: "인기 마켓" },
-  { href: "/recommendations", label: "추천 상품" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -219,6 +218,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="font-black text-foreground">쇼핑</p>
             <div className="mt-3 grid gap-2">
               <Link href="/categories" className="hover:text-foreground">카테고리별 상품</Link>
+              <Link href="/market-feed" className="hover:text-foreground">마켓 피드</Link>
               <Link href="/popular-markets" className="hover:text-foreground">인기 마켓</Link>
             </div>
           </div>

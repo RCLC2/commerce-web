@@ -48,12 +48,6 @@ test.describe("remaining public catalog routes against backend origin/main", () 
       heading: "인기 상품",
       linkPrefix: "/products/",
     },
-    {
-      route: "/recommendations",
-      endpoint: "/api/v1/products/recommendations",
-      heading: "추천 상품",
-      linkPrefix: "/products/",
-    },
   ] as const) {
     test(`${target.route} renders its live collection`, async ({ page }) => {
       const responsePromise = page.waitForResponse((response) =>
@@ -71,6 +65,13 @@ test.describe("remaining public catalog routes against backend origin/main", () 
       await expect(page.locator(`a[href^="${target.linkPrefix}"]`).first()).toBeVisible();
     });
   }
+
+  test("legacy recommendations route points to the home recommendation slot", async ({ page }) => {
+    await page.goto("/recommendations");
+
+    await expect(page).toHaveURL(/\/#recommendations$/);
+    await expect(page.locator("#recommendations").getByRole("heading")).toBeVisible();
+  });
 
   test("category hub filters the live catalog and links to products", async ({ page }) => {
     const categoriesResponse = page.waitForResponse((response) =>
@@ -152,25 +153,20 @@ test.describe("remaining public catalog routes against backend origin/main", () 
     await expect(page.locator('a[href^="/products/"]').first()).toBeVisible();
   });
 
-  test("snapshot uses supported search trends without requesting removed social posts", async ({ page }) => {
-    let removedTrendPostsRequestCount = 0;
+  test("legacy snapshot redirects to market feed without requesting search trends", async ({ page }) => {
+    let trendingRequestCount = 0;
     page.on("request", (request) => {
-      if (request.url().includes("/api/v1/trends/posts")) {
-        removedTrendPostsRequestCount += 1;
-      }
+      if (request.url().includes("/api/v1/search/trending")) trendingRequestCount += 1;
     });
-    const trendsResponse = page.waitForResponse((response) =>
-      response.url().includes("/api/v1/search/trending?segment=women"));
+    const marketsResponse = page.waitForResponse((response) =>
+      response.url().includes("/api/v1/markets?sort=popular&limit=6"));
     await page.goto("/snapshot");
-    const response = await trendsResponse;
-    expect(response.ok(), `search trends: ${response.status()}`).toBeTruthy();
+    expect((await marketsResponse).ok()).toBeTruthy();
 
-    await expect(page.getByRole("heading", { name: "트렌드관", exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "실시간 인기 검색어", exact: true })).toBeVisible();
-    await expect(page.locator('a[href^="/search?q="]').first().or(
-      page.getByText("아직 집계된 검색어가 없습니다.", { exact: true }),
-    )).toBeVisible();
-    expect(removedTrendPostsRequestCount).toBe(0);
+    await expect(page).toHaveURL(/\/market-feed$/);
+    await expect(page.getByRole("heading", { name: "마켓 피드", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "팔로우할 마켓을 찾아보세요", exact: true })).toBeVisible();
+    expect(trendingRequestCount).toBe(0);
   });
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useInfiniteQuery, useQueries, useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -22,16 +22,20 @@ function productsForHomeSection(section: CMSHomeSection) {
   if (section.api_url.includes("/products/promotions")) {
     return api.listPromotionProducts();
   }
-  if (section.api_url.includes("/products/latest") || section.api_url.includes("/products/recommendations")) {
+  if (section.api_url.includes("/products/latest")) {
     return api.listLatestProducts();
   }
   return api.listPopularProducts();
 }
 
+function isLegacyRecommendationSection(section: CMSHomeSection) {
+  return section.api_url.includes("/products/recommendations");
+}
+
 export function HomePage() {
   const token = useSessionStore((state) => state.accessToken);
   const memberID = useSessionStore((state) => state.memberID);
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const hydrated = useSessionStore((state) => state.hydrated);
   const effectiveToken = getEffectiveToken(token);
   const eventsQuery = useQuery({
     queryKey: queryKeys.events,
@@ -48,45 +52,49 @@ export function HomePage() {
     queryFn: api.listHomeSections,
   });
   const homeSections = homeSectionsQuery.data ?? [];
-  const recommendationQuery = useInfiniteQuery({
-    queryKey: queryKeys.personalizedProducts({ sort: "new" }),
-    initialPageParam: 0,
-    queryFn: ({ pageParam }) => api.listRecommendedProducts({ limit: 12, offset: pageParam }),
-    getNextPageParam: (lastPage, pages) => (
-      lastPage.length === 12 ? pages.length * 12 : undefined
-    ),
+  const recommendationQuery = useQuery({
+    queryKey: queryKeys.homeRecommendations(memberID),
+    queryFn: async () => {
+      if (!effectiveToken) {
+        return { source: "GUEST" as const, products: await api.listPopularProducts() };
+      }
+      const recommendations = await api.listMyRecommendations(effectiveToken, 12);
+      return {
+        source: recommendations[0]?.source ?? "BATCH",
+        products: recommendations.map((recommendation) => recommendation.product),
+      };
+    },
+    enabled: hydrated,
   });
-  const { fetchNextPage, hasNextPage, isFetchingNextPage } = recommendationQuery;
-  const recommendationProducts = recommendationQuery.data?.pages.flat() ?? [];
+  const recommendationProducts = recommendationQuery.data?.products ?? [];
   const profileQuery = useQuery({
     queryKey: queryKeys.homeMe(memberID),
     queryFn: () => api.me(effectiveToken ?? ""),
     enabled: Boolean(effectiveToken),
   });
   const profile = profileQuery.data;
-  const recommendationTitle = `${profile?.email?.split("@")[0] ?? "사용자"}님을 위한 추천 상품`;
+  const profileName = profile?.email?.split("@")[0] || "회원";
+  const recommendationSource = recommendationQuery.data?.source ?? (hydrated && !effectiveToken ? "GUEST" : undefined);
+  const recommendationTitle = recommendationSource === "GUEST"
+    ? "지금 많이 보는 상품"
+    : recommendationSource === "FALLBACK"
+      ? "요즘 인기 있는 상품"
+      : `${profileName}님을 위한 추천 상품`;
+  const recommendationDescription = recommendationSource === "GUEST"
+    ? "로그인하면 취향과 쇼핑 활동을 반영한 추천을 볼 수 있어요."
+    : recommendationSource === "FALLBACK"
+      ? "취향을 더 알아가는 동안 회원들이 많이 보는 상품을 보여드려요."
+      : "최근 활동과 선호를 반영해 고른 상품이에요.";
   const displayHomeCategoryChips = [...homeCategoryChips].sort((a, b) => a.sequence - b.sequence || a.id - b.id);
-  const displayHomeSections = [...homeSections].sort((a, b) => a.sequence - b.sequence || a.id - b.id);
+  const displayHomeSections = [...homeSections]
+    .filter((section) => !isLegacyRecommendationSection(section))
+    .sort((a, b) => a.sequence - b.sequence || a.id - b.id);
   const homeSectionQueries = useQueries({
     queries: displayHomeSections.map((section) => ({
       queryKey: ["home-section-products", section.api_url],
       queryFn: () => productsForHomeSection(section),
     })),
   });
-
-  useEffect(() => {
-    const target = loadMoreRef.current;
-    if (!target) {
-      return;
-    }
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
-        void fetchNextPage();
-      }
-    });
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24">
@@ -142,11 +150,12 @@ export function HomePage() {
         <SponsoredPlacement placementKey="home_feed.sponsored_card" />
       </section>
 
-      <section className="py-7">
+      <section id="recommendations" className="scroll-mt-20 py-7">
         <div className="mb-4 flex items-end justify-between">
           <div>
             <h2 className="text-xl font-black">{recommendationTitle}</h2>
-            {profileQuery.isError ? <p className="mt-1 text-xs font-bold text-amber-800">회원 정보를 불러오지 못해 일반 추천을 표시합니다.</p> : null}
+            <p className="mt-1 text-sm text-muted">{recommendationDescription}</p>
+            {effectiveToken && profileQuery.isError ? <p className="mt-1 text-xs font-bold text-amber-800">회원 이름을 불러오지 못했지만 추천 결과는 그대로 표시합니다.</p> : null}
           </div>
         </div>
         {recommendationQuery.isError ? (
@@ -165,10 +174,6 @@ export function HomePage() {
           </div>
         )}
         {recommendationQuery.isSuccess && recommendationProducts.length === 0 ? <p className="text-sm text-muted">표시할 추천 상품이 없습니다.</p> : null}
-        <div ref={loadMoreRef} className="h-8" />
-        {recommendationQuery.hasNextPage || recommendationQuery.isFetchingNextPage ? (
-          <p className="text-center text-xs text-muted">추천 상품을 더 불러오는 중입니다.</p>
-        ) : null}
       </section>
     </main>
   );

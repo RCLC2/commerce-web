@@ -4,14 +4,15 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import { formatFollowerCount } from "@/lib/utils";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
 export function PopularMarketsPage() {
   const marketsQuery = useQuery({
-    queryKey: ["markets"],
-    queryFn: api.listMarkets,
+    queryKey: queryKeys.popularMarkets(50),
+    queryFn: () => api.listMarkets({ sort: "popular", limit: 50 }),
   });
   const markets = marketsQuery.data ?? [];
 
