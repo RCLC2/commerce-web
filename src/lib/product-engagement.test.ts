@@ -46,6 +46,7 @@ describe("product engagement state", () => {
     expect(canWriteOrderLineReview({ ...base, reviewStatusLoaded: false })).toBe(false);
     expect(canWriteOrderLineReview({ ...base, serverReviewed: true })).toBe(false);
     expect(canWriteOrderLineReview({ ...base, submitted: true })).toBe(false);
+    expect(canWriteOrderLineReview({ ...base, reviewable: undefined })).toBe(false);
   });
 
   it("selects and clamps against active unreserved inventory", () => {

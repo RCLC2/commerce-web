@@ -31,7 +31,14 @@ const parseProducts = async (path: string) =>
   (await requestParsed(z.array(plpProductSchema), path)).map(normalizePublicProduct);
 
 export const catalogApi = {
-  listMarkets: () => requestParsed(z.array(marketSchema), "/api/v1/markets"),
+  listMarkets: (params: { sort?: "new" | "popular"; limit?: number; offset?: number } = {}) => {
+    const search = new URLSearchParams();
+    if (params.sort) search.set("sort", params.sort);
+    if (params.limit) search.set("limit", String(params.limit));
+    if (params.offset) search.set("offset", String(params.offset));
+    const query = search.toString();
+    return requestParsed(z.array(marketSchema), `/api/v1/markets${query ? `?${query}` : ""}`);
+  },
   listCategories: () => requestParsed(z.array(categorySchema), "/api/v1/categories"),
   getPLPInformation: (): Promise<PLPInformation> =>
     requestParsed(plpInformationSchema, "/api/v1/plp-information"),
@@ -81,13 +88,6 @@ export const catalogApi = {
   },
   listPopularProducts: () => parseProducts("/api/v1/products/popular"),
   listPromotionProducts: () => parseProducts("/api/v1/products/promotions"),
-  listRecommendedProducts: (params?: { limit?: number; offset?: number }) => {
-    const search = new URLSearchParams();
-    if (params?.limit) search.set("limit", String(params.limit));
-    if (params?.offset !== undefined) search.set("offset", String(params.offset));
-    const query = search.toString();
-    return parseProducts(`/api/v1/products/recommendations${query ? `?${query}` : ""}`);
-  },
   listLatestProducts: () => parseProducts("/api/v1/products/latest"),
   getProduct: (id: number) =>
     requestParsed(productDetailSchema, `/api/v1/products/${id}`).then((detail) => normalizePublicProduct({

@@ -7,7 +7,12 @@ const loginResponseSchema = z.object({
   accessToken: z.string().min(1),
 });
 
-const signupResponseSchema = z.object({ id: z.number().int().positive() });
+const signupResponseSchema = z.object({
+  id: z.number().int().positive(),
+  role: z.string().optional().default("MEMBER"),
+  accessToken: z.string().min(1).optional(),
+  onboardingStatus: z.string().optional().default("NOT_ELIGIBLE"),
+});
 
 const memberProfileSchema = z.object({
   id: z.number().int().positive(),

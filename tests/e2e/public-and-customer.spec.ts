@@ -32,7 +32,7 @@ test.describe("public and customer journeys with live and controlled API boundar
     await expect(page.getByRole("button", { name: "다시 시도", exact: true })).toBeVisible();
     await expect(page.getByText("표시할 상품이 없습니다.", { exact: true })).toHaveCount(0);
 
-    await page.route("**/api/v1/markets", (route) => route.fulfill({ status: 503, body: "markets unavailable" }));
+    await page.route("**/api/v1/markets?**", (route) => route.fulfill({ status: 503, body: "markets unavailable" }));
     await page.goto("/popular-markets");
     await expect(page.getByRole("button", { name: "다시 시도", exact: true })).toBeVisible();
     await expect(page.getByText("표시할 마켓이 없습니다.", { exact: true })).toHaveCount(0);

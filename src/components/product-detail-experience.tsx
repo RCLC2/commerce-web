@@ -20,7 +20,8 @@ import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import type { PdpMerchandising, Product, ProductOption } from "@/lib/types";
 import { discountRate, formatPrice } from "@/lib/utils";
-import { AlsoViewedSection, PdpCardAdSection, SponsoredMarketSection } from "./pdp-merchandising-sections";
+import { SponsoredPlacement } from "./advertising/sponsored-placement";
+import { AlsoViewedSection } from "./pdp-merchandising-sections";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
@@ -490,11 +491,9 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
         ) : null}
       </section>
 
-      {initialMerchandising.card_ad ? <PdpCardAdSection ad={initialMerchandising.card_ad} /> : null}
+      <SponsoredPlacement placementKey="pdp.card_banner" className="mt-10" />
 
-      {initialMerchandising.sponsored_market ? (
-        <SponsoredMarketSection shelf={initialMerchandising.sponsored_market} />
-      ) : null}
+      <SponsoredPlacement placementKey="pdp.sponsored_market" className="mt-10" />
 
       <section className="pt-10">
         <div className="mx-auto max-w-3xl">

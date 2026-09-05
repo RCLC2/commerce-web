@@ -93,10 +93,24 @@ export type PLPMarketSummary = {
   profile_image_url?: string;
 };
 
+export type ProductBadgeTone = "shipping" | "delivery" | "exclusive" | "new" | "default";
+
+export type ApiErrorDetail = {
+  code: string;
+  message: string;
+  request_id: string;
+  details?: Record<string, unknown>;
+};
+
+export type ApiErrorEnvelope = {
+  success: false;
+  error: ApiErrorDetail;
+};
+
 export type PLPTagChip = {
   code: string;
   label: string;
-  tone: "shipping" | "delivery" | "exclusive" | "new" | "default" | string;
+  tone: ProductBadgeTone;
 };
 
 export type ProductCouponOffer = {
@@ -196,25 +210,8 @@ export type PLPProductParams = {
   pageSize?: number;
 };
 
-export type PdpCardAd = {
-  campaign_id: number;
-  title: string;
-  image_url?: string;
-  link_url: string;
-  disclosure: "AD" | string;
-};
-
-export type SponsoredMarketShelf = {
-  campaign_id: number;
-  market: Pick<Market, "id" | "name" | "description" | "profile_image_url">;
-  products: Product[];
-  disclosure: "SPONSORED" | string;
-};
-
 export type PdpMerchandising = {
   also_viewed: Product[];
-  card_ad: PdpCardAd | null;
-  sponsored_market: SponsoredMarketShelf | null;
 };
 
 export type SearchSuggestion = {
@@ -719,13 +716,28 @@ export type Notification = {
 };
 
 export type Recommendation = {
-  id?: number;
-  user_id?: number;
-  product_id?: number;
-  product?: Product;
-  score?: number;
-  reason?: string;
-  created_at?: string;
+  member_id: number;
+  product_id: number;
+  product: Product;
+  score: number;
+  rank: number;
+  reason_code: string;
+  reason_text?: string;
+  algorithm: string;
+  source: "BATCH" | "FALLBACK";
+  generated_at: string;
+  expires_at?: string;
+};
+
+export type MarketFeedItem = {
+  market: Pick<Market, "id" | "name" | "profile_image_url"> & { follower_count: number };
+  product: Product;
+  published_at: string;
+};
+
+export type MarketFeedResponse = {
+  items: MarketFeedItem[];
+  next_cursor?: string;
 };
 
 export type SettlementSummary = {

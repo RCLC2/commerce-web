@@ -88,7 +88,7 @@ export const productSchema = z.object({
   market_name: z.string().optional(),
   market_profile_image_url: z.string().optional(),
   tags: z.array(z.string()).optional(),
-  tag_chips: z.array(z.object({ code: z.string(), label: z.string(), tone: z.string() })).optional(),
+  tag_chips: z.array(plpTagChipSchema).optional(),
   in_stock: z.boolean().optional(),
 });
 
@@ -145,7 +145,7 @@ export const categoryInformationSchema = z.object({
 });
 
 export const plpProductPageSchema = z.object({
-  items: z.array(productSchema),
+  items: z.array(plpProductSchema),
   page: z.number().int().positive(),
   page_size: z.number().int().positive(),
   total: nonNegativeIntSchema,
@@ -158,7 +158,7 @@ export const plpInformationSchema = z.object({
   price_ranges: z.array(z.object({ code: z.string(), label: z.string(), min_price: nonNegativeIntSchema, max_price: nonNegativeIntSchema })),
   sort_options: z.array(z.object({ code: z.enum(["popular", "new", "price-low", "price-high"]), label: z.string() })),
   default_sort: z.enum(["popular", "new", "price-low", "price-high"]),
-  tag_chips: z.array(z.object({ code: z.string(), label: z.string(), tone: z.string() })),
+  tag_chips: z.array(plpTagChipSchema),
 });
 export const homeSectionSchema = z.object({
   id: identifierSchema,
@@ -324,13 +324,31 @@ export const issuableCouponQuoteSchema = z.object({
 });
 
 export const recommendationSchema = z.looseObject({
-  id: identifierSchema.optional(),
-  user_id: identifierSchema.optional(),
-  product_id: identifierSchema.optional(),
-  product: productSchema.optional(),
-  score: z.number().optional(),
-  reason: z.string().optional(),
-  created_at: dateStringSchema.optional(),
+  member_id: identifierSchema,
+  product_id: identifierSchema,
+  score: z.number(),
+  rank: z.number().int().positive(),
+  reason_code: z.string().min(1),
+  reason_text: z.string().optional(),
+  algorithm: z.string().min(1),
+  source: z.enum(["BATCH", "FALLBACK"]),
+  generated_at: dateStringSchema,
+  expires_at: dateStringSchema.optional(),
+  product: productSchema,
+});
+
+export const marketFeedResponseSchema = z.object({
+  items: z.array(z.object({
+    market: z.object({
+      id: identifierSchema,
+      name: z.string().min(1),
+      profile_image_url: z.string().optional(),
+      follower_count: nonNegativeIntSchema,
+    }),
+    product: productSchema,
+    published_at: dateStringSchema,
+  })),
+  next_cursor: z.string().min(1).optional(),
 });
 
 export const carouselSchema = z.object({

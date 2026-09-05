@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requestParsed, requestVoid } from "../api-client";
 import {
   orderSchema,
+  marketFeedResponseSchema,
   productSchema,
   recommendationSchema,
   statusResponseSchema,
@@ -26,6 +27,7 @@ import {
   normalizeNotification,
   normalizeOwnedCoupon,
   normalizePaymentRequest,
+  normalizePublicProduct,
   normalizeReviewMutation,
   normalizeSettlementSummary,
 } from "./normalizers/contracts";
@@ -100,7 +102,32 @@ export const customerApi = {
   listNotifications: async (token: string) =>
     (await requestParsed(z.array(rawNotificationSchema), "/api/v1/me/notifications", { token }))
       .map(normalizeNotification),
-  listMyRecommendations: (token: string) => requestParsed(z.array(recommendationSchema), "/api/v1/me/recommendations", { token }),
+  listMyRecommendations: async (token: string, limit = 12) => {
+    const recommendations = await requestParsed(
+      z.array(recommendationSchema),
+      `/api/v1/me/recommendations?limit=${limit}`,
+      { token },
+    );
+    return recommendations.map((recommendation) => ({
+      ...recommendation,
+      product: normalizePublicProduct(recommendation.product),
+    }));
+  },
+  listMarketFeed: async (token: string, params: { limit?: number; cursor?: string } = {}) => {
+    const search = new URLSearchParams();
+    if (params.limit) search.set("limit", String(params.limit));
+    if (params.cursor) search.set("cursor", params.cursor);
+    const query = search.toString();
+    const feed = await requestParsed(
+      marketFeedResponseSchema,
+      `/api/v1/me/market-feed${query ? `?${query}` : ""}`,
+      { token },
+    );
+    return {
+      ...feed,
+      items: feed.items.map((item) => ({ ...item, product: normalizePublicProduct(item.product) })),
+    };
+  },
   listWishlistedProducts: (token: string) => requestParsed(z.array(productSchema), "/api/v1/me/wishlist", { token }),
   listLikedProducts: (token: string) => requestParsed(z.array(productSchema), "/api/v1/me/liked-products", { token }),
   placeOrder: (token: string, payload: { cart_item_ids: number[]; used_coupon_id?: number; used_point: number; shipping_address?: { receiver: string; phone: string; zip_code: string; line1: string; line2: string } }) =>

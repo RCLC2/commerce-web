@@ -1,50 +1,11 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRef } from "react";
-import type { PdpCardAd, Product, SponsoredMarketShelf } from "@/lib/types";
+import type { Product } from "@/lib/types";
 import { ProductCard } from "./product-card";
-import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
-
-export function PdpCardAdSection({ ad }: { ad: PdpCardAd }) {
-  return (
-    <section className="mt-10" aria-label="광고">
-      <Link
-        href={ad.link_url}
-        className="group grid min-h-40 overflow-hidden rounded-2xl bg-zinc-950 text-white md:grid-cols-[1fr_42%]"
-      >
-        <div className="flex flex-col justify-center p-6 md:p-8">
-          <span className="w-fit rounded-full border border-white/35 px-2 py-1 text-[10px] font-black tracking-wider text-white/80">
-            {ad.disclosure}
-          </span>
-          <h2 className="mt-3 text-2xl font-black md:text-3xl">{ad.title}</h2>
-          <span className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-white/75 group-hover:text-white">
-            혜택 보러가기 <ExternalLink size={14} />
-          </span>
-        </div>
-        {ad.image_url ? (
-          <div className="relative min-h-40 bg-zinc-800">
-            <SafeImage src={ad.image_url} alt="" fill sizes="(max-width: 768px) 100vw, 42vw" className="object-cover transition duration-300 group-hover:scale-[1.03]" />
-          </div>
-        ) : null}
-      </Link>
-    </section>
-  );
-}
-
-export function SponsoredMarketSection({ shelf }: { shelf: SponsoredMarketShelf }) {
-  return (
-    <ProductShelf
-      eyebrow={shelf.disclosure}
-      title={`${shelf.market.name} 인기 상품`}
-      description={shelf.market.description}
-      products={shelf.products.map((product) => ({ ...product, market_name: shelf.market.name }))}
-      headerHref={`/markets/${shelf.market.id}`}
-    />
-  );
-}
 
 export function AlsoViewedSection({ products }: { products: Product[] }) {
   return (

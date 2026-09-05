@@ -4,16 +4,39 @@ import { catalogApi } from "./catalog";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("catalogApi backend contracts", () => {
+  it("rejects product badge tones outside the public five-tone contract", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([{
+      id: 1,
+      market_id: 2,
+      category_id: 3,
+      name: "상품",
+      description: "설명",
+      base_price: 10_000,
+      status: "SELLING",
+      market: { id: 2, name: "마켓" },
+      tag_chips: [{ code: "PROMOTION", label: "프로모션", tone: "promotion" }],
+    }]), { status: 200 })));
+
+    try {
+      await catalogApi.listPopularProducts();
+      throw new Error("expected listPopularProducts to fail");
+    } catch (error) {
+      expect(error).toMatchObject({ kind: "contract", endpoint: "/api/v1/products/popular" });
+      expect((error as { issues: Array<{ path: PropertyKey[] }> }).issues[0]?.path)
+        .toEqual([0, "tag_chips", 0, "tone"]);
+    }
+  });
+
   it("keeps home category chip 404 errors visible", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("not found", { status: 404 })));
     await expect(catalogApi.listHomeCategoryChips()).rejects.toMatchObject({ status: 404 });
   });
 
-  it("sends limit and offset for recommendation infinite scrolling", async () => {
+  it("requests explicitly popular markets for discovery surfaces", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
-    await catalogApi.listRecommendedProducts({ limit: 12, offset: 24 });
-    expect(fetchMock.mock.calls[0][0]).toContain("/api/v1/products/recommendations?limit=12&offset=24");
+    await catalogApi.listMarkets({ sort: "popular", limit: 12 });
+    expect(fetchMock.mock.calls[0][0]).toContain("/api/v1/markets?sort=popular&limit=12");
   });
 
   it("does not replace category, PLP, product, or event 404 responses", async () => {

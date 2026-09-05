@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { api } from "@/lib/api";
+import { useSessionStore } from "@/lib/session-store";
 import { Button } from "./ui/button";
 
 const schema = z.object({
@@ -23,6 +24,7 @@ type RegisterForm = z.infer<typeof schema>;
 
 export function RegisterPage() {
   const router = useRouter();
+  const setSession = useSessionStore((state) => state.setSession);
   const form = useForm<RegisterForm>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -34,7 +36,18 @@ export function RegisterPage() {
   });
   const register = useMutation({
     mutationFn: api.signup,
-    onSuccess: () => router.push("/login"),
+    onSuccess: (data) => {
+      if (!data.accessToken) {
+        router.push("/login");
+        return;
+      }
+      setSession({ accessToken: data.accessToken, memberID: data.id, role: data.role });
+      if (["NOT_STARTED", "IN_PROGRESS"].includes(data.onboardingStatus)) {
+        router.replace("/onboarding/preferences");
+        return;
+      }
+      router.replace("/");
+    },
   });
 
   return (

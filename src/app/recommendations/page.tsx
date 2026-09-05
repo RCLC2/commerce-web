@@ -1,5 +1,5 @@
-import { SimpleProductSection } from "@/components/simple-product-section";
+import { redirect } from "next/navigation";
 
-export default function Recommendations() {
-  return <SimpleProductSection title="추천 상품" description="취향 기반 추천 영역을 위한 상품 리스트입니다." kind="recommended" />;
+export default function RecommendationsRedirect() {
+  redirect("/#recommendations");
 }
