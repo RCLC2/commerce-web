@@ -9,6 +9,7 @@ import { searchApi } from "./api/search";
 import { sellerApi } from "./api/seller";
 import { experimentApi } from "./api/experiment";
 import { onboardingApi } from "./api/onboarding";
+import { outfitApi } from "./api/outfit";
 
 export const api = {
   ...catalogApi,
@@ -22,4 +23,5 @@ export const api = {
   ...adminApi,
   ...experimentApi,
   ...onboardingApi,
+  ...outfitApi,
 };
