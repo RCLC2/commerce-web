@@ -5,6 +5,13 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  {
+    files: ["scripts/design-system/src/**/*.{ts,tsx}"],
+    rules: {
+      "@next/next/no-img-element": "off",
+      "@next/next/no-html-link-for-pages": "off",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
@@ -13,6 +20,7 @@ const eslintConfig = defineConfig([
     "output/**",
     "build/**",
     "public/mockServiceWorker.js",
+    "docs/design-system/assets/**",
     "next-env.d.ts",
   ]),
 ]);

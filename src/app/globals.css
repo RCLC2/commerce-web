@@ -1,13 +1,123 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fafafa;
-  --foreground: #171717;
-  --muted: #71717a;
-  --line: #e4e4e7;
-  --brand: #ff516d;
-  --brand-strong: #e33858;
-  --surface: #ffffff;
+  /* Primitive palette: do not consume these directly in product screens. */
+  --primitive-neutral-0: #ffffff;
+  --primitive-neutral-25: #f7f7f8;
+  --primitive-neutral-50: #f3f4f6;
+  --primitive-neutral-100: #e8e9ed;
+  --primitive-neutral-200: #cdd0d7;
+  --primitive-neutral-400: #858791;
+  --primitive-neutral-500: #6d6f79;
+  --primitive-neutral-700: #5c5e66;
+  --primitive-neutral-950: #17171b;
+  --primitive-pink-50: #fff1f4;
+  --primitive-pink-500: #ff0077;
+  --primitive-pink-600: #d90065;
+  --primitive-pink-650: #c9005c;
+  --primitive-pink-700: #bf0058;
+  --primitive-green-50: #eaf9f1;
+  --primitive-green-700: #087f5b;
+  --primitive-amber-50: #fff7e8;
+  --primitive-amber-800: #9a5b00;
+  --primitive-red-50: #fff0f2;
+  --primitive-red-700: #ca2a43;
+  --primitive-violet-50: #f4f0ff;
+  --primitive-violet-700: #6d28d9;
+
+  /* Semantic tokens: stable product intent, independent from the palette. */
+  --commerce-canvas: var(--primitive-neutral-25);
+  --commerce-surface: var(--primitive-neutral-0);
+  --commerce-surface-subtle: var(--primitive-neutral-50);
+  --commerce-surface-raised: var(--primitive-neutral-0);
+  --commerce-content-primary: var(--primitive-neutral-950);
+  --commerce-content-secondary: var(--primitive-neutral-700);
+  --commerce-content-tertiary: var(--primitive-neutral-500);
+  --commerce-content-inverse: var(--primitive-neutral-0);
+  --commerce-content-on-brand: #fff7f8;
+  --commerce-border-subtle: var(--primitive-neutral-100);
+  --commerce-border-strong: var(--primitive-neutral-400);
+  --commerce-border-interactive: var(--primitive-neutral-400);
+  /* Preserve the established commerce pink for visual emphasis. */
+  --commerce-brand: var(--primitive-pink-500);
+  /* Use a contrast-safe derivative whenever pink carries normal-sized text. */
+  --commerce-action-primary: var(--primitive-pink-600);
+  --commerce-action-primary-pressed: var(--primitive-pink-700);
+  --commerce-action-secondary: var(--primitive-pink-50);
+  --commerce-promotion: var(--primitive-violet-700);
+  --commerce-promotion-subtle: var(--primitive-violet-50);
+  --commerce-status-positive: var(--primitive-green-700);
+  --commerce-status-positive-subtle: var(--primitive-green-50);
+  --commerce-status-warning: var(--primitive-amber-800);
+  --commerce-status-warning-subtle: var(--primitive-amber-50);
+  --commerce-status-negative: var(--primitive-red-700);
+  --commerce-status-negative-subtle: var(--primitive-red-50);
+  --commerce-status-info: #005fcc;
+  --commerce-status-info-subtle: #edf5ff;
+  --commerce-status-positive-border: #99dabc;
+  --commerce-status-warning-border: #edcd8d;
+  --commerce-status-negative-border: #f7b6c3;
+  --commerce-status-info-border: #a9caff;
+  --commerce-focus: #a80055;
+  --commerce-focus-on-brand: #ffadd5;
+
+  /* Component tokens: component recipes consume semantic values only. */
+  /* The visual brand stays #ff0077; solid CTAs use its accessible companion with light text. */
+  --commerce-button-primary-bg: var(--commerce-action-primary);
+  /* A deeper magenta makes hover obvious without moving the brand into red. */
+  --commerce-button-primary-hover: var(--primitive-pink-650);
+  --commerce-button-primary-pressed: var(--primitive-pink-700);
+  --commerce-button-primary-content: var(--commerce-content-on-brand);
+  --commerce-button-primary-focus: var(--commerce-focus-on-brand);
+  --commerce-button-secondary-bg: var(--commerce-surface-raised);
+  --commerce-button-secondary-hover: var(--commerce-action-secondary);
+  --commerce-button-secondary-border: var(--commerce-border-interactive);
+  --commerce-button-danger-bg: var(--commerce-status-negative);
+  --commerce-button-danger-hover: #aa2037;
+  --commerce-radius-control: 0.75rem;
+  --commerce-radius-surface: 1rem;
+  --commerce-radius-feature: 1.5rem;
+  --commerce-shadow-float: 0 12px 32px rgb(23 23 27 / 12%);
+  --commerce-shadow-card: 0 1px 2px rgb(23 23 27 / 5%);
+
+  /* Layout tokens: use these instead of route-specific magic values. */
+  --commerce-space-1: 0.25rem;
+  --commerce-space-2: 0.5rem;
+  --commerce-space-3: 0.75rem;
+  --commerce-space-4: 1rem;
+  --commerce-space-6: 1.5rem;
+  --commerce-space-8: 2rem;
+  --commerce-space-12: 3rem;
+  --commerce-space-16: 4rem;
+  --commerce-font-display: 3rem;
+  --commerce-font-heading: 1.5rem;
+  --commerce-font-title: 1.125rem;
+  --commerce-font-body: 0.875rem;
+  --commerce-font-label: 0.75rem;
+  --commerce-font-caption: 0.6875rem;
+  --commerce-line-display: 1.15;
+  --commerce-line-heading: 1.3;
+  --commerce-line-body: 1.5;
+  --commerce-density-comfortable: 2.75rem;
+  --commerce-density-console: 2.25rem;
+  --commerce-motion-fast: 120ms;
+  --commerce-motion-normal: 160ms;
+  --commerce-motion-slow: 240ms;
+  --commerce-ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --commerce-z-base: 0;
+  --commerce-z-sticky: 20;
+  --commerce-z-mobile-cta: 30;
+  --commerce-z-dropdown: 40;
+  --commerce-z-modal: 70;
+
+  /* Legacy aliases remain while screens migrate to the semantic names. */
+  --background: var(--commerce-canvas);
+  --foreground: var(--commerce-content-primary);
+  --muted: var(--commerce-content-secondary);
+  --line: var(--commerce-border-subtle);
+  --brand: var(--commerce-action-primary);
+  --brand-strong: var(--commerce-action-primary-pressed);
+  --surface: var(--commerce-surface);
 }
 
 @theme inline {
@@ -18,7 +128,59 @@
   --color-brand: var(--brand);
   --color-brand-strong: var(--brand-strong);
   --color-surface: var(--surface);
-  --font-sans: var(--font-geist-sans);
+  --color-canvas: var(--commerce-canvas);
+  --color-surface-subtle: var(--commerce-surface-subtle);
+  --color-surface-raised: var(--commerce-surface-raised);
+  --color-content-primary: var(--commerce-content-primary);
+  --color-content-secondary: var(--commerce-content-secondary);
+  --color-content-tertiary: var(--commerce-content-tertiary);
+  --color-content-inverse: var(--commerce-content-inverse);
+  --color-content-on-brand: var(--commerce-content-on-brand);
+  --color-border-subtle: var(--commerce-border-subtle);
+  --color-border-strong: var(--commerce-border-strong);
+  --color-border-interactive: var(--commerce-border-interactive);
+  --color-action-primary: var(--commerce-action-primary);
+  --color-action-primary-pressed: var(--commerce-action-primary-pressed);
+  --color-action-secondary: var(--commerce-action-secondary);
+  --color-accent: var(--commerce-brand);
+  --color-promotion: var(--commerce-promotion);
+  --color-promotion-subtle: var(--commerce-promotion-subtle);
+  --color-status-positive: var(--commerce-status-positive);
+  --color-status-positive-subtle: var(--commerce-status-positive-subtle);
+  --color-status-positive-border: var(--commerce-status-positive-border);
+  --color-status-warning: var(--commerce-status-warning);
+  --color-status-warning-subtle: var(--commerce-status-warning-subtle);
+  --color-status-warning-border: var(--commerce-status-warning-border);
+  --color-status-negative: var(--commerce-status-negative);
+  --color-status-negative-subtle: var(--commerce-status-negative-subtle);
+  --color-status-negative-border: var(--commerce-status-negative-border);
+  --color-status-info: var(--commerce-status-info);
+  --color-status-info-subtle: var(--commerce-status-info-subtle);
+  --color-status-info-border: var(--commerce-status-info-border);
+  --color-button-primary: var(--commerce-button-primary-bg);
+  --color-button-primary-hover: var(--commerce-button-primary-hover);
+  --color-button-primary-pressed: var(--commerce-button-primary-pressed);
+  --color-button-primary-content: var(--commerce-button-primary-content);
+  --color-button-primary-focus: var(--commerce-button-primary-focus);
+  --color-button-secondary: var(--commerce-button-secondary-bg);
+  --color-button-secondary-hover: var(--commerce-button-secondary-hover);
+  --color-button-secondary-border: var(--commerce-button-secondary-border);
+  --color-button-danger: var(--commerce-button-danger-bg);
+  --color-button-danger-hover: var(--commerce-button-danger-hover);
+  --radius-control: var(--commerce-radius-control);
+  --radius-surface: var(--commerce-radius-surface);
+  --radius-feature: var(--commerce-radius-feature);
+  --shadow-float: var(--commerce-shadow-float);
+  --shadow-card: var(--commerce-shadow-card);
+  --spacing-commerce-1: var(--commerce-space-1);
+  --spacing-commerce-2: var(--commerce-space-2);
+  --spacing-commerce-3: var(--commerce-space-3);
+  --spacing-commerce-4: var(--commerce-space-4);
+  --spacing-commerce-6: var(--commerce-space-6);
+  --spacing-commerce-8: var(--commerce-space-8);
+  --spacing-commerce-12: var(--commerce-space-12);
+  --spacing-commerce-16: var(--commerce-space-16);
+  --font-sans: var(--font-korean), var(--font-geist-sans), "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 
@@ -35,7 +197,9 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-korean), "Apple SD Gothic Neo", "Malgun Gothic", var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  letter-spacing: -0.012em;
+  line-height: 1.5;
 }
 
 a {
@@ -45,12 +209,35 @@ a {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
+button:not(:disabled),
+[role="button"],
+a[href] {
+  cursor: pointer;
+}
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--commerce-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
 ::selection {
-  background: #ffe1e7;
+  background: #ffe3f2;
 }
 
 .no-scrollbar {
