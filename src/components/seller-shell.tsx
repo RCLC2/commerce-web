@@ -16,6 +16,7 @@ export const sellerLinks = [
   { href: "/seller/orders", label: "주문/배송" },
   { href: "/seller/settlements", label: "정산" },
   { href: "/seller/reviews", label: "리뷰" },
+  { href: "/seller/audit-logs", label: "변경 이력" },
 ];
 
 export function useSellerConsoleContext() {

@@ -1,4 +1,5 @@
 import { adminApi } from "./api/admin";
+import { auditApi } from "./api/audit";
 import { authApi } from "./api/auth";
 import { advertisingApi } from "./api/advertising";
 import { catalogApi } from "./api/catalog";
@@ -22,6 +23,7 @@ export const api = {
   ...sellerApi,
   ...adminApi,
   ...experimentApi,
+  ...auditApi,
   ...onboardingApi,
   ...outfitApi,
 };

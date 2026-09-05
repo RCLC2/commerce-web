@@ -53,11 +53,14 @@ export function ConsoleLayout({
   const primaryQueries = activeQueries.filter(
     (query) => query.meta?.consoleDataRole === "primary",
   );
+  const keepsChildrenMounted = activeQueries.some(
+    (query) => query.meta?.consoleKeepMounted === true,
+  );
   const hasResolvedData = activeQueries.some((query) => query.state.data !== undefined);
   const hasResolvedPrimaryData = primaryQueries.some((query) => query.state.data !== undefined);
-  const canRenderChildren = primaryQueries.length
+  const canRenderChildren = keepsChildrenMounted || (primaryQueries.length
     ? hasResolvedPrimaryData
-    : activeQueries.length === 0 || hasResolvedData;
+    : activeQueries.length === 0 || hasResolvedData);
 
   return (
     <main className="mx-auto grid max-w-7xl gap-5 px-4 pb-24 pt-5 md:grid-cols-[208px_minmax(0,1fr)]">

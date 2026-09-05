@@ -70,16 +70,6 @@ export const adminApi = {
       `/api/v1/admin/coupons${memberID ? `?member_id=${memberID}` : ""}`,
       { token },
     )).map(normalizeAdminCoupon),
-  adminAuditLogs: async (token: string) =>
-    (await collectAllUniquePages(
-      (limit, offset) => requestParsed(
-        z.array(rawAuditLogSchema),
-        `/api/v1/admin/audit-logs?limit=${limit}&offset=${offset}`,
-        { token },
-      ),
-      (log) => log.ID,
-    ))
-      .map(normalizeAuditLog),
   adminCarousels: (token: string) => requestParsed(z.array(carouselSchema), "/api/v1/admin/carousels", { token }),
   adminEvents: (token: string) =>
     requestParsed(z.array(eventSchema), "/api/v1/admin/events", { token }),

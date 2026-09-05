@@ -227,35 +227,6 @@ export function AdminCouponsPage() {
   );
 }
 
-export function AdminAuditLogsPage() {
-  const token = useAdminToken();
-  const [query, setQuery] = useState("");
-  const { data = [] } = useQuery({ queryKey: ["admin-audit-logs"], queryFn: () => api.adminAuditLogs(token ?? ""), enabled: Boolean(token) });
-
-  if (!token) {
-    return <AdminAuthRequired />;
-  }
-
-  const filteredLogs = data.filter((log) => !query || `${log.target_type} ${log.action} ${log.settlement_id ?? ""}`.toLowerCase().includes(query.toLowerCase()));
-
-  return (
-    <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
-      <ConsoleHeader title="감사 로그" description="서버가 제공하는 정산 관리자 작업 필드만 표시합니다." />
-      <ConsoleSection className="mt-5" action={<SearchBox value={query} onChange={setQuery} placeholder="대상 또는 작업 검색" />}>
-        <DataTable
-          columns={["관리자", "대상", "작업", "일시"]}
-          rows={filteredLogs.map((log) => [
-            `#${log.admin_id}`,
-            `${log.target_type} #${auditTargetID(log)}`,
-            log.action,
-            new Date(log.created_at).toLocaleString("ko-KR"),
-          ])}
-        />
-      </ConsoleSection>
-    </ConsoleLayout>
-  );
-}
-
 export function AdminCMSPage() {
   const token = useAdminToken();
   const queryClient = useQueryClient();
