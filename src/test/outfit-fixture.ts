@@ -17,7 +17,7 @@ export function createOutfitLook(index = 1): OutfitLook {
     id: index,
     title: `실제 상품 코디 ${index}`,
     reason: "가벼운 레이어드와 포인트 컬러를 조합했어요.",
-    image_url: "/images/fashion-placeholder.svg",
+    image_url: `/api/v1/outfits/images/${index}`,
     image_disclosure: "AI 연출 이미지 · 실제 상품과 차이가 있을 수 있습니다",
     items: outfitSlotOrder.map((slot, slotIndex) => ({
       slot,

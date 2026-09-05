@@ -17,6 +17,7 @@ describe("today outfit API contract", () => {
       "head", "accessory", "outer", "top", "bottom", "bag", "shoes",
     ]);
     expect(new Set(response.looks[0].items.map((item) => item.product.id)).size).toBe(7);
+    expect(response.looks[0].image_url).toBe("/api/v1/outfits/images/1");
   });
 
   it("rejects duplicate product and slot assignments", () => {
