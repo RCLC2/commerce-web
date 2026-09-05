@@ -6,7 +6,7 @@ import { apiErrorMessage } from "@/lib/api-client";
 import { ProductCard } from "./product-card";
 import { Button } from "./ui/button";
 
-type ProductSectionKind = "catalog" | "popular" | "promotion" | "recommended";
+type ProductSectionKind = "catalog" | "popular" | "promotion";
 
 export function SimpleProductSection({
   title,
@@ -47,9 +47,6 @@ function listSectionProducts(kind: ProductSectionKind, query?: { q?: string; sor
   }
   if (kind === "promotion") {
     return api.listPromotionProducts();
-  }
-  if (kind === "recommended") {
-    return api.listRecommendedProducts();
   }
   return api.listProducts(query);
 }

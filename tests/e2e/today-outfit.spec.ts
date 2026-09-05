@@ -82,7 +82,7 @@ test.describe("today outfit", () => {
 
     const navigation = page.getByRole("navigation", { name: "하단 주요 메뉴" });
     await expect(navigation).toBeVisible();
-    for (const label of ["카테고리", "트렌드관", "오늘의 코디", "홈", "좋아요", "장바구니", "마이페이지"]) {
+    for (const label of ["카테고리", "마켓 피드", "오늘의 코디", "홈", "좋아요", "장바구니", "마이페이지"]) {
       await expect(navigation.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
   });

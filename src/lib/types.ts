@@ -716,13 +716,28 @@ export type Notification = {
 };
 
 export type Recommendation = {
-  id?: number;
-  user_id?: number;
-  product_id?: number;
-  product?: Product;
-  score?: number;
-  reason?: string;
-  created_at?: string;
+  member_id: number;
+  product_id: number;
+  product: Product;
+  score: number;
+  rank: number;
+  reason_code: string;
+  reason_text?: string;
+  algorithm: string;
+  source: "BATCH" | "FALLBACK";
+  generated_at: string;
+  expires_at?: string;
+};
+
+export type MarketFeedItem = {
+  market: Pick<Market, "id" | "name" | "profile_image_url"> & { follower_count: number };
+  product: Product;
+  published_at: string;
+};
+
+export type MarketFeedResponse = {
+  items: MarketFeedItem[];
+  next_cursor?: string;
 };
 
 export type SettlementSummary = {

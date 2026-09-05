@@ -44,27 +44,20 @@ test.describe("discovery navigation with controlled APIs", () => {
     expect(new URL(requestedURLs.at(-1) ?? "").searchParams.get("category")).toBe("top");
   });
 
-  test("renders search trends without requesting the removed social-post endpoint", async ({ page }) => {
-    let removedEndpointCalls = 0;
+  test("redirects the retired trend surface to guest market discovery", async ({ page }) => {
+    let trendingEndpointCalls = 0;
     page.on("request", (request) => {
-      if (request.url().includes("/api/v1/trends/posts")) removedEndpointCalls += 1;
+      if (request.url().includes("/api/v1/search/trending")) trendingEndpointCalls += 1;
     });
-    await page.route("**/api/v1/search/trending?**", (route) => route.fulfill({
+    await page.route("**/api/v1/markets?**", (route) => route.fulfill({
       status: 200,
-      json: {
-        segment: "women",
-        segments: [{ id: "women", label: "여성" }, { id: "men", label: "남성" }],
-        items: Array.from({ length: 10 }, (_, index) => ({
-          rank: index + 1,
-          keyword: `스타일 ${index + 1}`,
-          trend: index % 3 === 0 ? "UP" : index % 3 === 1 ? "DOWN" : "SAME",
-        })),
-      },
+      json: [{ id: 3, name: "인기 마켓", description: "새 상품이 많은 마켓", follower_count: 120, status: "OPEN" }],
     }));
 
     await page.goto("/snapshot");
-    await expect(page.getByRole("heading", { name: "실시간 인기 검색어", exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: /01 스타일 1/ })).toBeVisible();
-    expect(removedEndpointCalls).toBe(0);
+    await expect(page).toHaveURL(/\/market-feed$/);
+    await expect(page.getByRole("heading", { name: "마켓 피드", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: /인기 마켓/ }).first()).toBeVisible();
+    expect(trendingEndpointCalls).toBe(0);
   });
 });

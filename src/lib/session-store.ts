@@ -29,8 +29,8 @@ export const useSessionStore = create<SessionState>((set) => ({
       accessToken: window.localStorage.getItem("commerce.accessToken"),
       memberID: Number(window.localStorage.getItem("commerce.memberID")) || null,
       role: window.localStorage.getItem("commerce.role"),
-      hydrated: true,
       sellerContext: parseSellerContext(window.localStorage.getItem("commerce.sellerContext")),
+      hydrated: true,
     });
   },
   setSession: ({ accessToken, memberID, role }) => {
@@ -52,7 +52,7 @@ export const useSessionStore = create<SessionState>((set) => ({
     window.localStorage.removeItem("commerce.memberID");
     window.localStorage.removeItem("commerce.role");
     window.localStorage.removeItem("commerce.sellerContext");
-    set({ accessToken: null, memberID: null, role: null, sellerContext: null });
+    set({ accessToken: null, memberID: null, role: null, sellerContext: null, hydrated: true });
   },
 }));
 
