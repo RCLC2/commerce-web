@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import type { ComponentProps } from "react";
 import type { Product, ProductBadgeTone } from "@/lib/types";
 import { couponPriceForProduct } from "@/lib/product-card-pricing";
+import { Badge } from "./ui/badge";
 import { ProductCardPrice } from "./product-card-price";
 import { SafeImage } from "./safe-image";
 
@@ -12,7 +14,7 @@ export function ProductCard({ product, imageAspect = "aspect-square" }: { produc
   return (
     <article className="group">
       <Link href={`/products/${product.id}`} className="block">
-        <div className={`relative ${imageAspect} overflow-hidden rounded-md bg-zinc-100`}>
+        <div className={`relative ${imageAspect} overflow-hidden rounded-control bg-surface-subtle`}>
           <SafeImage
             src={product.image_url}
             alt={product.name}
@@ -41,12 +43,12 @@ export function ProductCard({ product, imageAspect = "aspect-square" }: { produc
 }
 
 function ProductChip({ label, tone }: { label: string; tone: ProductBadgeTone }) {
-  const toneClasses: Record<ProductBadgeTone, string> = {
-    shipping: "bg-emerald-50 text-emerald-700",
-    delivery: "bg-sky-50 text-sky-700",
-    exclusive: "bg-amber-50 text-amber-800",
-    new: "bg-brand text-white",
-    default: "bg-zinc-100 text-zinc-600",
+  const tones: Record<ProductBadgeTone, ComponentProps<typeof Badge>["tone"]> = {
+    shipping: "positive",
+    delivery: "brand",
+    exclusive: "warning",
+    new: "inverse",
+    default: "neutral",
   };
-  return <span className={`rounded-sm px-1.5 py-0.5 text-[11px] font-bold ${toneClasses[tone]}`}>{label}</span>;
+  return <Badge tone={tones[tone]}>{label}</Badge>;
 }

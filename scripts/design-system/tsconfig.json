@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "incremental": false,
+    "plugins": [],
+    "types": ["node", "react", "react-dom", "@testing-library/jest-dom/vitest"],
+    "paths": { "@/*": ["../../src/*"] }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["node_modules"]
+}

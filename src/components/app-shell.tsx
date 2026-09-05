@@ -84,8 +84,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {!searchPage ? <header className="sticky top-0 z-30 border-b border-line bg-white/95 backdrop-blur">
+    <div className="min-h-screen bg-canvas">
+      {!searchPage ? <header className="sticky top-0 z-30 border-b border-border-subtle bg-surface-raised/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
           <Button variant="ghost" size="icon" aria-label="메뉴" onClick={() => setMenuOpen((value) => !value)}>
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -94,7 +94,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             commerce
           </Link>
           <form
-            className="relative flex h-10 min-w-0 flex-1 items-center gap-2 rounded-md border border-line bg-zinc-50 px-3"
+            className="relative flex h-11 min-w-0 flex-1 items-center gap-2 rounded-control border border-border-interactive bg-surface-subtle px-3 transition hover:border-action-primary focus-within:border-action-primary focus-within:bg-surface-raised focus-within:ring-4 focus-within:ring-action-primary/10"
             onSubmit={submitSearch}
           >
             <Search size={18} className="shrink-0 text-muted" />
@@ -110,12 +110,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 setSearchFocused(true);
               }}
               onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
-              className="w-full bg-transparent text-sm outline-none"
+              className="w-full bg-transparent text-sm outline-none placeholder:text-content-tertiary"
               placeholder="상품, 마켓, 키워드 검색"
               aria-label="통합 검색"
             />
             {showSuggestions ? (
-              <div className="absolute left-0 right-0 top-12 z-40 overflow-hidden rounded-md border border-line bg-white shadow-xl">
+              <div className="absolute left-0 right-0 top-12 z-40 overflow-hidden rounded-surface border border-border-subtle bg-surface-raised shadow-float">
                 {suggestions.map((item) => (
                   <Link
                     key={item.id}
@@ -206,7 +206,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
       {children}
-      <footer className="border-t border-line bg-white pb-20">
+      <footer className="border-t border-border-subtle bg-surface-raised pb-20">
         <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 text-sm text-muted md:grid-cols-[1.2fr_1fr_1fr]">
           <div>
             <p className="text-lg font-black text-foreground">commerce</p>
@@ -237,7 +237,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
-      <nav className="fixed inset-x-0 bottom-0 z-50 isolate border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur" aria-label="하단 주요 메뉴">
+      <nav className="fixed inset-x-0 bottom-0 z-50 isolate border-t border-border-subtle bg-surface-raised/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_20px_rgb(23_23_27_/_6%)] backdrop-blur" aria-label="하단 주요 메뉴">
         <div className="mx-auto grid h-16 max-w-6xl grid-cols-7 px-1" data-session-role={role ?? "guest"}>
           {nav.map((item) => {
             const Icon = item.icon;
