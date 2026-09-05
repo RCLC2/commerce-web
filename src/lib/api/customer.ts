@@ -102,10 +102,14 @@ export const customerApi = {
   listNotifications: async (token: string) =>
     (await requestParsed(z.array(rawNotificationSchema), "/api/v1/me/notifications", { token }))
       .map(normalizeNotification),
-  listMyRecommendations: async (token: string, limit = 12) => {
+  listMyRecommendations: async (token: string, params: { limit?: number; offset?: number } = {}) => {
+    const search = new URLSearchParams();
+    if (params.limit) search.set("limit", String(params.limit));
+    if (params.offset !== undefined) search.set("offset", String(params.offset));
+    const query = search.toString();
     const recommendations = await requestParsed(
       z.array(recommendationSchema),
-      `/api/v1/me/recommendations?limit=${limit}`,
+      `/api/v1/me/recommendations${query ? `?${query}` : ""}`,
       { token },
     );
     return recommendations.map((recommendation) => ({

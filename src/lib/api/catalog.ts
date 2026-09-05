@@ -86,7 +86,13 @@ export const catalogApi = {
     const query = search.toString();
     return parseProducts(`/api/v1/products${query ? `?${query}` : ""}`);
   },
-  listPopularProducts: () => parseProducts("/api/v1/products/popular"),
+  listPopularProducts: (params: { limit?: number; offset?: number } = {}) => {
+    const search = new URLSearchParams();
+    if (params.limit) search.set("limit", String(params.limit));
+    if (params.offset !== undefined) search.set("offset", String(params.offset));
+    const query = search.toString();
+    return parseProducts(`/api/v1/products/popular${query ? `?${query}` : ""}`);
+  },
   listPromotionProducts: () => parseProducts("/api/v1/products/promotions"),
   listLatestProducts: () => parseProducts("/api/v1/products/latest"),
   getProduct: (id: number) =>

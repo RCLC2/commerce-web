@@ -39,6 +39,15 @@ describe("catalogApi backend contracts", () => {
     expect(fetchMock.mock.calls[0][0]).toContain("/api/v1/markets?sort=popular&limit=12");
   });
 
+  it("passes limit and offset when paging popular products", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await catalogApi.listPopularProducts({ limit: 12, offset: 24 });
+
+    expect(fetchMock.mock.calls[0][0]).toContain("/api/v1/products/popular?limit=12&offset=24");
+  });
+
   it("does not replace category, PLP, product, or event 404 responses", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(new Response("not found", { status: 404 }))));
     await expect(catalogApi.getCategoryInformation({ category: "outer" })).rejects.toMatchObject({ status: 404 });

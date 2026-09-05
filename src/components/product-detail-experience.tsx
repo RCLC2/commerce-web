@@ -491,9 +491,9 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
         ) : null}
       </section>
 
-      <SponsoredPlacement placementKey="pdp.card_banner" className="mt-10" />
+      <SponsoredPlacement placementKey="pdp.card_banner" className="mt-8" />
 
-      <SponsoredPlacement placementKey="pdp.sponsored_market" className="mt-10" />
+      <SponsoredPlacement placementKey="pdp.sponsored_market" className="mt-8" />
 
       <section className="pt-10">
         <div className="mx-auto max-w-3xl">
