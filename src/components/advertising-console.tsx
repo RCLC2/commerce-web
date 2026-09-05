@@ -24,7 +24,7 @@ import { ConsoleModal, useDebouncedValue } from "./console-ui";
 import { sellerLinks } from "./seller-shell";
 import { Button } from "./ui/button";
 
-type CreativeFormat = "PRODUCT_CARD" | "BANNER" | "MARKET_SHELF" | "IN_APP" | "PUSH";
+type CreativeFormat = "PRODUCT_CARD" | "BANNER" | "MARKET_SHELF" | "PROMOTION_CARD" | "PUSH";
 type TargetType = "PRODUCT" | "MARKET";
 type PricingModel = "CPM" | "DAILY_FLAT";
 type SellerAdProduct = { id: number; name: string; image_url?: string };
@@ -42,7 +42,7 @@ const placementCatalog: readonly PlacementOption[] = [
   { value: "search.sponsored_top", label: "검색 결과 상단", format: "PRODUCT_CARD", allowedTargets: ["PRODUCT"], pricingModel: "CPM" },
   { value: "pdp.card_banner", label: "상품 상세 배너", format: "BANNER", allowedTargets: ["PRODUCT", "MARKET"], pricingModel: "CPM" },
   { value: "pdp.sponsored_market", label: "상품 상세 추천 마켓", format: "MARKET_SHELF", allowedTargets: ["MARKET"], pricingModel: "CPM" },
-  { value: "crm.in_app_notification", label: "인앱 알림", format: "IN_APP", allowedTargets: ["PRODUCT", "MARKET"], pricingModel: "CPM" },
+  { value: "home.promotion_card", label: "홈 프로모션 카드", format: "PROMOTION_CARD", allowedTargets: ["PRODUCT", "MARKET"], pricingModel: "CPM" },
   { value: "crm.push_notification", label: "푸시 알림", format: "PUSH", allowedTargets: ["PRODUCT", "MARKET"], pricingModel: "CPM" },
 ] as const;
 
@@ -279,7 +279,7 @@ function campaignPayload(form: ReturnType<typeof emptyCampaignForm>, marketID?: 
   const landingURL = form.targetType === "PRODUCT" ? `/products/${targetID}` : `/markets/${targetID}`;
   const creative: Record<string, unknown> = { format: placement.format, landing_url: landingURL };
   if (placement.format === "BANNER") Object.assign(creative, { headline: form.name.trim(), image_url: form.imageURL.trim(), cta_label: "자세히 보기" });
-  if (placement.format === "IN_APP" || placement.format === "PUSH") Object.assign(creative, { headline: form.name.trim(), body: `${form.name.trim()} 광고를 확인해 보세요.` });
+  if (placement.format === "PROMOTION_CARD" || placement.format === "PUSH") Object.assign(creative, { headline: form.name.trim(), body: `${form.name.trim()} 광고를 확인해 보세요.` });
   return {
     target: form.targetType === "PRODUCT" ? { type: "PRODUCT", product_id: targetID } : { type: "MARKET", market_id: targetID },
     creative,

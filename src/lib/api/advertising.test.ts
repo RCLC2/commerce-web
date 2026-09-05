@@ -10,7 +10,7 @@ describe("advertising API contract", () => {
       { placement: "home_feed.sponsored_card", target: productTarget(), creative: { format: "PRODUCT_CARD", landing_url: "/products/7" } },
       { placement: "home.main_banner", target: productTarget(), creative: { format: "BANNER", headline: "주간 추천", image_url: "https://images.pexels.com/banner.jpg", landing_url: "/products/7", cta_label: "자세히 보기" } },
       { placement: "pdp.sponsored_market", target: marketTarget(), creative: { format: "MARKET_SHELF", landing_url: "/markets/3" } },
-      { placement: "crm.in_app_notification", target: productTarget(), creative: { format: "IN_APP", headline: "새 소식", body: "추천 상품을 확인하세요", landing_url: "/products/7" } },
+      { placement: "home.promotion_card", target: productTarget(), creative: { format: "PROMOTION_CARD", headline: "오늘의 추천", body: "추천 상품을 확인하세요", landing_url: "/products/7" } },
       { placement: "crm.push_notification", target: productTarget(), creative: { format: "PUSH", headline: "새 소식", body: "추천 상품을 확인하세요", landing_url: "/products/7" } },
     ] as const;
 

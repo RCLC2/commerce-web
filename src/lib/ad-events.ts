@@ -1,7 +1,7 @@
 import type { AdPlacement } from "./api/advertising";
 import { advertisingApi } from "./api/advertising";
 
-export type AdvertisingEventType = "IMPRESSION" | "CLICK" | "IN_APP_IMPRESSION";
+export type AdvertisingEventType = "IMPRESSION" | "CLICK" | "PROMOTION_CARD_IMPRESSION";
 
 export async function recordAdvertisingEvent({
   decisionID,
@@ -58,6 +58,6 @@ export function cryptoSafeID(): string {
 
 function eventPrefix(type: AdvertisingEventType): string {
   if (type === "CLICK") return "clk";
-  if (type === "IN_APP_IMPRESSION") return "inapp";
+  if (type === "PROMOTION_CARD_IMPRESSION") return "promo";
   return "imp";
 }

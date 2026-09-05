@@ -68,7 +68,7 @@ describe("SponsoredDecision", () => {
     ["PRODUCT_CARD", productCardDecision()],
     ["BANNER", bannerDecision()],
     ["MARKET_SHELF", marketShelfDecision()],
-    ["IN_APP", inAppDecision()],
+    ["PROMOTION_CARD", homePromotionCardDecision()],
   ])("renders %s with exactly one top-right SPONSORED disclosure", (_format, decision) => {
     render(<SponsoredDecision decision={decision} />);
 
@@ -152,11 +152,11 @@ function marketShelfDecision(): AdDecision {
   });
 }
 
-function inAppDecision(): AdDecision {
+function homePromotionCardDecision(): AdDecision {
   return baseDecision({
-    placement_key: "crm.in_app_notification",
+    placement_key: "home.promotion_card",
     target: productTarget(),
-    creative: { id: 4, format: "IN_APP", headline: "새 소식", body: "추천 상품을 확인하세요", landing_url: "/products/7" },
+    creative: { id: 4, format: "PROMOTION_CARD", headline: "오늘의 추천", body: "추천 상품을 확인하세요", landing_url: "/products/7" },
   });
 }
 

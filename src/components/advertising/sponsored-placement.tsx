@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 import type { AdDecision, AdPlacement } from "@/lib/api/advertising";
 import { useSessionStore } from "@/lib/session-store";
 import { SponsoredBanner } from "./sponsored-banner";
-import { SponsoredInApp } from "./sponsored-in-app";
+import { SponsoredHomePromotionCard } from "./sponsored-home-promotion-card";
 import { SponsoredMarketShelf } from "./sponsored-market-shelf";
 import { SponsoredProductCard } from "./sponsored-product-card";
 
@@ -33,7 +33,7 @@ export function SponsoredPlacement({ placementKey, className = "" }: { placement
 
 export function SponsoredDecision({ decision, token, className = "" }: { decision: AdDecision; token?: string | null; className?: string }) {
   const trackedRef = useRef<HTMLElement | null>(null);
-  const impressionType = decision.creative.format === "IN_APP" ? "IN_APP_IMPRESSION" : "IMPRESSION";
+  const impressionType = decision.creative.format === "PROMOTION_CARD" ? "PROMOTION_CARD_IMPRESSION" : "IMPRESSION";
   useAdImpression({
     targetRef: trackedRef,
     decisionID: decision.decision_id,
@@ -55,7 +55,7 @@ export function SponsoredDecision({ decision, token, className = "" }: { decisio
       {decision.creative.format === "BANNER" ? <SponsoredBanner decision={decision} onNavigate={onNavigate} /> : null}
       {decision.creative.format === "PRODUCT_CARD" ? <SponsoredProductCard decision={decision} onNavigate={onNavigate} /> : null}
       {decision.creative.format === "MARKET_SHELF" ? <SponsoredMarketShelf decision={decision} onNavigate={onNavigate} /> : null}
-      {decision.creative.format === "IN_APP" ? <SponsoredInApp decision={decision} onNavigate={onNavigate} /> : null}
+      {decision.creative.format === "PROMOTION_CARD" ? <SponsoredHomePromotionCard decision={decision} onNavigate={onNavigate} /> : null}
     </section>
   );
 }

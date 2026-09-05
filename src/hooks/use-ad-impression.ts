@@ -17,7 +17,7 @@ export function useAdImpression({
   decisionID: string;
   placementKey: AdPlacement;
   token?: string | null;
-  eventType?: Extract<AdvertisingEventType, "IMPRESSION" | "IN_APP_IMPRESSION">;
+  eventType?: Extract<AdvertisingEventType, "IMPRESSION" | "PROMOTION_CARD_IMPRESSION">;
 }): void {
   useEffect(() => {
     const target = targetRef.current;

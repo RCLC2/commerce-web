@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { AdDecision } from "@/lib/api/advertising";
 import { SponsoredDisclosure } from "./sponsored-disclosure";
 
-export function SponsoredInApp({ decision, onNavigate }: { decision: AdDecision; onNavigate: () => void }) {
-  if (decision.creative.format !== "IN_APP") return null;
+export function SponsoredHomePromotionCard({ decision, onNavigate }: { decision: AdDecision; onNavigate: () => void }) {
+  if (decision.creative.format !== "PROMOTION_CARD") return null;
   return (
     <article className="relative overflow-hidden rounded-xl border border-brand/25 bg-rose-50 p-5 pr-32">
       <SponsoredDisclosure />
