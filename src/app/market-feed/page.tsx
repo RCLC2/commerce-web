@@ -1,5 +1,5 @@
-import { MarketFeedPage } from "@/components/market-feed-page";
+import { redirect } from "next/navigation";
 
 export default function MarketFeed() {
-  return <MarketFeedPage />;
+  redirect("/markets");
 }

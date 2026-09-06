@@ -31,7 +31,7 @@ const parseProducts = async (path: string) =>
   (await requestParsed(z.array(plpProductSchema), path)).map(normalizePublicProduct);
 
 export const catalogApi = {
-  listMarkets: (params: { sort?: "new" | "popular"; limit?: number; offset?: number } = {}) => {
+  listMarkets: (params: { sort?: "new" | "popular" | "trending" | "new-products"; limit?: number; offset?: number } = {}) => {
     const search = new URLSearchParams();
     if (params.sort) search.set("sort", params.sort);
     if (params.limit) search.set("limit", String(params.limit));

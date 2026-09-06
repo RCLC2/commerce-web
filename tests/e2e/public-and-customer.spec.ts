@@ -33,9 +33,10 @@ test.describe("public and customer journeys with live and controlled API boundar
     await expect(page.getByText("표시할 상품이 없습니다.", { exact: true })).toHaveCount(0);
 
     await page.route("**/api/v1/markets?**", (route) => route.fulfill({ status: 503, body: "markets unavailable" }));
-    await page.goto("/popular-markets");
-    await expect(page.getByRole("button", { name: "다시 시도", exact: true })).toBeVisible();
-    await expect(page.getByText("표시할 마켓이 없습니다.", { exact: true })).toHaveCount(0);
+    await page.goto("/markets");
+    await expect(page.getByRole("button", { name: "다시 불러오기", exact: true })).toHaveCount(2);
+    await expect(page.getByText("아직 이번 주 상승세를 보여 줄 마켓이 없습니다.", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("최근 7일 신상품이 등록된 마켓이 없습니다.", { exact: true })).toHaveCount(0);
 
     await page.route("**/api/v1/search/trending**", (route) => route.fulfill({ status: 503, body: "trending unavailable" }));
     await page.goto("/search");

@@ -6,7 +6,15 @@ import { couponPriceForProduct } from "@/lib/product-card-pricing";
 import { ProductCardPrice } from "./product-card-price";
 import { SafeImage } from "./safe-image";
 
-export function ProductCard({ product, imageAspect = "aspect-square" }: { product: Product; imageAspect?: string }) {
+export function ProductCard({
+  product,
+  imageAspect = "aspect-square",
+  compact = false,
+}: {
+  product: Product;
+  imageAspect?: string;
+  compact?: boolean;
+}) {
   const couponPrice = couponPriceForProduct(product);
 
   return (
@@ -22,16 +30,22 @@ export function ProductCard({ product, imageAspect = "aspect-square" }: { produc
           />
         </div>
       </Link>
-      <div className="mt-3 space-y-1.5">
+      <div className={compact ? "mt-2 space-y-1" : "mt-3 space-y-1.5"}>
         <Link href={`/markets/${product.market?.id ?? product.market_id}`} className="inline-flex w-fit text-xs font-semibold text-muted underline-offset-2 hover:text-foreground hover:underline">
           {product.market?.name ?? product.market_name ?? `마켓 ${product.market_id}`}
         </Link>
         <Link href={`/products/${product.id}`} className="block">
-          <h3 className="line-clamp-2 min-h-10 text-sm font-medium leading-5 group-hover:underline">{product.name}</h3>
+          <h3 className={compact ? "line-clamp-1 min-h-5 text-sm font-medium leading-5 group-hover:underline" : "line-clamp-2 min-h-10 text-sm font-medium leading-5 group-hover:underline"}>{product.name}</h3>
         </Link>
-        <ProductCardPrice basePrice={product.base_price} discountPrice={product.discount_price} couponPrice={couponPrice} />
+        <ProductCardPrice
+          basePrice={product.base_price}
+          discountPrice={product.discount_price}
+          couponPrice={couponPrice}
+          variant={compact ? "compact" : "default"}
+          className={compact ? "!mt-1" : ""}
+        />
         <div className="flex flex-wrap gap-1">
-          {(product.tag_chips ?? []).slice(0, 4).map((chip) => (
+          {(product.tag_chips ?? []).slice(0, compact ? 2 : 4).map((chip) => (
             <ProductChip key={chip.code} label={chip.label} tone={chip.tone} />
           ))}
         </div>

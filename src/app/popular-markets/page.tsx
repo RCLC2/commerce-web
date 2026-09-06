@@ -1,5 +1,5 @@
-import { PopularMarketsPage } from "@/components/popular-markets-page";
+import { redirect } from "next/navigation";
 
 export default function PopularMarkets() {
-  return <PopularMarketsPage />;
+  redirect("/markets#trending");
 }
