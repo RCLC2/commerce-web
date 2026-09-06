@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
+import { cryptoSafeID } from "@/lib/ad-events";
 import { getEffectiveToken } from "@/lib/auth-token";
 import {
   availableOptionQuantity,
@@ -18,12 +19,12 @@ import {
 import { resolveProductDetailHtml } from "@/lib/product-detail-html";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
-import type { PdpMerchandising, Product, ProductOption } from "@/lib/types";
+import type { Product, ProductOption } from "@/lib/types";
 import { discountRate, formatPrice } from "@/lib/utils";
-import { SponsoredPlacement } from "./advertising/sponsored-placement";
 import { CollapsibleProductDetail } from "./collapsible-product-detail";
+import { PDPReviewBanner } from "./home-placement-cards";
 import { PageJumpControls } from "./page-jump-controls";
-import { AlsoViewedSection } from "./pdp-merchandising-sections";
+import { PDPShelfSection } from "./pdp-merchandising-sections";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
@@ -34,12 +35,14 @@ class CartPreflightError extends Error {
   }
 }
 
-export function ProductDetailExperience({ productId, initialProduct, initialMerchandising }: { productId: number; initialProduct?: Product; initialMerchandising: PdpMerchandising }) {
+export function ProductDetailExperience({ productId, initialProduct }: { productId: number; initialProduct?: Product }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const token = useSessionStore((state) => state.accessToken);
   const memberID = useSessionStore((state) => state.memberID);
+  const hydrated = useSessionStore((state) => state.hydrated);
   const effectiveToken = getEffectiveToken(token);
+  const reviewBannerRequestID = useMemo(() => `pdp-review-${productId}-${cryptoSafeID()}`, [productId]);
   const [quantity, setQuantity] = useState(1);
   const [optionID, setOptionID] = useState<number | null>(null);
   const [activeImage, setActiveImage] = useState(0);
@@ -62,6 +65,20 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
   const summaryQuery = useQuery({
     queryKey: [...queryKeys.productReviews(productId), "summary"],
     queryFn: () => api.getProductReviewSummary(productId),
+  });
+  const marketShelfQuery = useQuery({
+    queryKey: queryKeys.productMarketShelf(productId),
+    queryFn: () => api.getProductMarketShelf(productId),
+  });
+  const similarProductsQuery = useQuery({
+    queryKey: queryKeys.similarProducts(productId),
+    queryFn: () => api.getSimilarProducts(productId),
+  });
+  const reviewBannerQuery = useQuery({
+    queryKey: queryKeys.pdpReviewBanner(productId, memberID),
+    queryFn: () => api.pdpReviewBanner(productId, reviewBannerRequestID, effectiveToken),
+    enabled: hydrated,
+    retry: false,
   });
   const likedProductsQuery = useQuery({
     queryKey: queryKeys.likedProducts(memberID),
@@ -419,6 +436,13 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
         </aside>
       </div>
 
+      <PDPShelfSection
+        eyebrow="FROM THIS MARKET"
+        title={`${product.market_name ?? "이 마켓"}의 추천 상품`}
+        description={marketShelfQuery.data?.mode === "NEWEST" ? "이 마켓에 새로 등록된 상품 순으로 보여드려요." : "플랫폼 추천 순서로 엄선한 이 마켓의 상품이에요."}
+        products={marketShelfQuery.data?.items ?? []}
+      />
+
       <section className="mt-10 border-y border-line py-7" aria-labelledby="review-carousel-title">
         <div className="flex items-end justify-between">
           <div>
@@ -493,9 +517,11 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
         ) : null}
       </section>
 
-      <SponsoredPlacement placementKey="pdp.card_banner" className="mt-8" />
-
-      <SponsoredPlacement placementKey="pdp.sponsored_market" className="mt-8" />
+      <PDPReviewBanner
+        card={reviewBannerQuery.data?.card}
+        token={effectiveToken}
+        memberID={memberID}
+      />
 
       <section className="pt-10">
         <div className="mx-auto max-w-3xl">
@@ -508,7 +534,12 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
         </div>
       </section>
 
-      <AlsoViewedSection products={initialMerchandising.also_viewed} />
+      <PDPShelfSection
+        eyebrow="SIMILAR PICKS"
+        title="비슷한 상품 추천"
+        description="카테고리, 스타일, 가격대를 함께 살펴 골랐어요."
+        products={similarProductsQuery.data?.items ?? []}
+      />
 
       <PageJumpControls />
 

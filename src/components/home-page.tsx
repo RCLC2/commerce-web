@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { cryptoSafeID } from "@/lib/ad-events";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { couponPriceForProduct } from "@/lib/product-card-pricing";
 import { queryKeys } from "@/lib/query-keys";
@@ -13,7 +14,7 @@ import { useSessionStore } from "@/lib/session-store";
 import { ApiErrorState } from "./api-error-state";
 import { ProductCard } from "./product-card";
 import { ProductCardPrice } from "./product-card-price";
-import { SponsoredPlacement } from "./advertising/sponsored-placement";
+import { HomeContextTextCard, HomeFeatureCard } from "./home-placement-cards";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
@@ -54,6 +55,7 @@ export function HomePage() {
   const memberID = useSessionStore((state) => state.memberID);
   const hydrated = useSessionStore((state) => state.hydrated);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const [homePlacementRequestID] = useState(() => `home-${cryptoSafeID()}`);
   const effectiveToken = getEffectiveToken(token);
   const eventsQuery = useQuery({
     queryKey: queryKeys.events,
@@ -70,6 +72,12 @@ export function HomePage() {
     queryFn: api.listHomeSections,
   });
   const homeSections = homeSectionsQuery.data ?? [];
+  const homePlacementsQuery = useQuery({
+    queryKey: queryKeys.homePlacements(memberID),
+    queryFn: () => api.homePlacements(homePlacementRequestID, effectiveToken),
+    enabled: hydrated,
+    retry: false,
+  });
   const recommendationQuery = useInfiniteQuery({
     queryKey: queryKeys.homeRecommendations(memberID),
     initialPageParam: 0,
@@ -148,7 +156,7 @@ export function HomePage() {
         ) : events.length ? (
           <EventCarousel events={events} />
         ) : eventsQuery.isLoading ? (
-          <div className="h-64 animate-pulse rounded-md bg-zinc-200" />
+          <div className="h-52 animate-pulse rounded-md bg-zinc-200 md:h-72" />
         ) : <p className="rounded-md border border-line bg-white p-6 text-sm text-muted">진행 중인 이벤트가 없습니다.</p>}
       </section>
 
@@ -168,13 +176,11 @@ export function HomePage() {
           ))}
         </div>
       </section>
-
-      <section className="py-2" aria-label="메인 보장형 광고">
-        <SponsoredPlacement placementKey="home.main_banner" />
-      </section>
-      <section className="py-2" aria-label="홈 프로모션 카드">
-        <SponsoredPlacement placementKey="home.promotion_card" />
-      </section>
+      <HomeContextTextCard
+        card={homePlacementsQuery.data?.context_text.card}
+        token={effectiveToken}
+        memberID={memberID}
+      />
       {homeSectionsQuery.isError ? <ApiErrorState className="my-7" error={homeSectionsQuery.error} onRetry={() => void homeSectionsQuery.refetch()} retryLabel="홈 구좌 다시 시도" /> : null}
       {homeSectionsQuery.isLoading ? <p className="py-7 text-sm text-muted">홈 상품 구좌를 불러오는 중입니다.</p> : null}
       {homeSectionsQuery.isSuccess && displayHomeSections.length === 0 ? <p className="py-7 text-sm text-muted">표시할 홈 상품 구좌가 없습니다.</p> : null}
@@ -190,8 +196,8 @@ export function HomePage() {
           onRetry={() => void homeSectionQueries[index]?.refetch()}
         />
       ))}
-      <section className="py-2" aria-label="스폰서드 상품">
-        <SponsoredPlacement placementKey="home_feed.sponsored_card" />
+      <section className="py-2" aria-label="홈 추천 카드">
+        <HomeFeatureCard card={homePlacementsQuery.data?.feature_card.card} token={effectiveToken} memberID={memberID} />
       </section>
 
       <section id="recommendations" className="scroll-mt-20 py-7">
@@ -285,12 +291,12 @@ export function EventCarousel({ events }: { events: CommerceEvent[] }) {
       >
         {events.map((event, index) => (
           <Link key={event.id} href={`/events/${event.id}`} className="block min-w-full">
-            <div className="relative h-64 bg-zinc-100 md:h-[380px]">
+            <div className="relative h-52 bg-zinc-100 md:h-72">
               <SafeImage src={event.image_url} alt={event.title} fill sizes="100vw" className="object-cover" priority={index === 0} />
               <div className="absolute inset-0 bg-black/30" />
               <div className="absolute bottom-0 left-0 max-w-lg p-5 text-white md:p-8">
                 <p className="text-sm font-bold">진행중인 이벤트</p>
-                <h1 className="mt-2 text-3xl font-black md:text-5xl">{event.title}</h1>
+                <h1 className="mt-1.5 text-2xl font-black md:text-3xl">{event.title}</h1>
                 <p className="mt-2 text-sm text-white/90">{event.subtitle}</p>
               </div>
             </div>

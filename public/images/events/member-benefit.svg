@@ -1,0 +1,26 @@
+<svg width="1200" height="420" viewBox="0 0 1200 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="20" x2="1120" y2="400" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#881337"/>
+      <stop offset="0.52" stop-color="#E11D48"/>
+      <stop offset="1" stop-color="#FB7185"/>
+    </linearGradient>
+    <linearGradient id="gift" x1="850" y1="96" x2="1030" y2="340" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF7ED"/>
+      <stop offset="1" stop-color="#FFE4E6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="420" rx="32" fill="url(#bg)"/>
+  <circle cx="1090" cy="20" r="210" fill="white" fill-opacity="0.1"/>
+  <circle cx="770" cy="410" r="180" fill="white" fill-opacity="0.08"/>
+  <path d="M830 170H1050V344H830V170Z" fill="url(#gift)"/>
+  <path d="M808 126H1072V196H808V126Z" fill="white"/>
+  <path d="M940 126V344" stroke="#FB7185" stroke-width="28"/>
+  <path d="M940 126C884 126 854 105 854 74C854 49 873 32 898 32C931 32 940 77 940 126Z" fill="#FFF1F2" stroke="white" stroke-width="10"/>
+  <path d="M940 126C996 126 1026 105 1026 74C1026 49 1007 32 982 32C949 32 940 77 940 126Z" fill="#FFF1F2" stroke="white" stroke-width="10"/>
+  <g fill="white" fill-opacity="0.8">
+    <circle cx="733" cy="86" r="7"/><circle cx="1100" cy="280" r="9"/><circle cx="765" cy="255" r="5"/>
+    <path d="M1080 82L1088 100L1106 108L1088 116L1080 134L1072 116L1054 108L1072 100L1080 82Z"/>
+    <path d="M785 125L791 139L805 145L791 151L785 165L779 151L765 145L779 139L785 125Z"/>
+  </g>
+</svg>

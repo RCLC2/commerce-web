@@ -100,6 +100,16 @@ describe("SponsoredDecision", () => {
     expect(screen.getByRole("link", { name: /마켓 상품/ })).toHaveClass("w-32", "md:w-36");
   });
 
+  it("keeps the shared product ad compact without a separate detail row", () => {
+    const decision = productCardDecision();
+    decision.placement_key = "home.feature_card";
+
+    render(<SponsoredDecision decision={decision} />);
+
+    expect(screen.getByRole("link", { name: /테스트 상품/ })).toHaveClass("min-h-32", "grid-cols-[104px_1fr]");
+    expect(screen.queryByText("상품 상세로 이동")).not.toBeInTheDocument();
+  });
+
   it("keeps market carousel controls separate and keyboard-labelled", () => {
     render(<SponsoredDecision decision={marketShelfDecision()} />);
 

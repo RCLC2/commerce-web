@@ -27,6 +27,15 @@ const productDetailSchema = z.object({
   today_shipping_available: z.boolean().optional(),
 });
 
+const marketShelfSchema = z.object({
+  mode: z.enum(["PLATFORM_RECOMMENDED", "NEWEST"]),
+  items: z.array(plpProductSchema),
+});
+
+const similarProductsSchema = z.object({
+  items: z.array(plpProductSchema),
+});
+
 const parseProducts = async (path: string) =>
   (await requestParsed(z.array(plpProductSchema), path)).map(normalizePublicProduct);
 
@@ -110,6 +119,14 @@ export const catalogApi = {
     requestParsed(z.array(reviewSchema), `/api/v1/products/${id}/reviews`),
   getProductReviewSummary: (id: number) =>
     requestParsed(reviewSummarySchema, `/api/v1/products/${id}/reviews/summary`),
+  getProductMarketShelf: async (id: number, limit = 10) => {
+    const shelf = await requestParsed(marketShelfSchema, `/api/v1/products/${id}/market-shelf?limit=${limit}`);
+    return { ...shelf, items: shelf.items.map(normalizePublicProduct) };
+  },
+  getSimilarProducts: async (id: number, limit = 10) => {
+    const shelf = await requestParsed(similarProductsSchema, `/api/v1/products/${id}/similar?limit=${limit}`);
+    return { items: shelf.items.map(normalizePublicProduct) };
+  },
   listActiveCarousels: () =>
     requestParsed(z.array(carouselSchema), "/api/v1/carousels/active"),
   recordCampaignClick: (campaignID: number) =>
