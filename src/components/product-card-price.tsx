@@ -36,10 +36,10 @@ export function ProductCardPrice({
           {pricing.state === "regular" ? <span className="text-[11px] font-bold text-muted">{formatPrice(pricing.basePrice)}</span> : null}
           {pricing.state === "stacked" ? <span className="text-[10px] font-black text-brand">할인 {pricing.saleRate}% · 쿠폰 {pricing.couponRate}%</span> : null}
           {pricing.state === "sale" ? <span className="text-xs font-black text-brand">{pricing.saleRate}%</span> : null}
-          {pricing.state === "coupon" ? <span className="text-xs font-black text-violet-700">{pricing.couponRate}%</span> : null}
+          {pricing.state === "coupon" ? <span className="text-xs font-black text-promotion">{pricing.couponRate}%</span> : null}
           {pricing.compareAtPrice !== undefined ? <del className="text-[11px] text-muted">{formatPrice(pricing.compareAtPrice)}</del> : null}
         </div>
-        <strong className={`mt-0.5 block text-xs font-black ${isCouponPrice ? "text-violet-700" : "text-brand"}`}>
+        <strong className={`mt-0.5 block text-xs font-black ${isCouponPrice ? "text-promotion" : "text-brand"}`}>
           {isCouponPrice
             ? `쿠폰 최적가 ${formatPrice(pricing.finalPrice)}`
             : pricing.state === "sale"
@@ -51,7 +51,7 @@ export function ProductCardPrice({
   }
 
   return (
-    <div className={`min-h-14 rounded-md bg-zinc-50 px-2.5 py-2 ${className}`}>
+    <div className={`min-h-14 rounded-control bg-surface-subtle px-2.5 py-2 ${className}`}>
       <p className="text-[11px] font-bold text-muted">판매가</p>
       <div className="mt-1 flex min-w-0 flex-wrap items-baseline justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-baseline gap-1.5">
@@ -64,14 +64,14 @@ export function ProductCardPrice({
             </>
           ) : (
             <>
-              <span className={`shrink-0 text-sm font-black ${isCouponPrice ? "text-violet-700" : "text-brand"}`}>
+             <span className={`shrink-0 text-sm font-black ${isCouponPrice ? "text-promotion" : "text-brand"}`}>
                 {isCouponPrice ? pricing.couponRate : pricing.saleRate}%
               </span>
               <del className="truncate text-xs font-bold text-muted">{formatPrice(pricing.compareAtPrice ?? 0)}</del>
             </>
           )}
         </div>
-        <strong className={isCouponPrice ? "ml-auto shrink-0 text-sm font-black text-violet-700" : "ml-auto shrink-0 text-base font-black tracking-tight text-brand"}>
+       <strong className={isCouponPrice ? "ml-auto shrink-0 text-sm font-black text-promotion" : "ml-auto shrink-0 text-base font-black tracking-tight text-brand"}>
           {isCouponPrice
             ? `쿠폰 최적가 ${formatPrice(pricing.finalPrice)}`
             : pricing.state === "sale"

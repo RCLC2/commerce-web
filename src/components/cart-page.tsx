@@ -13,6 +13,9 @@ import { useSessionStore } from "@/lib/session-store";
 import { formatPrice } from "@/lib/utils";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { EmptyState, LoadingState } from "./ui/feedback";
+import { Notice } from "./ui/notice";
+import { OrderSummary } from "./ui/order-summary";
 
 export function CartPage() {
   const router = useRouter();
@@ -87,41 +90,41 @@ export function CartPage() {
       </div>
       <div className="mt-7 grid gap-6 md:grid-cols-[minmax(0,1fr)_320px]">
         <section>
-          {displayGroups.length ? <label className="mb-3 flex w-fit cursor-pointer items-center gap-2 text-sm font-black"><input type="checkbox" className="h-5 w-5 accent-brand" checked={allSelected} onChange={toggleAll} />전체 선택</label> : null}
+          {displayGroups.length ? <label className="mb-3 flex w-fit cursor-pointer items-center gap-2 text-sm font-black"><input type="checkbox" className="h-5 w-5 accent-action-primary" checked={allSelected} onChange={toggleAll} />전체 선택</label> : null}
           <div className="space-y-3">
-          {cart.isLoading ? <p className="text-sm text-muted">장바구니를 불러오는 중입니다.</p> : null}
+          {cart.isLoading ? <LoadingState label="장바구니를 불러오는 중입니다." /> : null}
           {cart.isError ? (
-            <div className="rounded-xl border border-brand/30 bg-red-50 p-4 text-sm">
-              <p className="font-bold text-brand">{apiErrorMessage(cart.error)}</p>
+            <Notice tone="error" title={apiErrorMessage(cart.error)}>
               <Button className="mt-3" size="sm" variant="secondary" onClick={() => void cart.refetch()}>다시 시도</Button>
-            </div>
+            </Notice>
           ) : null}
-          {productError ? <p className="rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800">일부 상품의 현재 정보는 불러오지 못했습니다. 장바구니에 담긴 가격과 수량은 그대로 표시합니다.</p> : null}
-          {cart.isSuccess && !displayGroups.length ? <div className="rounded-2xl border border-line bg-white p-10 text-center"><ShoppingBag className="mx-auto text-zinc-300" size={36} /><p className="mt-4 font-black">장바구니가 비어 있습니다</p><p className="mt-1 text-sm text-muted">마음에 드는 상품을 담아보세요.</p><Link href="/products" className="mt-5 inline-block"><Button>상품 둘러보기</Button></Link></div> : null}
+          {productError ? <Notice tone="warning">일부 상품의 현재 정보는 불러오지 못했습니다. 장바구니에 담긴 가격과 수량은 그대로 표시합니다.</Notice> : null}
+          {cart.isSuccess && !displayGroups.length ? <EmptyState icon={<ShoppingBag className="size-7" />} title="장바구니가 비어 있습니다" description="마음에 드는 상품을 담아보세요." action={<Link href="/products"><Button>상품 둘러보기</Button></Link>} /> : null}
           {displayGroups.map((group) => {
             const item = group.items[0];
             const option = item.product?.options?.find((candidate) => candidate.id === group.option_id);
             const selected = selectedGroupKeys.has(group.key);
-            return <article key={group.key} className={`rounded-2xl border bg-white p-4 transition ${selected ? "border-brand/40 shadow-sm" : "border-line"}`}>
+            return <article key={group.key} className={`rounded-surface border bg-surface-raised p-4 transition ${selected ? "border-action-primary/40 shadow-card" : "border-border-subtle"}`}>
               <div className="grid grid-cols-[24px_88px_minmax(0,1fr)] gap-3">
-                <label className="pt-1" aria-label={`${item.product?.name ?? `상품 ${group.product_id}`} 선택`}><input type="checkbox" className="h-5 w-5 cursor-pointer accent-brand" checked={selected} onChange={() => toggleGroup(group.cartItemIDs)} /></label>
-                <Link href={`/products/${group.product_id}`} className="relative aspect-square overflow-hidden rounded-xl bg-zinc-100"><SafeImage src={item.product?.image_url} alt="" fill sizes="88px" className="object-cover" /></Link>
+                <label className="pt-1" aria-label={`${item.product?.name ?? `상품 ${group.product_id}`} 선택`}><input type="checkbox" className="h-5 w-5 cursor-pointer accent-action-primary" checked={selected} onChange={() => toggleGroup(group.cartItemIDs)} /></label>
+                <Link href={`/products/${group.product_id}`} className="relative aspect-square overflow-hidden rounded-control bg-surface-subtle"><SafeImage src={item.product?.image_url} alt="" fill sizes="88px" className="object-cover" /></Link>
                 <div className="min-w-0">
-                  <Link href={`/products/${group.product_id}`} className="group block"><p className="text-xs font-bold text-muted">{item.product?.market_name ?? `마켓 #${item.product?.market_id ?? "-"}`}</p><div className="mt-1 flex items-start justify-between gap-2"><h2 className="line-clamp-2 text-sm font-black leading-5 group-hover:underline">{item.product?.name ?? `상품 #${group.product_id}`}</h2><ChevronRight className="mt-0.5 shrink-0 text-zinc-400" size={16} /></div></Link>
-                  <p className="mt-2 text-xs text-muted">{option ? `${option.option_name} · ${option.option_value}` : `옵션 #${group.option_id}`} · {group.quantity}개</p>
-                  <p className="mt-3 text-right font-black">{formatPrice(group.totalPrice)}</p>
+                  <Link href={`/products/${group.product_id}`} className="group block"><p className="text-xs font-bold text-content-secondary">{item.product?.market_name ?? `마켓 #${item.product?.market_id ?? "-"}`}</p><div className="mt-1 flex items-start justify-between gap-2"><h2 className="line-clamp-2 text-sm font-black leading-5 text-content-primary group-hover:underline">{item.product?.name ?? `상품 #${group.product_id}`}</h2><ChevronRight className="mt-0.5 shrink-0 text-content-tertiary" size={16} /></div></Link>
+                  <p className="mt-2 text-xs text-content-secondary">{option ? `${option.option_name} · ${option.option_value}` : `옵션 #${group.option_id}`} · {group.quantity}개</p>
+                  <p className="mt-3 text-right font-black text-content-primary">{formatPrice(group.totalPrice)}</p>
                 </div>
               </div>
             </article>;
           })}
           </div>
         </section>
-        <aside className="h-fit rounded-2xl border border-line bg-white p-5 md:sticky md:top-24">
-          <h2 className="font-black">주문 예상 금액</h2>
-          <div className="mt-5 flex justify-between text-sm"><span className="text-muted">선택 수량 {selectedQuantity}개</span><strong>{formatPrice(total)}</strong></div>
-          <div className="mt-5 border-t border-line pt-5"><div className="flex items-end justify-between"><span className="font-bold">총 결제 예정</span><strong className="text-2xl">{formatPrice(total)}</strong></div></div>
-          <Button className="mt-5 w-full" size="lg" disabled={!selectedItems.length || cart.isError} onClick={goToCheckout}><Check size={18} /> 선택 상품 주문하기</Button>
-          {displayGroups.length > 0 && !selectedItems.length ? <p className="mt-3 text-center text-xs font-bold text-brand">주문할 상품을 선택해주세요.</p> : null}
+        <aside className="md:sticky md:top-24">
+          <OrderSummary
+            title="주문 예상 금액"
+            items={[{ label: `선택 수량 ${selectedQuantity}개`, value: formatPrice(total) }]}
+            total={formatPrice(total)}
+            footer={<><Button className="w-full" size="lg" disabled={!selectedItems.length || cart.isError} onClick={goToCheckout}><Check size={18} /> 선택 상품 주문하기</Button>{displayGroups.length > 0 && !selectedItems.length ? <p className="mt-3 text-center text-xs font-bold text-action-primary">주문할 상품을 선택해주세요.</p> : null}</>}
+          />
         </aside>
       </div>
     </main>

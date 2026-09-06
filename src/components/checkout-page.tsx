@@ -28,6 +28,11 @@ import type { CartItem, OrderResponse, PaymentRequest } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import { TossPaymentWidget } from "./toss-payment-widget";
 import { Button } from "./ui/button";
+import { Field } from "./ui/field";
+import { Input, Select } from "./ui/input";
+import { Notice } from "./ui/notice";
+import { OrderSummary } from "./ui/order-summary";
+import { Surface } from "./ui/surface";
 
 export function CheckoutPage() {
   const router = useRouter();
@@ -313,31 +318,26 @@ export function CheckoutPage() {
     <main className="mx-auto max-w-5xl px-4 pb-28 pt-8">
       <h1 className="text-2xl font-black">주문서</h1>
       {!createdOrderCode && requestedCartItemIDs !== null && cart.isSuccess && !items.length ? (
-        <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-900">
-          선택한 장바구니 상품을 찾을 수 없습니다. <Link href="/cart" className="underline">장바구니에서 다시 선택해주세요.</Link>
-        </div>
+        <Notice className="mt-5" tone="warning" title="선택한 장바구니 상품을 찾을 수 없습니다."><Link href="/cart" className="font-bold underline">장바구니에서 다시 선택해주세요.</Link></Notice>
       ) : null}
       {blockingError ? (
-        <div className="mt-5 rounded-md border border-brand/30 bg-red-50 p-4 text-sm">
-          <p className="font-bold text-brand">{apiErrorMessage(blockingError)}</p>
+        <Notice className="mt-5" tone="error" title={apiErrorMessage(blockingError)}>
           <Button className="mt-3" size="sm" variant="secondary" onClick={() => {
             void cart.refetch(); void coupons.refetch(); void profile.refetch(); void addresses.refetch();
           }}>다시 시도</Button>
-        </div>
+        </Notice>
       ) : null}
       {supportingError ? (
-        <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm">
-          <p className="font-bold text-amber-900">
-            쿠폰·포인트·참고용 배송지 일부를 불러오지 못했습니다. 할인 없이 주문은 계속할 수 있습니다.
-          </p>
+        <Notice className="mt-3" tone="warning" title="쿠폰·포인트·참고용 배송지 일부를 불러오지 못했습니다.">
+          할인 없이 주문은 계속할 수 있습니다.
           <Button className="mt-3" size="sm" variant="secondary" onClick={() => {
             void coupons.refetch(); void profile.refetch(); void addresses.refetch();
           }}>부가 정보 다시 시도</Button>
-        </div>
+        </Notice>
       ) : null}
       <div className="mt-6 grid gap-6 md:grid-cols-[1fr_340px]">
         <section className="space-y-5">
-          <div className="rounded-md border border-line bg-white p-4">
+          <Surface padding="sm">
             <h2 className="font-black">기본 배송지</h2>
             {defaultAddress ? (
               <div className="mt-3 text-sm leading-6">
@@ -345,18 +345,13 @@ export function CheckoutPage() {
                 <p className="text-muted">({defaultAddress.zip_code}) {defaultAddress.line1} {defaultAddress.line2}</p>
               </div>
             ) : <p className="mt-3 text-sm text-muted">등록된 기본 배송지가 없습니다.</p>}
-            {defaultAddress ? <p className="mt-3 text-xs font-bold text-emerald-700">이 배송지는 주문 당시 정보로 저장되어 셀러와 관리자 배송 처리에 사용됩니다.</p> : null}
-          </div>
+            {defaultAddress ? <p className="mt-3 text-xs font-bold text-status-positive">이 배송지는 주문 당시 정보로 저장되어 셀러와 관리자 배송 처리에 사용됩니다.</p> : null}
+          </Surface>
 
-          <div className="rounded-md border border-line bg-white p-4">
+          <Surface padding="sm">
             <h2 className="font-black">주문 상품</h2>
             {createdOrderCode ? (
-              <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3">
-                <p className="text-sm font-black text-amber-950">복구한 주문은 현재 장바구니와 별개입니다</p>
-                <p className="mt-1 text-xs leading-5 text-amber-900">
-                  아래에는 서버에서 확인한 기존 주문 상품만 표시합니다. 현재 장바구니 변경사항은 이 결제에 포함되지 않습니다.
-                </p>
-              </div>
+              <Notice className="mt-3" tone="warning" title="복구한 주문은 현재 장바구니와 별개입니다">아래에는 서버에서 확인한 기존 주문 상품만 표시합니다. 현재 장바구니 변경사항은 이 결제에 포함되지 않습니다.</Notice>
             ) : null}
             <div className="mt-4 space-y-3">
               {displayItems.map((item) => {
@@ -372,14 +367,13 @@ export function CheckoutPage() {
                 <p className="text-sm text-muted">서버 주문에 표시할 상품 상세가 없습니다. 결제 금액은 서버 확정값을 사용합니다.</p>
               ) : null}
             </div>
-          </div>
+          </Surface>
 
-          <div className="rounded-md border border-line bg-white p-4">
+          <Surface padding="sm">
             <h2 className="font-black">할인 요청</h2>
-            <label className="mt-4 block">
-              <span className="text-sm font-bold">보유 쿠폰</span>
-              <select
-                className="mt-2 h-11 w-full rounded-md border border-line px-3 outline-none"
+            <Field className="mt-4" label="보유 쿠폰" htmlFor="checkout-coupon" hint="주문에는 쿠폰 정의 ID가 아닌 보유 쿠폰 ID가 전송됩니다.">
+              <Select
+                id="checkout-coupon"
                 value={eligibleSelectedCoupon?.id ?? ""}
                 disabled={Boolean(createdOrderCode)}
                 onChange={(event) => {
@@ -396,69 +390,71 @@ export function CheckoutPage() {
                     </option>
                   );
                 })}
-              </select>
-              <span className="mt-1 block text-xs text-muted">주문에는 쿠폰 정의 ID가 아닌 보유 쿠폰 ID가 전송됩니다.</span>
-            </label>
-            <label className="mt-4 block">
-              <span className="text-sm font-bold">포인트 사용</span>
-              <input type="number" min={0} max={pointLimit} step={1} disabled={Boolean(createdOrderCode)} className="mt-2 h-11 w-full rounded-md border border-line px-3 outline-none" value={usedPoint} onChange={(event) => setUsedPoint(normalizeRequestedPoints(Number(event.target.value)))} />
-              <span className="mt-1 block text-xs text-muted">요청 {formatPrice(appliedPoint)} · 최대 사용 {formatPrice(pointLimit)} · 보유 {formatPrice(availablePoint)}</span>
-            </label>
-          </div>
+              </Select>
+            </Field>
+            <Field className="mt-4" label="포인트 사용" htmlFor="checkout-point" hint={`요청 ${formatPrice(appliedPoint)} · 최대 사용 ${formatPrice(pointLimit)} · 보유 ${formatPrice(availablePoint)}`}>
+              <Input id="checkout-point" type="number" min={0} max={pointLimit} step={1} disabled={Boolean(createdOrderCode)} value={usedPoint} onChange={(event) => setUsedPoint(normalizeRequestedPoints(Number(event.target.value)))} />
+            </Field>
+          </Surface>
         </section>
 
-        <aside className="h-fit rounded-md border border-line bg-white p-4">
-          <h2 className="font-black">{confirmedOrder ? "서버 확정 결제 금액" : "주문 전 예상 금액"}</h2>
-          <div className="mt-4 space-y-3 text-sm">
-            <div className="flex justify-between"><span>상품 금액</span><strong>{formatPrice(confirmedOrder?.total_order_price ?? productTotal)}</strong></div>
-            <div className="flex justify-between"><span>서버 할인</span><strong>{confirmedOrder ? `-${formatPrice(confirmedOrder.total_discount_price)}` : "주문 후 확정"}</strong></div>
-            <div className="flex justify-between"><span>포인트</span><strong>-{formatPrice(confirmedOrder?.used_point ?? appliedPoint)}</strong></div>
-          </div>
-          <div className="mt-4 border-t border-line pt-4"><div className="flex justify-between"><span className="font-bold">결제 금액</span><strong className="text-xl">{serverAmount === undefined ? "주문 후 확정" : formatPrice(serverAmount)}</strong></div></div>
-          {!paymentRequest ? (
-            <Button
-              className="mt-5 w-full"
-              size="lg"
-              disabled={
-                !retryStateReady
-                || (!createdOrderCode && (
-                  !items.length
-                  || !defaultAddress
-                  || !Number.isSafeInteger(expectedAmount)
-                  || expectedAmount <= 0
-                  || pendingAttemptBlocked
-                ))
-                || Boolean(blockingError && !createdOrderCode)
-                || checkout.isPending
-              }
-              onClick={() => checkout.mutate()}
-            >
-              {checkout.isPending ? "처리 중" : createdOrderCode ? "결제 정보 다시 준비" : "주문 생성 후 결제"}
-            </Button>
-          ) : (
-            <TossPaymentWidget
-              clientKey={paymentRequest.client_key}
-              orderId={paymentRequest.order_id}
-              orderName={paymentRequest.order_name}
-              amount={paymentRequest.amount}
-              customerEmail={profile.data?.email}
-            />
-          )}
-          {createdOrderCode ? <p className="mt-3 text-xs text-muted">생성된 주문: {createdOrderCode}. 재시도해도 주문은 다시 생성하지 않습니다.</p> : null}
-          {!createdOrderCode && items.length > 0 && expectedAmount <= 0 ? (
-            <p className="mt-3 text-xs font-bold text-brand">최소 결제 금액은 1원입니다. 쿠폰 또는 포인트 사용액을 조정해주세요.</p>
-          ) : null}
-          {!createdOrderCode && addresses.isSuccess && !defaultAddress ? (
-            <p className="mt-3 text-xs font-bold text-brand">주문하려면 마이페이지에서 배송지를 먼저 등록해 주세요.</p>
-          ) : null}
-          {restoreError ? <p className="mt-3 text-xs font-bold text-amber-800">{restoreError}</p> : null}
-          {pendingAttemptBlocked && !createdOrderCode ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Link href="/mypage"><Button size="sm" variant="secondary">주문 내역 확인</Button></Link>
-              <Button size="sm" variant="secondary" onClick={() => setRestoreNonce((value) => value + 1)}>복구 다시 확인</Button>
-            </div>
-          ) : null}
-          {checkout.error ? <p className="mt-3 text-sm font-bold text-brand">{apiErrorMessage(checkout.error)}</p> : null}
+        <aside className="h-fit md:sticky md:top-24">
+          <OrderSummary
+            title={confirmedOrder ? "서버 확정 결제 금액" : "주문 전 예상 금액"}
+            items={[
+              { label: "상품 금액", value: formatPrice(confirmedOrder?.total_order_price ?? productTotal) },
+              { label: "서버 할인", value: confirmedOrder ? `-${formatPrice(confirmedOrder.total_discount_price)}` : "주문 후 확정", emphasis: confirmedOrder ? "negative" : "default" },
+              { label: "포인트", value: `-${formatPrice(confirmedOrder?.used_point ?? appliedPoint)}`, emphasis: "negative" },
+            ]}
+            totalLabel="결제 금액"
+            total={serverAmount === undefined ? "주문 후 확정" : formatPrice(serverAmount)}
+            footer={<>
+              {!paymentRequest ? (
+                <Button
+                  className="w-full"
+                  size="lg"
+                  disabled={
+                    !retryStateReady
+                    || (!createdOrderCode && (
+                      !items.length
+                      || !defaultAddress
+                      || !Number.isSafeInteger(expectedAmount)
+                      || expectedAmount <= 0
+                      || pendingAttemptBlocked
+                    ))
+                    || Boolean(blockingError && !createdOrderCode)
+                    || checkout.isPending
+                  }
+                  onClick={() => checkout.mutate()}
+                >
+                  {checkout.isPending ? "처리 중" : createdOrderCode ? "결제 정보 다시 준비" : "주문 생성 후 결제"}
+                </Button>
+              ) : (
+                <TossPaymentWidget
+                  clientKey={paymentRequest.client_key}
+                  orderId={paymentRequest.order_id}
+                  orderName={paymentRequest.order_name}
+                  amount={paymentRequest.amount}
+                  customerEmail={profile.data?.email}
+                />
+              )}
+              {createdOrderCode ? <p className="mt-3 text-xs text-content-secondary">생성된 주문: {createdOrderCode}. 재시도해도 주문은 다시 생성하지 않습니다.</p> : null}
+              {!createdOrderCode && items.length > 0 && expectedAmount <= 0 ? (
+                <p className="mt-3 text-xs font-bold text-action-primary">최소 결제 금액은 1원입니다. 쿠폰 또는 포인트 사용액을 조정해주세요.</p>
+              ) : null}
+              {!createdOrderCode && addresses.isSuccess && !defaultAddress ? (
+                <p className="mt-3 text-xs font-bold text-action-primary">주문하려면 마이페이지에서 배송지를 먼저 등록해 주세요.</p>
+              ) : null}
+              {restoreError ? <p className="mt-3 text-xs font-bold text-status-warning">{restoreError}</p> : null}
+              {pendingAttemptBlocked && !createdOrderCode ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link href="/mypage"><Button size="sm" variant="secondary">주문 내역 확인</Button></Link>
+                  <Button size="sm" variant="secondary" onClick={() => setRestoreNonce((value) => value + 1)}>복구 다시 확인</Button>
+                </div>
+              ) : null}
+              {checkout.error ? <p className="mt-3 text-sm font-bold text-action-primary">{apiErrorMessage(checkout.error)}</p> : null}
+            </>}
+          />
         </aside>
       </div>
     </main>
