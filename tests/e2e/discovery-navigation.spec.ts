@@ -44,7 +44,7 @@ test.describe("discovery navigation with controlled APIs", () => {
     expect(new URL(requestedURLs.at(-1) ?? "").searchParams.get("category")).toBe("top");
   });
 
-  test("redirects the retired trend surface to guest market discovery", async ({ page }) => {
+  test("redirects retired market surfaces to guest market discovery", async ({ page }) => {
     let trendingEndpointCalls = 0;
     page.on("request", (request) => {
       if (request.url().includes("/api/v1/search/trending")) trendingEndpointCalls += 1;
@@ -54,10 +54,14 @@ test.describe("discovery navigation with controlled APIs", () => {
       json: [{ id: 3, name: "인기 마켓", description: "새 상품이 많은 마켓", follower_count: 120, status: "OPEN" }],
     }));
 
-    await page.goto("/snapshot");
-    await expect(page).toHaveURL(/\/market-feed$/);
-    await expect(page.getByRole("heading", { name: "마켓 피드", exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: /인기 마켓/ }).first()).toBeVisible();
+    for (const path of ["/snapshot", "/market-feed", "/popular-markets"]) {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/markets(?:#trending)?$/);
+      await expect(page.getByRole("heading", { name: "마켓", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "지금 뜨는 마켓", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "신상이 활발한 마켓", exact: true })).toBeVisible();
+      await expect(page.getByRole("link", { name: /인기 마켓/ }).first()).toBeVisible();
+    }
     expect(trendingEndpointCalls).toBe(0);
   });
 });

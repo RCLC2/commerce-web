@@ -106,6 +106,8 @@ export const marketSchema = z.object({
   profile_image_url: z.string().optional(),
   cover_image_url: z.string().optional(),
   follower_count: nonNegativeIntSchema.optional(),
+  recent_follower_count: nonNegativeIntSchema.optional(),
+  new_product_count: nonNegativeIntSchema.optional(),
   status: z.string(),
   tags: z.array(z.string()).optional(),
 });

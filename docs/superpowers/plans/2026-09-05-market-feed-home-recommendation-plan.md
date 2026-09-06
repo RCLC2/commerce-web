@@ -1,5 +1,7 @@
 # 마켓 피드 전환과 홈 추천 계약 정리 구현 계획
 
+> 2026-09-06 고도화: 고객 노출명과 정식 경로는 `마켓`·`/markets`로 변경한다. 공개 메인은 최근 7일 팔로워 상승(`sort=trending`)과 최근 7일 신상품 활동(`sort=new-products`) 두 목록이며, 기존 마켓 피드는 로그인 회원의 첫 번째 `내가 팔로우중인 마켓의 신상품` 캐러셀로 축소한다. `/snapshot`, `/market-feed`, `/popular-markets`는 `/markets`로 리다이렉트한다.
+
 - 날짜: 2026-09-05
 - 상태: 구현 진행
 - 기준 설계: `docs/superpowers/specs/2026-09-05-market-feed-home-recommendation-design.md`

@@ -19,6 +19,7 @@ export type Market = {
   profile_image_url?: string;
   cover_image_url?: string;
   follower_count?: number;
+  recent_follower_count?: number;
   satisfaction_rate?: number;
   average_product_rating?: number;
   product_count?: number;
