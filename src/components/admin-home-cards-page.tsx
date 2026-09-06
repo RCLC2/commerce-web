@@ -16,15 +16,13 @@ type Placement = HomeCard["placement"];
 const cardTypeOptions: Array<{ value: CardType; label: string }> = [
   { value: "SIGNUP_COUPON", label: "가입 기념 쿠폰" },
   { value: "FIRST_PURCHASE_COUPON", label: "첫 구매 쿠폰" },
-  { value: "PERSONALIZED_EVENT", label: "개인화 이벤트" },
   { value: "TEXT_AD", label: "텍스트 광고" },
-  { value: "EVENT", label: "통합 카드 이벤트" },
+  { value: "EVENT", label: "카드 이벤트" },
 ];
 
 const placementOptions: Array<{ value: Placement; label: string }> = [
-  { value: "HOME_CONTEXT_TEXT", label: "홈 텍스트 혜택" },
-  { value: "HOME_FEATURE_CARD", label: "홈 통합 카드" },
-  { value: "PDP_REVIEW_BANNER", label: "PDP 리뷰 하단 배너" },
+  { value: "HOME_CONTEXT_TEXT", label: "홈 전용 텍스트 광고" },
+  { value: "HOME_FEATURE_CARD", label: "홈·PDP 공통 카드" },
 ];
 
 export function AdminHomeCardsPage() {
@@ -57,20 +55,20 @@ export function AdminHomeCardsPage() {
     <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <ConsoleHeader
         title="홈 구좌 카드"
-        description="홈 텍스트·통합 카드와 PDP 리뷰 하단 배너에 노출할 플랫폼 카드를 등록합니다. 활성 카드의 대상과 노출 가능 여부는 서버가 결정합니다."
+        description="홈 전용 텍스트 광고와 홈·PDP 리뷰 하단에 함께 사용하는 쿠폰·이벤트 카드를 등록합니다. 대상과 발급 이력을 반영한 실제 노출은 서버가 결정합니다."
       />
       <ConsoleSection className="mt-5" title="카드 등록" description="CTA 문구와 이동 URL은 함께 입력하세요. 쿠폰·이벤트 참조 ID는 해당 카드 유형에서만 사용됩니다.">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Field label="구좌">
             <select className={inputClass} value={form.placement} onChange={(event) => {
               const placement = event.target.value as Placement;
-              setForm({ ...form, placement, cardType: cardTypeOptionsForPlacement(placement)[0].value, takeover: false });
+              setForm({ ...form, placement, cardType: cardTypeOptionsForPlacement(placement)[0].value });
             }}>
               {placementOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </Field>
           <Field label="카드 유형">
-            <select className={inputClass} value={form.cardType} onChange={(event) => setForm({ ...form, cardType: event.target.value as CardType, takeover: false })}>
+            <select className={inputClass} value={form.cardType} onChange={(event) => setForm({ ...form, cardType: event.target.value as CardType })}>
               {cardTypeOptionsForPlacement(form.placement).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </Field>
@@ -91,12 +89,6 @@ export function AdminHomeCardsPage() {
           <Field label="시작 일시"><input className={inputClass} type="datetime-local" value={form.startsAt} onChange={(event) => setForm({ ...form, startsAt: event.target.value })} /></Field>
           <Field label="종료 일시"><input className={inputClass} type="datetime-local" value={form.endsAt} onChange={(event) => setForm({ ...form, endsAt: event.target.value })} /></Field>
         </div>
-        {form.placement === "HOME_FEATURE_CARD" && form.cardType === "EVENT" ? (
-          <label className="mt-4 flex items-center gap-2 text-sm font-bold">
-            <input type="checkbox" checked={form.takeover} onChange={(event) => setForm({ ...form, takeover: event.target.checked })} />
-            광고보다 먼저 노출하는 takeover 이벤트
-          </label>
-        ) : null}
         <div className="mt-4 flex items-center gap-3">
           <Button onClick={() => create.mutate()} disabled={create.isPending || !canCreate(form)}>{create.isPending ? "등록 중" : "비활성 카드 등록"}</Button>
           <span className="text-xs text-muted">등록 후 목록에서 활성화해야 해당 구좌에 노출됩니다.</span>
@@ -128,8 +120,8 @@ export function AdminHomeCardsPage() {
 function emptyForm() {
   return {
     placement: "HOME_CONTEXT_TEXT" as Placement,
-    cardType: "SIGNUP_COUPON" as CardType,
-    audience: "AUTHENTICATED" as Audience,
+    cardType: "TEXT_AD" as CardType,
+    audience: "ALL" as Audience,
     priority: "100",
     headline: "",
     body: "",
@@ -139,7 +131,6 @@ function emptyForm() {
     landingURL: "",
     startsAt: "",
     endsAt: "",
-    takeover: false,
   };
 }
 
@@ -148,13 +139,12 @@ function isCouponType(type: CardType) {
 }
 
 function isEventType(type: CardType) {
-  return type === "PERSONALIZED_EVENT" || type === "EVENT";
+  return type === "EVENT";
 }
 
 function cardTypeOptionsForPlacement(placement: Placement) {
-  if (placement === "HOME_FEATURE_CARD") return cardTypeOptions.filter((option) => option.value === "EVENT");
-  if (placement === "HOME_CONTEXT_TEXT") return cardTypeOptions.filter((option) => option.value !== "EVENT");
-  return cardTypeOptions;
+  if (placement === "HOME_CONTEXT_TEXT") return cardTypeOptions.filter((option) => option.value === "TEXT_AD");
+  return cardTypeOptions.filter((option) => option.value !== "TEXT_AD");
 }
 
 function cardPayload(form: ReturnType<typeof emptyForm>) {
@@ -171,7 +161,6 @@ function cardPayload(form: ReturnType<typeof emptyForm>) {
     event_id: isEventType(form.cardType) ? referenceID : undefined,
     audience_type: form.audience,
     priority: Number(form.priority) || 0,
-    is_takeover: form.placement === "HOME_FEATURE_CARD" && form.cardType === "EVENT" && form.takeover,
     starts_at: form.startsAt ? new Date(form.startsAt).toISOString() : undefined,
     ends_at: form.endsAt ? new Date(form.endsAt).toISOString() : undefined,
     status: "INACTIVE",

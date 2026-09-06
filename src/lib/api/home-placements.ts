@@ -2,11 +2,10 @@ import { z } from "zod";
 import { requestParsed } from "../api-client";
 import { adDecisionSchema } from "./advertising";
 
-export const homePlacementSchema = z.enum(["HOME_CONTEXT_TEXT", "HOME_FEATURE_CARD", "PDP_REVIEW_BANNER"]);
+export const homePlacementSchema = z.enum(["HOME_CONTEXT_TEXT", "HOME_FEATURE_CARD"]);
 export const homeCardTypeSchema = z.enum([
   "SIGNUP_COUPON",
   "FIRST_PURCHASE_COUPON",
-  "PERSONALIZED_EVENT",
   "TEXT_AD",
   "EVENT",
 ]);
@@ -73,7 +72,6 @@ export const homeCardSchema = z.strictObject({
   audience_type: homeAudienceSchema,
   segment_key: z.string().min(1).optional(),
   priority: z.number().int(),
-  is_takeover: z.boolean(),
   starts_at: dateStringSchema.optional(),
   ends_at: dateStringSchema.optional(),
   status: homeCardStatusSchema,

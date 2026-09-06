@@ -4,18 +4,17 @@ import { homePlacementApi, homePlacementsSchema, homeSlotSchema } from "./home-p
 afterEach(() => vi.unstubAllGlobals());
 
 describe("home placement API contract", () => {
-  it("parses an eligible coupon card and one unified product ad", () => {
+  it("parses an independent home text ad and one unified product ad", () => {
     const result = homePlacementsSchema.parse({
       context_text: {
         status: "FILLED",
         card: {
           source: "PLATFORM",
           id: 9,
-          card_type: "SIGNUP_COUPON",
-          headline: "가입 기념 쿠폰이 도착했어요",
-          coupon_id: 3,
-          cta_label: "쿠폰 받기",
-          landing_url: "/mypage/coupons",
+          card_type: "TEXT_AD",
+          headline: "홈 전용 할인 정보예요",
+          cta_label: "자세히 보기",
+          landing_url: "/events/3",
         },
       },
       feature_card: {

@@ -74,12 +74,22 @@ export function HomeContextTextCard({
   );
 }
 
-export function HomeFeatureCard({ card, token, compact = false }: { card?: ResolvedHomeCard; token?: string | null; compact?: boolean }) {
+export function HomeFeatureCard({
+  card,
+  token,
+  memberID,
+  compact = false,
+}: {
+  card?: ResolvedHomeCard;
+  token?: string | null;
+  memberID?: number | null;
+  compact?: boolean;
+}) {
   if (!card) return null;
   if (card.source === "AD") {
     return <SponsoredDecision decision={card.decision} token={token} />;
   }
-  if (!card.image_url) return null;
+  if (!card.image_url) return <HomeContextTextCard card={card} token={token} memberID={memberID} />;
 
   const visual = (
     <article className={`relative overflow-hidden rounded-2xl bg-zinc-900 text-white shadow-sm ${compact ? "h-36 md:h-44" : "h-44 md:h-56"}`}>
@@ -111,11 +121,7 @@ export function PDPReviewBanner({
   if (!card) return null;
   return (
     <section className="py-6" aria-label="리뷰 아래 추천 배너">
-      {card.source === "AD" || card.image_url ? (
-        <HomeFeatureCard card={card} token={token} compact />
-      ) : (
-        <HomeContextTextCard card={card} token={token} memberID={memberID} />
-      )}
+      <HomeFeatureCard card={card} token={token} memberID={memberID} compact />
     </section>
   );
 }

@@ -197,7 +197,7 @@ export function HomePage() {
         />
       ))}
       <section className="py-2" aria-label="홈 추천 카드">
-        <HomeFeatureCard card={homePlacementsQuery.data?.feature_card.card} token={effectiveToken} />
+        <HomeFeatureCard card={homePlacementsQuery.data?.feature_card.card} token={effectiveToken} memberID={memberID} />
       </section>
 
       <section id="recommendations" className="scroll-mt-20 py-7">
