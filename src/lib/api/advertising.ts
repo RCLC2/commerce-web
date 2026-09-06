@@ -2,6 +2,7 @@ import { z } from "zod";
 import { parseContract, request, requestParsed } from "../api-client";
 
 export const adPlacementSchema = z.enum([
+  "home.feature_card",
   "home.main_banner",
   "home_feed.sponsored_card",
   "search.sponsored_top",
@@ -103,18 +104,24 @@ export const adDecisionSchema = z.strictObject({
   decided_at: dateStringSchema,
   expires_at: dateStringSchema,
 }).superRefine((value, context) => {
-  const contract: Record<AdPlacement, { format: z.infer<typeof creativeFormatSchema>; targets: readonly ("PRODUCT" | "MARKET")[] }> = {
-    "home.main_banner": { format: "BANNER", targets: ["PRODUCT", "MARKET"] },
-    "home_feed.sponsored_card": { format: "PRODUCT_CARD", targets: ["PRODUCT"] },
-    "search.sponsored_top": { format: "PRODUCT_CARD", targets: ["PRODUCT"] },
-    "pdp.card_banner": { format: "BANNER", targets: ["PRODUCT", "MARKET"] },
-    "pdp.sponsored_market": { format: "MARKET_SHELF", targets: ["MARKET"] },
-    "home.promotion_card": { format: "PROMOTION_CARD", targets: ["PRODUCT", "MARKET"] },
-    "crm.push_notification": { format: "PUSH", targets: ["PRODUCT", "MARKET"] },
+  type FormatRule = { format: z.infer<typeof creativeFormatSchema>; targets: readonly ("PRODUCT" | "MARKET")[] };
+  const contract: Record<AdPlacement, readonly FormatRule[]> = {
+    "home.feature_card": [
+      { format: "PRODUCT_CARD", targets: ["PRODUCT"] },
+      { format: "BANNER", targets: ["PRODUCT", "MARKET"] },
+    ],
+    "home.main_banner": [{ format: "BANNER", targets: ["PRODUCT", "MARKET"] }],
+    "home_feed.sponsored_card": [{ format: "PRODUCT_CARD", targets: ["PRODUCT"] }],
+    "search.sponsored_top": [{ format: "PRODUCT_CARD", targets: ["PRODUCT"] }],
+    "pdp.card_banner": [{ format: "BANNER", targets: ["PRODUCT", "MARKET"] }],
+    "pdp.sponsored_market": [{ format: "MARKET_SHELF", targets: ["MARKET"] }],
+    "home.promotion_card": [{ format: "PROMOTION_CARD", targets: ["PRODUCT", "MARKET"] }],
+    "crm.push_notification": [{ format: "PUSH", targets: ["PRODUCT", "MARKET"] }],
   };
-  const expected = contract[value.placement_key];
-  if (value.creative.format !== expected.format) {
+  const expected = contract[value.placement_key].find((rule) => rule.format === value.creative.format);
+  if (!expected) {
     context.addIssue({ code: "custom", message: "광고 지면과 크리에이티브 형식이 일치하지 않습니다.", path: ["creative", "format"] });
+    return;
   }
   if (!expected.targets.includes(value.target.type)) {
     context.addIssue({ code: "custom", message: "광고 지면에서 지원하지 않는 타깃입니다.", path: ["target", "type"] });
@@ -181,6 +188,7 @@ export type AdCampaign = z.infer<typeof adCampaignSchema>;
 const placementRateSchema = z.strictObject({
   id: z.number().int().positive(),
   placement_key: adPlacementSchema,
+  creative_format: creativeFormatSchema,
   pricing_model: pricingModelSchema,
   rate_source: z.enum(["ADMIN", "SYNTHETIC_DEFAULT"]),
   cpm_micros: z.number().int().nonnegative(),

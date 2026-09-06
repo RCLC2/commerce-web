@@ -7,6 +7,8 @@ afterEach(() => vi.unstubAllGlobals());
 describe("advertising API contract", () => {
   it("parses each creative format as a discriminated union", () => {
     const variants = [
+      { placement: "home.feature_card", target: productTarget(), creative: { format: "PRODUCT_CARD", landing_url: "/products/7" } },
+      { placement: "home.feature_card", target: marketTarget(), creative: { format: "BANNER", headline: "통합 이미지 광고", image_url: "https://images.pexels.com/feature.jpg", landing_url: "/markets/3", cta_label: "자세히 보기" } },
       { placement: "home_feed.sponsored_card", target: productTarget(), creative: { format: "PRODUCT_CARD", landing_url: "/products/7" } },
       { placement: "home.main_banner", target: productTarget(), creative: { format: "BANNER", headline: "주간 추천", image_url: "https://images.pexels.com/banner.jpg", landing_url: "/products/7", cta_label: "자세히 보기" } },
       { placement: "pdp.sponsored_market", target: marketTarget(), creative: { format: "MARKET_SHELF", landing_url: "/markets/3" } },
@@ -34,6 +36,13 @@ describe("advertising API contract", () => {
     const targetResult = adDecisionSchema.safeParse(wrongTarget);
     expect(targetResult.success).toBe(false);
     if (!targetResult.success) expect(targetResult.error.issues.at(-1)?.path).toEqual(["target", "type"]);
+
+    const unifiedProductWithMarket = productDecision({ id: 3, format: "PRODUCT_CARD", landing_url: "/markets/3" });
+    unifiedProductWithMarket.placement_key = "home.feature_card";
+    unifiedProductWithMarket.target = marketTarget();
+    const unifiedTargetResult = adDecisionSchema.safeParse(unifiedProductWithMarket);
+    expect(unifiedTargetResult.success).toBe(false);
+    if (!unifiedTargetResult.success) expect(unifiedTargetResult.error.issues.at(-1)?.path).toEqual(["target", "type"]);
   });
 
   it("rejects malformed target and incomplete Pexels attribution with exact issue paths", () => {

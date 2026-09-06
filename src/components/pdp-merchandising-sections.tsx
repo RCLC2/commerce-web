@@ -18,6 +18,20 @@ export function AlsoViewedSection({ products }: { products: Product[] }) {
   );
 }
 
+export function PDPShelfSection({
+  eyebrow,
+  title,
+  description,
+  products,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  products: Product[];
+}) {
+  return <ProductShelf eyebrow={eyebrow} title={title} description={description} products={products} />;
+}
+
 function ProductShelf({
   eyebrow,
   title,

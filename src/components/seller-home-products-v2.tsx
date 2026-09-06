@@ -4,6 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import type { PDPShelfMode } from "@/lib/api/market-display";
+import { apiErrorMessage } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query-keys";
 import {
   sellerConsoleApi,
   type SellerProductDetail,
@@ -50,11 +53,21 @@ function categoryLabel(category: CommerceCategory) {
 
 export function SellerHomePageV2() {
   const { token, marketID, marketName } = useSellerConsoleContext();
+  const queryClient = useQueryClient();
   const dashboardQuery = useQuery({
     queryKey: ["seller-dashboard-v2", marketID],
     queryFn: () => sellerConsoleApi.dashboard(token ?? "", marketID),
     enabled: Boolean(token),
     meta: { consoleDataRole: "primary" },
+  });
+  const displaySettingsQuery = useQuery({
+    queryKey: queryKeys.marketDisplaySettings(marketID),
+    queryFn: () => api.sellerMarketDisplaySettings(token ?? "", marketID ?? 0),
+    enabled: Boolean(token && marketID),
+  });
+  const updateDisplaySettings = useMutation({
+    mutationFn: (mode: PDPShelfMode) => api.updateSellerMarketDisplaySettings(token ?? "", marketID ?? 0, mode),
+    onSuccess: (settings) => queryClient.setQueryData(queryKeys.marketDisplaySettings(marketID), settings),
   });
 
   if (!token) return <SellerAuthRequiredV2 />;
@@ -79,6 +92,38 @@ export function SellerHomePageV2() {
           </div>
         ))}
       </div>
+
+      <ConsoleSection
+        className="mt-5"
+        title="상품 상세 추천 캐러셀"
+        description="내 마켓의 모든 상품 상세 페이지에서 리뷰 위에 노출할 상품 순서를 선택합니다. 추천 순서 계산은 플랫폼이 담당합니다."
+      >
+        <div className="grid gap-3 md:grid-cols-2">
+          {([
+            ["PLATFORM_RECOMMENDED", "마켓의 추천 상품", "플랫폼 추천 알고리즘이 상품 순서를 정합니다."],
+            ["NEWEST", "신상품 순", "판매 중인 상품을 최신 등록 순으로 보여줍니다."],
+          ] as const).map(([mode, label, description]) => {
+            const selected = (displaySettingsQuery.data?.pdp_shelf_mode ?? "PLATFORM_RECOMMENDED") === mode;
+            return (
+              <button
+                key={mode}
+                type="button"
+                className={`rounded-xl border p-4 text-left transition ${selected ? "border-brand bg-rose-50" : "border-line bg-white hover:bg-zinc-50"}`}
+                disabled={updateDisplaySettings.isPending || !marketID}
+                onClick={() => updateDisplaySettings.mutate(mode)}
+              >
+                <span className="text-sm font-black">{label}</span>
+                <span className="mt-1 block text-xs leading-5 text-muted">{description}</span>
+              </button>
+            );
+          })}
+        </div>
+        {displaySettingsQuery.isLoading ? <p className="mt-3 text-xs text-muted">전시 설정을 불러오는 중입니다.</p> : null}
+        {displaySettingsQuery.isError || updateDisplaySettings.isError ? (
+          <p className="mt-3 text-xs font-bold text-brand">{apiErrorMessage(displaySettingsQuery.error ?? updateDisplaySettings.error)}</p>
+        ) : null}
+        {updateDisplaySettings.isSuccess ? <p className="mt-3 text-xs font-bold text-emerald-700">추천 캐러셀 설정을 저장했습니다.</p> : null}
+      </ConsoleSection>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
         <ConsoleSection title="처리 필요 작업" description="현재 마켓에 해당하는 작업만 표시합니다.">
