@@ -78,11 +78,9 @@ export function AdminHomeCardsPage() {
             <select className={inputClass} value={form.audience} onChange={(event) => setForm({ ...form, audience: event.target.value as Audience })}>
               <option value="ALL">전체</option>
               <option value="AUTHENTICATED">로그인 회원</option>
-              <option value="SEGMENT">지정 세그먼트</option>
             </select>
           </Field>
           <Field label="우선순위"><input className={inputClass} type="number" value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })} /></Field>
-          {form.audience === "SEGMENT" ? <Field label="세그먼트 키"><input className={inputClass} value={form.segmentKey} onChange={(event) => setForm({ ...form, segmentKey: event.target.value })} /></Field> : null}
           <Field label="제목"><input className={inputClass} value={form.headline} onChange={(event) => setForm({ ...form, headline: event.target.value })} /></Field>
           <Field label="본문"><input className={inputClass} value={form.body} onChange={(event) => setForm({ ...form, body: event.target.value })} /></Field>
           {form.cardType === "EVENT" ? <Field label="이미지 URL"><input className={inputClass} value={form.imageURL} onChange={(event) => setForm({ ...form, imageURL: event.target.value })} placeholder="https://... 또는 /images/..." /></Field> : null}
@@ -133,7 +131,6 @@ function emptyForm() {
     cardType: "SIGNUP_COUPON" as CardType,
     audience: "AUTHENTICATED" as Audience,
     priority: "100",
-    segmentKey: "",
     headline: "",
     body: "",
     imageURL: "",
@@ -173,7 +170,6 @@ function cardPayload(form: ReturnType<typeof emptyForm>) {
     coupon_id: isCouponType(form.cardType) ? referenceID : undefined,
     event_id: isEventType(form.cardType) ? referenceID : undefined,
     audience_type: form.audience,
-    segment_key: form.audience === "SEGMENT" ? form.segmentKey.trim() : undefined,
     priority: Number(form.priority) || 0,
     is_takeover: form.placement === "HOME_FEATURE_CARD" && form.cardType === "EVENT" && form.takeover,
     starts_at: form.startsAt ? new Date(form.startsAt).toISOString() : undefined,
@@ -188,7 +184,6 @@ function canCreate(form: ReturnType<typeof emptyForm>) {
   if ((form.ctaLabel.trim() || form.landingURL.trim()) && !(form.ctaLabel.trim() && form.landingURL.trim())) return false;
   if ((isCouponType(form.cardType) || isEventType(form.cardType)) && Number(form.referenceID) < 1) return false;
   if (form.cardType === "EVENT" && !form.imageURL.trim()) return false;
-  if (form.audience === "SEGMENT" && !form.segmentKey.trim()) return false;
   return !form.startsAt || !form.endsAt || new Date(form.endsAt) > new Date(form.startsAt);
 }
 
