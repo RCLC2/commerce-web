@@ -5,7 +5,6 @@ export const pdpShelfModeSchema = z.enum(["PLATFORM_RECOMMENDED", "NEWEST"]);
 export const marketDisplaySettingsSchema = z.object({
   market_id: z.number().int().positive(),
   pdp_shelf_mode: pdpShelfModeSchema,
-  updated_by_member_id: z.number().int().positive().optional(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
 });
