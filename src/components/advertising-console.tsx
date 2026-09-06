@@ -39,6 +39,7 @@ type PlacementOption = {
 const placementCatalog: readonly PlacementOption[] = [
   { value: "home.feature_card", label: "홈 통합 카드 · 상품", format: "PRODUCT_CARD", allowedTargets: ["PRODUCT"], pricingModel: "CPM" },
   { value: "home.feature_card", label: "홈 통합 카드 · 이미지", format: "BANNER", allowedTargets: ["PRODUCT", "MARKET"], pricingModel: "DAILY_FLAT" },
+  { value: "pdp.card_banner", label: "PDP 리뷰 하단 배너", format: "BANNER", allowedTargets: ["PRODUCT", "MARKET"], pricingModel: "CPM" },
   { value: "search.sponsored_top", label: "검색 결과 상단", format: "PRODUCT_CARD", allowedTargets: ["PRODUCT"], pricingModel: "CPM" },
   { value: "crm.push_notification", label: "푸시 알림", format: "PUSH", allowedTargets: ["PRODUCT", "MARKET"], pricingModel: "CPM" },
 ] as const;

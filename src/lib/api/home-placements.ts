@@ -2,7 +2,7 @@ import { z } from "zod";
 import { requestParsed } from "../api-client";
 import { adDecisionSchema } from "./advertising";
 
-export const homePlacementSchema = z.enum(["HOME_CONTEXT_TEXT", "HOME_FEATURE_CARD"]);
+export const homePlacementSchema = z.enum(["HOME_CONTEXT_TEXT", "HOME_FEATURE_CARD", "PDP_REVIEW_BANNER"]);
 export const homeCardTypeSchema = z.enum([
   "SIGNUP_COUPON",
   "FIRST_PURCHASE_COUPON",
@@ -90,6 +90,11 @@ export type HomeCard = z.infer<typeof homeCardSchema>;
 export const homePlacementApi = {
   homePlacements: (requestID: string, token?: string | null) =>
     requestParsed(homePlacementsSchema, `/api/v1/home/placements?request_id=${encodeURIComponent(requestID)}`, {
+      token: token ?? undefined,
+      credentials: "include",
+    }),
+  pdpReviewBanner: (productID: number, requestID: string, token?: string | null) =>
+    requestParsed(homeSlotSchema, `/api/v1/products/${productID}/review-banner?request_id=${encodeURIComponent(requestID)}`, {
       token: token ?? undefined,
       credentials: "include",
     }),

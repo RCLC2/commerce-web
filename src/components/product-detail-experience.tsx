@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
+import { cryptoSafeID } from "@/lib/ad-events";
 import { getEffectiveToken } from "@/lib/auth-token";
 import {
   availableOptionQuantity,
@@ -21,6 +22,7 @@ import { useSessionStore } from "@/lib/session-store";
 import type { Product, ProductOption } from "@/lib/types";
 import { discountRate, formatPrice } from "@/lib/utils";
 import { CollapsibleProductDetail } from "./collapsible-product-detail";
+import { PDPReviewBanner } from "./home-placement-cards";
 import { PageJumpControls } from "./page-jump-controls";
 import { PDPShelfSection } from "./pdp-merchandising-sections";
 import { SafeImage } from "./safe-image";
@@ -38,7 +40,9 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
   const queryClient = useQueryClient();
   const token = useSessionStore((state) => state.accessToken);
   const memberID = useSessionStore((state) => state.memberID);
+  const hydrated = useSessionStore((state) => state.hydrated);
   const effectiveToken = getEffectiveToken(token);
+  const reviewBannerRequestID = useMemo(() => `pdp-review-${productId}-${cryptoSafeID()}`, [productId]);
   const [quantity, setQuantity] = useState(1);
   const [optionID, setOptionID] = useState<number | null>(null);
   const [activeImage, setActiveImage] = useState(0);
@@ -69,6 +73,12 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
   const similarProductsQuery = useQuery({
     queryKey: queryKeys.similarProducts(productId),
     queryFn: () => api.getSimilarProducts(productId),
+  });
+  const reviewBannerQuery = useQuery({
+    queryKey: queryKeys.pdpReviewBanner(productId, memberID),
+    queryFn: () => api.pdpReviewBanner(productId, reviewBannerRequestID, effectiveToken),
+    enabled: hydrated,
+    retry: false,
   });
   const likedProductsQuery = useQuery({
     queryKey: queryKeys.likedProducts(memberID),
@@ -506,6 +516,12 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
           </div>
         ) : null}
       </section>
+
+      <PDPReviewBanner
+        card={reviewBannerQuery.data?.card}
+        token={effectiveToken}
+        memberID={memberID}
+      />
 
       <section className="pt-10">
         <div className="mx-auto max-w-3xl">

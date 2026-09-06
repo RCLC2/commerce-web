@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("PDP puts the seller market shelf above reviews and similar products at the bottom without PDP ads", async ({ page }) => {
+test("PDP puts the market shelf above reviews, a flexible banner below reviews, and similar products at the bottom", async ({ page }) => {
   const product = {
     id: 1,
     market_id: 7,
@@ -45,6 +45,24 @@ test("PDP puts the seller market shelf above reviews and similar products at the
       await route.fulfill({ status: 200, json: { items: [shelfProduct(3, "비슷한 상품")] } });
       return;
     }
+    if (path.endsWith("/review-banner")) {
+      await route.fulfill({
+        status: 200,
+        json: {
+          status: "FILLED",
+          card: {
+            source: "PLATFORM",
+            id: 15,
+            card_type: "SIGNUP_COUPON",
+            headline: "가입 축하 쿠폰이 도착했어요",
+            coupon_id: 3,
+            cta_label: "쿠폰 받기",
+            landing_url: "/mypage/coupons",
+          },
+        },
+      });
+      return;
+    }
     await route.fulfill({ status: 200, json: { product } });
   });
 
@@ -53,12 +71,17 @@ test("PDP puts the seller market shelf above reviews and similar products at the
   const reviewTitle = page.getByRole("heading", { name: "상품 리뷰" });
   const similarTitle = page.getByRole("heading", { name: "비슷한 상품 추천" });
   const detailTitle = page.getByRole("heading", { name: "상품 상세 정보" });
+  const reviewBanner = page.getByLabel("리뷰 아래 추천 배너");
 
   await expect(marketShelfTitle).toBeVisible();
   await expect(similarTitle).toBeVisible();
   expect(await marketShelfTitle.evaluate((node) => node.getBoundingClientRect().top))
     .toBeLessThan(await reviewTitle.evaluate((node) => node.getBoundingClientRect().top));
+  await expect(reviewBanner.getByText("가입 축하 쿠폰이 도착했어요")).toBeVisible();
+  expect(await reviewTitle.evaluate((node) => node.getBoundingClientRect().top))
+    .toBeLessThan(await reviewBanner.evaluate((node) => node.getBoundingClientRect().top));
+  expect(await reviewBanner.evaluate((node) => node.getBoundingClientRect().top))
+    .toBeLessThan(await detailTitle.evaluate((node) => node.getBoundingClientRect().top));
   expect(await similarTitle.evaluate((node) => node.getBoundingClientRect().top))
     .toBeGreaterThan(await detailTitle.evaluate((node) => node.getBoundingClientRect().top));
-  await expect(page.locator('[data-ad-placement^="pdp."]')).toHaveCount(0);
 });

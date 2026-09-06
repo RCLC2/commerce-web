@@ -10,6 +10,7 @@ export const queryKeys = {
   productReviews: (id: number) => ["product-reviews", id] as const,
   productMarketShelf: (id: number) => ["product-market-shelf", id] as const,
   similarProducts: (id: number) => ["similar-products", id] as const,
+  pdpReviewBanner: (id: number, memberID: number | null | undefined) => ["pdp-review-banner", id, memberID ?? "guest"] as const,
   homePlacements: (memberID: number | null | undefined) => ["home-placements", memberID ?? "guest"] as const,
   marketDisplaySettings: (marketID: number | null | undefined) => ["market-display-settings", marketID ?? "unknown"] as const,
   homeRecommendations: (memberID: number | null | undefined) => ["home-recommendations", memberID ?? "guest"] as const,

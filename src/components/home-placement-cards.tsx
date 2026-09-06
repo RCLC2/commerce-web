@@ -30,6 +30,7 @@ export function HomeContextTextCard({
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.homePlacements(memberID) }),
+        queryClient.invalidateQueries({ queryKey: ["pdp-review-banner"] }),
         queryClient.invalidateQueries({ queryKey: queryKeys.coupons(memberID) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.issuableCoupons(memberID) }),
       ]);
@@ -73,7 +74,7 @@ export function HomeContextTextCard({
   );
 }
 
-export function HomeFeatureCard({ card, token }: { card?: ResolvedHomeCard; token?: string | null }) {
+export function HomeFeatureCard({ card, token, compact = false }: { card?: ResolvedHomeCard; token?: string | null; compact?: boolean }) {
   if (!card) return null;
   if (card.source === "AD") {
     return <SponsoredDecision decision={card.decision} token={token} />;
@@ -81,7 +82,7 @@ export function HomeFeatureCard({ card, token }: { card?: ResolvedHomeCard; toke
   if (!card.image_url) return null;
 
   const visual = (
-    <article className="relative h-44 overflow-hidden rounded-2xl bg-zinc-900 text-white shadow-sm md:h-56">
+    <article className={`relative overflow-hidden rounded-2xl bg-zinc-900 text-white shadow-sm ${compact ? "h-36 md:h-44" : "h-44 md:h-56"}`}>
       <SafeImage src={card.image_url} alt={card.headline ?? "홈 이벤트"} fill sizes="(max-width: 768px) 100vw, 1152px" className="object-cover" />
       <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/35 to-transparent" />
       <div className="absolute inset-0 flex items-end p-5 md:items-center md:p-7">
@@ -96,4 +97,25 @@ export function HomeFeatureCard({ card, token }: { card?: ResolvedHomeCard; toke
   );
 
   return card.landing_url ? <Link href={card.landing_url}>{visual}</Link> : visual;
+}
+
+export function PDPReviewBanner({
+  card,
+  token,
+  memberID,
+}: {
+  card?: ResolvedHomeCard;
+  token?: string | null;
+  memberID?: number | null;
+}) {
+  if (!card) return null;
+  return (
+    <section className="py-6" aria-label="리뷰 아래 추천 배너">
+      {card.source === "AD" || card.image_url ? (
+        <HomeFeatureCard card={card} token={token} compact />
+      ) : (
+        <HomeContextTextCard card={card} token={token} memberID={memberID} />
+      )}
+    </section>
+  );
 }

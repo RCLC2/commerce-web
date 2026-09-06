@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { homePlacementsSchema } from "./home-placements";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { homePlacementApi, homePlacementsSchema, homeSlotSchema } from "./home-placements";
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("home placement API contract", () => {
   it("parses an eligible coupon card and one unified product ad", () => {
@@ -56,5 +58,33 @@ describe("home placement API contract", () => {
     });
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.issues[0]?.path).toEqual(["context_text", "card"]);
+  });
+
+  it("parses a PDP review banner with an eligible signup coupon", () => {
+	const slot = homeSlotSchema.parse({
+	  status: "FILLED",
+	  card: {
+		source: "PLATFORM",
+		id: 12,
+		card_type: "SIGNUP_COUPON",
+		headline: "가입 축하 쿠폰이 도착했어요",
+		coupon_id: 3,
+		cta_label: "쿠폰 받기",
+		landing_url: "/mypage/coupons",
+	  },
+	});
+	expect(slot.card?.card_type).toBe("SIGNUP_COUPON");
+  });
+
+  it("requests the product review banner with credentials and request ID", async () => {
+	const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ status: "EMPTY" }), { status: 200 }));
+	vi.stubGlobal("fetch", fetchMock);
+
+	await homePlacementApi.pdpReviewBanner(7, "pdp-review-1", "member-token");
+
+	const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+	expect(url).toContain("/api/v1/products/7/review-banner?request_id=pdp-review-1");
+	expect(options.credentials).toBe("include");
+	expect(new Headers(options.headers).get("Authorization")).toBe("Bearer member-token");
   });
 });
