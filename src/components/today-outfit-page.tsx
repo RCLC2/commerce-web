@@ -1,5 +1,7 @@
 "use client";
 
+import { PageHeading } from "./ui/page-heading";
+
 import { useQuery } from "@tanstack/react-query";
 import { Shirt } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -86,13 +88,7 @@ export function TodayOutfitPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-28 pt-8">
-      <div className="mb-7 flex items-start gap-3">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-brand text-white shadow-lg"><Shirt size={23} /></span>
-        <div>
-          <h1 className="text-2xl font-black">오늘의 코디</h1>
-          <p className="mt-1 text-sm text-muted">지금 날씨와 실제 판매 상품을 조합한 AI 코디를 확인해 보세요.</p>
-        </div>
-      </div>
+      <PageHeading className="mb-7" icon={<Shirt />} title="오늘의 코디" description="지금 날씨와 실제 판매 상품을 조합한 AI 코디를 확인해 보세요." />
 
       <WeatherPanel
         forecast={forecast}
@@ -130,11 +126,11 @@ export function TodayOutfitPage() {
 function OutfitLoadingState() {
   return (
     <section aria-label="오늘의 코디 불러오는 중" aria-busy="true">
-      <div className="h-7 w-52 animate-pulse rounded bg-zinc-200" />
-      <div className="mt-4 min-h-[560px] animate-pulse rounded-3xl border border-line bg-zinc-100" />
-      <div className="mt-8 h-7 w-40 animate-pulse rounded bg-zinc-200" />
+      <div className="h-7 w-52 animate-pulse rounded bg-border-subtle" />
+      <div className="mt-4 min-h-[560px] animate-pulse rounded-3xl border border-border-subtle bg-surface-subtle" />
+      <div className="mt-8 h-7 w-40 animate-pulse rounded bg-border-subtle" />
       <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7">
-        {Array.from({ length: 7 }, (_, index) => <div key={index} className="aspect-[3/4] animate-pulse rounded-xl bg-zinc-100" />)}
+        {Array.from({ length: 7 }, (_, index) => <div key={index} className="aspect-[3/4] animate-pulse rounded-xl bg-surface-subtle" />)}
       </div>
     </section>
   );

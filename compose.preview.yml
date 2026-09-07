@@ -1,0 +1,94 @@
+# Combine with the companion backend's docker-compose.yml using docker-preview.sh.
+services:
+  storage-init:
+    image: alpine:3.22
+    command: ["sh", "-c", "chown 1000:1000 /cursus /temporal"]
+    volumes: ["preview-cursus:/cursus", "preview-temporal:/temporal"]
+  mysql:
+    container_name: !reset null
+    ports: !override ["127.0.0.1:3307:3306"]
+    volumes: ["preview-mysql:/var/lib/mysql"]
+  temporal:
+    platform: linux/amd64
+    container_name: !reset null
+    command: ["server", "start-dev", "--ip", "0.0.0.0", "--db-filename", "/home/temporal/preview.db"]
+    volumes: ["preview-temporal:/home/temporal"]
+    depends_on:
+      storage-init: { condition: service_completed_successfully }
+    ports: !override ["127.0.0.1:7233:7233", "127.0.0.1:8233:8233"]
+  cursus-broker:
+    platform: linux/amd64
+    container_name: !reset null
+    command: ["-config", "/config/config.yaml", "-min-insync-replicas", "1", "-default-replication-factor", "1", "-advertised-host", "cursus-broker"]
+    volumes: !override
+      - ./deployments/cursus/config.yaml:/config/config.yaml:ro
+      - preview-cursus:/var/lib/cursus
+    depends_on:
+      storage-init: { condition: service_completed_successfully }
+    ports: !override []
+  seed:
+    build:
+      context: .
+      target: local-tools-container
+    command: ["./seed"]
+    environment:
+      DATABASE_URL: commerce:commerce@tcp(mysql:3306)/commerce?charset=utf8mb4&parseTime=true&loc=UTC&multiStatements=true
+    depends_on:
+      mysql: { condition: service_healthy }
+  api:
+    ports: !override ["127.0.0.1:8080:8080"]
+    environment:
+      APP_ENV: development
+      AWS_ACCESS_KEY_ID: ""
+      AWS_SECRET_ACCESS_KEY: ""
+      AWS_SESSION_TOKEN: ""
+      AWS_EC2_METADATA_DISABLED: "true"
+      S3_BUCKET: ""
+      IMGPROXY_BASE_URL: ""
+      IMGPROXY_KEY: ""
+      IMGPROXY_SALT: ""
+      COURIER_TRACKING_ENABLED: "false"
+    depends_on:
+      seed: { condition: service_completed_successfully }
+      temporal: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  worker:
+    environment:
+      APP_ENV: development
+      COURIER_TRACKING_ENABLED: "false"
+      SYNTHETIC_DATA_ENABLED: "false"
+    depends_on:
+      seed: { condition: service_completed_successfully }
+      temporal: { condition: service_healthy }
+  experiment-api:
+    container_name: !reset null
+    depends_on:
+      seed: { condition: service_completed_successfully }
+  experiment-consumer:
+    container_name: !reset null
+  event-log-worker:
+    container_name: !reset null
+    depends_on:
+      seed: { condition: service_completed_successfully }
+  web:
+    build:
+      context: ${COMMERCE_WEB_CONTEXT}
+    environment:
+      BACKEND_API_BASE_URL: http://api:8080
+      EXPERIMENT_API_BASE_URL: http://experiment-api:8081
+    ports: ["127.0.0.1:${COMMERCE_WEB_PORT:-3000}:3000"]
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+volumes:
+  preview-mysql:
+  preview-temporal:
+  preview-cursus:

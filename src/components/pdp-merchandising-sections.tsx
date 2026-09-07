@@ -10,8 +10,8 @@ import { Button } from "./ui/button";
 export function AlsoViewedSection({ products }: { products: Product[] }) {
   return (
     <ProductShelf
-      eyebrow="DISCOVERY"
-      title="같이 본 상품들"
+      eyebrow="추천 상품"
+      title="함께 본 상품"
       description="이 상품과 함께 둘러본 고객들이 관심을 보인 상품입니다."
       products={products}
     />
@@ -52,14 +52,14 @@ function ProductShelf({
     carouselRef.current?.scrollBy({ left: direction * 640, behavior: "smooth" });
   }
 
-  const heading = <h2 className="mt-1 text-2xl font-black">{title}</h2>;
+  const heading = <h2 className="mt-1 text-2xl font-bold">{title}</h2>;
   return (
-    <section className="mt-10 border-t border-line pt-8">
+    <section className="mt-10 border-t border-border-subtle pt-8">
       <div className="mb-5 flex items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-black tracking-[0.18em] text-brand">{eyebrow}</p>
-          {headerHref ? <Link href={headerHref} className="hover:text-brand">{heading}</Link> : heading}
-          {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
+          <p className="text-xs font-bold tracking-normal text-action-primary">{eyebrow}</p>
+          {headerHref ? <Link href={headerHref} className="hover:text-action-primary">{heading}</Link> : heading}
+          {description ? <p className="mt-1 text-sm text-content-secondary">{description}</p> : null}
         </div>
         <div className="flex shrink-0 gap-2">
           <Button variant="secondary" size="icon" aria-label={`${title} 이전`} onClick={() => slide(-1)}><ChevronLeft size={18} /></Button>

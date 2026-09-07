@@ -152,7 +152,7 @@ test.describe("public and customer journeys with live and controlled API boundar
     await page.getByPlaceholder("사이즈, 핏, 소재감이 어땠나요?").fill("응답 유실 리뷰");
     await page.getByRole("button", { name: "리뷰 등록", exact: true }).click();
 
-    await expect(page.getByText("Reviewed", { exact: true })).toBeVisible();
+    await expect(page.getByText("리뷰 작성 완료", { exact: true })).toBeVisible();
     expect(createAttempts).toBe(1);
   });
 
@@ -426,7 +426,7 @@ test.describe("public and customer journeys with live and controlled API boundar
     await expect(page.getByText("리뷰 작성 여부를 확인하는 중입니다.", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Write review", exact: true })).toHaveCount(0);
     releaseReviewRefresh();
-    await expect(page.getByText("Reviewed", { exact: true })).toBeVisible();
+    await expect(page.getByText("리뷰 작성 완료", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Write review", exact: true })).toHaveCount(0);
   });
 

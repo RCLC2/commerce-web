@@ -1,5 +1,10 @@
 "use client";
 
+import { PageHeading } from "./ui/page-heading";
+import { ReceiptText as PageIcon } from "lucide-react";
+
+import { ButtonLink } from "@/components/ui/button-link";
+
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
@@ -9,28 +14,16 @@ import { canWriteOrderLineReview, reviewedOrderLineItemIDs } from "@/lib/product
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import type { OrderLineItemResponse, TrackingInfo } from "@/lib/types";
+import { orderStatusLabel as statusLabel } from "@/lib/order-utils";
+import { paymentMethodLabel } from "@/lib/display-labels";
+import { apiErrorMessage } from "@/lib/api-client";
+import { ApiErrorState } from "./api-error-state";
 import { formatPrice } from "@/lib/utils";
 import { ReviewWritePanel } from "./review-write-panel";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
 const statusSteps = ["PAYMENT_PENDING", "PAID", "PLACED", "SHIPPED", "DELIVERED", "COMPLETED"];
-
-function statusLabel(status: string) {
-  const labels: Record<string, string> = {
-    PAYMENT_PENDING: "Payment pending",
-    PAID: "Paid",
-    PLACED: "Placed",
-    SHIPPED: "Shipping",
-    SHIPPING: "Shipping",
-    DELIVERED: "Delivered",
-    COMPLETED: "Confirmed",
-    CANCELLED: "Canceled",
-    ORDERED: "Ordered",
-    REVIEWED: "Reviewed",
-  };
-  return labels[status] ?? status;
-}
 
 export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   const token = useSessionStore((state) => state.accessToken);
@@ -75,7 +68,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   const trackDelivery = useMutation({
     mutationFn: () => {
       if (!order?.delivery?.id) {
-        throw new Error("Delivery information is missing.");
+        throw new Error("배송 정보가 없습니다.");
       }
       return api.trackDelivery(effectiveToken, orderCode, order.delivery.id);
     },
@@ -85,20 +78,18 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   if (!token) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-16">
-        <h1 className="text-2xl font-black">Login required</h1>
-        <Link href="/login">
-          <Button className="mt-5">Log in</Button>
-        </Link>
+        <h1 className="text-2xl font-bold">로그인이 필요합니다</h1>
+        <ButtonLink href="/login" className="mt-5">로그인</ButtonLink>
       </main>
     );
   }
 
   if (isLoading) {
-    return <main className="mx-auto max-w-4xl px-4 py-8 text-sm text-muted">Loading order.</main>;
+    return <main className="mx-auto max-w-4xl px-4 py-8 text-sm text-content-secondary">주문 정보를 불러오는 중입니다.</main>;
   }
 
   if (error || !order) {
-    return <main className="mx-auto max-w-4xl px-4 py-8 text-sm text-brand"><p>Could not load order.</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void refetch()}>Retry</Button></main>;
+    return <main className="mx-auto max-w-4xl px-4 py-8 text-sm text-action-primary"><ApiErrorState error={error ?? new Error("주문 정보를 찾을 수 없습니다.")} onRetry={() => void refetch()} /></main>;
   }
 
   const amount = order.total_order_price - order.total_discount_price - order.used_point;
@@ -106,23 +97,22 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
 
   return (
     <main className="mx-auto max-w-4xl px-4 pb-24 pt-8">
-      <div className="rounded-md border border-line bg-white p-5">
-        <p className="text-sm font-bold text-muted">Order no.</p>
-        <h1 className="mt-1 text-2xl font-black">{order.order_code}</h1>
-        <p className="mt-1 text-sm text-muted">{order.ordered_at ? new Date(order.ordered_at).toLocaleString("ko-KR") : "-"}</p>
+      <div className="rounded-md border border-border-subtle bg-surface-raised p-5">
+        <PageHeading icon={<PageIcon />} title="주문 상세" description={`주문 번호 ${order.order_code}`} />
+        <p className="mt-1 text-sm text-content-secondary">{order.ordered_at ? new Date(order.ordered_at).toLocaleString("ko-KR") : "-"}</p>
         <div className="mt-5 grid gap-3 md:grid-cols-3">
-          <InfoBox label="Status" value={statusLabel(order.status)} />
-          <InfoBox label="Payment" value={order.payment_method ?? "CARD"} />
-          <InfoBox label="Amount" value={formatPrice(amount)} />
+          <InfoBox label="상태" value={statusLabel(order.status)} />
+          <InfoBox label="결제" value={paymentMethodLabel(order.payment_method)} />
+          <InfoBox label="결제 금액" value={formatPrice(amount)} />
         </div>
         <OrderProgress status={order.status} />
       </div>
 
-      <section className="mt-6 rounded-md border border-line bg-white p-5">
+      <section className="mt-6 rounded-md border border-border-subtle bg-surface-raised p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-black">Delivery</h2>
-            <p className="mt-1 text-sm text-muted">{statusLabel(deliveryStatus)}</p>
+            <h2 className="text-lg font-bold">배송 정보</h2>
+            <p className="mt-1 text-sm text-content-secondary">{statusLabel(deliveryStatus)}</p>
           </div>
           <Button
             size="sm"
@@ -130,43 +120,43 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
             disabled={!order.delivery?.id || trackDelivery.isPending || !order.delivery?.tracking_number}
             onClick={() => trackDelivery.mutate()}
           >
-            {trackDelivery.isPending ? "Tracking" : "Track"}
+            {trackDelivery.isPending ? "배송 조회 중" : "배송 조회"}
           </Button>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <InfoBox label="Carrier" value={order.delivery?.carrier || "-"} />
-          <InfoBox label="Tracking no." value={order.delivery?.tracking_number || "-"} />
-          <InfoBox label="Delivery status" value={statusLabel(order.delivery?.status ?? order.status)} />
+          <InfoBox label="택배사" value={order.delivery?.carrier || "-"} />
+          <InfoBox label="운송장 번호" value={order.delivery?.tracking_number || "-"} />
+          <InfoBox label="배송 상태" value={statusLabel(order.delivery?.status ?? order.status)} />
         </div>
         {trackingInfo ? (
-          <div className="mt-4 rounded-md bg-zinc-50 p-3 text-sm">
-            <p className="font-black">{trackingInfo.Status ?? trackingInfo.status ?? "Tracking"}</p>
-            <p className="mt-1 text-muted">{trackingInfo.Location ?? trackingInfo.location ?? "No location"}</p>
-            <p className="mt-1 text-muted">{trackingInfo.Description ?? trackingInfo.description ?? ""}</p>
+          <div className="mt-4 rounded-md bg-surface-subtle p-3 text-sm">
+            <p className="font-bold">{statusLabel(trackingInfo.Status ?? trackingInfo.status ?? "배송 조회 결과")}</p>
+            <p className="mt-1 text-content-secondary">{trackingInfo.Location ?? trackingInfo.location ?? "위치 정보 없음"}</p>
+            <p className="mt-1 text-content-secondary">{trackingInfo.Description ?? trackingInfo.description ?? ""}</p>
           </div>
         ) : null}
-        {trackDelivery.error ? <p className="mt-3 text-sm font-bold text-brand">{trackDelivery.error.message}</p> : null}
+        {trackDelivery.error ? <p className="mt-3 text-sm font-bold text-status-negative">{apiErrorMessage(trackDelivery.error)}</p> : null}
       </section>
 
-      <section className="mt-6 rounded-md border border-line bg-white p-5">
-        <h2 className="text-lg font-black">Address</h2>
-        <p className="mt-3 text-sm text-muted">This order API does not store or return a shipping address.</p>
+      <section className="mt-6 rounded-md border border-border-subtle bg-surface-raised p-5">
+        <h2 className="text-lg font-bold">배송지</h2>
+        <p className="mt-3 text-sm text-content-secondary">현재 주문의 배송지 정보를 확인할 수 없습니다.</p>
       </section>
 
       <section className="mt-6 space-y-4">
-        <h2 className="text-lg font-black">Items</h2>
-        {myReviews.isFetching ? <p className="text-xs text-muted">리뷰 작성 여부를 확인하는 중입니다.</p> : null}
+        <h2 className="text-lg font-bold">주문 상품</h2>
+        {myReviews.isFetching ? <p className="text-xs text-content-secondary">리뷰 작성 여부를 확인하는 중입니다.</p> : null}
         {myReviews.error ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-xs font-bold text-brand">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-status-negative-border bg-status-negative-subtle p-3 text-xs font-bold text-action-primary">
             <p>리뷰 작성 여부를 확인하지 못해 중복 작성을 막기 위해 작성 버튼을 숨겼습니다.</p>
             <Button size="sm" variant="secondary" onClick={() => void myReviews.refetch()}>다시 확인</Button>
           </div>
         ) : null}
         {order.market_orders?.map((marketOrder) => (
-          <div key={marketOrder.id} className="rounded-md border border-line bg-white p-4">
+          <div key={marketOrder.id} className="rounded-md border border-border-subtle bg-surface-raised p-4">
             <div className="flex justify-between text-sm">
-              <span className="font-bold">Market #{marketOrder.market_id}</span>
-              <span className="text-muted">{statusLabel(marketOrder.status)}</span>
+              <span className="font-bold">마켓 #{marketOrder.market_id}</span>
+              <span className="text-content-secondary">{statusLabel(marketOrder.status)}</span>
             </div>
             <div className="mt-4 space-y-4">
               {marketOrder.line_items.map((item) => {
@@ -183,20 +173,20 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
                 const canToggleReview = reviewEligible && (!myReviews.isFetching || isReviewing);
 
                 return (
-                  <div key={item.id} className="border-t border-line pt-4 first:border-t-0 first:pt-0">
+                  <div key={item.id} className="border-t border-border-subtle pt-4 first:border-t-0 first:pt-0">
                     <div className="flex gap-3 text-sm">
-                      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-zinc-100">
+                      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-surface-subtle">
                         <SafeImage src={product?.image_url} alt="" fill sizes="80px" className="object-cover" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex justify-between gap-3">
                           <Link href={`/products/${item.product_id}`} className="font-bold hover:underline">
-                            {product?.name ?? `Product ${item.product_id}`}
+                            {product?.name ?? `상품 ${item.product_id}`}
                           </Link>
-                          <p className="font-black">{formatPrice(item.price * item.quantity)}</p>
+                          <p className="shrink-0 whitespace-nowrap font-bold tabular-nums">{formatPrice(item.price * item.quantity)}</p>
                         </div>
-                        <p className="mt-1 text-muted">
-                          Option #{item.option_id} / {item.quantity} pcs / {statusLabel(item.status)}
+                        <p className="mt-1 text-content-secondary">
+                          옵션 #{item.option_id} / {item.quantity} 개 / {statusLabel(item.status)}
                         </p>
                         <OrderItemActions
                           item={item}
@@ -232,36 +222,36 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
         ))}
       </section>
 
-      <section className="mt-6 rounded-md border border-line bg-white p-5">
-        <h2 className="text-lg font-black">Payment</h2>
+      <section className="mt-6 rounded-md border border-border-subtle bg-surface-raised p-5">
+        <h2 className="text-lg font-bold">결제</h2>
         <div className="mt-4 space-y-2 text-sm">
-          <PriceRow label="Subtotal" value={order.total_order_price} />
-          <PriceRow label="Discount" value={-order.total_discount_price} />
-          <PriceRow label="Points" value={-order.used_point} />
-          <div className="border-t border-line pt-3">
-            <PriceRow label="Final amount" value={amount} strong />
+          <PriceRow label="상품 금액" value={order.total_order_price} />
+          <PriceRow label="할인 금액" value={-order.total_discount_price} />
+          <PriceRow label="사용 포인트" value={-order.used_point} />
+          <div className="border-t border-border-subtle pt-3">
+            <PriceRow label="최종 결제 금액" value={amount} strong />
           </div>
         </div>
       </section>
 
-      {confirmPurchase.error ? <p className="mt-4 text-sm font-bold text-brand">{confirmPurchase.error.message}</p> : null}
+      {confirmPurchase.error ? <p className="mt-4 text-sm font-bold text-status-negative">{apiErrorMessage(confirmPurchase.error)}</p> : null}
     </main>
   );
 }
 
 function OrderProgress({ status }: { status: string }) {
-  if (status === "CANCELLED") {
+  if (!statusSteps.includes(status) && status !== "SHIPPING") {
     return (
-      <div className="mt-5 rounded-md bg-red-50 px-3 py-2 text-xs font-black text-brand">
+      <div className="mt-5 rounded-md bg-status-negative-subtle px-3 py-2 text-xs font-bold text-action-primary">
         {statusLabel(status)}
       </div>
     );
   }
-  const activeIndex = statusSteps.indexOf(status);
+  const activeIndex = statusSteps.indexOf(status === "SHIPPING" ? "SHIPPED" : status);
   return (
     <div className="mt-5 grid gap-2 md:grid-cols-6">
       {statusSteps.map((step, index) => (
-        <div key={step} className={`rounded-md px-3 py-2 text-xs font-black ${index <= activeIndex ? "bg-zinc-900 text-white" : "bg-zinc-100 text-muted"}`}>
+        <div key={step} className={`rounded-md px-3 py-2 text-xs font-bold ${index <= activeIndex ? "bg-content-primary text-content-inverse" : "bg-surface-subtle text-content-secondary"}`}>
           {statusLabel(step)}
         </div>
       ))}
@@ -294,32 +284,32 @@ function OrderItemActions({
     <div className="mt-3 flex flex-wrap items-center gap-2">
       {delivered ? (
         <Button size="sm" disabled={busy} onClick={onConfirm}>
-          Confirm purchase
+          구매 확정
         </Button>
       ) : null}
-      {reviewSubmitted ? <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-black text-muted">Reviewed</span> : null}
+      {reviewSubmitted ? <span className="rounded-md bg-surface-subtle px-2 py-1 text-xs font-bold text-content-secondary">리뷰 작성 완료</span> : null}
       {canWriteReview ? (
         <Button size="sm" variant="secondary" disabled={busy} onClick={onToggleReview}>
-          {reviewOpen ? "Close review" : "Write review"}
+          {reviewOpen ? "리뷰 닫기" : "리뷰 작성"}
         </Button>
       ) : null}
-      {completed ? <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-black text-muted">Confirmed</span> : null}
+      {completed ? <span className="rounded-md bg-surface-subtle px-2 py-1 text-xs font-bold text-content-secondary">구매 확정</span> : null}
     </div>
   );
 }
 
 function InfoBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-zinc-50 p-3">
-      <p className="text-xs text-muted">{label}</p>
-      <p className="mt-1 font-black">{value}</p>
+    <div className="rounded-md bg-surface-subtle p-3">
+      <p className="text-xs text-content-secondary">{label}</p>
+      <p className="mt-1 font-bold">{value}</p>
     </div>
   );
 }
 
 function PriceRow({ label, value, strong }: { label: string; value: number; strong?: boolean }) {
   return (
-    <div className={`flex justify-between ${strong ? "text-base font-black" : ""}`}>
+    <div className={`flex justify-between ${strong ? "text-base font-bold" : ""}`}>
       <span>{label}</span>
       <strong>{formatPrice(value)}</strong>
     </div>

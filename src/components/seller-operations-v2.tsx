@@ -1,10 +1,13 @@
 "use client";
 
+import { Input, Select } from "./ui/input";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { sellerConsoleApi } from "@/lib/seller-console-api";
+import { paymentMethodLabel } from "@/lib/display-labels";
 import { formatPrice } from "@/lib/utils";
 import {
   ConsoleHeader,
@@ -146,10 +149,10 @@ export function SellerOrdersPageV2() {
       <ConsoleSection className="mt-5" title="주문 목록" description="주문을 누르면 상품, 구매자, 배송 정보와 처리 버튼을 확인할 수 있습니다.">
         <FilterPanel>
           <FilterField label="주문 검색">
-            <input className={consoleInputClass} value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="주문번호, 상품명, 구매자" />
+            <Input className={consoleInputClass} value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="주문번호, 상품명, 구매자" />
           </FilterField>
           <FilterField label="상태">
-            <select className={consoleInputClass} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
+            <Select className={consoleInputClass} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
               <option value="ALL">전체 상태</option>
               <option value="PAYMENT_PENDING">결제 대기</option>
               <option value="PAID">출고 대기</option>
@@ -162,20 +165,20 @@ export function SellerOrdersPageV2() {
               <option value="RETURN_REJECTED">반품 거절</option>
               <option value="RETURN_COMPLETED">반품 완료</option>
               <option value="CANCELLED">취소</option>
-            </select>
+            </Select>
           </FilterField>
           <FilterField label="시작일">
-            <input className={consoleInputClass} type="date" value={from} onChange={(event) => { setFrom(event.target.value); setPage(1); }} />
+            <Input className={consoleInputClass} type="date" value={from} onChange={(event) => { setFrom(event.target.value); setPage(1); }} />
           </FilterField>
           <FilterField label="종료일">
-            <input className={consoleInputClass} type="date" value={to} onChange={(event) => { setTo(event.target.value); setPage(1); }} />
+            <Input className={consoleInputClass} type="date" value={to} onChange={(event) => { setTo(event.target.value); setPage(1); }} />
           </FilterField>
         </FilterPanel>
         <div className="mt-4">
           <ConsoleTable
             columns={["주문번호", "구매자", "대표 상품", "결제 금액", "정산 예정", "상태", "주문일"]}
             rows={orders.map((item) => [
-              <span key="code" className="font-black">{item.order_code}</span>,
+              <span key="code" className="font-bold">{item.order_code}</span>,
               <span key="buyer" className="break-all">{item.buyer_email}</span>,
               item.representative_product + (item.item_count > 1 ? " 외 " + String(item.item_count - 1) + "건" : ""),
               formatPrice(item.market_total_amount),
@@ -205,21 +208,21 @@ export function SellerOrdersPageV2() {
               <DetailItem label="마켓 결제 금액">{formatPrice(order.market_total_amount)}</DetailItem>
               <DetailItem label="배송비">{formatPrice(order.shipping_fee)}</DetailItem>
               <DetailItem label="예상 정산">{formatPrice(order.expected_settlement_amount)}</DetailItem>
-              <DetailItem label="결제 수단">{order.payment_method}</DetailItem>
+              <DetailItem label="결제 수단">{paymentMethodLabel(order.payment_method)}</DetailItem>
               <DetailItem label="주문일">{dateTime(order.created_at)}</DetailItem>
               <DetailItem label="수정일">{dateTime(order.updated_at)}</DetailItem>
             </DetailGrid>
             <section>
-              <h3 className="mb-3 font-black">배송 정보</h3>
-              <div className="grid gap-3 rounded-xl bg-zinc-50 p-4 sm:grid-cols-2">
+              <h3 className="mb-3 font-bold">배송 정보</h3>
+              <div className="grid gap-3 rounded-xl bg-surface-subtle p-4 sm:grid-cols-2">
                 <FilterField label="택배사">
-                  <select className={consoleInputClass} value={carrier} onChange={(event) => setCarrier(event.target.value)} disabled={["DELIVERED", "COMPLETED"].includes(deliveryStatus)}>
+                  <Select className={consoleInputClass} value={carrier} onChange={(event) => setCarrier(event.target.value)} disabled={["DELIVERED", "COMPLETED"].includes(deliveryStatus)}>
                     <option value="">택배사 선택</option>
                     {(carriersQuery.data?.carriers ?? []).map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
-                  </select>
+                  </Select>
                 </FilterField>
                 <FilterField label="송장번호">
-                  <input className={consoleInputClass} value={invoice} onChange={(event) => setInvoice(event.target.value)} placeholder="송장번호" disabled={["DELIVERED", "COMPLETED"].includes(deliveryStatus)} />
+                  <Input className={consoleInputClass} value={invoice} onChange={(event) => setInvoice(event.target.value)} placeholder="송장번호" disabled={["DELIVERED", "COMPLETED"].includes(deliveryStatus)} />
                 </FilterField>
                 <DetailItem label="배송 상태"><StatusBadge value={deliveryStatus} /></DetailItem>
                 <DetailItem label="수령인">{order.delivery?.receiver_name}</DetailItem>
@@ -228,7 +231,7 @@ export function SellerOrdersPageV2() {
               </div>
             </section>
             <section>
-              <h3 className="mb-3 font-black">주문 상품</h3>
+              <h3 className="mb-3 font-bold">주문 상품</h3>
               <ConsoleTable
                 columns={["상품", "옵션", "수량", "판매가", "할인", "상태"]}
                 rows={order.items.map((item) => [
@@ -287,28 +290,28 @@ export function SellerSettlementsPageV2() {
       <ConsoleSection className="mt-5" title="정산 목록">
         <FilterPanel>
           <FilterField label="상태">
-            <select className={consoleInputClass} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
+            <Select className={consoleInputClass} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
               <option value="ALL">전체 상태</option>
               <option value="PREPARED">지급 대기</option>
               <option value="CONFIRMED">지급 확정</option>
               <option value="PAID">지급 완료</option>
               <option value="EXCLUDED">정산 제외</option>
-            </select>
+            </Select>
           </FilterField>
           <FilterField label="정산월">
-            <input className={consoleInputClass} type="month" value={targetMonth} onChange={(event) => { setTargetMonth(event.target.value); setPage(1); }} />
+            <Input className={consoleInputClass} type="month" value={targetMonth} onChange={(event) => { setTargetMonth(event.target.value); setPage(1); }} />
           </FilterField>
         </FilterPanel>
         <div className="mt-4">
           <ConsoleTable
             columns={["정산월", "매출", "수수료", "최종 정산", "지급 예정일", "상태"]}
             rows={settlements.map((item) => [
-              <span key="month" className="font-black">{item.target_month}</span>,
+              <span key="month" className="font-bold">{item.target_month}</span>,
               formatPrice(item.total_sales_amount),
               formatPrice(item.commission_amount),
-              <span key="amount" className="font-black">{formatPrice(item.final_settlement_amount)}</span>,
+              <span key="amount" className="font-bold">{formatPrice(item.final_settlement_amount)}</span>,
               dateTime(item.payment_due_date),
-              <StatusBadge key="status" value={item.status} />,
+              <StatusBadge context="settlement" key="status" value={item.status} />,
             ])}
             rowKeys={settlements.map((item) => item.id)}
             onRowClick={(index) => { setSelectedID(settlements[index].id); setLinePage(1); }}
@@ -326,7 +329,7 @@ export function SellerSettlementsPageV2() {
         {settlementQuery.data ? (
           <div className="grid gap-6">
             <DetailGrid>
-              <DetailItem label="상태"><StatusBadge value={settlementQuery.data.status} /></DetailItem>
+              <DetailItem label="상태"><StatusBadge context="settlement" value={settlementQuery.data.status} /></DetailItem>
               <DetailItem label="총 매출">{formatPrice(settlementQuery.data.total_sales_amount)}</DetailItem>
               <DetailItem label="반품 배송비">{formatPrice(settlementQuery.data.total_return_shipping_fee)}</DetailItem>
               <DetailItem label="수수료">{formatPrice(settlementQuery.data.commission_amount)}</DetailItem>
@@ -336,17 +339,17 @@ export function SellerSettlementsPageV2() {
               <DetailItem label="수정일">{dateTime(settlementQuery.data.updated_at)}</DetailItem>
             </DetailGrid>
             <section>
-              <h3 className="mb-3 font-black">주문별 정산</h3>
+              <h3 className="mb-3 font-bold">주문별 정산</h3>
               <ConsoleTable
                 columns={["주문", "상품 / 옵션", "수량", "매출", "수수료", "최종 정산", "상태"]}
                 rows={settlementQuery.data.lines.items.map((line) => [
                   line.order_code,
-                  <div key="product"><p className="font-bold">{line.product_name}</p><p className="text-xs text-muted">{line.option_name}: {line.option_value}</p></div>,
+                  <div key="product"><p className="font-bold">{line.product_name}</p><p className="text-xs text-content-secondary">{line.option_name}: {line.option_value}</p></div>,
                   String(line.quantity) + "개",
                   formatPrice(line.gross_amount),
                   formatPrice(line.commission_amount),
                   formatPrice(line.final_settlement_amount),
-                  <StatusBadge key="status" value={line.status} />,
+                  <StatusBadge context="settlement" key="status" value={line.status} />,
                 ])}
               />
               <PaginationBar page={settlementQuery.data.lines.page} totalPages={settlementQuery.data.lines.total_pages} total={settlementQuery.data.lines.total} onChange={setLinePage} />
@@ -399,20 +402,20 @@ export function SellerReviewsPageV2() {
       <ConsoleSection className="mt-5" title="리뷰 목록">
         <FilterPanel>
           <FilterField label="리뷰 검색">
-            <input className={consoleInputClass} value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="상품명, 구매자, 내용" />
+            <Input className={consoleInputClass} value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="상품명, 구매자, 내용" />
           </FilterField>
           <FilterField label="상태">
-            <select className={consoleInputClass} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
+            <Select className={consoleInputClass} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
               <option value="ALL">전체 상태</option>
               <option value="ACTIVE">노출</option>
               <option value="HIDE">숨김</option>
-            </select>
+            </Select>
           </FilterField>
           <FilterField label="평점">
-            <select className={consoleInputClass} value={ratingX2} onChange={(event) => { setRatingX2(event.target.value); setPage(1); }}>
+            <Select className={consoleInputClass} value={ratingX2} onChange={(event) => { setRatingX2(event.target.value); setPage(1); }}>
               <option value="">전체 평점</option>
               {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((value) => <option key={value} value={value}>{value / 2}점</option>)}
-            </select>
+            </Select>
           </FilterField>
         </FilterPanel>
         <div className="mt-4">
@@ -420,11 +423,11 @@ export function SellerReviewsPageV2() {
             columns={["상품", "구매자", "평점", "내용", "상태", "작성일"]}
             rows={reviews.map((review) => [
               <div key="product" className="flex min-w-0 items-center gap-3">
-                <div className="relative size-11 shrink-0 overflow-hidden rounded-lg bg-zinc-100"><SafeImage src={review.product_image_url} alt="" fill sizes="44px" className="object-cover" /></div>
-                <p className="line-clamp-2 font-black">{review.product_name}</p>
+                <div className="relative size-11 shrink-0 overflow-hidden rounded-lg bg-surface-subtle"><SafeImage src={review.product_image_url} alt="" fill sizes="44px" className="object-cover" /></div>
+                <p className="line-clamp-2 font-bold">{review.product_name}</p>
               </div>,
               <span key="buyer" className="break-all">{review.buyer_email}</span>,
-              <span key="rating" className="inline-flex items-center gap-1 font-black text-brand"><Star className="size-4 fill-brand" />{review.rating}</span>,
+              <span key="rating" className="inline-flex items-center gap-1 font-bold text-action-primary"><Star className="size-4 fill-brand" />{review.rating}</span>,
               <span key="content" className="line-clamp-2">{review.content_preview}</span>,
               <StatusBadge key="status" value={review.status} />,
               dateTime(review.created_at),
@@ -445,7 +448,7 @@ export function SellerReviewsPageV2() {
         {reviewQuery.data ? (
           <div className="grid gap-5">
             <div className="grid gap-5 sm:grid-cols-[160px_minmax(0,1fr)]">
-              <div className="relative aspect-square overflow-hidden rounded-xl bg-zinc-100">
+              <div className="relative aspect-square overflow-hidden rounded-xl bg-surface-subtle">
                 <SafeImage src={reviewQuery.data.product_image_url} alt={reviewQuery.data.product_name} fill sizes="160px" className="object-cover" />
               </div>
               <DetailGrid>
@@ -453,15 +456,15 @@ export function SellerReviewsPageV2() {
                 <DetailItem label="옵션">{reviewQuery.data.option_name}: {reviewQuery.data.option_value}</DetailItem>
                 <DetailItem label="구매자">{reviewQuery.data.buyer_email}</DetailItem>
                 <DetailItem label="주문번호">{reviewQuery.data.order_code}</DetailItem>
-                <DetailItem label="평점"><span className="inline-flex items-center gap-1 text-brand"><Star className="size-4 fill-brand" />{reviewQuery.data.rating}</span></DetailItem>
+                <DetailItem label="평점"><span className="inline-flex items-center gap-1 text-action-primary"><Star className="size-4 fill-brand" />{reviewQuery.data.rating}</span></DetailItem>
                 <DetailItem label="상태"><StatusBadge value={reviewQuery.data.status} /></DetailItem>
                 <DetailItem label="신체 정보">{reviewQuery.data.height_at_time ?? "-"}cm / {reviewQuery.data.weight_at_time ?? "-"}kg</DetailItem>
                 <DetailItem label="작성일">{dateTime(reviewQuery.data.created_at)}</DetailItem>
               </DetailGrid>
             </div>
             <section>
-              <h3 className="mb-2 font-black">리뷰 내용</h3>
-              <p className="whitespace-pre-wrap rounded-xl bg-zinc-50 p-4 text-sm leading-7">{reviewQuery.data.content}</p>
+              <h3 className="mb-2 font-bold">리뷰 내용</h3>
+              <p className="whitespace-pre-wrap rounded-xl bg-surface-subtle p-4 text-sm leading-7">{reviewQuery.data.content}</p>
             </section>
           </div>
         ) : (

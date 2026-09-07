@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import {
+  ApiError,
+  apiErrorMessage,
   ApiContractError,
   ApiParseError,
   parseContract,
@@ -133,5 +135,16 @@ describe("shouldRetryApiError", () => {
   it("allows one retry for a transient HTTP failure", () => {
     expect(shouldRetryApiError(0, new Error("temporary"))).toBe(true);
     expect(shouldRetryApiError(1, new Error("temporary"))).toBe(false);
+  });
+});
+
+describe("Korean error presentation", () => {
+  it("translates an English server failure while retaining the diagnostic error", () => {
+    const error = new ApiError("Internal Server Error", "http", 500);
+    expect(apiErrorMessage(error)).toBe("서버에서 요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.");
+    expect(error.message).toBe("Internal Server Error");
+  });
+  it("preserves an actionable Korean validation message", () => {
+    expect(apiErrorMessage(new ApiError("이미 사용한 쿠폰입니다.", "http", 409))).toBe("이미 사용한 쿠폰입니다.");
   });
 });

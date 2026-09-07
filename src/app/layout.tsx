@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Noto_Sans_KR } from "next/font/google";
 import { AppShell } from "@/components/app-shell";
 import { Providers } from "./providers";
 import "./globals.css";
@@ -14,9 +14,16 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const notoSansKR = Noto_Sans_KR({
+  variable: "--font-korean",
+  weight: "variable",
+  display: "swap",
+  fallback: ["Apple SD Gothic Neo", "Malgun Gothic", "sans-serif"],
+});
+
 export const metadata: Metadata = {
-  title: "Commerce Web",
-  description: "Production-ready fashion commerce frontend for commerce-engine.",
+  title: "commerce | 나를 위한 패션 쇼핑",
+  description: "인기 상품부터 취향에 맞는 마켓과 오늘의 코디까지, 나를 위한 패션을 만나보세요.",
 };
 
 export const viewport: Viewport = {
@@ -33,7 +40,7 @@ export default function RootLayout({
   return (
     <html
       lang="ko"
-      className={`${geistSans.variable} ${geistMono.variable}`}
+      className={`${geistSans.variable} ${geistMono.variable} ${notoSansKR.variable}`}
       suppressHydrationWarning
     >
       <body>

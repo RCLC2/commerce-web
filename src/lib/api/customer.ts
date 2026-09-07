@@ -77,6 +77,12 @@ export const customerApi = {
     }),
   listCart: async (token: string) =>
     (await requestParsed(z.array(rawCartSchema), "/api/v1/cart", { token })).map(normalizeCartItem),
+  updateCartItems: async (token: string, payload: { cart_item_ids: number[]; option_id: number; quantity: number }) =>
+    normalizeCartItem(await requestParsed(rawCartSchema, "/api/v1/cart/items", {
+      method: "PATCH",
+      token,
+      body: JSON.stringify(payload),
+    })),
   listCoupons: async (token: string) =>
     (await requestParsed(z.array(rawOwnedCouponSchema), "/api/v1/coupons", { token }))
       .map((coupon) => normalizeOwnedCoupon(coupon)),

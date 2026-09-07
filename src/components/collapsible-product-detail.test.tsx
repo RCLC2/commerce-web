@@ -2,11 +2,15 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CollapsibleProductDetail, collapsedProductDetailHeight } from "./collapsible-product-detail";
 
+const push = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+
 const originalScrollHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollHeight");
 let detailHeight = 0;
 
 describe("CollapsibleProductDetail", () => {
   beforeEach(() => {
+    push.mockClear();
     detailHeight = 0;
     Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
       configurable: true,
@@ -37,6 +41,15 @@ describe("CollapsibleProductDetail", () => {
     } else {
       Reflect.deleteProperty(HTMLElement.prototype, "scrollHeight");
     }
+  });
+
+  it("keeps authored internal links in SPA navigation after expanding", async () => {
+    detailHeight = 1800;
+    render(<CollapsibleProductDetail html='<a href="/products?category=tops#list">관련 상품</a>' />);
+    fireEvent.click(await screen.findByRole("button", { name: "상품정보 더보기" }));
+    fireEvent.click(screen.getByRole("link", { name: "관련 상품" }));
+    expect(push).toHaveBeenCalledWith("/products?category=tops#list");
+    expect(screen.getByRole("button", { name: "상품정보 접기" })).toHaveAttribute("aria-expanded", "true");
   });
 
   it("uses the mobile and desktop collapse thresholds", () => {

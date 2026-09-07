@@ -69,11 +69,11 @@ describe("SponsoredDecision", () => {
     ["BANNER", bannerDecision()],
     ["MARKET_SHELF", marketShelfDecision()],
     ["PROMOTION_CARD", homePromotionCardDecision()],
-  ])("renders %s with exactly one top-right SPONSORED disclosure", (_format, decision) => {
+  ])("renders %s with exactly one top-right 광고 disclosure", (_format, decision) => {
     render(<SponsoredDecision decision={decision} />);
 
-    expect(screen.getAllByText("SPONSORED")).toHaveLength(1);
-    expect(screen.getByText("SPONSORED")).toHaveClass("right-3", "top-3");
+    expect(screen.getAllByText("광고")).toHaveLength(1);
+    expect(screen.getByText("광고")).toHaveClass("right-3", "top-3");
   });
 
   it("renders a responsive banner with descriptive alt text and Pexels attribution links", () => {

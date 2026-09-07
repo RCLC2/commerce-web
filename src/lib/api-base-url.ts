@@ -1,6 +1,11 @@
 const LOCAL_API_BASE_URL = "http://127.0.0.1:8080";
 
 export function getApiBaseUrl() {
+  const serverUrl = typeof window === "undefined" ? process.env.BACKEND_API_BASE_URL?.trim() : undefined;
+  if (serverUrl) {
+    const withProtocol = /^https?:\/\//i.test(serverUrl) ? serverUrl : `http://${serverUrl}`;
+    return withProtocol.replace(/\/+$/, "");
+  }
   const configuredUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
   if (configuredUrl === "same-origin") {
     return "";

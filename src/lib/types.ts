@@ -169,6 +169,8 @@ export type CategoryInformation = {
     page: number;
     page_size: number;
     has_next: boolean;
+    total?: number;
+    total_pages?: number;
   };
   realtime_popular_carousel: {
     title: string;

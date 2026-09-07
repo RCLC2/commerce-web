@@ -8,7 +8,7 @@ export function SponsoredBanner({ decision, onNavigate }: { decision: AdDecision
   const targetName = decision.target.type === "PRODUCT" ? decision.target.product.name : decision.target.market.name;
   const heightClass = decision.placement_key === "pdp.card_banner" ? "h-36 md:h-44" : "h-44 md:h-56";
   return (
-    <article className="relative overflow-hidden rounded-2xl bg-zinc-950 text-white shadow-sm">
+    <article className="relative overflow-hidden rounded-2xl bg-content-primary text-content-inverse shadow-sm">
       <SponsoredDisclosure />
       <div className={`relative ${heightClass}`}>
         <SafeImage
@@ -21,17 +21,17 @@ export function SponsoredBanner({ decision, onNavigate }: { decision: AdDecision
         <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/45 to-black/10" />
         <Link href={decision.creative.landing_url} onClick={onNavigate} className="absolute inset-0 flex items-end p-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-white md:items-center md:p-6">
           <div className="max-w-xl pr-16">
-            <p className="text-xs font-bold text-white/75">{targetName}</p>
-            <h2 className="mt-1 line-clamp-1 text-xl font-black md:text-3xl">{decision.creative.headline}</h2>
-            {decision.creative.body ? <p className="mt-1 line-clamp-1 text-sm text-white/80">{decision.creative.body}</p> : null}
-            <span className="mt-3 inline-flex rounded-full bg-white px-3 py-1.5 text-xs font-black text-zinc-950">{decision.creative.cta_label}</span>
+            <p className="text-xs font-bold text-content-inverse/75">{targetName}</p>
+            <h2 className="mt-1 line-clamp-1 text-xl font-bold md:text-3xl">{decision.creative.headline}</h2>
+            {decision.creative.body ? <p className="mt-1 line-clamp-1 text-sm text-content-inverse/80">{decision.creative.body}</p> : null}
+            <span className="mt-3 inline-flex rounded-full bg-surface-raised px-3 py-1.5 text-xs font-bold text-content-primary">{decision.creative.cta_label}</span>
           </div>
         </Link>
       </div>
       {decision.creative.pexels_photographer && decision.creative.pexels_photographer_url && decision.creative.pexels_photo_url ? (
-        <p className="absolute bottom-2 right-3 z-20 text-[10px] text-white/75">
-          Photo by <a href={decision.creative.pexels_photographer_url} target="_blank" rel="noreferrer" className="underline">{decision.creative.pexels_photographer}</a>{" "}
-          on <a href={decision.creative.pexels_photo_url} target="_blank" rel="noreferrer" className="underline">Pexels</a>
+        <p className="absolute bottom-2 right-3 z-20 text-xs text-content-inverse/75">
+          사진: <a href={decision.creative.pexels_photographer_url} target="_blank" rel="noreferrer" className="underline">{decision.creative.pexels_photographer}</a>{" "}
+          제공: <a href={decision.creative.pexels_photo_url} target="_blank" rel="noreferrer" className="underline">Pexels</a>
         </p>
       ) : null}
     </article>

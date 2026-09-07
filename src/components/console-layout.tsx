@@ -1,11 +1,18 @@
 "use client";
 
+import { Input } from "./ui/input";
+
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiErrorMessage } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { displayLabel } from "@/lib/display-labels";
+import { orderStatusLabel } from "@/lib/order-utils";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Notice } from "./ui/notice";
 
 type ConsoleLink = {
   href: string;
@@ -64,22 +71,23 @@ export function ConsoleLayout({
 
   return (
     <main className="mx-auto grid max-w-7xl gap-5 px-4 pb-24 pt-5 md:grid-cols-[208px_minmax(0,1fr)]">
-      <aside className="h-fit min-w-0 rounded-md border border-line bg-white p-3 md:sticky md:top-24">
+      <aside className="h-fit min-w-0 rounded-surface border border-border-subtle bg-surface-raised p-3 md:sticky md:top-24">
         <div className="px-3 py-2">
-          <h1 className="text-lg font-black">{title}</h1>
-          {subtitle ? <p className="mt-1 text-xs font-bold leading-5 text-muted">{subtitle}</p> : null}
+          <h1 className="text-lg font-bold">{title}</h1>
+          {subtitle ? <p className="mt-1 text-xs font-bold leading-5 text-content-secondary">{subtitle}</p> : null}
         </div>
         {sidebarHeader ? <div className="mb-3 px-1">{sidebarHeader}</div> : null}
         <nav className="mt-2 grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-1">
           {links.map((link) => {
-            const active = pathname === link.href || (link.href !== "/admin" && pathname.startsWith(`${link.href}/`));
+            const active = pathname === link.href || (!["/admin", "/seller"].includes(link.href) && pathname.startsWith(`${link.href}/`));
             return (
               <Link
                 key={link.href}
                 href={link.href}
+                aria-current={active ? "page" : undefined}
                 className={cn(
-                  "rounded-md border border-transparent px-3 py-2.5 text-sm font-bold text-zinc-600 transition hover:bg-zinc-50",
-                  active && "border-brand bg-brand text-white shadow-sm hover:bg-brand",
+                  "rounded-md border border-transparent px-3 py-2.5 text-sm font-bold text-content-secondary transition hover:bg-surface-subtle",
+                  active && "border-action-primary bg-action-secondary text-action-primary shadow-card hover:bg-action-secondary",
                 )}
               >
                 {link.label}
@@ -87,24 +95,20 @@ export function ConsoleLayout({
             );
           })}
         </nav>
-        {sidebarFooter ? <div className="mt-4 border-t border-line pt-4">{sidebarFooter}</div> : null}
+        {sidebarFooter ? <div className="mt-4 border-t border-border-subtle pt-4">{sidebarFooter}</div> : null}
       </aside>
       <section className="min-w-0 overflow-hidden">
         {activeQueryErrors.length ? (
-          <div className="mb-4 rounded-md border border-brand/30 bg-red-50 p-4 text-sm">
-            <p className="font-black text-brand">데이터를 불러오지 못했습니다.</p>
-            <p className="mt-1 text-xs text-red-800">{apiErrorMessage(activeQueryErrors[0].state.error)}</p>
-            <button className="mt-3 rounded-md border border-line bg-white px-3 py-2 text-xs font-black" onClick={() => void queryClient.refetchQueries({ type: "active" })}>다시 시도</button>
-          </div>
+          <Notice tone="error" title="데이터를 불러오지 못했습니다." className="mb-4">
+            <p>{apiErrorMessage(activeQueryErrors[0].state.error)}</p>
+            <Button className="mt-3" variant="secondary" size="sm" onClick={() => void queryClient.refetchQueries({ type: "active" })}>다시 시도</Button>
+          </Notice>
         ) : null}
         {mutationError ? (
-          <div className="mb-4 rounded-md border border-brand/30 bg-red-50 p-4 text-sm">
-            <p className="font-black text-brand">작업을 완료하지 못했습니다.</p>
-            <p className="mt-1 text-xs text-red-800">{apiErrorMessage(mutationError)}</p>
-          </div>
+          <Notice tone="error" title="작업을 완료하지 못했습니다." className="mb-4">{apiErrorMessage(mutationError)}</Notice>
         ) : null}
         {!canRenderChildren && activePendingQueries.length ? (
-          <div className="rounded-md border border-line bg-white p-8 text-center text-sm font-bold text-muted">
+          <div className="rounded-surface border border-border-subtle bg-surface-raised p-8 text-center text-sm font-bold text-content-secondary">
             데이터를 불러오는 중입니다.
           </div>
         ) : null}
@@ -115,12 +119,12 @@ export function ConsoleLayout({
 }
 
 export function FilterPanel({ children }: { children: React.ReactNode }) {
-  return <div className="grid gap-2 rounded-md bg-zinc-50 p-3 md:grid-cols-3 xl:grid-cols-4">{children}</div>;
+  return <div className="grid gap-2 rounded-md bg-surface-subtle p-3 md:grid-cols-3 xl:grid-cols-4">{children}</div>;
 }
 
 export function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="grid gap-1 text-xs font-black text-muted">
+    <label className="grid gap-1 text-xs font-bold text-content-secondary">
       {label}
       {children}
     </label>
@@ -139,8 +143,8 @@ export function ConsoleHeader({
   return (
     <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
       <div>
-        <h2 className="text-2xl font-black">{title}</h2>
-        {description ? <p className="mt-1 text-sm leading-6 text-muted">{description}</p> : null}
+        <h2 className="text-3xl font-bold leading-tight">{title}</h2>
+        {description ? <p className="mt-1 text-sm leading-6 text-content-secondary">{description}</p> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>
@@ -161,12 +165,12 @@ export function ConsoleSection({
   className?: string;
 }) {
   return (
-    <section className={cn("min-w-0 overflow-hidden rounded-md border border-line bg-white p-4", className)}>
+    <section className={cn("min-w-0 overflow-hidden rounded-surface border border-border-subtle bg-surface-raised p-4", className)}>
       {title || description || action ? (
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            {title ? <h3 className="font-black">{title}</h3> : null}
-            {description ? <p className="mt-1 text-xs leading-5 text-muted">{description}</p> : null}
+            {title ? <h3 className="font-bold">{title}</h3> : null}
+            {description ? <p className="mt-1 text-xs leading-5 text-content-secondary">{description}</p> : null}
           </div>
           {action ? <div className="w-full shrink-0 md:w-auto">{action}</div> : null}
         </div>
@@ -180,10 +184,10 @@ export function MetricGrid({ metrics }: { metrics: { label: string; value: strin
   return (
     <div className="grid gap-3 md:grid-cols-4">
       {metrics.map((metric) => (
-        <div key={metric.label} className="rounded-md border border-line bg-white p-4">
-          <p className="text-sm font-bold text-muted">{metric.label}</p>
-          <p className="mt-2 text-2xl font-black">{metric.value}</p>
-          {metric.delta ? <p className="mt-1 text-xs font-black text-brand">{metric.delta}</p> : null}
+        <div key={metric.label} className="rounded-surface border border-border-subtle bg-surface-raised p-4">
+          <p className="text-sm font-bold text-content-secondary">{metric.label}</p>
+          <p className="mt-2 text-2xl font-bold">{metric.value}</p>
+          {metric.delta ? <p className="mt-1 text-xs font-bold text-action-primary">{metric.delta}</p> : null}
         </div>
       ))}
     </div>
@@ -200,14 +204,14 @@ export function DataTable({
   emptyText?: string;
 }) {
   return (
-    <div className="rounded-md border border-line bg-white">
+    <div className="rounded-surface border border-border-subtle bg-surface-raised">
       {rows.length ? (
-        <div className="grid divide-y divide-line">
+        <div className="grid divide-y divide-border-subtle">
           {rows.map((row, rowIndex) => (
-            <div key={rowIndex} className="grid gap-3 p-3 hover:bg-zinc-50/70" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
+            <div key={rowIndex} className="grid gap-3 p-3 hover:bg-surface-subtle/70" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
               {row.map((cell, cellIndex) => (
                 <div key={cellIndex} className="min-w-0">
-                  <p className="mb-1 text-[11px] font-black text-muted">{columns[cellIndex]}</p>
+                  <p className="mb-1 text-xs font-bold text-content-secondary">{columns[cellIndex]}</p>
                   <div className="min-w-0 break-words text-sm">{cell}</div>
                 </div>
               ))}
@@ -215,25 +219,25 @@ export function DataTable({
           ))}
         </div>
       ) : (
-        <div className="px-4 py-8 text-center text-sm font-bold text-muted">{emptyText}</div>
+        <div className="px-4 py-8 text-center text-sm font-bold text-content-secondary">{emptyText}</div>
       )}
     </div>
   );
 }
 
-export function StatusBadge({ value }: { value: string }) {
+export function StatusBadge({ value, context }: { value: string; context?: "settlement" }) {
   const status = statusMeta(value);
-
-  return <span className={cn("rounded-sm px-2 py-1 text-xs font-black", status.className)}>{status.label}</span>;
+  const label = context === "settlement" && value === "PAID" ? "지급 완료" : status.label;
+  return <Badge className={status.className}>{label}</Badge>;
 }
 
 export function SummaryStrip({ items }: { items: { label: string; value: React.ReactNode }[] }) {
   return (
     <div className="grid gap-2 md:grid-cols-4">
       {items.map((item) => (
-        <div key={item.label} className="rounded-md bg-zinc-50 px-3 py-3">
-          <p className="text-xs font-bold text-muted">{item.label}</p>
-          <p className="mt-1 text-lg font-black">{item.value}</p>
+        <div key={item.label} className="rounded-md bg-surface-subtle px-3 py-3">
+          <p className="text-xs font-bold text-content-secondary">{item.label}</p>
+          <p className="mt-1 text-lg font-bold">{item.value}</p>
         </div>
       ))}
     </div>
@@ -250,10 +254,10 @@ export function SearchBox({
   placeholder: string;
 }) {
   return (
-    <input
+    <Input
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="h-10 w-full rounded-md border border-line bg-white px-3 text-sm outline-none focus:border-foreground md:w-72"
+      className="h-11 w-full rounded-control border border-border-interactive bg-surface-raised px-3 text-sm outline-none focus:border-foreground md:w-72"
       placeholder={placeholder}
       aria-label={placeholder}
     />
@@ -263,24 +267,24 @@ export function SearchBox({
 function statusMeta(value: string) {
   const labels: Record<string, string> = {
     ACTIVE: "활성",
-    OPEN: "운영중",
+    OPEN: "운영 중",
     CLOSED: "운영 종료",
     HIDE: "숨김",
     EXIT: "퇴점",
     WITHDRAWN: "탈퇴",
     PENDING: "대기",
     SUSPENDED: "정지",
-    SELLING: "판매중",
+    SELLING: "판매 중",
     SOLD_OUT: "품절/소진",
     PLACED: "주문 접수",
     PAYMENT_PENDING: "결제 대기",
-    SHIPPED: "배송중",
-    SHIPPING: "배송중",
+    SHIPPED: "배송 중",
+    SHIPPING: "배송 중",
     DELIVERED: "배송 완료",
     COMPLETED: "구매 확정",
     CANCELLED: "취소",
     PREPARED: "지급 대기",
-    PAID: "지급 완료",
+    PAID: "결제 완료",
     CONFIRMED: "지급 확정",
     EXCLUDED: "정산 제외",
     SUCCESS: "성공",
@@ -292,8 +296,8 @@ function statusMeta(value: string) {
     INACTIVE: "비활성",
     ISSUABLE: "발급 가능",
     ISSUED: "발급됨",
-    SCHEDULED: "발급 예정",
-    ENDED: "발급 종료",
+    SCHEDULED: "예정",
+    ENDED: "종료",
     AVAILABLE: "사용 가능",
     EXPIRED: "만료",
     USED: "사용됨",
@@ -301,35 +305,35 @@ function statusMeta(value: string) {
     IMPERSONATING: "대리 접속",
   };
   const tone: Record<string, string> = {
-    ACTIVE: "bg-emerald-50 text-emerald-700",
-    OPEN: "bg-emerald-50 text-emerald-700",
-    SELLING: "bg-emerald-50 text-emerald-700",
-    SUCCESS: "bg-emerald-50 text-emerald-700",
-    PAID: "bg-emerald-50 text-emerald-700",
-    DELIVERED: "bg-emerald-50 text-emerald-700",
-    WARNING: "bg-amber-50 text-amber-700",
-    PAYMENT_PENDING: "bg-amber-50 text-amber-700",
-    PREPARED: "bg-amber-50 text-amber-700",
-    PENDING: "bg-amber-50 text-amber-700",
-    CRITICAL: "bg-red-50 text-red-700",
-    FAILED: "bg-red-50 text-red-700",
-    SUSPENDED: "bg-red-50 text-red-700",
-    EXCLUDED: "bg-red-50 text-red-700",
-    SOLD_OUT: "bg-red-50 text-red-700",
-    CANCELLED: "bg-red-50 text-red-700",
-    INFO: "bg-sky-50 text-sky-700",
-    SHIPPED: "bg-sky-50 text-sky-700",
-    SHIPPING: "bg-sky-50 text-sky-700",
-    ISSUABLE: "bg-sky-50 text-sky-700",
-    ISSUED: "bg-sky-50 text-sky-700",
-    INACTIVE: "bg-zinc-100 text-zinc-600",
-    PAUSED: "bg-zinc-100 text-zinc-600",
-    PENALTY: "bg-red-50 text-red-700",
-    IMPERSONATING: "bg-violet-50 text-violet-700",
+    ACTIVE: "bg-status-positive-subtle text-status-positive",
+    OPEN: "bg-status-positive-subtle text-status-positive",
+    SELLING: "bg-status-positive-subtle text-status-positive",
+    SUCCESS: "bg-status-positive-subtle text-status-positive",
+    PAID: "bg-status-positive-subtle text-status-positive",
+    DELIVERED: "bg-status-positive-subtle text-status-positive",
+    WARNING: "bg-status-warning-subtle text-status-warning",
+    PAYMENT_PENDING: "bg-status-warning-subtle text-status-warning",
+    PREPARED: "bg-status-warning-subtle text-status-warning",
+    PENDING: "bg-status-warning-subtle text-status-warning",
+    CRITICAL: "bg-status-negative-subtle text-status-negative",
+    FAILED: "bg-status-negative-subtle text-status-negative",
+    SUSPENDED: "bg-status-negative-subtle text-status-negative",
+    EXCLUDED: "bg-status-negative-subtle text-status-negative",
+    SOLD_OUT: "bg-status-negative-subtle text-status-negative",
+    CANCELLED: "bg-status-negative-subtle text-status-negative",
+    INFO: "bg-status-info-subtle text-status-info",
+    SHIPPED: "bg-status-info-subtle text-status-info",
+    SHIPPING: "bg-status-info-subtle text-status-info",
+    ISSUABLE: "bg-status-info-subtle text-status-info",
+    ISSUED: "bg-status-info-subtle text-status-info",
+    INACTIVE: "bg-surface-subtle text-content-secondary",
+    PAUSED: "bg-surface-subtle text-content-secondary",
+    PENALTY: "bg-status-negative-subtle text-status-negative",
+    IMPERSONATING: "bg-promotion-subtle text-promotion",
   };
 
   return {
-    label: labels[value] ?? value,
-    className: tone[value] ?? "bg-zinc-100 text-zinc-700",
+    label: labels[value] ?? displayLabel(orderStatusLabel(value)),
+    className: tone[value] ?? "bg-surface-subtle text-content-secondary",
   };
 }

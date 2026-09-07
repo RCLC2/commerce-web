@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { Store } from "lucide-react";
+import type { ComponentProps } from "react";
 import type { Product, ProductBadgeTone } from "@/lib/types";
 import { couponPriceForProduct } from "@/lib/product-card-pricing";
+import { Badge } from "./ui/badge";
 import { ProductCardPrice } from "./product-card-price";
 import { SafeImage } from "./safe-image";
 
@@ -18,9 +21,9 @@ export function ProductCard({
   const couponPrice = couponPriceForProduct(product);
 
   return (
-    <article className="group">
+    <article className="group min-w-0">
       <Link href={`/products/${product.id}`} className="block">
-        <div className={`relative ${imageAspect} overflow-hidden rounded-md bg-zinc-100`}>
+        <div className={`relative ${imageAspect} overflow-hidden rounded-control bg-surface-subtle`}>
           <SafeImage
             src={product.image_url}
             alt={product.name}
@@ -30,12 +33,12 @@ export function ProductCard({
           />
         </div>
       </Link>
-      <div className={compact ? "mt-2 space-y-1" : "mt-3 space-y-1.5"}>
-        <Link href={`/markets/${product.market?.id ?? product.market_id}`} className="inline-flex w-fit text-xs font-semibold text-muted underline-offset-2 hover:text-foreground hover:underline">
-          {product.market?.name ?? product.market_name ?? `마켓 ${product.market_id}`}
+      <div className={compact ? "mt-2 space-y-1" : "mt-2.5 space-y-1.5"}>
+        <Link href={`/markets/${product.market?.id ?? product.market_id}`} className="inline-flex max-w-full items-center gap-1 text-xs font-medium text-content-secondary underline-offset-2 hover:text-content-primary hover:underline">
+          <Store size={13} className="shrink-0" aria-hidden="true" /><span className="truncate">{product.market?.name ?? product.market_name ?? `마켓 ${product.market_id}`}</span>
         </Link>
         <Link href={`/products/${product.id}`} className="block">
-          <h3 className={compact ? "line-clamp-1 min-h-5 text-sm font-medium leading-5 group-hover:underline" : "line-clamp-2 min-h-10 text-sm font-medium leading-5 group-hover:underline"}>{product.name}</h3>
+          <h3 className={`${compact ? "line-clamp-1" : "line-clamp-2"} text-sm font-bold leading-5 text-content-primary hover:underline`}>{product.name}</h3>
         </Link>
         <ProductCardPrice
           basePrice={product.base_price}
@@ -55,12 +58,12 @@ export function ProductCard({
 }
 
 function ProductChip({ label, tone }: { label: string; tone: ProductBadgeTone }) {
-  const toneClasses: Record<ProductBadgeTone, string> = {
-    shipping: "bg-emerald-50 text-emerald-700",
-    delivery: "bg-sky-50 text-sky-700",
-    exclusive: "bg-amber-50 text-amber-800",
-    new: "bg-brand text-white",
-    default: "bg-zinc-100 text-zinc-600",
+  const tones: Record<ProductBadgeTone, ComponentProps<typeof Badge>["tone"]> = {
+    shipping: "positive",
+    delivery: "brand",
+    exclusive: "warning",
+    new: "inverse",
+    default: "neutral",
   };
-  return <span className={`rounded-sm px-1.5 py-0.5 text-[11px] font-bold ${toneClasses[tone]}`}>{label}</span>;
+  return <Badge tone={tones[tone]}>{label}</Badge>;
 }

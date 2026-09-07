@@ -25,8 +25,7 @@ describe("PageJumpControls", () => {
     expect(scrollTo).toHaveBeenNthCalledWith(2, { top: 5000, behavior: "smooth" });
     expect(screen.getByRole("navigation", { name: "페이지 빠른 이동" })).toHaveClass(
       "fixed",
-      "bottom-[calc(10.5rem+env(safe-area-inset-bottom))]",
-      "md:bottom-24",
+      "bottom-[calc(11.5rem+env(safe-area-inset-bottom))]",
     );
   });
 

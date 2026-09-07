@@ -1,5 +1,12 @@
 "use client";
 
+import { PageHeading } from "./ui/page-heading";
+import { UserRound as PageIcon } from "lucide-react";
+
+import { ButtonLink } from "@/components/ui/button-link";
+
+import { Input, Select } from "./ui/input";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import Link from "next/link";
@@ -53,41 +60,41 @@ export function ProfileEditPage() {
     onSuccess: () => router.push("/onboarding/preferences"),
   });
 
-  if (!token) return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-black">로그인이 필요합니다</h1><Link href="/login"><Button className="mt-5">로그인하기</Button></Link></main>;
-  if (profile.isLoading || (!profile.data && !profile.error)) return <main className="mx-auto max-w-2xl px-4 py-16 text-sm text-muted">프로필을 불러오는 중입니다.</main>;
-  if (!profile.data || !values) return <main className="mx-auto max-w-2xl px-4 py-16"><p className="text-sm font-bold text-brand">{apiErrorMessage(profile.error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void profile.refetch()}>다시 시도</Button></main>;
+  if (!token) return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-bold">로그인이 필요합니다</h1><ButtonLink href="/login" className="mt-5">로그인하기</ButtonLink></main>;
+  if (profile.isLoading || (!profile.data && !profile.error)) return <main className="mx-auto max-w-2xl px-4 py-16 text-sm text-content-secondary">프로필을 불러오는 중입니다.</main>;
+  if (!profile.data || !values) return <main className="mx-auto max-w-2xl px-4 py-16"><p className="text-sm font-bold text-status-negative">{apiErrorMessage(profile.error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void profile.refetch()}>다시 시도</Button></main>;
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-24 pt-8">
-      <Link href="/mypage" className="inline-flex items-center gap-1 text-sm font-bold text-muted hover:text-foreground"><ArrowLeft size={17} /> 뒤로가기</Link>
-      <h1 className="mt-5 text-2xl font-black">사용자 상세 정보 수정</h1>
-      <p className="mt-2 text-sm text-muted">알림 수신 설정과 리뷰에 활용할 신체 정보를 변경합니다.</p>
-      <form className="mt-6 space-y-5 rounded-2xl border border-line bg-white p-5" onSubmit={(event) => { event.preventDefault(); save.mutate(); }}>
-        <Field label="이메일"><input className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm disabled:bg-zinc-50" value={profile.data?.email ?? ""} disabled /></Field>
+      <Link href="/mypage" className="inline-flex items-center gap-1 text-sm font-bold text-content-secondary hover:text-content-primary"><ArrowLeft size={17} /> 뒤로가기</Link>
+      <PageHeading className="mt-5" icon={<PageIcon />} title="사용자 상세 정보 수정" />
+      <p className="mt-2 text-sm text-content-secondary">알림 수신 설정과 리뷰에 활용할 신체 정보를 변경합니다.</p>
+      <form className="mt-6 space-y-5 rounded-2xl border border-border-subtle bg-surface-raised p-5" onSubmit={(event) => { event.preventDefault(); save.mutate(); }}>
+        <Field label="이메일"><Input className="h-11 w-full rounded-control border border-border-interactive bg-surface-raised px-3 text-sm disabled:bg-surface-subtle" value={profile.data?.email ?? ""} disabled /></Field>
         <Field label="알림 방식">
-          <select className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm" value={values.notification_type} onChange={(event) => change({ notification_type: event.target.value })}>
+          <Select className="h-11 w-full rounded-control border border-border-interactive bg-surface-raised px-3 text-sm" value={values.notification_type} onChange={(event) => change({ notification_type: event.target.value })}>
             <option value="PUSH">푸시</option><option value="EMAIL">이메일</option><option value="SMS">문자</option><option value="NONE">받지 않음</option>
-          </select>
+          </Select>
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="키 (cm)"><input className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm" type="number" min="0" max="300" value={values.height} onChange={(event) => change({ height: Number(event.target.value) })} /></Field>
-          <Field label="몸무게 (kg)"><input className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm" type="number" min="0" max="500" value={values.weight} onChange={(event) => change({ weight: Number(event.target.value) })} /></Field>
+          <Field label="키 (cm)"><Input className="h-11 w-full rounded-control border border-border-interactive bg-surface-raised px-3 text-sm" type="number" min="0" max="300" value={values.height} onChange={(event) => change({ height: Number(event.target.value) })} /></Field>
+          <Field label="몸무게 (kg)"><Input className="h-11 w-full rounded-control border border-border-interactive bg-surface-raised px-3 text-sm" type="number" min="0" max="500" value={values.weight} onChange={(event) => change({ weight: Number(event.target.value) })} /></Field>
         </div>
         <label className="flex items-center gap-3 text-sm font-bold"><input type="checkbox" checked={values.marketing_consent} onChange={(event) => change({ marketing_consent: event.target.checked })} /> 마케팅 정보 수신 동의</label>
         <label className="flex items-center gap-3 text-sm font-bold"><input type="checkbox" checked={values.nighttime_consent} onChange={(event) => change({ nighttime_consent: event.target.checked })} /> 야간 알림 수신 동의</label>
-        {profile.error || save.error ? <p className="text-sm font-bold text-brand">{apiErrorMessage(profile.error ?? save.error)}</p> : null}
-        {save.isSuccess ? <p className="text-sm font-bold text-emerald-700">저장했습니다.</p> : null}
+        {profile.error || save.error ? <p className="text-sm font-bold text-status-negative">{apiErrorMessage(profile.error ?? save.error)}</p> : null}
+        {save.isSuccess ? <p className="text-sm font-bold text-status-positive">저장했습니다.</p> : null}
         <Button type="submit" disabled={save.isPending}>{save.isPending ? "저장 중" : "변경사항 저장"}</Button>
       </form>
-      {onboardingPreference.data && onboardingPreference.data.status !== "NOT_ELIGIBLE" ? <section className="mt-5 rounded-2xl border border-line bg-white p-5">
+      {onboardingPreference.data && onboardingPreference.data.status !== "NOT_ELIGIBLE" ? <section className="mt-5 rounded-2xl border border-border-subtle bg-surface-raised p-5">
         <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand"><Sparkles size={19} /></span>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-action-primary/10 text-action-primary"><Sparkles size={19} /></span>
           <div>
-            <h2 className="font-black">상품 취향 다시 고르기</h2>
-            <p className="mt-1 text-sm leading-6 text-muted">10개 상품을 다시 보고 추천 취향을 새로 설정합니다.</p>
+            <h2 className="font-bold">상품 취향 다시 고르기</h2>
+            <p className="mt-1 text-sm leading-6 text-content-secondary">10개 상품을 다시 보고 추천 취향을 새로 설정합니다.</p>
           </div>
         </div>
-        {restartOnboarding.error ? <p className="mt-3 text-sm font-bold text-brand">{apiErrorMessage(restartOnboarding.error)}</p> : null}
+        {restartOnboarding.error ? <p className="mt-3 text-sm font-bold text-status-negative">{apiErrorMessage(restartOnboarding.error)}</p> : null}
         <Button className="mt-4" variant="secondary" onClick={() => restartOnboarding.mutate()} disabled={restartOnboarding.isPending}>
           다시 선택하기
         </Button>

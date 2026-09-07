@@ -1,8 +1,12 @@
 "use client";
 
+import { Input, Select } from "./ui/input";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { adminConsoleApi } from "@/lib/admin-console-api";
+import { orderStatusLabel } from "@/lib/order-utils";
+import { paymentMethodLabel } from "@/lib/display-labels";
 import { formatPrice } from "@/lib/utils";
 import { AdminAuthRequired, adminLinks, useAdminToken } from "./admin-console";
 import {
@@ -74,7 +78,7 @@ export function AdminProductsPageV2() {
   const products = data?.items ?? [];
 
   return (
-    <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
+    <ConsoleLayout title="관리자" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <ConsoleHeader
         title="상품 관리"
         description="카드가 무한히 늘어나는 화면 대신, 서버 필터·페이지 단위 목록과 별도 상세 모달로 정리했습니다."
@@ -82,7 +86,7 @@ export function AdminProductsPageV2() {
       <ConsoleSection className="mt-5" title="상품 목록" description="목록은 핵심 정보만 표시하고, 상품을 누르면 옵션과 이미지를 추가 조회합니다.">
         <FilterPanel>
           <FilterField label="상품 검색">
-            <input
+            <Input
               className={consoleInputClass}
               value={query}
               onChange={(event) => {
@@ -93,7 +97,7 @@ export function AdminProductsPageV2() {
             />
           </FilterField>
           <FilterField label="상태">
-            <select
+            <Select
               className={consoleInputClass}
               value={status}
               onChange={(event) => {
@@ -106,10 +110,10 @@ export function AdminProductsPageV2() {
               <option value="SOLD_OUT">품절</option>
               <option value="HIDE">숨김</option>
               <option value="PENDING">검수 대기</option>
-            </select>
+            </Select>
           </FilterField>
           <FilterField label="마켓 번호">
-            <input
+            <Input
               className={consoleInputClass}
               inputMode="numeric"
               value={marketID}
@@ -121,7 +125,7 @@ export function AdminProductsPageV2() {
             />
           </FilterField>
           <FilterField label="카테고리 번호">
-            <input
+            <Input
               className={consoleInputClass}
               inputMode="numeric"
               value={categoryID}
@@ -138,23 +142,23 @@ export function AdminProductsPageV2() {
             columns={["상품", "마켓 / 카테고리", "판매가", "가용 재고", "상태"]}
             rows={products.map((product) => [
               <div key="product" className="flex min-w-0 items-center gap-3">
-                <div className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-zinc-100">
+                <div className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-surface-subtle">
                   <SafeImage src={product.image_url} alt="" fill sizes="48px" className="object-cover" />
                 </div>
                 <div className="min-w-0">
-                  <p className="line-clamp-2 font-black">{product.name}</p>
-                  <p className="text-xs text-muted">#{product.id}</p>
+                  <p className="line-clamp-2 font-bold">{product.name}</p>
+                  <p className="text-xs text-content-secondary">#{product.id}</p>
                 </div>
               </div>,
               <div key="owner">
                 <p className="font-bold">{product.market_name}</p>
-                <p className="text-xs text-muted">{product.category_name}</p>
+                <p className="text-xs text-content-secondary">{product.category_name}</p>
               </div>,
               <div key="price">
                 {product.discount_price > 0 ? (
-                  <p className="text-xs text-muted line-through">{formatPrice(product.base_price)}</p>
+                  <p className="text-xs text-content-secondary line-through">{formatPrice(product.base_price)}</p>
                 ) : null}
-                <p className="font-black">{formatPrice(product.discount_price || product.base_price)}</p>
+                <p className="font-bold">{formatPrice(product.discount_price || product.base_price)}</p>
               </div>,
               product.available_quantity.toLocaleString("ko-KR"),
               <StatusBadge key="status" value={product.status} />,
@@ -181,7 +185,7 @@ export function AdminProductsPageV2() {
         {productQuery.data ? (
           <div className="grid gap-6">
             <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
-              <div className="relative aspect-square overflow-hidden rounded-xl bg-zinc-100">
+              <div className="relative aspect-square overflow-hidden rounded-xl bg-surface-subtle">
                 <SafeImage src={productQuery.data.image_url} alt={productQuery.data.name} fill sizes="220px" className="object-cover" />
               </div>
               <DetailGrid>
@@ -196,17 +200,17 @@ export function AdminProductsPageV2() {
               </DetailGrid>
             </div>
             <section>
-              <h3 className="mb-2 font-black">요약 설명</h3>
-              <p className="whitespace-pre-wrap rounded-xl bg-zinc-50 p-4 text-sm leading-6">{productQuery.data.summary_description || "-"}</p>
+              <h3 className="mb-2 font-bold">요약 설명</h3>
+              <p className="whitespace-pre-wrap rounded-xl bg-surface-subtle p-4 text-sm leading-6">{productQuery.data.summary_description || "-"}</p>
             </section>
             <section>
-              <h3 className="mb-2 font-black">상품 상세</h3>
-              <div className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-xl border border-line p-4 text-sm leading-6">
+              <h3 className="mb-2 font-bold">상품 상세</h3>
+              <div className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-xl border border-border-subtle p-4 text-sm leading-6">
                 {productQuery.data.description || "-"}
               </div>
             </section>
             <section>
-              <h3 className="mb-3 font-black">옵션</h3>
+              <h3 className="mb-3 font-bold">옵션</h3>
               <ConsoleTable
                 columns={["옵션", "추가 금액", "재고", "예약", "가용", "사용"]}
                 rows={productQuery.data.options.map((option) => [
@@ -275,15 +279,15 @@ export function AdminOrdersPageV2() {
   const orders = data?.items ?? [];
 
   return (
-    <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
+    <ConsoleLayout title="관리자" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <ConsoleHeader title="주문 관리" description="주문번호·구매자·마켓·날짜·상태 필터를 서버에서 처리합니다." />
       <ConsoleSection className="mt-5" title="주문 목록" description="목록을 누르면 구매자, 마켓별 주문, 배송지와 상품 내역을 상세 조회합니다.">
         <FilterPanel>
           <FilterField label="주문 검색">
-            <input className={consoleInputClass} value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="주문번호 또는 이메일" />
+            <Input className={consoleInputClass} value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="주문번호 또는 이메일" />
           </FilterField>
           <FilterField label="상태">
-            <select className={consoleInputClass} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
+            <Select className={consoleInputClass} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
               <option value="ALL">전체 상태</option>
               <option value="PLACED">주문 접수</option>
               <option value="PAYMENT_PENDING">결제 대기</option>
@@ -296,23 +300,23 @@ export function AdminOrdersPageV2() {
               <option value="RETURN_REJECTED">반품 거절</option>
               <option value="RETURN_COMPLETED">반품 완료</option>
               <option value="CANCELLED">취소</option>
-            </select>
+            </Select>
           </FilterField>
           <FilterField label="마켓 번호">
-            <input className={consoleInputClass} inputMode="numeric" value={marketID} onChange={(event) => { setMarketID(event.target.value); setPage(1); }} placeholder="전체" />
+            <Input className={consoleInputClass} inputMode="numeric" value={marketID} onChange={(event) => { setMarketID(event.target.value); setPage(1); }} placeholder="전체" />
           </FilterField>
           <FilterField label="시작일">
-            <input className={consoleInputClass} type="date" value={from} onChange={(event) => { setFrom(event.target.value); setPage(1); }} />
+            <Input className={consoleInputClass} type="date" value={from} onChange={(event) => { setFrom(event.target.value); setPage(1); }} />
           </FilterField>
           <FilterField label="종료일">
-            <input className={consoleInputClass} type="date" value={to} onChange={(event) => { setTo(event.target.value); setPage(1); }} />
+            <Input className={consoleInputClass} type="date" value={to} onChange={(event) => { setTo(event.target.value); setPage(1); }} />
           </FilterField>
         </FilterPanel>
         <div className="mt-4">
           <ConsoleTable
             columns={["주문번호", "구매자", "결제 금액", "마켓 / 상품", "상태", "주문일"]}
             rows={orders.map((order) => [
-              <span key="code" className="font-black">{order.order_code}</span>,
+              <span key="code" className="font-bold">{order.order_code}</span>,
               <span key="buyer" className="break-all">{order.buyer_email}</span>,
               formatPrice(order.total_order_price - order.discount_amount),
               `${order.market_count}개 마켓 / ${order.item_count}개 상품`,
@@ -347,13 +351,13 @@ export function AdminOrdersPageV2() {
               <DetailItem label="주문 금액">{formatPrice(orderQuery.data.total_order_price)}</DetailItem>
               <DetailItem label="총 할인">{formatPrice(orderQuery.data.total_discount_price)}</DetailItem>
               <DetailItem label="사용 포인트">{formatPrice(orderQuery.data.used_point)}</DetailItem>
-              <DetailItem label="결제 수단">{orderQuery.data.payment_method}</DetailItem>
+              <DetailItem label="결제 수단">{paymentMethodLabel(orderQuery.data.payment_method)}</DetailItem>
               <DetailItem label="주문일">{dateTime(orderQuery.data.created_at)}</DetailItem>
               <DetailItem label="수정일">{dateTime(orderQuery.data.updated_at)}</DetailItem>
             </DetailGrid>
             {orderQuery.data.delivery ? (
               <section>
-                <h3 className="mb-3 font-black">배송 정보</h3>
+                <h3 className="mb-3 font-bold">배송 정보</h3>
                 <DetailGrid>
                   <DetailItem label="수령인">{orderQuery.data.delivery.receiver_name}</DetailItem>
                   <DetailItem label="연락처">{orderQuery.data.delivery.receiver_phone}</DetailItem>
@@ -365,14 +369,14 @@ export function AdminOrdersPageV2() {
               </section>
             ) : null}
             {orderQuery.data.market_orders.map((marketOrder) => (
-              <section key={marketOrder.id} className="rounded-xl border border-line p-4">
+              <section key={marketOrder.id} className="rounded-xl border border-border-subtle p-4">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h3 className="font-black">{marketOrder.market_name}</h3>
-                    <p className="mt-1 text-xs text-muted">배송비 {formatPrice(marketOrder.shipping_fee)} · 예상 정산 {formatPrice(marketOrder.expected_settlement_amount)}</p>
+                    <h3 className="font-bold">{marketOrder.market_name}</h3>
+                    <p className="mt-1 text-xs text-content-secondary">배송비 {formatPrice(marketOrder.shipping_fee)} · 예상 정산 {formatPrice(marketOrder.expected_settlement_amount)}</p>
                     {marketOrder.shipping_package ? (
-                      <p className="mt-1 text-xs text-muted">
-                        {marketOrder.shipping_package.carrier || "택배사 미지정"} · {marketOrder.shipping_package.tracking_number || "송장 미등록"} · {marketOrder.shipping_package.status}
+                      <p className="mt-1 text-xs text-content-secondary">
+                        {marketOrder.shipping_package.carrier || "택배사 미지정"} · {marketOrder.shipping_package.tracking_number || "송장 미등록"} · {orderStatusLabel(marketOrder.shipping_package.status)}
                       </p>
                     ) : null}
                   </div>
@@ -446,27 +450,27 @@ export function AdminSettlementsPageV2() {
   const settlements = data?.items ?? [];
 
   return (
-    <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
+    <ConsoleLayout title="관리자" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <ConsoleHeader title="정산 관리" description="정산 목록과 주문별 정산 라인을 분리하고, 월·마켓·상태 조건을 서버에서 처리합니다." />
       <ConsoleSection className="mt-5" title="정산 목록">
         <FilterPanel>
           <FilterField label="마켓 검색">
-            <input className={consoleInputClass} value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="마켓명" />
+            <Input className={consoleInputClass} value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="마켓명" />
           </FilterField>
           <FilterField label="상태">
-            <select className={consoleInputClass} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
+            <Select className={consoleInputClass} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
               <option value="ALL">전체 상태</option>
               <option value="PREPARED">지급 대기</option>
               <option value="CONFIRMED">지급 확정</option>
               <option value="PAID">지급 완료</option>
               <option value="EXCLUDED">정산 제외</option>
-            </select>
+            </Select>
           </FilterField>
           <FilterField label="정산월">
-            <input className={consoleInputClass} type="month" value={targetMonth} onChange={(event) => { setTargetMonth(event.target.value); setPage(1); }} />
+            <Input className={consoleInputClass} type="month" value={targetMonth} onChange={(event) => { setTargetMonth(event.target.value); setPage(1); }} />
           </FilterField>
           <FilterField label="마켓 번호">
-            <input className={consoleInputClass} inputMode="numeric" value={marketID} onChange={(event) => { setMarketID(event.target.value); setPage(1); }} placeholder="전체" />
+            <Input className={consoleInputClass} inputMode="numeric" value={marketID} onChange={(event) => { setMarketID(event.target.value); setPage(1); }} placeholder="전체" />
           </FilterField>
         </FilterPanel>
         <div className="mt-4">
@@ -474,14 +478,14 @@ export function AdminSettlementsPageV2() {
             columns={["마켓", "정산월", "매출", "수수료", "최종 정산", "상태"]}
             rows={settlements.map((settlement) => [
               <div key="market">
-                <p className="font-black">{settlement.market_name}</p>
-                <p className="text-xs text-muted">#{settlement.market_id}</p>
+                <p className="font-bold">{settlement.market_name}</p>
+                <p className="text-xs text-content-secondary">#{settlement.market_id}</p>
               </div>,
               settlement.target_month,
               formatPrice(settlement.total_sales_amount),
               formatPrice(settlement.commission_amount),
-              <span key="amount" className="font-black">{formatPrice(settlement.final_settlement_amount)}</span>,
-              <StatusBadge key="status" value={settlement.status} />,
+              <span key="amount" className="font-bold">{formatPrice(settlement.final_settlement_amount)}</span>,
+              <StatusBadge context="settlement" key="status" value={settlement.status} />,
             ])}
             rowKeys={settlements.map((settlement) => settlement.id)}
             onRowClick={(index) => {
@@ -507,7 +511,7 @@ export function AdminSettlementsPageV2() {
         {settlementQuery.data ? (
           <div className="grid gap-6">
             <DetailGrid>
-              <DetailItem label="상태"><StatusBadge value={settlementQuery.data.status} /></DetailItem>
+              <DetailItem label="상태"><StatusBadge context="settlement" value={settlementQuery.data.status} /></DetailItem>
               <DetailItem label="총 매출">{formatPrice(settlementQuery.data.total_sales_amount)}</DetailItem>
               <DetailItem label="반품 배송비">{formatPrice(settlementQuery.data.total_return_shipping_fee)}</DetailItem>
               <DetailItem label="수수료">{formatPrice(settlementQuery.data.commission_amount)}</DetailItem>
@@ -517,17 +521,17 @@ export function AdminSettlementsPageV2() {
               <DetailItem label="수정일">{dateTime(settlementQuery.data.updated_at)}</DetailItem>
             </DetailGrid>
             <section>
-              <h3 className="mb-3 font-black">주문별 정산 내역</h3>
+              <h3 className="mb-3 font-bold">주문별 정산 내역</h3>
               <ConsoleTable
                 columns={["주문", "상품 / 옵션", "수량", "매출", "수수료", "최종 정산", "상태"]}
                 rows={settlementQuery.data.lines.items.map((line) => [
                   line.order_code,
-                  <div key="product"><p className="font-bold">{line.product_name}</p><p className="text-xs text-muted">{line.option_name}: {line.option_value}</p></div>,
+                  <div key="product"><p className="font-bold">{line.product_name}</p><p className="text-xs text-content-secondary">{line.option_name}: {line.option_value}</p></div>,
                   `${line.quantity}개`,
                   formatPrice(line.gross_amount),
                   formatPrice(line.commission_amount),
                   formatPrice(line.final_settlement_amount),
-                  <StatusBadge key="status" value={line.status} />,
+                  <StatusBadge context="settlement" key="status" value={line.status} />,
                 ])}
               />
               <PaginationBar

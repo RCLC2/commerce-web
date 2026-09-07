@@ -1,5 +1,12 @@
 "use client";
 
+import { PageHeading } from "./ui/page-heading";
+import { MessageSquareText as PageIcon } from "lucide-react";
+
+import { ButtonLink } from "@/components/ui/button-link";
+
+import { Select, Textarea } from "./ui/input";
+
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Star } from "lucide-react";
 import Link from "next/link";
@@ -61,47 +68,47 @@ export function MyReviewsPage() {
     remove.mutate(variables);
   }
 
-  if (!token) return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-black">내 리뷰</h1><Link href="/login?next=/mypage/reviews"><Button className="mt-5">로그인하기</Button></Link></main>;
+  if (!token) return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-bold">내 리뷰</h1><ButtonLink href="/login?next=/mypage/reviews" className="mt-5">로그인하기</ButtonLink></main>;
 
   return (
     <main className="mx-auto max-w-4xl px-4 pb-24 pt-8">
-      <Link href="/mypage" className="inline-flex items-center gap-1 text-sm font-bold text-muted hover:text-foreground"><ArrowLeft size={17} /> 뒤로가기</Link>
-      <h1 className="mt-5 text-2xl font-black">리뷰 관리</h1>
-      <p className="mt-1 text-sm text-muted">작성한 리뷰를 확인하고 수정하거나 삭제할 수 있습니다.</p>
+      <Link href="/mypage" className="inline-flex items-center gap-1 text-sm font-bold text-content-secondary hover:text-content-primary"><ArrowLeft size={17} /> 뒤로가기</Link>
+      <PageHeading className="mt-5" icon={<PageIcon />} title="리뷰 관리" />
+      <p className="mt-1 text-sm text-content-secondary">작성한 리뷰를 확인하고 수정하거나 삭제할 수 있습니다.</p>
       {reviews.error ? (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-md bg-red-50 p-4 text-sm font-bold text-brand">
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-md bg-status-negative-subtle p-4 text-sm font-bold text-action-primary">
           <p>리뷰를 불러오지 못했습니다. {apiErrorMessage(reviews.error)}</p>
           <Button size="sm" variant="secondary" onClick={() => void reviews.refetch()}>다시 불러오기</Button>
         </div>
       ) : null}
-      {reviews.isLoading ? <p className="mt-6 text-sm text-muted">리뷰를 불러오는 중입니다.</p> : null}
-      {remove.error ? <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-red-50 p-4 text-sm font-bold text-brand"><p>리뷰를 삭제하지 못했습니다. {apiErrorMessage(remove.error)}</p><Button size="sm" variant="secondary" disabled={remove.isPending || remove.variables === undefined} onClick={() => void retryRemove()}>삭제 상태 확인 후 다시 시도</Button></div> : null}
-      {removeResolution ? <p className="mt-4 rounded-md bg-emerald-50 p-4 text-sm font-bold text-emerald-900">{removeResolution}</p> : null}
-      {update.isSuccess ? <p className="mt-4 rounded-md bg-emerald-50 p-4 text-sm font-bold text-emerald-900">리뷰를 수정했습니다.</p> : null}
+      {reviews.isLoading ? <p className="mt-6 text-sm text-content-secondary">리뷰를 불러오는 중입니다.</p> : null}
+      {remove.error ? <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-status-negative-subtle p-4 text-sm font-bold text-status-negative"><p>리뷰를 삭제하지 못했습니다. {apiErrorMessage(remove.error)}</p><Button size="sm" variant="secondary" disabled={remove.isPending || remove.variables === undefined} onClick={() => void retryRemove()}>삭제 상태 확인 후 다시 시도</Button></div> : null}
+      {removeResolution ? <p className="mt-4 rounded-md bg-status-positive-subtle p-4 text-sm font-bold text-status-positive">{removeResolution}</p> : null}
+      {update.isSuccess ? <p className="mt-4 rounded-md bg-status-positive-subtle p-4 text-sm font-bold text-status-positive">리뷰를 수정했습니다.</p> : null}
       <div className="mt-6 space-y-3">
         {items.map((review) => {
           const product = byID.get(review.product_id);
           const editing = editingID === review.id;
           return (
-            <article key={review.id} className="rounded-2xl border border-line bg-white p-4">
+            <article key={review.id} className="rounded-2xl border border-border-subtle bg-surface-raised p-4">
               <div className="flex gap-3">
-                <div className="relative h-20 w-16 shrink-0 overflow-hidden rounded-md bg-zinc-100"><SafeImage src={product?.image_url} alt="" fill sizes="64px" className="object-cover" /></div>
+                <div className="relative h-20 w-16 shrink-0 overflow-hidden rounded-md bg-surface-subtle"><SafeImage src={product?.image_url} alt="" fill sizes="64px" className="object-cover" /></div>
                 <div className="min-w-0 flex-1">
-                  <Link href={`/products/${review.product_id}`} className="truncate font-black hover:underline">{product?.name ?? `상품 #${review.product_id}`}</Link>
+                  <Link href={`/products/${review.product_id}`} className="truncate font-bold hover:underline">{product?.name ?? `상품 #${review.product_id}`}</Link>
                   {editing ? (
                     <div className="mt-3 space-y-3">
-                      <select className="h-10 rounded-md border border-line bg-white px-3 text-sm" value={draft.rating_x2} onChange={(event) => setDraft((value) => ({ ...value, rating_x2: Number(event.target.value) }))}>
+                      <Select className="h-11 rounded-control border border-border-interactive bg-surface-raised px-3 text-sm" value={draft.rating_x2} onChange={(event) => setDraft((value) => ({ ...value, rating_x2: Number(event.target.value) }))}>
                         {[10, 8, 6, 4, 2].map((value) => <option key={value} value={value}>{value / 2}점</option>)}
-                      </select>
-                      <textarea className="min-h-24 w-full rounded-md border border-line p-3 text-sm" value={draft.content} onChange={(event) => setDraft((value) => ({ ...value, content: event.target.value }))} />
-                      {update.error ? <p className="text-sm font-bold text-brand">리뷰를 수정하지 못했습니다. {apiErrorMessage(update.error)}</p> : null}
+                      </Select>
+                      <Textarea className="min-h-24 w-full rounded-control border border-border-interactive p-3 text-sm" value={draft.content} onChange={(event) => setDraft((value) => ({ ...value, content: event.target.value }))} />
+                      {update.error ? <p className="text-sm font-bold text-status-negative">리뷰를 수정하지 못했습니다. {apiErrorMessage(update.error)}</p> : null}
                       <div className="flex gap-2"><Button size="sm" disabled={update.isPending} onClick={() => update.mutate({ id: review.id })}>{update.isPending ? "저장 중" : "저장"}</Button><Button size="sm" variant="secondary" disabled={update.isPending} onClick={() => setEditingID(null)}>취소</Button></div>
                     </div>
                   ) : (
                     <>
-                      <p className="mt-2 flex items-center gap-1 text-sm font-black"><Star size={15} className="fill-amber-400 text-amber-400" /> {review.rating.toFixed(1)}</p>
+                      <p className="mt-2 flex items-center gap-1 text-sm font-bold"><Star size={15} className="fill-brand text-action-primary" /> {review.rating.toFixed(1)}</p>
                       <p className="mt-2 text-sm leading-6">{review.content}</p>
-                      <div className="mt-3 flex gap-3 text-xs font-bold"><button disabled={update.isPending || remove.isPending} onClick={() => { remove.reset(); update.reset(); setRemoveResolution(null); setEditingID(review.id); setDraft({ rating_x2: review.rating_x2 ?? Math.round(review.rating * 2), content: review.content }); }}>수정</button><button className="text-brand" disabled={update.isPending || remove.isPending} onClick={() => { update.reset(); remove.reset(); setRemoveResolution(null); remove.mutate({ id: review.id, productID: review.product_id }); }}>{remove.isPending && remove.variables?.id === review.id ? "삭제 중" : "삭제"}</button></div>
+                      <div className="mt-3 flex gap-3 text-xs font-bold"><Button variant="ghost" disabled={update.isPending || remove.isPending} onClick={() => { remove.reset(); update.reset(); setRemoveResolution(null); setEditingID(review.id); setDraft({ rating_x2: review.rating_x2 ?? Math.round(review.rating * 2), content: review.content }); }}>수정</Button><Button variant="ghost" className="text-action-primary" disabled={update.isPending || remove.isPending} onClick={() => { update.reset(); remove.reset(); setRemoveResolution(null); remove.mutate({ id: review.id, productID: review.product_id }); }}>{remove.isPending && remove.variables?.id === review.id ? "삭제 중" : "삭제"}</Button></div>
                     </>
                   )}
                 </div>
@@ -109,7 +116,7 @@ export function MyReviewsPage() {
             </article>
           );
         })}
-        {reviews.isSuccess && !items.length ? <p className="rounded-md border border-line bg-white p-8 text-center text-sm text-muted">작성한 리뷰가 없습니다.</p> : null}
+        {reviews.isSuccess && !items.length ? <p className="rounded-md border border-border-subtle bg-surface-raised p-8 text-center text-sm text-content-secondary">작성한 리뷰가 없습니다.</p> : null}
       </div>
     </main>
   );

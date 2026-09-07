@@ -1,5 +1,7 @@
 "use client";
 
+import { Textarea } from "./ui/input";
+
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ImagePlus, Loader2, Star, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -155,7 +157,7 @@ export function ReviewWritePanel({ token, memberID, orderCode, lineItemID, produ
 
   return (
     <form
-      className="mt-4 rounded-md border border-line bg-zinc-50 p-4"
+      className="mt-4 rounded-md border border-border-subtle bg-surface-subtle p-4"
       onSubmit={(event) => {
         event.preventDefault();
         if (canSubmit) {
@@ -165,20 +167,20 @@ export function ReviewWritePanel({ token, memberID, orderCode, lineItemID, produ
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-black">구매 리뷰 작성</p>
-          <p className="mt-1 text-xs text-muted">상품을 사용한 느낌을 남겨주세요.</p>
+          <p className="text-sm font-bold">구매 리뷰 작성</p>
+          <p className="mt-1 text-xs text-content-secondary">상품을 사용한 느낌을 남겨주세요.</p>
         </div>
         <div className="flex items-center gap-1" aria-label="평점">
           {[1, 2, 3, 4, 5].map((score) => (
-            <button
+            <Button variant="ghost" size="icon"
               key={score}
               type="button"
-              className="rounded-md p-1 text-brand transition hover:bg-white"
+              className="rounded-md p-1 text-action-primary transition hover:bg-surface-raised"
               aria-label={`${score}점`}
               onClick={() => setRatingX2(score * 2)}
             >
               <Star size={20} className={cn(score * 2 <= ratingX2 && "fill-brand")} />
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -186,9 +188,9 @@ export function ReviewWritePanel({ token, memberID, orderCode, lineItemID, produ
       <label htmlFor={`${inputID}-content`} className="sr-only">
         리뷰 내용
       </label>
-      <textarea
+      <Textarea
         id={`${inputID}-content`}
-        className="mt-3 min-h-28 w-full resize-none rounded-md border border-line bg-white px-3 py-3 text-sm leading-6 outline-none focus:border-foreground"
+        className="mt-3 min-h-28 w-full resize-none rounded-control border border-border-interactive bg-surface-raised px-3 py-3 text-sm leading-6 outline-none focus:border-foreground"
         value={content}
         onChange={(event) => setContent(event.target.value)}
         placeholder="사이즈, 핏, 소재감이 어땠나요?"
@@ -197,7 +199,7 @@ export function ReviewWritePanel({ token, memberID, orderCode, lineItemID, produ
       {images.length > 0 ? (
         <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
           {images.map((image, index) => (
-            <div key={image.s3Key} className="relative aspect-square overflow-hidden rounded-md border border-line bg-white">
+            <div key={image.s3Key} className="relative aspect-square overflow-hidden rounded-md border border-border-subtle bg-surface-raised">
               <div
                 className="h-full w-full bg-cover bg-center"
                 style={{ backgroundImage: `url(${image.previewURL})` }}
@@ -205,16 +207,16 @@ export function ReviewWritePanel({ token, memberID, orderCode, lineItemID, produ
                 aria-label={`첨부 이미지 ${index + 1}`}
               />
               {index === 0 ? (
-                <span className="absolute left-1 top-1 rounded bg-foreground px-1.5 py-0.5 text-[10px] font-bold text-white">대표</span>
+                <span className="absolute left-1 top-1 rounded bg-foreground px-1.5 py-0.5 text-xs font-bold text-content-inverse">대표</span>
               ) : null}
-              <button
+              <Button variant="ghost" size="icon"
                 type="button"
                 aria-label={`${image.filename} 제거`}
-                className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-foreground shadow-sm"
+                className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-surface-raised/90 text-content-primary shadow-sm"
                 onClick={() => removeImage(image.s3Key)}
               >
                 <X size={14} />
-              </button>
+              </Button>
             </div>
           ))}
         </div>
@@ -236,23 +238,23 @@ export function ReviewWritePanel({ token, memberID, orderCode, lineItemID, produ
           <label
             htmlFor={inputID}
             className={cn(
-              "inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-line bg-white px-3 text-sm font-semibold transition hover:bg-zinc-50",
+              "inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-border-subtle bg-surface-raised px-3 text-sm font-semibold transition hover:bg-surface-subtle",
               (isUploading || images.length >= maxReviewImages) && "pointer-events-none opacity-45",
             )}
           >
             {isUploading ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
             사진 첨부
           </label>
-          <span className="text-xs font-bold text-muted">{images.length}/5</span>
+          <span className="text-xs font-bold text-content-secondary">{images.length}/5</span>
         </div>
         <Button type="submit" size="sm" disabled={!canSubmit}>
           {createReview.isPending ? "등록 중" : "리뷰 등록"}
         </Button>
       </div>
 
-      {uploadError ? <p className="mt-2 text-xs font-bold text-brand">{uploadError}</p> : null}
-      {createReview.isError ? <p className="mt-2 text-xs font-bold text-brand">{apiErrorMessage(createReview.error)}</p> : null}
-      {createReview.isSuccess ? <p className="mt-2 text-xs font-bold text-foreground">리뷰가 등록되었습니다.</p> : null}
+      {uploadError ? <p className="mt-2 text-xs font-bold text-action-primary">{uploadError}</p> : null}
+      {createReview.isError ? <p className="mt-2 text-xs font-bold text-status-negative">{apiErrorMessage(createReview.error)}</p> : null}
+      {createReview.isSuccess ? <p className="mt-2 text-xs font-bold text-content-primary">리뷰가 등록되었습니다.</p> : null}
     </form>
   );
 }

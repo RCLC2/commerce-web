@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { ProductDetailContent } from "./product-detail-content";
+import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 
 const MOBILE_COLLAPSED_HEIGHT = 1100;
@@ -79,7 +81,7 @@ export function CollapsibleProductDetail({ html, className }: { html: string; cl
   return (
     <div ref={rootRef}>
       <div className="relative">
-        <div
+        <ProductDetailContent
           id={contentId}
           ref={contentRef}
           data-testid="product-detail-content"
@@ -87,25 +89,25 @@ export function CollapsibleProductDetail({ html, className }: { html: string; cl
             className,
             isExpanded ? "max-h-none overflow-visible" : "max-h-[1100px] overflow-hidden md:max-h-[1400px]",
           )}
-          dangerouslySetInnerHTML={{ __html: html }}
+          html={html}
         />
         {isOverflowing && !isExpanded ? (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-white/0 via-white/85 to-white"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-surface-raised/0 via-surface-raised/85 to-surface-raised"
           />
         ) : null}
       </div>
       {isOverflowing ? (
-        <button
-          type="button"
-          className="relative mt-3 flex h-12 w-full items-center justify-center rounded-md border border-line bg-white text-sm font-black text-foreground shadow-sm transition hover:border-zinc-400 hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+        <Button
+          variant="secondary"
+          className="relative mt-3 h-12 w-full"
           aria-controls={contentId}
           aria-expanded={isExpanded}
           onClick={toggleExpanded}
         >
           {isExpanded ? "상품정보 접기" : "상품정보 더보기"}
-        </button>
+        </Button>
       ) : null}
     </div>
   );

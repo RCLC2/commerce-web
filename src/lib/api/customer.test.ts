@@ -60,3 +60,14 @@ describe("customer discovery contracts", () => {
     expect(feed).toMatchObject({ items: [{ product: { id: 31 } }], next_cursor: "opaque+/=cursor" });
   });
 });
+
+it("persists a cart group edit with authenticated PATCH and parses the saved row", async () => {
+  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ID: 1, MemberID: 7, ProductID: 31, OptionID: 5, Quantity: 3, PriceAtAdded: 42000 }), { status: 200 }));
+  vi.stubGlobal("fetch", fetchMock);
+  const payload = { cart_item_ids: [1, 2], option_id: 5, quantity: 3 };
+  const saved = await customerApi.updateCartItems("token", payload);
+  expect(fetchMock.mock.calls[0][0]).toContain("/api/v1/cart/items");
+  expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "PATCH", body: JSON.stringify(payload) });
+  expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get("Authorization")).toBe("Bearer token");
+  expect(saved).toMatchObject({ id: 1, option_id: 5, quantity: 3, price_at_added: 42000 });
+});
