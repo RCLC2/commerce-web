@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { ButtonLink } from "@/components/ui/button-link";
+
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { apiErrorMessage } from "@/lib/api-client";
@@ -98,19 +99,19 @@ export function TossSuccessClient() {
 
   return (
     <main className="mx-auto max-w-xl px-4 py-16 text-center">
-      <h1 className="text-2xl font-black">{state === "success" ? "결제 완료" : "토스 결제 확인"}</h1>
-      <p className="mt-4 text-sm text-muted">{message}</p>
+      <h1 className="text-2xl font-bold">{state === "success" ? "결제 완료" : "토스 결제 확인"}</h1>
+      <p className="mt-4 text-sm text-content-secondary">{message}</p>
       {orderId && amount ? <p className="mt-2 text-sm font-bold">{orderId} · {formatPrice(amount)}</p> : null}
-      {state === "waiting" ? <p className="mt-5 text-sm text-muted">잠시만 기다려주세요.</p> : null}
+      {state === "waiting" ? <p className="mt-5 text-sm text-content-secondary">잠시만 기다려주세요.</p> : null}
       {state === "success" && orderId ? (
-        <Link href={`/orders/${encodeURIComponent(orderId)}`}><Button className="mt-6">주문 상세 보기</Button></Link>
+        <ButtonLink href={`/orders/${encodeURIComponent(orderId)}`} className="mt-6">주문 상세 보기</ButtonLink>
       ) : null}
       {state === "error" ? (
         <div className="mt-6 flex justify-center gap-2">
           {callbackParams ? <Button onClick={retryConfirmation}>같은 결제 다시 확인</Button> : null}
-          <Link href="/checkout"><Button>결제 다시 시도</Button></Link>
-          {!token ? <Link href="/login"><Button variant="secondary">로그인하기</Button></Link> : null}
-          <Link href="/mypage"><Button variant="secondary">주문 내역</Button></Link>
+          <ButtonLink href="/checkout" >결제 다시 시도</ButtonLink>
+          {!token ? <ButtonLink href="/login" variant="secondary">로그인하기</ButtonLink> : null}
+          <ButtonLink href="/mypage" variant="secondary">주문 내역</ButtonLink>
         </div>
       ) : null}
     </main>

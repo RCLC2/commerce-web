@@ -11,11 +11,11 @@ export function formatPrice(value: number) {
 
 export function formatFollowerCount(value: number) {
   const count = Math.max(0, Math.trunc(value));
-  if (count < 1_000) {
+  if (count < 10_000) {
     return new Intl.NumberFormat("ko-KR").format(count);
   }
 
-  return `${Math.floor(count / 1_000)}k`;
+  return `${Math.floor(count / 1_000) / 10}만`;
 }
 
 export function discountRate(basePrice: number, discountPrice?: number) {

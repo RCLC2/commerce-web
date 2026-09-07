@@ -184,6 +184,7 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@layer base {
 * {
   box-sizing: border-box;
 }
@@ -199,6 +200,8 @@ body {
   color: var(--foreground);
   font-family: var(--font-korean), "Apple SD Gothic Neo", "Malgun Gothic", var(--font-geist-sans), Arial, Helvetica, sans-serif;
   letter-spacing: -0.012em;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   line-height: 1.5;
 }
 
@@ -225,6 +228,8 @@ a[href] {
   outline-offset: 2px;
 }
 
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -248,3 +253,26 @@ a[href] {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+.commerce-drawer {
+  visibility: hidden;
+  transition: visibility var(--commerce-motion-slow) step-end;
+}
+
+.commerce-drawer[data-open="true"] {
+  visibility: visible;
+  transition-timing-function: step-start;
+}
+
+.commerce-drawer-backdrop {
+  opacity: 0;
+  transition: opacity var(--commerce-motion-slow) var(--commerce-ease-out);
+}
+
+.commerce-drawer-panel {
+  transform: translateX(-100%);
+  transition: transform var(--commerce-motion-slow) var(--commerce-ease-out);
+}
+
+.commerce-drawer[data-open="true"] .commerce-drawer-backdrop { opacity: 1; }
+.commerce-drawer[data-open="true"] .commerce-drawer-panel { transform: translateX(0); }

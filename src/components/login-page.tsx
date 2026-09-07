@@ -1,5 +1,10 @@
 "use client";
 
+import { PageHeading } from "./ui/page-heading";
+import { LogIn as PageIcon } from "lucide-react";
+
+import { apiErrorMessage } from "@/lib/api-client";
+
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
@@ -57,8 +62,8 @@ export function LoginPage() {
     <main className="mx-auto flex min-h-[calc(100vh-64px)] max-w-md items-center px-4 pb-24">
       <Surface className="w-full" padding="lg">
       <form onSubmit={form.handleSubmit((values) => login.mutate(values))}>
-        <h1 className="text-2xl font-black">로그인</h1>
-        <p className="mt-2 text-sm text-muted">등록된 계정으로 로그인합니다.</p>
+        <PageHeading icon={<PageIcon />} title="로그인" />
+        <p className="mt-2 text-sm text-content-secondary">등록된 계정으로 로그인합니다.</p>
         <div className="mt-6 space-y-4">
           <Field label="이메일" htmlFor="login-email" error={form.formState.errors.email?.message} required>
             <Input id="login-email" autoComplete="email" state={form.formState.errors.email ? "error" : "default"} {...form.register("email")} />
@@ -73,11 +78,11 @@ export function LoginPage() {
             />
           </Field>
         </div>
-        {login.error ? <Notice className="mt-4" tone="error" title="로그인하지 못했습니다.">{login.error.message}</Notice> : null}
-        <Button className="mt-6 w-full" size="lg" disabled={login.isPending}>
+        {login.error ? <Notice className="mt-4" tone="error" title="로그인하지 못했습니다.">{apiErrorMessage(login.error)}</Notice> : null}
+        <Button type="submit" className="mt-6 w-full" size="lg" disabled={login.isPending}>
           로그인
         </Button>
-        <Link href="/register" className="mt-4 block text-center text-sm font-bold text-muted">
+        <Link href="/register" className="mt-4 block text-center text-sm font-bold text-content-secondary">
           계정 만들기
         </Link>
       </form>

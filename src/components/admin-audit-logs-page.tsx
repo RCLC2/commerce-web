@@ -12,7 +12,7 @@ export function AdminAuditLogsPage() {
   }
 
   return (
-    <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
+    <ConsoleLayout title="관리자" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <AuditLogExplorer scope="admin" token={token} />
     </ConsoleLayout>
   );

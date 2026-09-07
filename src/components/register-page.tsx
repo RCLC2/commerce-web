@@ -1,5 +1,10 @@
 "use client";
 
+import { PageHeading } from "./ui/page-heading";
+import { UserRoundPlus as PageIcon } from "lucide-react";
+
+import { apiErrorMessage } from "@/lib/api-client";
+
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
@@ -58,8 +63,8 @@ export function RegisterPage() {
     <main className="mx-auto flex min-h-[calc(100vh-64px)] max-w-md items-center px-4 pb-24">
       <Surface className="w-full" padding="lg">
       <form onSubmit={form.handleSubmit((values) => register.mutate(values))}>
-        <h1 className="text-2xl font-black">회원가입</h1>
-        <p className="mt-2 text-sm text-muted">고객 계정으로 쇼핑과 주문 내역 조회를 시작합니다.</p>
+        <PageHeading icon={<PageIcon />} title="회원가입" />
+        <p className="mt-2 text-sm text-content-secondary">고객 계정으로 쇼핑과 주문 내역 조회를 시작합니다.</p>
         <div className="mt-6 space-y-4">
           <Field label="이메일" htmlFor="register-email" error={form.formState.errors.email?.message} required>
             <Input id="register-email" autoComplete="email" state={form.formState.errors.email ? "error" : "default"} {...form.register("email")} />
@@ -82,11 +87,11 @@ export function RegisterPage() {
             야간 알림 수신 동의
           </label>
         </div>
-        {register.error ? <Notice className="mt-4" tone="error" title="회원가입하지 못했습니다.">{register.error.message}</Notice> : null}
-        <Button className="mt-6 w-full" size="lg" disabled={register.isPending}>
+        {register.error ? <Notice className="mt-4" tone="error" title="회원가입하지 못했습니다.">{apiErrorMessage(register.error)}</Notice> : null}
+        <Button type="submit" className="mt-6 w-full" size="lg" disabled={register.isPending}>
           가입하기
         </Button>
-        <Link href="/login" className="mt-4 block text-center text-sm font-bold text-muted">
+        <Link href="/login" className="mt-4 block text-center text-sm font-bold text-content-secondary">
           이미 계정이 있어요
         </Link>
       </form>

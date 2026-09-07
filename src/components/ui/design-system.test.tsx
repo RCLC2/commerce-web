@@ -3,6 +3,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Badge } from "./badge";
+import { ButtonLink } from "./button-link";
 import { Button } from "./button";
 import { Field } from "./field";
 import { Input } from "./input";
@@ -11,10 +12,17 @@ import { BottomSheet, Dialog } from "./overlay";
 import { Tabs } from "./tabs";
 
 describe("commerce UI primitives", () => {
+  it("renders a navigation action as one focusable link", () => {
+    render(<ButtonLink href="/cart">장바구니 이동</ButtonLink>);
+    const link = screen.getByRole("link", { name: "장바구니 이동" });
+    expect(link).toHaveAttribute("href", "/cart");
+    expect(link.querySelector("button")).toBeNull();
+  });
+
   it("keeps the semantic primary and destructive action variants distinct", () => {
     render(<><Button>구매하기</Button><Button variant="danger">주문 취소</Button></>);
 
-    expect(screen.getByRole("button", { name: "구매하기" })).toHaveClass("bg-button-primary", "text-button-primary-content", "enabled:hover:bg-button-primary-hover", "enabled:active:bg-button-primary-pressed");
+    expect(screen.getByRole("button", { name: "구매하기" })).toHaveClass("bg-button-primary", "text-button-primary-content", "not-disabled:hover:bg-button-primary-hover", "not-disabled:active:bg-button-primary-pressed");
     expect(screen.getByRole("button", { name: "주문 취소" })).toHaveClass("bg-button-danger");
     expect(screen.getByRole("button", { name: "주문 취소" })).toHaveClass("bg-button-danger");
   });

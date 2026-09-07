@@ -19,7 +19,7 @@ export function Notice({ tone = "info", title, className, children, ...props }: 
   return (
     <div className={cn("flex gap-3 rounded-control border px-4 py-3 text-sm leading-5", toneClassName, className)} role={tone === "error" ? "alert" : "status"} {...props}>
       <Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-      <div>{title ? <p className="font-bold">{title}</p> : null}{children ? <div className={title ? "mt-1" : undefined}>{children}</div> : null}</div>
+      <div className="min-w-0 break-words">{title ? <p className="font-bold">{title}</p> : null}{children ? <div className={title ? "mt-1" : undefined}>{children}</div> : null}</div>
     </div>
   );
 }

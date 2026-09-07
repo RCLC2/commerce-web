@@ -1,3 +1,6 @@
+import { PageHeadingDemo } from "../components/examples/page-heading-demo";
+import { PaginationDemo } from "../components/examples/pagination-demo";
+import { DrawerDemo } from "../components/examples/drawer-demo";
 import { DocsHero } from "../components/docs-content";
 import { ComponentReference } from "../components/component-reference";
 import { ButtonDemo } from "../components/examples/button-demo";
@@ -11,6 +14,9 @@ import { BottomActionBarDemo } from "../components/examples/bottom-action-bar-de
 import styles from "../components/docs.module.css";
 
 const links = [
+  ["page-heading", "PageHeading"],
+  ["pagination", "Pagination"],
+  ["drawer", "Drawer"],
   ["button", "Button"],
   ["field", "Field & Input"],
   ["select", "Select"],
@@ -36,6 +42,9 @@ export default function ComponentsPage() {
           </a>
         ))}
       </nav>
+      <ComponentReference id="page-heading" title="PageHeading" description="페이지 제목과 아이콘, 설명의 위계를 통일합니다." usage="아이콘은 장식으로 처리하고 제목을 문서의 h1으로 제공합니다." properties={[["title / description", "제목과 안내 문구"], ["icon / eyebrow", "페이지 아이콘과 선택적 상위 라벨"]]}><PageHeadingDemo /></ComponentReference>
+      <ComponentReference id="pagination" title="Pagination" description="번호 선택과 직접 입력으로 목록을 이동합니다." usage="현재 페이지는 aria-current로 표시하며, 조회 중에는 이동을 잠급니다." properties={[["page / totalPages", "현재 페이지와 전체 페이지 수"], ["hasNext", "전체 개수가 없는 이전 API와의 호환용 다음 페이지 여부"], ["disabled / onChange", "조회 중 잠금과 이동 처리"]]}><PaginationDemo /></ComponentReference>
+      <ComponentReference id="drawer" title="Drawer" description="메뉴를 화면 왼쪽에서 열고 닫습니다." usage="240ms 전환, Escape 닫기, 포커스 복귀를 제공하며 동작 줄이기 설정을 따릅니다." properties={[["open / onClose", "열림 상태와 닫기 처리"], ["title / children", "메뉴 이름과 항목"]]}><DrawerDemo /></ComponentReference>
       <ComponentReference
         id="button"
         title="Button"

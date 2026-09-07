@@ -1,5 +1,7 @@
 "use client";
 
+import { Input, Select } from "./ui/input";
+
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import {
@@ -110,7 +112,7 @@ export function AuditLogExplorer({ scope, token }: { scope: AuditScope; token: s
         <form onSubmit={applyFilters}>
           <FilterPanel>
             <FilterField label="통합 검색">
-              <input
+              <Input
                 className={consoleInputClass}
                 value={draftFilters.q}
                 onChange={(event) => updateFilter("q", event.target.value)}
@@ -118,25 +120,25 @@ export function AuditLogExplorer({ scope, token }: { scope: AuditScope; token: s
               />
             </FilterField>
             <FilterField label="요청 ID">
-              <input
+              <Input
                 className={consoleInputClass}
                 value={draftFilters.requestID}
                 onChange={(event) => updateFilter("requestID", event.target.value)}
-                placeholder="request_id"
+                placeholder="요청 식별자"
               />
             </FilterField>
             <FilterField label="행위자 ID">
-              <input
+              <Input
                 className={consoleInputClass}
                 type="number"
                 min={1}
                 value={draftFilters.actorID}
                 onChange={(event) => updateFilter("actorID", event.target.value)}
-                placeholder="member ID"
+                placeholder="회원 식별자"
               />
             </FilterField>
             <FilterField label="행위자 역할">
-              <select
+              <Select
                 className={consoleInputClass}
                 value={draftFilters.actorRole}
                 onChange={(event) => updateFilter("actorRole", event.target.value as AuditFilterDraft["actorRole"])}
@@ -145,46 +147,46 @@ export function AuditLogExplorer({ scope, token }: { scope: AuditScope; token: s
                 <option value="ADMIN">관리자</option>
                 <option value="SELLER">셀러</option>
                 <option value="SYSTEM">시스템</option>
-              </select>
+              </Select>
             </FilterField>
             <FilterField label="작업">
-              <input
+              <Input
                 className={consoleInputClass}
                 value={draftFilters.action}
                 onChange={(event) => updateFilter("action", event.target.value)}
-                placeholder="category.update"
+                placeholder="예: category.update (카테고리 수정)"
               />
             </FilterField>
             <FilterField label="테이블">
-              <input
+              <Input
                 className={consoleInputClass}
                 value={draftFilters.tableName}
                 onChange={(event) => updateFilter("tableName", event.target.value)}
-                placeholder="categories"
+                placeholder="예: categories (카테고리)"
               />
             </FilterField>
             <FilterField label="레코드 ID">
-              <input
+              <Input
                 className={consoleInputClass}
                 value={draftFilters.recordID}
                 onChange={(event) => updateFilter("recordID", event.target.value)}
-                placeholder="record 또는 target ID"
+                placeholder="레코드 또는 대상 식별자"
               />
             </FilterField>
             {scope === "admin" ? (
               <FilterField label="마켓 ID">
-                <input
+                <Input
                   className={consoleInputClass}
                   type="number"
                   min={1}
                   value={draftFilters.marketID}
                   onChange={(event) => updateFilter("marketID", event.target.value)}
-                  placeholder="market ID"
+                  placeholder="마켓 식별자"
                 />
               </FilterField>
             ) : null}
             <FilterField label="변경 유형">
-              <select
+              <Select
                 className={consoleInputClass}
                 value={draftFilters.operation}
                 onChange={(event) => updateFilter("operation", event.target.value as AuditFilterDraft["operation"])}
@@ -193,10 +195,10 @@ export function AuditLogExplorer({ scope, token }: { scope: AuditScope; token: s
                 <option value="INSERT">생성</option>
                 <option value="UPDATE">수정</option>
                 <option value="DELETE">삭제</option>
-              </select>
+              </Select>
             </FilterField>
             <FilterField label="귀속 상태">
-              <select
+              <Select
                 className={consoleInputClass}
                 value={draftFilters.attributionStatus}
                 onChange={(event) => updateFilter("attributionStatus", event.target.value as AuditFilterDraft["attributionStatus"])}
@@ -205,10 +207,10 @@ export function AuditLogExplorer({ scope, token }: { scope: AuditScope; token: s
                 <option value="ATTRIBUTED">귀속 완료</option>
                 <option value="UNATTRIBUTED">미귀속</option>
                 <option value="AMBIGUOUS">귀속 불명확</option>
-              </select>
+              </Select>
             </FilterField>
             <FilterField label="시작 시각">
-              <input
+              <Input
                 className={consoleInputClass}
                 type="datetime-local"
                 value={draftFilters.from}
@@ -216,7 +218,7 @@ export function AuditLogExplorer({ scope, token }: { scope: AuditScope; token: s
               />
             </FilterField>
             <FilterField label="종료 시각">
-              <input
+              <Input
                 className={consoleInputClass}
                 type="datetime-local"
                 value={draftFilters.to}
@@ -236,9 +238,9 @@ export function AuditLogExplorer({ scope, token }: { scope: AuditScope; token: s
         title="변경 로그"
         description={`${page}페이지 · 이번 페이지 ${logs.length.toLocaleString("ko-KR")}건${logsQuery.isFetching ? " · 갱신 중" : ""}`}
         action={
-          <label className="flex items-center gap-2 text-xs font-black text-muted">
+          <label className="flex items-center gap-2 text-xs font-bold text-content-secondary">
             페이지 크기
-            <select
+            <Select
               aria-label="페이지 크기"
               className={consoleInputClass}
               value={limit}
@@ -248,7 +250,7 @@ export function AuditLogExplorer({ scope, token }: { scope: AuditScope; token: s
               }}
             >
               {pageSizes.map((size) => <option key={size} value={size}>{size}개</option>)}
-            </select>
+            </Select>
           </label>
         }
       >
@@ -260,11 +262,11 @@ export function AuditLogExplorer({ scope, token }: { scope: AuditScope; token: s
             actorLabel(log),
             <div key="change" className="grid gap-1">
               <OperationBadge operation={log.operation} />
-              <span className="break-all text-xs font-bold text-muted">{log.action || "직접 변경"}</span>
+              <span className="break-all text-xs font-bold text-content-secondary">{log.action || "직접 변경"}</span>
             </div>,
             <div key="target" className="grid gap-1">
               <span className="font-bold">{log.target_type || log.table_name}</span>
-              <span className="break-all text-xs text-muted">#{log.target_id || log.record_key || "-"}</span>
+              <span className="break-all text-xs text-content-secondary">#{log.target_id || log.record_key || "-"}</span>
             </div>,
             <AttributionBadge key="attribution" status={log.attribution_status} />,
             <Button key="detail" type="button" size="sm" variant="secondary" aria-label="상세 보기" onClick={() => setSelectedLog(log)}>
@@ -275,7 +277,7 @@ export function AuditLogExplorer({ scope, token }: { scope: AuditScope; token: s
         />
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
-          <p className="text-xs font-bold text-muted">cursor 기반 {page}페이지</p>
+          <p className="text-xs font-bold text-content-secondary">이전 조회 위치 기준 {page}페이지</p>
           <div className="flex gap-2">
             <Button
               type="button"
@@ -344,9 +346,9 @@ function AuditLogDetail({ log, onClose }: { log: AuditLog | null; onClose: () =>
 
 function JsonPanel({ title, value }: { title: string; value: unknown }) {
   return (
-    <section className="min-w-0 overflow-hidden rounded-xl border border-line bg-zinc-950">
-      <h3 className="border-b border-white/10 px-4 py-3 text-sm font-black text-white">{title}</h3>
-      <pre className="max-h-[420px] overflow-auto p-4 text-xs leading-6 text-zinc-200">{formatJSON(value)}</pre>
+    <section className="min-w-0 overflow-hidden rounded-xl border border-border-subtle bg-content-primary">
+      <h3 className="border-b border-white/10 px-4 py-3 text-sm font-bold text-content-inverse">{title}</h3>
+      <pre className="max-h-[420px] overflow-auto p-4 text-xs leading-6 text-content-inverse">{formatJSON(value)}</pre>
     </section>
   );
 }
@@ -397,10 +399,10 @@ function actorRoleLabel(role: NonNullable<AuditLog["actor_role"]>) {
 function OperationBadge({ operation }: { operation: AuditLog["operation"] }) {
   return (
     <span className={cn(
-      "w-fit rounded-full px-2 py-1 text-xs font-black",
-      operation === "INSERT" && "bg-emerald-50 text-emerald-700",
-      operation === "UPDATE" && "bg-sky-50 text-sky-700",
-      operation === "DELETE" && "bg-red-50 text-red-700",
+      "w-fit rounded-full px-2 py-1 text-xs font-bold",
+      operation === "INSERT" && "bg-status-positive-subtle text-status-positive",
+      operation === "UPDATE" && "bg-status-info-subtle text-status-info",
+      operation === "DELETE" && "bg-status-negative-subtle text-status-negative",
     )}>
       {operationLabel(operation)}
     </span>
@@ -414,10 +416,10 @@ function operationLabel(operation: AuditLog["operation"]) {
 function AttributionBadge({ status }: { status: AuditLog["attribution_status"] }) {
   return (
     <span className={cn(
-      "w-fit rounded-full px-2 py-1 text-xs font-black",
-      status === "ATTRIBUTED" && "bg-emerald-50 text-emerald-700",
-      status === "UNATTRIBUTED" && "bg-zinc-100 text-zinc-700",
-      status === "AMBIGUOUS" && "bg-amber-50 text-amber-700",
+      "w-fit rounded-full px-2 py-1 text-xs font-bold",
+      status === "ATTRIBUTED" && "bg-status-positive-subtle text-status-positive",
+      status === "UNATTRIBUTED" && "bg-surface-subtle text-content-secondary",
+      status === "AMBIGUOUS" && "bg-status-warning-subtle text-status-warning",
     )}>
       {attributionLabel(status)}
     </span>

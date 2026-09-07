@@ -1,5 +1,7 @@
 "use client";
 
+import { Input, Select, Textarea } from "./ui/input";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -8,6 +10,7 @@ import {
   type AdminMarketListItem,
   type AdminMemberListItem,
 } from "@/lib/admin-console-api";
+import { displayLabel } from "@/lib/display-labels";
 import { formatPrice } from "@/lib/utils";
 import { AdminAuthRequired, adminLinks, useAdminToken } from "./admin-console";
 import {
@@ -130,7 +133,7 @@ export function AdminMembersPageV2() {
   }
 
   return (
-    <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
+    <ConsoleLayout title="관리자" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <ConsoleHeader
         title="회원 관리"
         description="검색·권한·상태 조건을 서버에 전달하고, 목록과 상세 응답을 분리해 필요한 정보만 불러옵니다."
@@ -138,7 +141,7 @@ export function AdminMembersPageV2() {
       <ConsoleSection className="mt-5" title="회원 목록" description="회원을 누르면 상세 정보, 수정, 주문 내역을 확인할 수 있습니다.">
         <FilterPanel>
           <FilterField label="이메일 검색">
-            <input
+            <Input
               className={consoleInputClass}
               value={query}
               onChange={(event) => {
@@ -149,7 +152,7 @@ export function AdminMembersPageV2() {
             />
           </FilterField>
           <FilterField label="권한">
-            <select
+            <Select
               className={consoleInputClass}
               value={role}
               onChange={(event) => {
@@ -161,10 +164,10 @@ export function AdminMembersPageV2() {
               <option value="MEMBER">회원</option>
               <option value="SELLER">셀러</option>
               <option value="ADMIN">관리자</option>
-            </select>
+            </Select>
           </FilterField>
           <FilterField label="상태">
-            <select
+            <Select
               className={consoleInputClass}
               value={status}
               onChange={(event) => {
@@ -177,7 +180,7 @@ export function AdminMembersPageV2() {
               <option value="PENDING">승인 대기</option>
               <option value="SUSPENDED">정지</option>
               <option value="WITHDRAWN">탈퇴</option>
-            </select>
+            </Select>
           </FilterField>
         </FilterPanel>
         <div className="mt-4">
@@ -185,10 +188,10 @@ export function AdminMembersPageV2() {
             columns={["회원", "권한", "상태", "가입일"]}
             rows={members.map((member) => [
               <div key="member">
-                <p className="font-black">#{member.id}</p>
-                <p className="truncate text-xs text-muted">{member.email}</p>
+                <p className="font-bold">#{member.id}</p>
+                <p className="truncate text-xs text-content-secondary">{member.email}</p>
               </div>,
-              member.role,
+              displayLabel(member.role),
               <StatusBadge key="status" value={member.status} />,
               formatDate(member.created_at),
             ])}
@@ -228,16 +231,16 @@ export function AdminMembersPageV2() {
           ) : undefined
         }
       >
-        <div className="mb-5 flex gap-2 border-b border-line">
+        <div className="mb-5 flex gap-2 border-b border-border-subtle">
           {(["INFO", "ORDERS"] as const).map((value) => (
-            <button
+            <Button variant="ghost"
               key={value}
               type="button"
-              className={`border-b-2 px-4 py-2 text-sm font-black ${tab === value ? "border-brand text-brand" : "border-transparent text-muted"}`}
+              className={`border-b-2 px-4 py-2 text-sm font-bold ${tab === value ? "border-action-primary text-action-primary" : "border-transparent text-content-secondary"}`}
               onClick={() => setTab(value)}
             >
               {value === "INFO" ? "회원 정보" : "주문 내역"}
-            </button>
+            </Button>
           ))}
         </div>
         {tab === "INFO" ? (
@@ -246,32 +249,32 @@ export function AdminMembersPageV2() {
               <DetailItem label="이메일">{memberQuery.data.email}</DetailItem>
               <DetailItem label="권한">
                 {editing ? (
-                  <select className={consoleInputClass} value={editRole} onChange={(event) => setEditRole(event.target.value)}>
-                    <option value="MEMBER">MEMBER</option>
-                    <option value="SELLER">SELLER</option>
-                    <option value="ADMIN">ADMIN</option>
-                  </select>
+                  <Select className={consoleInputClass} value={editRole} onChange={(event) => setEditRole(event.target.value)}>
+                    <option value="MEMBER">일반 회원</option>
+                    <option value="SELLER">판매자</option>
+                    <option value="ADMIN">관리자</option>
+                  </Select>
                 ) : (
-                  memberQuery.data.role
+                  displayLabel(memberQuery.data.role)
                 )}
               </DetailItem>
               <DetailItem label="상태">
                 {editing ? (
-                  <select className={consoleInputClass} value={editStatus} onChange={(event) => setEditStatus(event.target.value)}>
-                    <option value="ACTIVE">ACTIVE</option>
-                    <option value="PENDING">PENDING</option>
-                    <option value="SUSPENDED">SUSPENDED</option>
-                    <option value="WITHDRAWN">WITHDRAWN</option>
-                  </select>
+                  <Select className={consoleInputClass} value={editStatus} onChange={(event) => setEditStatus(event.target.value)}>
+                    <option value="ACTIVE">활성</option>
+                    <option value="PENDING">대기</option>
+                    <option value="SUSPENDED">정지</option>
+                    <option value="WITHDRAWN">탈퇴</option>
+                  </Select>
                 ) : (
                   <StatusBadge value={memberQuery.data.status} />
                 )}
               </DetailItem>
-              <DetailItem label="알림 수신">{memberQuery.data.notification_type || "-"}</DetailItem>
+              <DetailItem label="알림 수신">{displayLabel(memberQuery.data.notification_type)}</DetailItem>
               <DetailItem label="마케팅 동의">{memberQuery.data.marketing_consent ? "동의" : "미동의"}</DetailItem>
               <DetailItem label="야간 알림 동의">{memberQuery.data.nighttime_consent ? "동의" : "미동의"}</DetailItem>
               <DetailItem label="키 / 몸무게">{memberQuery.data.height || "-"}cm / {memberQuery.data.weight || "-"}kg</DetailItem>
-              <DetailItem label="소셜 연동">{memberQuery.data.social_providers.join(", ") || "-"}</DetailItem>
+              <DetailItem label="소셜 연동">{memberQuery.data.social_providers.map(displayLabel).join(", ") || "-"}</DetailItem>
               <DetailItem label="가입일">{formatDate(memberQuery.data.created_at)}</DetailItem>
               <DetailItem label="수정일">{formatDate(memberQuery.data.updated_at)}</DetailItem>
             </DetailGrid>
@@ -363,7 +366,7 @@ export function AdminMarketsPageV2() {
   const markets = data?.items ?? [];
 
   return (
-    <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
+    <ConsoleLayout title="관리자" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <ConsoleHeader
         title="마켓 관리"
         description="마켓 행에서 바로 페널티를 부여하고, 상세 모달에서 셀러·상품·운영 상태를 함께 관리합니다."
@@ -371,7 +374,7 @@ export function AdminMarketsPageV2() {
       <ConsoleSection className="mt-5" title="마켓 목록">
         <FilterPanel>
           <FilterField label="마켓 검색">
-            <input
+            <Input
               className={consoleInputClass}
               value={query}
               onChange={(event) => {
@@ -382,7 +385,7 @@ export function AdminMarketsPageV2() {
             />
           </FilterField>
           <FilterField label="운영 상태">
-            <select
+            <Select
               className={consoleInputClass}
               value={status}
               onChange={(event) => {
@@ -395,7 +398,7 @@ export function AdminMarketsPageV2() {
               <option value="CLOSED">운영 종료</option>
               <option value="HIDE">숨김</option>
               <option value="EXIT">퇴점</option>
-            </select>
+            </Select>
           </FilterField>
         </FilterPanel>
         <div className="mt-4">
@@ -403,12 +406,12 @@ export function AdminMarketsPageV2() {
             columns={["마켓", "셀러", "상품", "페널티", "상태", "관리"]}
             rows={markets.map((market) => [
               <div key="market" className="flex min-w-0 items-center gap-3">
-                <div className="relative size-11 shrink-0 overflow-hidden rounded-lg bg-zinc-100">
+                <div className="relative size-11 shrink-0 overflow-hidden rounded-lg bg-surface-subtle">
                   <SafeImage src={market.profile_image_url} alt="" fill sizes="44px" className="object-cover" />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate font-black">{market.name}</p>
-                  <p className="truncate text-xs text-muted">{market.business_number}</p>
+                  <p className="truncate font-bold">{market.name}</p>
+                  <p className="truncate text-xs text-content-secondary">{market.business_number}</p>
                 </div>
               </div>,
               <span key="seller" className="break-all">{market.seller_email}</span>,
@@ -464,7 +467,7 @@ export function AdminMarketsPageV2() {
 
             <section>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <h3 className="font-black">운영 상태</h3>
+                <h3 className="font-bold">운영 상태</h3>
                 <div className="flex flex-wrap gap-2">
                   {["OPEN", "HIDE", "CLOSED", "EXIT"].map((nextStatus) => (
                     <Button
@@ -485,11 +488,11 @@ export function AdminMarketsPageV2() {
             <section>
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="font-black">판매 상품</h3>
-                  <p className="mt-1 text-xs text-muted">최대 7개를 미리 표시합니다.</p>
+                  <h3 className="font-bold">판매 상품</h3>
+                  <p className="mt-1 text-xs text-content-secondary">최대 7개를 미리 표시합니다.</p>
                 </div>
                 <Link
-                  className="inline-flex h-9 items-center justify-center rounded-md bg-zinc-100 px-3 text-sm font-black transition hover:bg-zinc-200"
+                  className="inline-flex h-9 items-center justify-center rounded-md bg-surface-subtle px-3 text-sm font-bold transition hover:bg-border-subtle"
                   href={marketQuery.data.public_url}
                   target="_blank"
                   rel="noreferrer"
@@ -499,19 +502,19 @@ export function AdminMarketsPageV2() {
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
                 {marketQuery.data.products.map((product) => (
-                  <div key={product.id} className="min-w-0 rounded-xl border border-line p-2">
-                    <div className="relative aspect-square overflow-hidden rounded-lg bg-zinc-100">
+                  <div key={product.id} className="min-w-0 rounded-xl border border-border-subtle p-2">
+                    <div className="relative aspect-square overflow-hidden rounded-lg bg-surface-subtle">
                       <SafeImage src={product.image_url} alt={product.name} fill sizes="140px" className="object-cover" />
                     </div>
-                    <p className="mt-2 line-clamp-2 text-xs font-black">{product.name}</p>
-                    <p className="mt-1 text-xs text-muted">{formatPrice(product.discount_price || product.base_price)}</p>
+                    <p className="mt-2 line-clamp-2 text-xs font-bold">{product.name}</p>
+                    <p className="mt-1 text-xs text-content-secondary">{formatPrice(product.discount_price || product.base_price)}</p>
                   </div>
                 ))}
               </div>
             </section>
 
             <section>
-              <h3 className="mb-3 font-black">최근 페널티</h3>
+              <h3 className="mb-3 font-bold">최근 페널티</h3>
               <ConsoleTable
                 columns={["점수", "사유", "부여일"]}
                 rows={marketQuery.data.recent_penalties.map((penalty) => [
@@ -553,7 +556,7 @@ export function AdminMarketsPageV2() {
       >
         <div className="grid gap-4 sm:grid-cols-[160px_minmax(0,1fr)]">
           <FilterField label="점수 (1~100)">
-            <input
+            <Input
               className={consoleInputClass}
               type="number"
               min={1}
@@ -563,7 +566,7 @@ export function AdminMarketsPageV2() {
             />
           </FilterField>
           <FilterField label="사유">
-            <textarea
+            <Textarea
               className={`${consoleInputClass} min-h-28 py-3`}
               value={penaltyReason}
               onChange={(event) => setPenaltyReason(event.target.value)}

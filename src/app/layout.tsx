@@ -22,8 +22,8 @@ const notoSansKR = Noto_Sans_KR({
 });
 
 export const metadata: Metadata = {
-  title: "Commerce Web",
-  description: "Production-ready fashion commerce frontend for commerce-engine.",
+  title: "commerce | 나를 위한 패션 쇼핑",
+  description: "인기 상품부터 취향에 맞는 마켓과 오늘의 코디까지, 나를 위한 패션을 만나보세요.",
 };
 
 export const viewport: Viewport = {

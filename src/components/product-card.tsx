@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Store } from "lucide-react";
 import type { ComponentProps } from "react";
 import type { Product, ProductBadgeTone } from "@/lib/types";
 import { couponPriceForProduct } from "@/lib/product-card-pricing";
@@ -12,7 +13,7 @@ export function ProductCard({ product, imageAspect = "aspect-square" }: { produc
   const couponPrice = couponPriceForProduct(product);
 
   return (
-    <article className="group">
+    <article className="group min-w-0">
       <Link href={`/products/${product.id}`} className="block">
         <div className={`relative ${imageAspect} overflow-hidden rounded-control bg-surface-subtle`}>
           <SafeImage
@@ -24,12 +25,12 @@ export function ProductCard({ product, imageAspect = "aspect-square" }: { produc
           />
         </div>
       </Link>
-      <div className="mt-3 space-y-1.5">
-        <Link href={`/markets/${product.market?.id ?? product.market_id}`} className="inline-flex w-fit text-xs font-semibold text-muted underline-offset-2 hover:text-foreground hover:underline">
-          {product.market?.name ?? product.market_name ?? `마켓 ${product.market_id}`}
+      <div className="mt-2.5 space-y-1.5">
+        <Link href={`/markets/${product.market?.id ?? product.market_id}`} className="inline-flex max-w-full items-center gap-1 text-xs font-medium text-content-secondary underline-offset-2 hover:text-content-primary hover:underline">
+          <Store size={13} className="shrink-0" aria-hidden="true" /><span className="truncate">{product.market?.name ?? product.market_name ?? `마켓 ${product.market_id}`}</span>
         </Link>
         <Link href={`/products/${product.id}`} className="block">
-          <h3 className="line-clamp-2 min-h-10 text-sm font-medium leading-5 group-hover:underline">{product.name}</h3>
+          <h3 className="line-clamp-2 text-sm font-bold leading-5 text-content-primary hover:underline">{product.name}</h3>
         </Link>
         <ProductCardPrice basePrice={product.base_price} discountPrice={product.discount_price} couponPrice={couponPrice} />
         <div className="flex flex-wrap gap-1">

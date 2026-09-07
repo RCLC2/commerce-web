@@ -93,13 +93,13 @@ export function TossPaymentWidget({
   };
 
   return (
-    <section className="mt-4 rounded-md border border-line bg-white p-4" aria-label="토스 테스트 결제">
-      <h3 className="font-black">토스 테스트 결제</h3>
+    <section className="mt-4 rounded-md border border-border-subtle bg-surface-raised p-4" aria-label="토스 테스트 결제">
+      <h3 className="font-bold">토스 테스트 결제</h3>
       <div id="toss-payment-methods" className="mt-3 min-h-20" />
       <div id="toss-payment-agreement" className="mt-3" />
-      {isLoading ? <p className="mt-3 text-sm text-muted">결제수단을 준비하는 중입니다.</p> : null}
-      {error ? <p className="mt-3 text-sm font-bold text-brand">{error}</p> : null}
-      {requestError ? <p className="mt-3 text-sm font-bold text-brand">{requestError}</p> : null}
+      {isLoading ? <p className="mt-3 text-sm text-content-secondary">결제수단을 준비하는 중입니다.</p> : null}
+      {error ? <p className="mt-3 text-sm font-bold text-action-primary">{error}</p> : null}
+      {requestError ? <p className="mt-3 text-sm font-bold text-action-primary">{requestError}</p> : null}
       <Button className="mt-4 w-full" size="lg" disabled={!isReady || isSubmitting} onClick={() => void requestPayment()}>
         {isSubmitting ? "결제창을 여는 중" : "테스트 결제하기"}
       </Button>

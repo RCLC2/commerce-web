@@ -134,6 +134,8 @@ export const categoryInformationSchema = z.object({
     page: z.number().int().positive(),
     page_size: z.number().int().positive(),
     has_next: z.boolean(),
+    total_pages: z.number().int().nonnegative().optional(),
+    total: z.number().int().nonnegative().optional(),
   }),
   realtime_popular_carousel: z.object({
     title: z.string(),

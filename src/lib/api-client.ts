@@ -252,9 +252,16 @@ export function apiErrorMessage(error: unknown): string {
     if (error.status === 401) return "로그인이 만료되었습니다. 다시 로그인해주세요.";
     if (error.status === 403) return "이 작업을 수행할 권한이 없습니다.";
     if (error.kind === "contract") return "서버 응답을 해석하지 못했습니다. 잠시 후 다시 시도해주세요.";
-    return error.message;
+    if (/[가-힣]/.test(error.message)) return error.message;
+    if (error.status === 404) return "요청한 정보를 찾을 수 없습니다.";
+    if (error.status === 409) return "현재 상태에서는 처리할 수 없습니다. 내용을 확인하고 다시 시도해주세요.";
+    if (error.status === 429) return "요청이 많습니다. 잠시 후 다시 시도해주세요.";
+    if (error.status && error.status >= 500) return "서버에서 요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.";
+    return "요청을 완료하지 못했습니다. 입력 내용을 확인하고 다시 시도해주세요.";
   }
-  return error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
+  return error instanceof Error && /[가-힣]/.test(error.message)
+    ? error.message
+    : "요청을 완료하지 못했습니다. 잠시 후 다시 시도해주세요.";
 }
 
 export function shouldRetryApiError(failureCount: number, error: unknown): boolean {

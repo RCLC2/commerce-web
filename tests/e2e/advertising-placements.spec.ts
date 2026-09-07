@@ -55,7 +55,7 @@ test("six home and commerce placements disclose sponsorship and preserve decisio
 async function exposePlacement(page: Page, placement: AdPlacement) {
   const root = page.locator(`[data-ad-placement="${placement}"]`);
   await expect(root).toBeVisible();
-  await expect(root.getByText("SPONSORED", { exact: true })).toHaveCount(1);
+  await expect(root.getByText("광고", { exact: true })).toHaveCount(1);
   await root.scrollIntoViewIfNeeded();
   await page.waitForTimeout(1_100);
   return root;

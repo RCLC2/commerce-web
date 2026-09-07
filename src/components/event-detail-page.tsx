@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "./ui/input";
+
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Gift, Store, Users } from "lucide-react";
 import Link from "next/link";
@@ -141,7 +143,7 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
     return <main className="mx-auto max-w-6xl px-4 py-8 text-sm"><ApiErrorState error={eventQuery.error} onRetry={() => void eventQuery.refetch()} /></main>;
   }
   if (eventQuery.isLoading || !event) {
-    return <main className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted">이벤트를 불러오는 중입니다.</main>;
+    return <main className="mx-auto max-w-6xl px-4 py-8 text-sm text-content-secondary">이벤트를 불러오는 중입니다.</main>;
   }
 
   const schedule = event.starts_at && event.ends_at
@@ -160,26 +162,26 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24">
       <section className="pt-5">
-        <div className="relative h-[320px] overflow-hidden rounded-md bg-zinc-100 md:h-[420px]">
+        <div className="relative h-[320px] overflow-hidden rounded-md bg-surface-subtle md:h-[420px]">
           <SafeImage src={event.image_url} alt={event.title} fill sizes="100vw" className="object-cover" priority />
           <div className={`absolute inset-0 bg-gradient-to-t ${heroTone} to-transparent`} />
-          <div className="absolute inset-x-0 bottom-0 max-w-3xl p-6 text-white md:p-10">
-            <p className="text-sm font-black">진행중 이벤트</p>
-            <h1 className="mt-3 text-4xl font-black md:text-6xl">{event.title}</h1>
-            <p className="mt-3 text-base text-white/90 md:text-lg">{event.subtitle}</p>
-            <p className="mt-5 text-sm font-bold text-white/80">{schedule}</p>
+          <div className="absolute inset-x-0 bottom-0 max-w-3xl p-6 text-content-inverse md:p-10">
+            <p className="text-sm font-bold">진행중 이벤트</p>
+            <h1 className="mt-3 text-4xl font-bold md:text-6xl">{event.title}</h1>
+            <p className="mt-3 text-base text-content-inverse/90 md:text-lg">{event.subtitle}</p>
+            <p className="mt-5 text-sm font-bold text-content-inverse/80">{schedule}</p>
           </div>
         </div>
       </section>
 
       {event.rewards.length ? (
         <section className="py-8" aria-labelledby="event-benefits-title">
-          <div className="rounded-3xl bg-zinc-50 p-4 md:p-6">
+          <div className="rounded-3xl bg-surface-subtle p-4 md:p-6">
             <div className="mb-5 flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#ff3f55] shadow-sm"><Gift size={19} /></span>
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-raised text-[#ff3f55] shadow-sm"><Gift size={19} /></span>
               <div>
-                <h2 id="event-benefits-title" className="text-xl font-black tracking-[-0.03em]">이벤트 혜택</h2>
-                <p className="mt-0.5 text-xs text-zinc-500">받기 버튼을 눌러 내 쿠폰함에 저장하세요.</p>
+                <h2 id="event-benefits-title" className="text-xl font-bold tracking-[-0.03em]">이벤트 혜택</h2>
+                <p className="mt-0.5 text-xs text-content-tertiary">받기 버튼을 눌러 내 쿠폰함에 저장하세요.</p>
               </div>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
@@ -196,9 +198,9 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
                 return <EventBenefitTicket key={reward.id} reward={reward} claimed={claimed} pending={isPending} ready={ready} authenticated={Boolean(effectiveToken)} onClaim={() => effectiveToken ? claimReward.mutate(reward) : router.push(`/login?next=/events/${eventId}`)} />;
               })}
             </div>
-            {claimReward.isError ? <p className="mt-3 text-sm font-bold text-brand">{apiErrorMessage(claimReward.error)}</p> : null}
-            {ownedCouponsQuery.isError ? <div className="mt-3 text-sm"><p className="font-bold text-brand">보유 쿠폰을 불러오지 못해 기존 수령 여부를 확인할 수 없습니다.</p><Button className="mt-2" size="sm" variant="secondary" onClick={() => void ownedCouponsQuery.refetch()}>쿠폰 상태 다시 확인</Button></div> : null}
-            {claimReward.isSuccess && claimReward.variables?.reward_type === "COUPON" && !confirmedClaimedRewards.has(claimReward.variables.id) ? <div className="mt-3 text-sm"><p className="font-bold text-amber-900">발급 응답을 받았지만 보유 쿠폰 목록에서 아직 확인되지 않았습니다.</p><Button className="mt-2" size="sm" variant="secondary" onClick={() => void ownedCouponsQuery.refetch()}>쿠폰 상태 다시 확인</Button></div> : null}
+            {claimReward.isError ? <p className="mt-3 text-sm font-bold text-status-negative">{apiErrorMessage(claimReward.error)}</p> : null}
+            {ownedCouponsQuery.isError ? <div className="mt-3 text-sm"><p className="font-bold text-action-primary">보유 쿠폰을 불러오지 못해 기존 수령 여부를 확인할 수 없습니다.</p><Button className="mt-2" size="sm" variant="secondary" onClick={() => void ownedCouponsQuery.refetch()}>쿠폰 상태 다시 확인</Button></div> : null}
+            {claimReward.isSuccess && claimReward.variables?.reward_type === "COUPON" && !confirmedClaimedRewards.has(claimReward.variables.id) ? <div className="mt-3 text-sm"><p className="font-bold text-status-warning">발급 응답을 받았지만 보유 쿠폰 목록에서 아직 확인되지 않았습니다.</p><Button className="mt-2" size="sm" variant="secondary" onClick={() => void ownedCouponsQuery.refetch()}>쿠폰 상태 다시 확인</Button></div> : null}
           </div>
         </section>
       ) : null}
@@ -206,7 +208,7 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
       {event.product_display.enabled ? (
         <section className="py-8">
           <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <h2 className="text-xl font-black">{event.product_display.section_title}</h2>
+            <h2 className="text-xl font-bold">{event.product_display.section_title}</h2>
             <div className="flex flex-wrap gap-2">
               {event.product_display.markets.length > 1 ? (
                 <FilterSelect label="전체 마켓" value={marketID} options={event.product_display.markets} onChange={setMarketID} />
@@ -214,14 +216,14 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
               {event.product_display.categories.length > 1 ? (
                 <FilterSelect label="전체 카테고리" value={categoryID} options={event.product_display.categories} onChange={setCategoryID} />
               ) : null}
-              <select aria-label="이벤트 상품 정렬" className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={activeSort} onChange={(e) => setSort(e.target.value as EventSort)}>
+              <Select aria-label="이벤트 상품 정렬" className="h-11 rounded-control border border-border-interactive bg-surface-raised px-3 text-sm font-bold" value={activeSort} onChange={(e) => setSort(e.target.value as EventSort)}>
                 {event.product_display.sort_options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
+              </Select>
             </div>
           </div>
 
           {productsQuery.isError ? <ApiErrorState error={productsQuery.error} onRetry={() => void productsQuery.refetch()} retryLabel="이벤트 상품 다시 시도" /> : productsQuery.isLoading ? <ProductSkeleton /> : products.length === 0 ? (
-            <p className="rounded-md border border-line bg-white p-8 text-center text-sm text-muted">표시할 이벤트 상품이 없습니다.</p>
+            <p className="rounded-md border border-border-subtle bg-surface-raised p-8 text-center text-sm text-content-secondary">표시할 이벤트 상품이 없습니다.</p>
           ) : event.product_display.mode === "MARKET_CAROUSELS" ? (
             <MarketCarousels products={products} />
           ) : (
@@ -230,7 +232,7 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
             </div>
           )}
           <div ref={loadMoreRef} className="h-10" />
-          {productsQuery.isFetchingNextPage ? <p className="text-center text-xs font-bold text-muted">이벤트 상품을 더 불러오는 중입니다.</p> : null}
+          {productsQuery.isFetchingNextPage ? <p className="text-center text-xs font-bold text-content-secondary">이벤트 상품을 더 불러오는 중입니다.</p> : null}
         </section>
       ) : null}
     </main>
@@ -239,15 +241,15 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
 
 function FilterSelect({ label, value, options, onChange }: { label: string; value?: number; options: Array<{ id: number; name: string }>; onChange: (value?: number) => void }) {
   return (
-    <select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold" value={value ?? ""} onChange={(event) => onChange(event.target.value ? Number(event.target.value) : undefined)}>
+    <Select className="h-11 rounded-control border border-border-interactive bg-surface-raised px-3 text-sm font-bold" value={value ?? ""} onChange={(event) => onChange(event.target.value ? Number(event.target.value) : undefined)}>
       <option value="">{label}</option>
       {options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
-    </select>
+    </Select>
   );
 }
 
 function ProductSkeleton() {
-  return <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="aspect-square animate-pulse rounded-md bg-zinc-200" />)}</div>;
+  return <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="aspect-square animate-pulse rounded-md bg-border-subtle" />)}</div>;
 }
 
 function MarketCarousels({ products }: { products: EventProduct[] }) {
@@ -291,20 +293,20 @@ function MarketCarousel({ market }: {
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const slide = (direction: -1 | 1) => carouselRef.current?.scrollBy({ left: direction * 640, behavior: "smooth" });
   return (
-    <article className="overflow-hidden rounded-2xl border border-line bg-white">
-      <div className="flex items-center justify-between gap-3 border-b border-line bg-zinc-50/70 p-4 md:p-5">
+    <article className="overflow-hidden rounded-2xl border border-border-subtle bg-surface-raised">
+      <div className="flex items-center justify-between gap-3 border-b border-border-subtle bg-surface-subtle/70 p-4 md:p-5">
         <Link href={`/markets/${market.id}`} className="flex min-w-0 items-center gap-3">
-          <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-line bg-zinc-100">
+          <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-border-subtle bg-surface-subtle">
             <SafeImage src={market.profileImageURL} alt={market.name} fill sizes="56px" className="object-cover" />
           </span>
           <span className="min-w-0">
             <span className="flex items-center gap-1.5">
-              <Store size={15} className="shrink-0 text-brand" />
-              <span className="truncate text-base font-black md:text-lg">{market.name}</span>
+              <Store size={15} className="shrink-0 text-action-primary" />
+              <span className="truncate text-base font-bold md:text-lg">{market.name}</span>
             </span>
-            {market.description ? <span className="mt-1 block truncate text-xs text-muted md:text-sm">{market.description}</span> : null}
+            {market.description ? <span className="mt-1 block truncate text-xs text-content-secondary md:text-sm">{market.description}</span> : null}
             {market.followerCount != null ? (
-              <span className="mt-1 flex items-center gap-1 text-xs font-bold text-muted">
+              <span className="mt-1 flex items-center gap-1 text-xs font-bold text-content-secondary">
                 <Users size={13} /> 팔로워 {formatFollowerCount(market.followerCount)}
               </span>
             ) : null}

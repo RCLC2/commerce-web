@@ -46,10 +46,10 @@ export function useSellerConsoleContext() {
 
 export function SellerAuthRequiredV2() {
   return (
-    <ConsoleLayout title="Seller" subtitle="마켓 운영 콘솔" links={sellerLinks}>
+    <ConsoleLayout title="판매자" subtitle="마켓 운영 콘솔" links={sellerLinks}>
       <ConsoleSection>
-        <h2 className="text-2xl font-black">셀러 권한이 필요합니다</h2>
-        <p className="mt-2 text-sm text-muted">셀러 계정 또는 관리자 대리 접속으로 로그인해야 합니다.</p>
+        <h2 className="text-2xl font-bold">셀러 권한이 필요합니다</h2>
+        <p className="mt-2 text-sm text-content-secondary">셀러 계정 또는 관리자 대리 접속으로 로그인해야 합니다.</p>
       </ConsoleSection>
     </ConsoleLayout>
   );
@@ -64,17 +64,17 @@ export function SellerConsoleLayoutV2({
 }) {
   return (
     <ConsoleLayout
-      title="Seller"
+      title="판매자"
       subtitle="마켓 운영 콘솔"
       links={sellerLinks}
       sidebarHeader={
-        <div className="flex min-w-0 items-center gap-3 rounded-lg bg-zinc-50 p-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-white text-brand">
+        <div className="flex min-w-0 items-center gap-3 rounded-lg bg-surface-subtle p-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-surface-raised text-action-primary">
             <Store className="size-4" />
           </span>
           <div className="min-w-0">
-            <p className="text-xs font-black text-muted">운영 마켓</p>
-            <p className="mt-0.5 line-clamp-2 text-sm font-black">{marketName}</p>
+            <p className="text-xs font-bold text-content-secondary">운영 마켓</p>
+            <p className="mt-0.5 line-clamp-2 text-sm font-bold">{marketName}</p>
           </div>
         </div>
       }

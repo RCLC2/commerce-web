@@ -1,5 +1,7 @@
 "use client";
 
+import { Input } from "./ui/input";
+
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -54,10 +56,10 @@ export function AdminTokenLookupPageV2() {
   const markets = data?.items ?? [];
 
   return (
-    <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
+    <ConsoleLayout title="관리자" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <ConsoleHeader title="셀러 화면 진입" description="마켓을 서버에서 검색한 뒤 관리자 대리 접속 토큰을 발급합니다." />
       <ConsoleSection className="mt-5" title="마켓 목록">
-        <input
+        <Input
           className={consoleInputClass + " w-full md:max-w-sm"}
           value={query}
           onChange={(event) => {
@@ -70,7 +72,7 @@ export function AdminTokenLookupPageV2() {
           <ConsoleTable
             columns={["마켓", "셀러", "상태", "작업"]}
             rows={markets.map((market) => [
-              <div key="market"><p className="font-black">{market.name}</p><p className="text-xs text-muted">{market.business_number}</p></div>,
+              <div key="market"><p className="font-bold">{market.name}</p><p className="text-xs text-content-secondary">{market.business_number}</p></div>,
               <span key="seller" className="break-all">{market.seller_email}</span>,
               <StatusBadge key="status" value={market.status} />,
               <Button

@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
 import { Check, X } from "lucide-react";
 import Image from "next/image";
 import { useRef, useState } from "react";
@@ -87,8 +89,8 @@ export function OnboardingSwipeCard({
         }
       }}
     >
-      <div className="overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-[0_24px_70px_rgba(0,0,0,0.14)]">
-        <div className="relative aspect-[4/5] bg-zinc-100">
+      <div className="overflow-hidden rounded-[28px] border border-black/5 bg-surface-raised shadow-[0_24px_70px_rgba(0,0,0,0.14)]">
+        <div className="relative aspect-[4/5] bg-surface-subtle">
           <Image
             src={item.product.image_url}
             alt={item.product.name}
@@ -101,42 +103,42 @@ export function OnboardingSwipeCard({
           <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent" />
           <div
             aria-hidden
-            className="absolute left-5 top-5 flex rotate-[-8deg] items-center gap-2 rounded-xl border-4 border-emerald-400 bg-white/90 px-4 py-2 text-xl font-black text-emerald-600"
+            className="absolute left-5 top-5 flex rotate-[-8deg] items-center gap-2 rounded-xl border-4 border-status-positive-border bg-surface-raised/90 px-4 py-2 text-xl font-bold text-status-positive"
             style={{ opacity: likeOpacity }}
           >
             <Check size={24} strokeWidth={4} /> O
           </div>
           <div
             aria-hidden
-            className="absolute right-5 top-5 flex rotate-[8deg] items-center gap-2 rounded-xl border-4 border-rose-400 bg-white/90 px-4 py-2 text-xl font-black text-rose-600"
+            className="absolute right-5 top-5 flex rotate-[8deg] items-center gap-2 rounded-xl border-4 border-status-negative bg-surface-raised/90 px-4 py-2 text-xl font-bold text-action-primary"
             style={{ opacity: dislikeOpacity }}
           >
             <X size={24} strokeWidth={4} /> X
           </div>
-          <div className="absolute inset-x-0 bottom-0 p-5 text-white">
-            <p className="text-sm font-bold text-white/80">{item.product.market_name}</p>
-            <h2 className="mt-1 line-clamp-2 text-2xl font-black leading-tight">{item.product.name}</h2>
-            <p className="mt-3 text-xl font-black">{price.toLocaleString("ko-KR")}원</p>
+          <div className="absolute inset-x-0 bottom-0 p-5 text-content-inverse">
+            <p className="text-sm font-bold text-content-inverse/80">{item.product.market_name}</p>
+            <h2 className="mt-1 line-clamp-2 text-2xl font-bold leading-tight">{item.product.name}</h2>
+            <p className="mt-3 text-xl font-bold">{price.toLocaleString("ko-KR")}원</p>
           </div>
         </div>
       </div>
       <div className="mt-6 grid grid-cols-2 gap-4">
-        <button
+        <Button variant="ghost" size="icon"
           type="button"
           aria-label="별로예요"
-          className={cn("flex h-14 items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-white text-base font-black text-rose-500 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-50 active:translate-y-0")}
+          className={cn("flex h-14 items-center justify-center gap-2 rounded-2xl border border-status-negative-border bg-surface-raised text-base font-bold text-action-primary shadow-sm transition hover:-translate-y-0.5 hover:bg-action-secondary active:translate-y-0")}
           onClick={() => onChoose("DISLIKE", "BUTTON")}
         >
           <X size={24} strokeWidth={3} /> 별로예요
-        </button>
-        <button
+        </Button>
+        <Button variant="ghost" size="icon"
           type="button"
           aria-label="좋아요"
-          className="flex h-14 items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white text-base font-black text-emerald-600 shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-50 active:translate-y-0"
+          className="flex h-14 items-center justify-center gap-2 rounded-2xl border border-status-positive-border bg-surface-raised text-base font-bold text-status-positive shadow-sm transition hover:-translate-y-0.5 hover:bg-status-positive-subtle active:translate-y-0"
           onClick={() => onChoose("LIKE", "BUTTON")}
         >
           <Check size={24} strokeWidth={3} /> 좋아요
-        </button>
+        </Button>
       </div>
     </article>
   );

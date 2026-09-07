@@ -211,18 +211,18 @@ export function OnboardingPage() {
   if (onboarding.error || !data) {
     return (
       <OnboardingMessage>
-        <p className="font-bold text-rose-600">{apiErrorMessage(onboarding.error)}</p>
+        <p className="font-bold text-status-negative">{apiErrorMessage(onboarding.error)}</p>
         <Button className="mt-5" onClick={() => void onboarding.refetch()}>다시 시도</Button>
-        <Link className="mt-4 block text-sm font-bold text-muted" href="/">나중에 할게요</Link>
+        <Link className="mt-4 block text-sm font-bold text-content-secondary" href="/">나중에 할게요</Link>
       </OnboardingMessage>
     );
   }
   if (completed) {
     return (
       <OnboardingMessage>
-        <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600"><Sparkles size={30} /></span>
-        <h1 className="mt-5 text-3xl font-black">취향 반영 완료!</h1>
-        <p className="mt-3 text-sm leading-6 text-muted">고른 취향을 바탕으로 나에게 맞는 상품을 준비했어요.</p>
+        <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-status-positive-subtle text-status-positive"><Sparkles size={30} /></span>
+        <h1 className="mt-5 text-3xl font-bold">취향 반영 완료!</h1>
+        <p className="mt-3 text-sm leading-6 text-content-secondary">고른 취향을 바탕으로 나에게 맞는 상품을 준비했어요.</p>
         <Button className="mt-7 w-full" size="lg" onClick={() => router.replace("/recommendations")}>내 추천 보러가기</Button>
       </OnboardingMessage>
     );
@@ -235,36 +235,36 @@ export function OnboardingPage() {
     <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,#fff1f4_0,#fafafa_42%)] px-4 pb-10 pt-[max(20px,env(safe-area-inset-top))]">
       <div className="mx-auto max-w-md">
         <div className="flex items-center justify-between gap-3">
-          <button
+          <Button variant="ghost"
             type="button"
-            className="inline-flex h-10 items-center gap-1 rounded-full px-3 text-sm font-bold text-muted hover:bg-white"
+            className="inline-flex h-10 items-center gap-1 rounded-full px-3 text-sm font-bold text-content-secondary hover:bg-surface-raised"
             onClick={undoLast}
             disabled={history.length === 0 || finishing}
           >
             <ArrowLeft size={17} /> 이전 선택
-          </button>
-          <button type="button" className="h-10 rounded-full px-3 text-sm font-bold text-muted hover:bg-white" onClick={() => void finish("SKIPPED")} disabled={finishing}>
+          </Button>
+          <Button variant="ghost" type="button" className="h-10 rounded-full px-3 text-sm font-bold text-content-secondary hover:bg-surface-raised" onClick={() => void finish("SKIPPED")} disabled={finishing}>
             나중에 할게요
-          </button>
+          </Button>
         </div>
 
         <div className="mt-3 flex items-center gap-3">
-          <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-200">
-            <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${items.length ? (answeredCount / items.length) * 100 : 0}%` }} />
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-border-subtle">
+            <div className="h-full rounded-full bg-action-primary transition-all" style={{ width: `${items.length ? (answeredCount / items.length) * 100 : 0}%` }} />
           </div>
-          <span className="min-w-10 text-right text-sm font-black">{answeredCount}/{items.length}</span>
+          <span className="min-w-10 text-right text-sm font-bold">{answeredCount}/{items.length}</span>
         </div>
 
         <div className="mb-5 mt-5 text-center">
-          <h1 className="text-2xl font-black">이 상품, 내 취향인가요?</h1>
-          <p className="mt-2 text-sm text-muted">카드를 넘기거나 O·X 버튼을 눌러주세요.</p>
+          <h1 className="text-2xl font-bold">이 상품, 내 취향인가요?</h1>
+          <p className="mt-2 text-sm text-content-secondary">카드를 넘기거나 O·X 버튼을 눌러주세요.</p>
         </div>
 
         {allAnswered ? (
-          <section className="rounded-[28px] border border-line bg-white p-8 text-center shadow-[0_24px_70px_rgba(0,0,0,0.10)]">
-            <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand/10 text-brand"><Check size={32} strokeWidth={3} /></span>
-            <h2 className="mt-5 text-2xl font-black">10개 모두 골랐어요</h2>
-            <p className="mt-3 text-sm leading-6 text-muted">선택을 저장한 뒤 바로 맞춤 추천을 만들어드릴게요.</p>
+          <section className="rounded-[28px] border border-border-subtle bg-surface-raised p-8 text-center shadow-[0_24px_70px_rgba(0,0,0,0.10)]">
+            <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-action-primary/10 text-action-primary"><Check size={32} strokeWidth={3} /></span>
+            <h2 className="mt-5 text-2xl font-bold">10개 모두 골랐어요</h2>
+            <p className="mt-3 text-sm leading-6 text-content-secondary">선택을 저장한 뒤 바로 맞춤 추천을 만들어드릴게요.</p>
             {failedCount > 0 ? (
               <Button className="mt-6 w-full" variant="secondary" size="lg" onClick={() => void retryFailedResponses()} disabled={finishing}>
                 저장 실패 {failedCount}개 다시 시도
@@ -274,9 +274,9 @@ export function OnboardingPage() {
                 {finishing ? "추천 만드는 중…" : "내 추천 만들기"}
               </Button>
             )}
-            <button type="button" className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-muted" onClick={undoLast} disabled={finishing}>
+            <Button variant="ghost" type="button" className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-content-secondary" onClick={undoLast} disabled={finishing}>
               <RotateCcw size={15} /> 마지막 선택 다시 하기
-            </button>
+            </Button>
           </section>
         ) : currentItem ? (
           <OnboardingSwipeCard key={currentItem.product.id} item={currentItem} onChoose={choose} />
@@ -284,13 +284,13 @@ export function OnboardingPage() {
           <OnboardingMessage>추천 상품을 충분히 준비하지 못했어요.</OnboardingMessage>
         )}
 
-        {syncError ? <p role="alert" className="mx-auto mt-5 max-w-sm rounded-xl bg-rose-50 px-4 py-3 text-center text-sm font-bold text-rose-600">{syncError}</p> : null}
-        <p className="mt-5 text-center text-xs leading-5 text-muted">키보드에서는 ← X · → O로 선택할 수 있어요.</p>
+        {syncError ? <p role="alert" className="mx-auto mt-5 max-w-sm rounded-xl bg-action-secondary px-4 py-3 text-center text-sm font-bold text-action-primary">{syncError}</p> : null}
+        <p className="mt-5 text-center text-xs leading-5 text-content-secondary">키보드에서는 ← X · → O로 선택할 수 있어요.</p>
       </div>
     </main>
   );
 }
 
 function OnboardingMessage({ children }: { children: React.ReactNode }) {
-  return <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6 text-center text-sm text-muted">{children}</main>;
+  return <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6 text-center text-sm text-content-secondary">{children}</main>;
 }

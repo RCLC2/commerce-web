@@ -31,6 +31,7 @@ const remotePatterns: RemotePattern[] = [
 ];
 
 const nextConfig: NextConfig = {
+  output: process.env.COMMERCE_DOCKER_STANDALONE === "1" ? "standalone" : undefined,
   allowedDevOrigins: ["127.0.0.1"],
   images: {
     remotePatterns,

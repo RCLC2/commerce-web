@@ -1,3 +1,4 @@
+import { orderStatusLabel } from "@/lib/order-utils";
 import { Badge } from "./badge";
 
 const labels: Record<string, { label: string; tone: "neutral" | "brand" | "promotion" | "positive" | "warning" | "negative" }> = {
@@ -13,6 +14,6 @@ const labels: Record<string, { label: string; tone: "neutral" | "brand" | "promo
 };
 
 export function OrderStatus({ status }: { status: string }) {
-  const value = labels[status] ?? { label: status, tone: "neutral" as const };
+  const value = labels[status] ?? { label: orderStatusLabel(status), tone: "neutral" as const };
   return <Badge tone={value.tone}>{value.label}</Badge>;
 }

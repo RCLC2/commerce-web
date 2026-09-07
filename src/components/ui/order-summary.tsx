@@ -18,7 +18,7 @@ export function OrderSummary({ title = "주문 금액", items, totalLabel = "총
       </dl>
       <div className="mt-5 flex items-end justify-between gap-4 border-t border-border-subtle pt-5">
         <p className="font-bold text-content-primary">{totalLabel}</p>
-        <strong className="text-xl font-black tracking-tight text-content-primary">{total}</strong>
+        <strong className="text-xl font-bold tracking-tight text-content-primary">{total}</strong>
       </div>
       {footer ? <div className="mt-5">{footer}</div> : null}
     </Surface>

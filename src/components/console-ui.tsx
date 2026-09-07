@@ -4,9 +4,9 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
+import { inputVariants } from "./ui/input";
+import { useAccessibleOverlay } from "./ui/use-accessible-overlay";
 
-const modalStack: symbol[] = [];
-let bodyOverflowBeforeModal = "";
 
 type ConsoleTableProps = {
   columns: string[];
@@ -25,7 +25,7 @@ export function ConsoleTable({
 }: ConsoleTableProps) {
   if (!rows.length) {
     return (
-      <div className="rounded-xl border border-dashed border-line bg-white px-5 py-12 text-center text-sm font-bold text-muted">
+      <div className="rounded-xl border border-dashed border-border-subtle bg-surface-raised px-5 py-12 text-center text-sm font-bold text-content-secondary">
         {emptyText}
       </div>
     );
@@ -33,18 +33,18 @@ export function ConsoleTable({
 
   return (
     <>
-      <div className="hidden overflow-x-auto rounded-xl border border-line bg-white md:block">
-        <table className="w-full min-w-[760px] table-fixed border-collapse text-left">
-          <thead className="border-b border-line bg-zinc-50">
+      <div className="hidden overflow-x-auto rounded-xl border border-border-subtle bg-surface-raised md:block">
+        <table className="w-full min-w-[760px] table-auto border-collapse text-left">
+          <thead className="border-b border-border-subtle bg-surface-subtle">
             <tr>
               {columns.map((column) => (
-                <th key={column} scope="col" className="px-4 py-3 text-xs font-black text-muted">
+                <th key={column} scope="col" className="px-4 py-3 text-xs font-bold text-content-secondary">
                   {column}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-line">
+          <tbody className="divide-y divide-border-subtle">
             {rows.map((row, rowIndex) => (
               <tr
                 key={rowKeys?.[rowIndex] ?? rowIndex}
@@ -52,7 +52,7 @@ export function ConsoleTable({
                 className={cn(
                   "align-middle",
                   onRowClick &&
-                    "cursor-pointer transition hover:bg-zinc-50 focus:bg-zinc-50 focus:outline-none",
+                    "cursor-pointer transition hover:bg-surface-subtle focus-visible:bg-surface-subtle focus-visible:outline-2 focus-visible:-outline-offset-2",
                 )}
                 onClick={() => onRowClick?.(rowIndex)}
                 onKeyDown={(event) => {
@@ -76,24 +76,24 @@ export function ConsoleTable({
         {rows.map((row, rowIndex) => {
           const content = row.map((cell, cellIndex) => (
             <span key={cellIndex} className="grid grid-cols-[88px_minmax(0,1fr)] gap-3">
-              <span className="text-xs font-black text-muted">{columns[cellIndex]}</span>
+              <span className="text-xs font-bold text-content-secondary">{columns[cellIndex]}</span>
               <span className="min-w-0 break-words text-sm">{cell}</span>
             </span>
           ));
 
           return onRowClick ? (
-            <button
+            <Button variant="ghost"
               key={rowKeys?.[rowIndex] ?? rowIndex}
               type="button"
-              className="grid w-full gap-3 rounded-xl border border-line bg-white p-4 text-left shadow-sm transition hover:border-zinc-400"
+              className="grid w-full gap-3 rounded-xl border border-border-subtle bg-surface-raised p-4 text-left shadow-sm transition hover:border-border-interactive"
               onClick={() => onRowClick(rowIndex)}
             >
               {content}
-            </button>
+            </Button>
           ) : (
             <div
               key={rowKeys?.[rowIndex] ?? rowIndex}
-              className="grid gap-3 rounded-xl border border-line bg-white p-4 shadow-sm"
+              className="grid gap-3 rounded-xl border border-border-subtle bg-surface-raised p-4 shadow-sm"
             >
               {content}
             </div>
@@ -118,7 +118,7 @@ export function PaginationBar({
   const safeTotalPages = Math.max(1, totalPages);
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
-      <p className="text-xs font-bold text-muted">총 {total.toLocaleString("ko-KR")}건</p>
+      <p className="text-xs font-bold text-content-secondary">총 {total.toLocaleString("ko-KR")}건</p>
       <div className="flex items-center gap-2">
         <Button
           type="button"
@@ -130,7 +130,7 @@ export function PaginationBar({
         >
           <ChevronLeft className="size-4" />
         </Button>
-        <span className="min-w-20 text-center text-sm font-black">
+        <span className="min-w-20 text-center text-sm font-bold">
           {page} / {safeTotalPages}
         </span>
         <Button
@@ -165,76 +165,49 @@ export function ConsoleModal({
   footer?: ReactNode;
   size?: "md" | "lg" | "xl";
 }) {
-  const modalID = useRef(Symbol("console-modal"));
-  const onCloseRef = useRef(onClose);
-
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    if (!open) return;
-    const id = modalID.current;
-    if (modalStack.length === 0) {
-      bodyOverflowBeforeModal = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-    }
-    modalStack.push(id);
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && modalStack.at(-1) === id) {
-        event.preventDefault();
-        onCloseRef.current();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      const stackIndex = modalStack.lastIndexOf(id);
-      if (stackIndex >= 0) modalStack.splice(stackIndex, 1);
-      if (modalStack.length === 0) {
-        document.body.style.overflow = bodyOverflowBeforeModal;
-      }
-    };
-  }, [open]);
+  const dialogRef = useRef<HTMLElement>(null);
+  useAccessibleOverlay(open, onClose, dialogRef);
 
   if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-6"
+      className="fixed inset-0 z-[var(--commerce-z-modal)] flex items-end justify-center bg-black/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-6"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
       <section
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={title}
         className={cn(
-          "flex max-h-[94vh] w-full flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl",
+          "flex max-h-[94vh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface-raised shadow-2xl sm:rounded-2xl",
           size === "md" && "sm:max-w-2xl",
           size === "lg" && "sm:max-w-4xl",
           size === "xl" && "sm:max-w-6xl",
         )}
       >
-        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-5 py-4 sm:px-6">
+        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-border-subtle px-5 py-4 sm:px-6">
           <div className="min-w-0">
-            <h2 className="truncate text-lg font-black">{title}</h2>
-            {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
+            <h2 className="break-words text-lg font-bold">{title}</h2>
+            {description ? <p className="mt-1 text-sm text-content-secondary">{description}</p> : null}
           </div>
-          <button
+          <Button variant="ghost" size="icon"
             type="button"
-            className="grid size-9 shrink-0 place-items-center rounded-full border border-line text-muted transition hover:bg-zinc-100 hover:text-foreground"
+            className="grid size-11 shrink-0 place-items-center rounded-full border border-border-subtle text-content-secondary transition hover:bg-surface-subtle hover:text-content-primary"
             onClick={onClose}
             aria-label="닫기"
           >
             <X className="size-4" />
-          </button>
+          </Button>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
         {footer ? (
-          <footer className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-line px-5 py-4 sm:px-6">
+          <footer className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-border-subtle px-5 py-4 sm:px-6">
             {footer}
           </footer>
         ) : null}
@@ -244,20 +217,20 @@ export function ConsoleModal({
 }
 
 export function DetailGrid({ children }: { children: ReactNode }) {
-  return <dl className="grid gap-4 rounded-xl bg-zinc-50 p-4 sm:grid-cols-2">{children}</dl>;
+  return <dl className="grid gap-4 rounded-xl bg-surface-subtle p-4 sm:grid-cols-2">{children}</dl>;
 }
 
 export function DetailItem({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs font-black text-muted">{label}</dt>
+      <dt className="text-xs font-bold text-content-secondary">{label}</dt>
       <dd className="mt-1 min-w-0 break-words text-sm font-bold">{children || "-"}</dd>
     </div>
   );
 }
 
 export function ModalLoading() {
-  return <div className="py-16 text-center text-sm font-bold text-muted">상세 정보를 불러오는 중입니다.</div>;
+  return <div className="py-16 text-center text-sm font-bold text-content-secondary">상세 정보를 불러오는 중입니다.</div>;
 }
 
 export function useDebouncedValue<T>(value: T, delay = 300) {
@@ -269,5 +242,4 @@ export function useDebouncedValue<T>(value: T, delay = 300) {
   return debouncedValue;
 }
 
-export const consoleInputClass =
-  "h-10 min-w-0 rounded-lg border border-line bg-white px-3 text-sm font-bold outline-none transition placeholder:text-muted focus:border-zinc-500";
+export const consoleInputClass = cn(inputVariants(), "h-11 min-w-0 font-medium");

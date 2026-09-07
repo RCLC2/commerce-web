@@ -1,6 +1,9 @@
 import { CodeBlock } from "./docs-content";
 
 export type DemoName =
+  | "page-heading"
+  | "pagination"
+  | "drawer"
   | "button"
   | "field"
   | "tabs"

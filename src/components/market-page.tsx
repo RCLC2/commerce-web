@@ -54,21 +54,21 @@ export function MarketPage({ marketId }: { marketId: number }) {
 
   const market = marketQuery.data;
   const products = productsQuery.data?.items ?? [];
-  if (marketQuery.isLoading) return <main className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted">마켓을 불러오는 중입니다.</main>;
-  if (marketQuery.error || !market) return <main className="mx-auto max-w-6xl px-4 py-16"><div className="rounded-md border border-red-200 bg-red-50 p-8 text-center"><h1 className="text-xl font-black text-red-900">마켓을 불러오지 못했습니다.</h1><Button className="mt-4" size="sm" variant="secondary" onClick={() => void marketQuery.refetch()}>마켓 다시 불러오기</Button></div></main>;
+  if (marketQuery.isLoading) return <main className="mx-auto max-w-6xl px-4 py-8 text-sm text-content-secondary">마켓을 불러오는 중입니다.</main>;
+  if (marketQuery.error || !market) return <main className="mx-auto max-w-6xl px-4 py-16"><div className="rounded-md border border-status-negative-border bg-status-negative-subtle p-8 text-center"><h1 className="text-xl font-bold text-status-negative">마켓을 불러오지 못했습니다.</h1><Button className="mt-4" size="sm" variant="secondary" onClick={() => void marketQuery.refetch()}>마켓 다시 불러오기</Button></div></main>;
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24">
-      <section className="overflow-hidden rounded-md border border-line bg-white">
-        <div className="relative h-56 bg-zinc-100 md:h-72"><SafeImage src={market.cover_image_url} alt={market.name} fill sizes="100vw" className="object-cover" /></div>
+      <section className="overflow-hidden rounded-md border border-border-subtle bg-surface-raised">
+        <div className="relative h-56 bg-surface-subtle md:h-72"><SafeImage src={market.cover_image_url} alt={market.name} fill sizes="100vw" className="object-cover" /></div>
         <div className="flex flex-col gap-4 p-5 md:flex-row md:items-end md:justify-between">
           <div className="flex gap-4">
-            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-line bg-zinc-100"><SafeImage src={market.profile_image_url} alt="" fill sizes="80px" className="object-cover" /></div>
-            <div><div className="flex items-center gap-2"><Store size={18} className="text-brand" /><h1 className="text-2xl font-black">{market.name}</h1></div><p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{market.description}</p></div>
+            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-border-subtle bg-surface-subtle"><SafeImage src={market.profile_image_url} alt="" fill sizes="80px" className="object-cover" /></div>
+            <div><div className="flex items-center gap-2"><Store size={18} className="text-action-primary" /><h1 className="text-2xl font-bold">{market.name}</h1></div><p className="mt-2 max-w-2xl text-sm leading-6 text-content-secondary">{market.description}</p></div>
           </div>
           <Button
             variant={following === true ? "primary" : following === false ? "secondary" : "ghost"}
-            className={following === undefined ? "border border-dashed border-zinc-300 bg-zinc-50 text-muted" : undefined}
+            className={following === undefined ? "border border-dashed border-border-interactive bg-surface-subtle text-content-secondary" : undefined}
             disabled={Boolean(token) && (following === undefined || toggle.isPending)}
             onClick={() => {
               if (!token) {
@@ -86,26 +86,26 @@ export function MarketPage({ marketId }: { marketId: number }) {
           </Button>
         </div>
         {followQuery.error ? (
-          <div className="mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 rounded-md bg-red-50 p-3 text-sm font-bold text-brand">
+          <div className="mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 rounded-md bg-status-negative-subtle p-3 text-sm font-bold text-action-primary">
             <p>팔로우 상태를 확인하지 못했습니다. {apiErrorMessage(followQuery.error)}</p>
             <Button size="sm" variant="secondary" onClick={() => void followQuery.refetch()}>팔로우 상태 다시 확인</Button>
           </div>
         ) : null}
         {toggle.error ? (
-          <div className="mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 rounded-md bg-red-50 p-3 text-sm font-bold text-brand">
+          <div className="mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 rounded-md bg-status-negative-subtle p-3 text-sm font-bold text-action-primary">
             <p>마켓 팔로우 상태를 저장하지 못했습니다. {apiErrorMessage(toggle.error)}</p>
             <Button size="sm" variant="secondary" disabled={toggle.isPending} onClick={() => void reconcileToggle()}>상태 확인 후 다시 시도</Button>
           </div>
         ) : null}
-        {toggle.isSuccess ? <p className="mx-5 mb-5 rounded-md bg-emerald-50 p-3 text-sm font-bold text-emerald-900" role="status">마켓 팔로우 상태를 저장했습니다.</p> : null}
-        {toggleResolution ? <p className="mx-5 mb-5 rounded-md bg-emerald-50 p-3 text-sm font-bold text-emerald-900" role="status">{toggleResolution}</p> : null}
+        {toggle.isSuccess ? <p className="mx-5 mb-5 rounded-md bg-status-positive-subtle p-3 text-sm font-bold text-status-positive" role="status">마켓 팔로우 상태를 저장했습니다.</p> : null}
+        {toggleResolution ? <p className="mx-5 mb-5 rounded-md bg-status-positive-subtle p-3 text-sm font-bold text-status-positive" role="status">{toggleResolution}</p> : null}
       </section>
       <section className="py-8">
-        <h2 className="text-xl font-black">마켓 상품</h2>
-        {productsQuery.isLoading ? <p className="mt-5 text-sm text-muted">상품을 불러오는 중입니다.</p> : null}
-        {productsQuery.error ? <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-md bg-red-50 p-4 text-sm font-bold text-brand"><p>마켓 상품을 불러오지 못했습니다. {apiErrorMessage(productsQuery.error)}</p><Button size="sm" variant="secondary" onClick={() => void productsQuery.refetch()}>상품 다시 불러오기</Button></div> : null}
+        <h2 className="text-xl font-bold">마켓 상품</h2>
+        {productsQuery.isLoading ? <p className="mt-5 text-sm text-content-secondary">상품을 불러오는 중입니다.</p> : null}
+        {productsQuery.error ? <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-md bg-status-negative-subtle p-4 text-sm font-bold text-status-negative"><p>마켓 상품을 불러오지 못했습니다. {apiErrorMessage(productsQuery.error)}</p><Button size="sm" variant="secondary" onClick={() => void productsQuery.refetch()}>상품 다시 불러오기</Button></div> : null}
         {productsQuery.isSuccess && products.length ? <div className="mt-5 grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">{products.map((product) => <ProductCard key={product.id} product={product} />)}</div> : null}
-        {productsQuery.isSuccess && !products.length ? <p className="mt-5 rounded-md border border-line bg-white p-8 text-center text-sm text-muted">등록된 상품이 없습니다.</p> : null}
+        {productsQuery.isSuccess && !products.length ? <p className="mt-5 rounded-md border border-border-subtle bg-surface-raised p-8 text-center text-sm text-content-secondary">등록된 상품이 없습니다.</p> : null}
       </section>
     </main>
   );

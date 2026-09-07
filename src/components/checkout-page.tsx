@@ -1,5 +1,10 @@
 "use client";
 
+import { PageHeading } from "./ui/page-heading";
+import { ClipboardList as PageIcon } from "lucide-react";
+
+import { ButtonLink } from "@/components/ui/button-link";
+
 import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -308,7 +313,7 @@ export function CheckoutPage() {
   });
 
   if (!token) {
-    return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-black">로그인이 필요합니다</h1><Link href="/login"><Button className="mt-5">로그인하기</Button></Link></main>;
+    return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-bold">로그인이 필요합니다</h1><ButtonLink href="/login" className="mt-5">로그인하기</ButtonLink></main>;
   }
 
   const blockingError = cart.error ?? (!createdOrderCode ? addresses.error : null);
@@ -316,7 +321,7 @@ export function CheckoutPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 pb-28 pt-8">
-      <h1 className="text-2xl font-black">주문서</h1>
+      <PageHeading icon={<PageIcon />} title="주문서" />
       {!createdOrderCode && requestedCartItemIDs !== null && cart.isSuccess && !items.length ? (
         <Notice className="mt-5" tone="warning" title="선택한 장바구니 상품을 찾을 수 없습니다."><Link href="/cart" className="font-bold underline">장바구니에서 다시 선택해주세요.</Link></Notice>
       ) : null}
@@ -328,7 +333,7 @@ export function CheckoutPage() {
         </Notice>
       ) : null}
       {supportingError ? (
-        <Notice className="mt-3" tone="warning" title="쿠폰·포인트·참고용 배송지 일부를 불러오지 못했습니다.">
+        <Notice className="mt-3" tone="warning" title="쿠폰·포인트·배송지 정보를 일부 불러오지 못했습니다.">
           할인 없이 주문은 계속할 수 있습니다.
           <Button className="mt-3" size="sm" variant="secondary" onClick={() => {
             void coupons.refetch(); void profile.refetch(); void addresses.refetch();
@@ -338,18 +343,18 @@ export function CheckoutPage() {
       <div className="mt-6 grid gap-6 md:grid-cols-[1fr_340px]">
         <section className="space-y-5">
           <Surface padding="sm">
-            <h2 className="font-black">기본 배송지</h2>
+            <h2 className="font-bold">기본 배송지</h2>
             {defaultAddress ? (
               <div className="mt-3 text-sm leading-6">
                 <p className="font-bold">{defaultAddress.receiver} / {defaultAddress.phone}</p>
-                <p className="text-muted">({defaultAddress.zip_code}) {defaultAddress.line1} {defaultAddress.line2}</p>
+                <p className="text-content-secondary">({defaultAddress.zip_code}) {defaultAddress.line1} {defaultAddress.line2}</p>
               </div>
-            ) : <p className="mt-3 text-sm text-muted">등록된 기본 배송지가 없습니다.</p>}
-            {defaultAddress ? <p className="mt-3 text-xs font-bold text-status-positive">이 배송지는 주문 당시 정보로 저장되어 셀러와 관리자 배송 처리에 사용됩니다.</p> : null}
+            ) : <p className="mt-3 text-sm text-content-secondary">등록된 기본 배송지가 없습니다.</p>}
+            {defaultAddress ? <p className="mt-3 text-xs font-bold text-status-positive">이 주소로 배송됩니다. 받는 분과 연락처를 확인해주세요.</p> : null}
           </Surface>
 
           <Surface padding="sm">
-            <h2 className="font-black">주문 상품</h2>
+            <h2 className="font-bold">주문 상품</h2>
             {createdOrderCode ? (
               <Notice className="mt-3" tone="warning" title="복구한 주문은 현재 장바구니와 별개입니다">아래에는 서버에서 확인한 기존 주문 상품만 표시합니다. 현재 장바구니 변경사항은 이 결제에 포함되지 않습니다.</Notice>
             ) : null}
@@ -358,20 +363,20 @@ export function CheckoutPage() {
                 const option = item.product?.options?.find((candidate) => candidate.id === item.option_id);
                 return (
                   <div key={item.id} className="flex justify-between gap-4 text-sm">
-                    <div><p className="font-bold">{item.product?.name ?? `상품 #${item.product_id}`}</p><p className="mt-1 text-muted">{option ? `${option.option_name} · ${option.option_value}` : `옵션 #${item.option_id}`} · {item.quantity}개</p></div>
-                    <p className="font-black">{formatPrice(item.totalPrice)}</p>
+                    <div><p className="font-bold">{item.product?.name ?? `상품 #${item.product_id}`}</p><p className="mt-1 text-content-secondary">{option ? `${option.option_name} · ${option.option_value}` : `옵션 #${item.option_id}`} · {item.quantity}개</p></div>
+                    <p className="shrink-0 whitespace-nowrap font-bold tabular-nums">{formatPrice(item.totalPrice)}</p>
                   </div>
                 );
               })}
               {createdOrderCode && confirmedOrder && displayItems.length === 0 ? (
-                <p className="text-sm text-muted">서버 주문에 표시할 상품 상세가 없습니다. 결제 금액은 서버 확정값을 사용합니다.</p>
+                <p className="text-sm text-content-secondary">서버 주문에 표시할 상품 상세가 없습니다. 결제 금액은 서버 확정값을 사용합니다.</p>
               ) : null}
             </div>
           </Surface>
 
           <Surface padding="sm">
-            <h2 className="font-black">할인 요청</h2>
-            <Field className="mt-4" label="보유 쿠폰" htmlFor="checkout-coupon" hint="주문에는 쿠폰 정의 ID가 아닌 보유 쿠폰 ID가 전송됩니다.">
+            <h2 className="font-bold">할인 요청</h2>
+            <Field className="mt-4" label="보유 쿠폰" htmlFor="checkout-coupon" hint="주문 금액과 사용 조건에 맞는 쿠폰을 선택해주세요.">
               <Select
                 id="checkout-coupon"
                 value={eligibleSelectedCoupon?.id ?? ""}
@@ -443,16 +448,16 @@ export function CheckoutPage() {
                 <p className="mt-3 text-xs font-bold text-action-primary">최소 결제 금액은 1원입니다. 쿠폰 또는 포인트 사용액을 조정해주세요.</p>
               ) : null}
               {!createdOrderCode && addresses.isSuccess && !defaultAddress ? (
-                <p className="mt-3 text-xs font-bold text-action-primary">주문하려면 마이페이지에서 배송지를 먼저 등록해 주세요.</p>
+                <p className="mt-3 text-xs font-bold text-action-primary">등록된 배송지가 없어 주문을 진행할 수 없습니다.</p>
               ) : null}
               {restoreError ? <p className="mt-3 text-xs font-bold text-status-warning">{restoreError}</p> : null}
               {pendingAttemptBlocked && !createdOrderCode ? (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Link href="/mypage"><Button size="sm" variant="secondary">주문 내역 확인</Button></Link>
+                  <ButtonLink href="/mypage" size="sm" variant="secondary">주문 내역 확인</ButtonLink>
                   <Button size="sm" variant="secondary" onClick={() => setRestoreNonce((value) => value + 1)}>복구 다시 확인</Button>
                 </div>
               ) : null}
-              {checkout.error ? <p className="mt-3 text-sm font-bold text-action-primary">{apiErrorMessage(checkout.error)}</p> : null}
+              {checkout.error ? <p className="mt-3 text-sm font-bold text-status-negative">{apiErrorMessage(checkout.error)}</p> : null}
             </>}
           />
         </aside>

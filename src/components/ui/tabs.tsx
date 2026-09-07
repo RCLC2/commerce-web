@@ -42,7 +42,7 @@ export function Tabs({ items, value, onValueChange, className, ariaLabel = "탭"
             aria-controls={item.content ? panelId : undefined}
             tabIndex={selected ? 0 : -1}
             disabled={item.disabled}
-            className={cn("relative shrink-0 cursor-pointer px-3 py-3 text-sm font-bold text-content-secondary transition-[color] duration-[var(--commerce-motion-fast)] disabled:cursor-not-allowed disabled:opacity-40", selected && "text-content-primary after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-action-primary")}
+            className={cn("relative shrink-0 cursor-pointer px-3 py-3 text-sm font-bold text-content-secondary not-disabled:hover:bg-action-secondary not-disabled:hover:text-action-primary transition-[color,background-color] duration-[var(--commerce-motion-fast)] disabled:cursor-not-allowed disabled:opacity-40", selected && "text-content-primary after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-action-primary")}
             onClick={() => onValueChange(item.value)}
             onKeyDown={(event) => {
               if (event.key === "ArrowRight") { event.preventDefault(); focusTab((items.filter((entry) => !entry.disabled).findIndex((entry) => entry.value === item.value) + 1) % items.filter((entry) => !entry.disabled).length); }

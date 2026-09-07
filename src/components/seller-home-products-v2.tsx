@@ -1,5 +1,7 @@
 "use client";
 
+import { Input, Select, Textarea } from "./ui/input";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -73,9 +75,9 @@ export function SellerHomePageV2() {
       <ConsoleHeader title="셀러 홈" description="주문, 출고, 배송, 정산, 상품 현황을 한 줄에서 빠르게 확인합니다." />
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {metricItems.map((metric) => (
-          <div key={metric.label} className="min-w-0 rounded-xl border border-line bg-white p-4">
-            <p className="truncate text-xs font-black text-muted">{metric.label}</p>
-            <p className="mt-2 text-2xl font-black">{metric.value.toLocaleString("ko-KR")}</p>
+          <div key={metric.label} className="min-w-0 rounded-xl border border-border-subtle bg-surface-raised p-4">
+            <p className="truncate text-xs font-bold text-content-secondary">{metric.label}</p>
+            <p className="mt-2 text-2xl font-bold">{metric.value.toLocaleString("ko-KR")}</p>
           </div>
         ))}
       </div>
@@ -84,16 +86,16 @@ export function SellerHomePageV2() {
         <ConsoleSection title="처리 필요 작업" description="현재 마켓에 해당하는 작업만 표시합니다.">
           <div className="grid gap-3">
             {(dashboard?.tasks ?? []).map((task) => (
-              <div key={task.id} className="rounded-xl bg-zinc-50 p-4">
+              <div key={task.id} className="rounded-xl bg-surface-subtle p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="font-black">{task.title}</p>
+                  <p className="font-bold">{task.title}</p>
                   <StatusBadge value={task.severity} />
                 </div>
-                <p className="mt-1 text-sm leading-6 text-muted">{task.description}</p>
+                <p className="mt-1 text-sm leading-6 text-content-secondary">{task.description}</p>
               </div>
             ))}
             {!dashboard?.tasks.length ? (
-              <p className="py-8 text-center text-sm font-bold text-muted">현재 처리할 작업이 없습니다.</p>
+              <p className="py-8 text-center text-sm font-bold text-content-secondary">현재 처리할 작업이 없습니다.</p>
             ) : null}
           </div>
         </ConsoleSection>
@@ -102,7 +104,7 @@ export function SellerHomePageV2() {
           title="최근 주문 처리"
           description="가장 최근 주문 5건만 표시합니다."
           action={
-            <Link className="text-sm font-black text-brand hover:underline" href="/seller/orders">
+            <Link className="text-sm font-bold text-action-primary hover:underline" href="/seller/orders">
               더보기
             </Link>
           }
@@ -110,7 +112,7 @@ export function SellerHomePageV2() {
           <ConsoleTable
             columns={["주문번호", "대표 상품", "상품 수", "상태", "주문일"]}
             rows={(dashboard?.recent_orders ?? []).slice(0, 5).map((order) => [
-              <span key="code" className="font-black">{order.order_code}</span>,
+              <span key="code" className="font-bold">{order.order_code}</span>,
               order.representative_product,
               String(order.item_count) + "개",
               <StatusBadge key="status" value={order.status} />,
@@ -341,23 +343,23 @@ export function SellerProductsPageV2() {
       <ConsoleSection className="mt-5" title="상품 목록 조회 및 관리">
         <FilterPanel>
           <FilterField label="상품 검색">
-            <input className={consoleInputClass} value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="상품명" />
+            <Input className={consoleInputClass} value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="상품명" />
           </FilterField>
           <FilterField label="판매 상태">
-            <select className={consoleInputClass} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
+            <Select className={consoleInputClass} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
               <option value="ALL">전체 상태</option>
               <option value="SELLING">판매중</option>
               <option value="SOLD_OUT">품절</option>
               <option value="HIDE">숨김</option>
-            </select>
+            </Select>
           </FilterField>
           <FilterField label="카테고리">
-            <select className={consoleInputClass} value={categoryID} onChange={(event) => { setCategoryID(event.target.value); setPage(1); }}>
+            <Select className={consoleInputClass} value={categoryID} onChange={(event) => { setCategoryID(event.target.value); setPage(1); }}>
               <option value="">전체 카테고리</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>{categoryLabel(category)}</option>
               ))}
-            </select>
+            </Select>
           </FilterField>
         </FilterPanel>
         <div className="mt-4">
@@ -365,10 +367,10 @@ export function SellerProductsPageV2() {
             columns={["상품", "카테고리", "판매가", "가용 재고", "상태", "수정일"]}
             rows={products.map((product) => [
               <div key="product" className="flex min-w-0 items-center gap-3">
-                <div className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-zinc-100">
+                <div className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-surface-subtle">
                   <SafeImage src={product.image_url} alt="" fill sizes="48px" className="object-cover" />
                 </div>
-                <div className="min-w-0"><p className="line-clamp-2 font-black">{product.name}</p><p className="text-xs text-muted">#{product.id}</p></div>
+                <div className="min-w-0"><p className="line-clamp-2 font-bold">{product.name}</p><p className="text-xs text-content-secondary">#{product.id}</p></div>
               </div>,
               product.category_name,
               formatPrice(product.discount_price || product.base_price),
@@ -406,27 +408,27 @@ export function SellerProductsPageV2() {
         {productQuery.data && editForm ? (
           <div className="grid gap-6">
             <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
-              <div className="relative aspect-square overflow-hidden rounded-xl bg-zinc-100">
+              <div className="relative aspect-square overflow-hidden rounded-xl bg-surface-subtle">
                 <SafeImage src={editForm.imageURL || productQuery.data.image_url} alt="" fill sizes="220px" className="object-cover" />
               </div>
               {editing ? (
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <FilterField label="상품명"><input className={consoleInputClass} value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} /></FilterField>
+                  <FilterField label="상품명"><Input className={consoleInputClass} value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} /></FilterField>
                   <FilterField label="카테고리">
-                    <select className={consoleInputClass} value={editForm.categoryID} onChange={(event) => setEditForm({ ...editForm, categoryID: event.target.value })}>
+                    <Select className={consoleInputClass} value={editForm.categoryID} onChange={(event) => setEditForm({ ...editForm, categoryID: event.target.value })}>
                       {categories.map((category) => <option key={category.id} value={category.id}>{categoryLabel(category)}</option>)}
-                    </select>
+                    </Select>
                   </FilterField>
-                  <FilterField label="정가"><input className={consoleInputClass} type="number" min={0} value={editForm.basePrice} onChange={(event) => setEditForm({ ...editForm, basePrice: event.target.value })} /></FilterField>
-                  <FilterField label="할인가"><input className={consoleInputClass} type="number" min={0} value={editForm.discountPrice} onChange={(event) => setEditForm({ ...editForm, discountPrice: event.target.value })} /></FilterField>
+                  <FilterField label="정가"><Input className={consoleInputClass} type="number" min={0} value={editForm.basePrice} onChange={(event) => setEditForm({ ...editForm, basePrice: event.target.value })} /></FilterField>
+                  <FilterField label="할인가"><Input className={consoleInputClass} type="number" min={0} value={editForm.discountPrice} onChange={(event) => setEditForm({ ...editForm, discountPrice: event.target.value })} /></FilterField>
                   <FilterField label="배송 유형">
-                    <select className={consoleInputClass} value={editForm.shippingType} onChange={(event) => setEditForm({ ...editForm, shippingType: event.target.value })}><option value="NORMAL">일반 배송</option><option value="FREE">무료 배송</option></select>
+                    <Select className={consoleInputClass} value={editForm.shippingType} onChange={(event) => setEditForm({ ...editForm, shippingType: event.target.value })}><option value="NORMAL">일반 배송</option><option value="FREE">무료 배송</option></Select>
                   </FilterField>
                   <FilterField label="상태">
-                    <select className={consoleInputClass} value={editForm.status} onChange={(event) => setEditForm({ ...editForm, status: event.target.value })}><option value="SELLING">판매중</option><option value="SOLD_OUT">품절</option><option value="HIDE">숨김</option></select>
+                    <Select className={consoleInputClass} value={editForm.status} onChange={(event) => setEditForm({ ...editForm, status: event.target.value })}><option value="SELLING">판매중</option><option value="SOLD_OUT">품절</option><option value="HIDE">숨김</option></Select>
                   </FilterField>
-                  <FilterField label="대표 이미지 URL"><input className={consoleInputClass} value={editForm.imageURL} onChange={(event) => setEditForm({ ...editForm, imageURL: event.target.value })} /></FilterField>
-                  <FilterField label="요약 설명"><input className={consoleInputClass} value={editForm.summary} onChange={(event) => setEditForm({ ...editForm, summary: event.target.value })} /></FilterField>
+                  <FilterField label="대표 이미지 URL"><Input className={consoleInputClass} value={editForm.imageURL} onChange={(event) => setEditForm({ ...editForm, imageURL: event.target.value })} /></FilterField>
+                  <FilterField label="요약 설명"><Input className={consoleInputClass} value={editForm.summary} onChange={(event) => setEditForm({ ...editForm, summary: event.target.value })} /></FilterField>
                 </div>
               ) : (
                 <DetailGrid>
@@ -443,19 +445,19 @@ export function SellerProductsPageV2() {
             </div>
             <section>
               <div className="mb-3 flex items-center justify-between gap-3">
-                <h3 className="font-black">상세 HTML</h3>
+                <h3 className="font-bold">상세 HTML</h3>
                 {editing ? <Button type="button" size="sm" variant="secondary" onClick={() => setHtmlEditor("EDIT")}>HTML 편집</Button> : null}
               </div>
-              <div className="max-h-56 overflow-y-auto whitespace-pre-wrap rounded-xl border border-line p-4 text-sm">{editForm.description || "-"}</div>
+              <div className="max-h-56 overflow-y-auto whitespace-pre-wrap rounded-xl border border-border-subtle p-4 text-sm">{editForm.description || "-"}</div>
             </section>
             <section>
-              <h3 className="mb-3 font-black">옵션</h3>
+              <h3 className="mb-3 font-bold">옵션</h3>
               <ConsoleTable
                 columns={["옵션", "추가 금액", "수량", "가용", "사용"]}
                 rows={productQuery.data.options.map((option, index) => [
                   option.option_name + ": " + option.option_value,
-                  editing ? <input key="price" className={consoleInputClass} type="number" min={0} value={editForm.options[index]?.additionalPrice ?? "0"} onChange={(event) => setEditForm({ ...editForm, options: editForm.options.map((item, itemIndex) => itemIndex === index ? { ...item, additionalPrice: event.target.value } : item) })} /> : formatPrice(option.additional_price),
-                  editing ? <input key="quantity" className={consoleInputClass} type="number" min={0} value={editForm.options[index]?.quantity ?? "0"} onChange={(event) => setEditForm({ ...editForm, options: editForm.options.map((item, itemIndex) => itemIndex === index ? { ...item, quantity: event.target.value } : item) })} /> : String(option.quantity) + "개",
+                  editing ? <Input key="price" className={consoleInputClass} type="number" min={0} value={editForm.options[index]?.additionalPrice ?? "0"} onChange={(event) => setEditForm({ ...editForm, options: editForm.options.map((item, itemIndex) => itemIndex === index ? { ...item, additionalPrice: event.target.value } : item) })} /> : formatPrice(option.additional_price),
+                  editing ? <Input key="quantity" className={consoleInputClass} type="number" min={0} value={editForm.options[index]?.quantity ?? "0"} onChange={(event) => setEditForm({ ...editForm, options: editForm.options.map((item, itemIndex) => itemIndex === index ? { ...item, quantity: event.target.value } : item) })} /> : String(option.quantity) + "개",
                   String(option.available_quantity) + "개",
                   editing ? <input key="active" type="checkbox" checked={editForm.options[index]?.isActive ?? false} onChange={(event) => setEditForm({ ...editForm, options: editForm.options.map((item, itemIndex) => itemIndex === index ? { ...item, isActive: event.target.checked } : item) })} /> : option.is_active ? "사용" : "중지",
                 ])}
@@ -481,22 +483,22 @@ export function SellerProductsPageV2() {
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <FilterField label="상품명"><input className={consoleInputClass} value={createForm.name} onChange={(event) => setCreateForm({ ...createForm, name: event.target.value })} /></FilterField>
+          <FilterField label="상품명"><Input className={consoleInputClass} value={createForm.name} onChange={(event) => setCreateForm({ ...createForm, name: event.target.value })} /></FilterField>
           <FilterField label="카테고리">
-            <select className={consoleInputClass} value={createForm.categoryID} onChange={(event) => setCreateForm({ ...createForm, categoryID: event.target.value })}>
+            <Select className={consoleInputClass} value={createForm.categoryID} onChange={(event) => setCreateForm({ ...createForm, categoryID: event.target.value })}>
               <option value="">카테고리 선택</option>
               {categories.map((category) => <option key={category.id} value={category.id}>{categoryLabel(category)}</option>)}
-            </select>
+            </Select>
           </FilterField>
-          <FilterField label="정가"><input className={consoleInputClass} type="number" min={0} value={createForm.basePrice} onChange={(event) => setCreateForm({ ...createForm, basePrice: event.target.value })} /></FilterField>
-          <FilterField label="할인가"><input className={consoleInputClass} type="number" min={0} value={createForm.discountPrice} onChange={(event) => setCreateForm({ ...createForm, discountPrice: event.target.value })} /></FilterField>
-          <FilterField label="배송 유형"><select className={consoleInputClass} value={createForm.shippingType} onChange={(event) => setCreateForm({ ...createForm, shippingType: event.target.value })}><option value="NORMAL">일반 배송</option><option value="FREE">무료 배송</option></select></FilterField>
-          <FilterField label="상태"><select className={consoleInputClass} value={createForm.status} onChange={(event) => setCreateForm({ ...createForm, status: event.target.value })}><option value="SELLING">판매중</option><option value="SOLD_OUT">품절</option><option value="HIDE">숨김</option></select></FilterField>
-          <FilterField label="대표 이미지 URL"><input className={consoleInputClass} value={createForm.imageURL} onChange={(event) => setCreateForm({ ...createForm, imageURL: event.target.value })} /></FilterField>
-          <FilterField label="요약 설명"><input className={consoleInputClass} value={createForm.summary} onChange={(event) => setCreateForm({ ...createForm, summary: event.target.value })} /></FilterField>
-          <FilterField label="옵션명"><input className={consoleInputClass} value={createForm.optionName} onChange={(event) => setCreateForm({ ...createForm, optionName: event.target.value })} placeholder="예: 색상" /></FilterField>
-          <FilterField label="옵션값"><input className={consoleInputClass} value={createForm.optionValue} onChange={(event) => setCreateForm({ ...createForm, optionValue: event.target.value })} placeholder="예: 블랙" /></FilterField>
-          <FilterField label="초기 재고"><input className={consoleInputClass} type="number" min={0} value={createForm.optionQuantity} onChange={(event) => setCreateForm({ ...createForm, optionQuantity: event.target.value })} /></FilterField>
+          <FilterField label="정가"><Input className={consoleInputClass} type="number" min={0} value={createForm.basePrice} onChange={(event) => setCreateForm({ ...createForm, basePrice: event.target.value })} /></FilterField>
+          <FilterField label="할인가"><Input className={consoleInputClass} type="number" min={0} value={createForm.discountPrice} onChange={(event) => setCreateForm({ ...createForm, discountPrice: event.target.value })} /></FilterField>
+          <FilterField label="배송 유형"><Select className={consoleInputClass} value={createForm.shippingType} onChange={(event) => setCreateForm({ ...createForm, shippingType: event.target.value })}><option value="NORMAL">일반 배송</option><option value="FREE">무료 배송</option></Select></FilterField>
+          <FilterField label="상태"><Select className={consoleInputClass} value={createForm.status} onChange={(event) => setCreateForm({ ...createForm, status: event.target.value })}><option value="SELLING">판매중</option><option value="SOLD_OUT">품절</option><option value="HIDE">숨김</option></Select></FilterField>
+          <FilterField label="대표 이미지 URL"><Input className={consoleInputClass} value={createForm.imageURL} onChange={(event) => setCreateForm({ ...createForm, imageURL: event.target.value })} /></FilterField>
+          <FilterField label="요약 설명"><Input className={consoleInputClass} value={createForm.summary} onChange={(event) => setCreateForm({ ...createForm, summary: event.target.value })} /></FilterField>
+          <FilterField label="옵션명"><Input className={consoleInputClass} value={createForm.optionName} onChange={(event) => setCreateForm({ ...createForm, optionName: event.target.value })} placeholder="예: 색상" /></FilterField>
+          <FilterField label="옵션값"><Input className={consoleInputClass} value={createForm.optionValue} onChange={(event) => setCreateForm({ ...createForm, optionValue: event.target.value })} placeholder="예: 블랙" /></FilterField>
+          <FilterField label="초기 재고"><Input className={consoleInputClass} type="number" min={0} value={createForm.optionQuantity} onChange={(event) => setCreateForm({ ...createForm, optionQuantity: event.target.value })} /></FilterField>
           <div className="grid content-end">
             <Button type="button" variant="secondary" onClick={() => setHtmlEditor("CREATE")}>상세 HTML 편집</Button>
           </div>
@@ -511,8 +513,8 @@ export function SellerProductsPageV2() {
         onClose={() => setHtmlEditor(undefined)}
         footer={<Button type="button" onClick={() => setHtmlEditor(undefined)}>편집 완료</Button>}
       >
-        <textarea
-          className="min-h-[52vh] w-full resize-y rounded-xl border border-line bg-zinc-950 p-4 font-mono text-sm leading-6 text-zinc-100 outline-none focus:border-zinc-500"
+        <Textarea
+          className="min-h-[52vh] w-full resize-y rounded-xl border border-border-interactive bg-content-primary p-4 font-mono text-sm leading-6 text-content-inverse outline-none focus:border-border-interactive"
           value={htmlEditor === "EDIT" ? editForm?.description ?? "" : createForm.description}
           onChange={(event) => {
             if (htmlEditor === "EDIT" && editForm) setEditForm({ ...editForm, description: event.target.value });
