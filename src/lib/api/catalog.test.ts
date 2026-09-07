@@ -39,6 +39,48 @@ describe("catalogApi backend contracts", () => {
     expect(fetchMock.mock.calls[0][0]).toContain("/api/v1/markets?sort=popular&limit=12");
   });
 
+  it("passes limit and offset when paging popular products", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await catalogApi.listPopularProducts({ limit: 12, offset: 24 });
+
+    expect(fetchMock.mock.calls[0][0]).toContain("/api/v1/products/popular?limit=12&offset=24");
+  });
+
+  it.each(["trending", "new-products"] as const)("requests %s market discovery rankings", async (sort) => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify([{
+      id: 3,
+      name: "발견 마켓",
+      description: "새로운 스타일",
+      follower_count: 120,
+      recent_follower_count: 14,
+      new_product_count: 8,
+      status: "OPEN",
+    }]), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const markets = await catalogApi.listMarkets({ sort, limit: 12 });
+
+    expect(fetchMock.mock.calls[0][0]).toContain(`/api/v1/markets?sort=${sort}&limit=12`);
+    expect(markets[0]).toMatchObject({ recent_follower_count: 14, new_product_count: 8 });
+  });
+
+  it("loads the two PDP shelves from their dedicated routes", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ mode: "PLATFORM_RECOMMENDED", items: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await catalogApi.getProductMarketShelf(7, 8);
+    await catalogApi.getSimilarProducts(7, 12);
+
+    expect(fetchMock.mock.calls.map((call) => new URL(String(call[0])).pathname + new URL(String(call[0])).search)).toEqual([
+      "/api/v1/products/7/market-shelf?limit=8",
+      "/api/v1/products/7/similar?limit=12",
+    ]);
+  });
+
   it("does not replace category, PLP, product, or event 404 responses", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(new Response("not found", { status: 404 }))));
     await expect(catalogApi.getCategoryInformation({ category: "outer" })).rejects.toMatchObject({ status: 404 });

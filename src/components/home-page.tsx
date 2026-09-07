@@ -1,10 +1,11 @@
 "use client";
 
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueries, useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Store } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { cryptoSafeID } from "@/lib/ad-events";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { couponPriceForProduct } from "@/lib/product-card-pricing";
 import { queryKeys } from "@/lib/query-keys";
@@ -13,7 +14,7 @@ import { useSessionStore } from "@/lib/session-store";
 import { ApiErrorState } from "./api-error-state";
 import { ProductCard } from "./product-card";
 import { ProductCardPrice } from "./product-card-price";
-import { SponsoredPlacement } from "./advertising/sponsored-placement";
+import { HomeContextTextCard, HomeFeatureCard } from "./home-placement-cards";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
@@ -32,10 +33,29 @@ function isLegacyRecommendationSection(section: CMSHomeSection) {
   return section.api_url.includes("/products/recommendations");
 }
 
+const HOME_RECOMMENDATION_PAGE_SIZE = 12;
+
+function nextRecommendationOffset(lastPage: { products: Product[] }, pages: Array<{ products: Product[] }>) {
+  if (lastPage.products.length < HOME_RECOMMENDATION_PAGE_SIZE) {
+    return undefined;
+  }
+
+  const previousProductIDs = new Set(
+    pages.slice(0, -1).flatMap((page) => page.products.map((product) => product.id)),
+  );
+  if (lastPage.products.every((product) => previousProductIDs.has(product.id))) {
+    return undefined;
+  }
+
+  return pages.length * HOME_RECOMMENDATION_PAGE_SIZE;
+}
+
 export function HomePage() {
   const token = useSessionStore((state) => state.accessToken);
   const memberID = useSessionStore((state) => state.memberID);
   const hydrated = useSessionStore((state) => state.hydrated);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const [homePlacementRequestID] = useState(() => `home-${cryptoSafeID()}`);
   const effectiveToken = getEffectiveToken(token);
   const eventsQuery = useQuery({
     queryKey: queryKeys.events,
@@ -52,21 +72,40 @@ export function HomePage() {
     queryFn: api.listHomeSections,
   });
   const homeSections = homeSectionsQuery.data ?? [];
-  const recommendationQuery = useQuery({
+  const homePlacementsQuery = useQuery({
+    queryKey: queryKeys.homePlacements(memberID),
+    queryFn: () => api.homePlacements(homePlacementRequestID, effectiveToken),
+    enabled: hydrated,
+    retry: false,
+  });
+  const recommendationQuery = useInfiniteQuery({
     queryKey: queryKeys.homeRecommendations(memberID),
-    queryFn: async () => {
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
       if (!effectiveToken) {
-        return { source: "GUEST" as const, products: await api.listPopularProducts() };
+        return {
+          source: "GUEST" as const,
+          products: await api.listPopularProducts({ limit: HOME_RECOMMENDATION_PAGE_SIZE, offset: pageParam }),
+        };
       }
-      const recommendations = await api.listMyRecommendations(effectiveToken, 12);
+      const recommendations = await api.listMyRecommendations(effectiveToken, {
+        limit: HOME_RECOMMENDATION_PAGE_SIZE,
+        offset: pageParam,
+      });
       return {
         source: recommendations[0]?.source ?? "BATCH",
         products: recommendations.map((recommendation) => recommendation.product),
       };
     },
+    getNextPageParam: nextRecommendationOffset,
     enabled: hydrated,
   });
-  const recommendationProducts = recommendationQuery.data?.products ?? [];
+  const recommendationProducts = Array.from(
+    new Map(
+      (recommendationQuery.data?.pages.flatMap((page) => page.products) ?? [])
+        .map((product) => [product.id, product] as const),
+    ).values(),
+  );
   const profileQuery = useQuery({
     queryKey: queryKeys.homeMe(memberID),
     queryFn: () => api.me(effectiveToken ?? ""),
@@ -74,7 +113,7 @@ export function HomePage() {
   });
   const profile = profileQuery.data;
   const profileName = profile?.email?.split("@")[0] || "회원";
-  const recommendationSource = recommendationQuery.data?.source ?? (hydrated && !effectiveToken ? "GUEST" : undefined);
+  const recommendationSource = recommendationQuery.data?.pages[0]?.source ?? (hydrated && !effectiveToken ? "GUEST" : undefined);
   const recommendationTitle = recommendationSource === "GUEST"
     ? "지금 많이 보는 상품"
     : recommendationSource === "FALLBACK"
@@ -96,6 +135,19 @@ export function HomePage() {
     })),
   });
 
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = recommendationQuery;
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+        void fetchNextPage();
+      }
+    }, { rootMargin: "320px 0px" });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24">
       <section className="py-5">
@@ -104,7 +156,7 @@ export function HomePage() {
         ) : events.length ? (
           <EventCarousel events={events} />
         ) : eventsQuery.isLoading ? (
-          <div className="h-64 animate-pulse rounded-md bg-border-subtle" />
+          <div className="h-52 animate-pulse rounded-md bg-border-subtle md:h-72" />
         ) : <p className="rounded-md border border-border-subtle bg-surface-raised p-6 text-sm text-content-secondary">진행 중인 이벤트가 없습니다.</p>}
       </section>
 
@@ -124,13 +176,11 @@ export function HomePage() {
           ))}
         </div>
       </section>
-
-      <section className="py-3" aria-label="메인 보장형 광고">
-        <SponsoredPlacement placementKey="home.main_banner" />
-      </section>
-      <section className="py-2" aria-label="홈 프로모션 카드">
-        <SponsoredPlacement placementKey="home.promotion_card" />
-      </section>
+      <HomeContextTextCard
+        card={homePlacementsQuery.data?.context_text.card}
+        token={effectiveToken}
+        memberID={memberID}
+      />
       {homeSectionsQuery.isError ? <ApiErrorState className="my-7" error={homeSectionsQuery.error} onRetry={() => void homeSectionsQuery.refetch()} retryLabel="홈 구좌 다시 시도" /> : null}
       {homeSectionsQuery.isLoading ? <p className="py-7 text-sm text-content-secondary">홈 상품 구좌를 불러오는 중입니다.</p> : null}
       {homeSectionsQuery.isSuccess && displayHomeSections.length === 0 ? <p className="py-7 text-sm text-content-secondary">표시할 홈 상품 구좌가 없습니다.</p> : null}
@@ -146,8 +196,8 @@ export function HomePage() {
           onRetry={() => void homeSectionQueries[index]?.refetch()}
         />
       ))}
-      <section className="py-3" aria-label="스폰서드 상품">
-        <SponsoredPlacement placementKey="home_feed.sponsored_card" />
+      <section className="py-2" aria-label="홈 추천 카드">
+        <HomeFeatureCard card={homePlacementsQuery.data?.feature_card.card} token={effectiveToken} memberID={memberID} />
       </section>
 
       <section id="recommendations" className="scroll-mt-20 py-7">
@@ -174,6 +224,10 @@ export function HomePage() {
           </div>
         )}
         {recommendationQuery.isSuccess && recommendationProducts.length === 0 ? <p className="text-sm text-content-secondary">표시할 추천 상품이 없습니다.</p> : null}
+        <div ref={loadMoreRef} className="h-8" aria-hidden="true" />
+        {recommendationQuery.hasNextPage || recommendationQuery.isFetchingNextPage ? (
+          <p className="text-center text-xs text-content-secondary">추천 상품을 더 불러오는 중입니다.</p>
+        ) : null}
       </section>
     </main>
   );
@@ -237,12 +291,12 @@ export function EventCarousel({ events }: { events: CommerceEvent[] }) {
       >
         {events.map((event, index) => (
           <Link key={event.id} href={`/events/${event.id}`} className="block min-w-full">
-            <div className="relative h-64 bg-surface-subtle md:h-[380px]">
+            <div className="relative h-52 bg-surface-subtle md:h-72">
               <SafeImage src={event.image_url} alt={event.title} fill sizes="100vw" className="object-cover" priority={index === 0} />
               <div className="absolute inset-0 bg-black/30" />
               <div className="absolute bottom-0 left-0 max-w-lg p-5 text-content-inverse md:p-8">
                 <p className="text-sm font-bold">진행중인 이벤트</p>
-                <h1 className="mt-2 text-3xl font-bold md:text-5xl">{event.title}</h1>
+                <h1 className="mt-1.5 text-2xl font-bold md:text-3xl">{event.title}</h1>
                 <p className="mt-2 text-sm text-content-inverse/90">{event.subtitle}</p>
               </div>
             </div>

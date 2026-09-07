@@ -1,11 +1,12 @@
 "use client";
 
+import type { ComponentPropsWithRef } from "react";
 import { useRouter } from "next/navigation";
 
 /** Keeps authored internal links in the same app navigation context. */
-export function ProductDetailContent({ html, className }: { html: string; className?: string }) {
+export function ProductDetailContent({ html, ...props }: { html: string } & Omit<ComponentPropsWithRef<"div">, "children" | "dangerouslySetInnerHTML" | "onClick">) {
   const router = useRouter();
-  return <div className={className} dangerouslySetInnerHTML={{ __html: html }} onClick={(event) => {
+  return <div {...props} dangerouslySetInnerHTML={{ __html: html }} onClick={(event) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const anchor = event.target instanceof Element ? event.target.closest("a[href]") : null;
     if (!(anchor instanceof HTMLAnchorElement) || !event.currentTarget.contains(anchor) || anchor.hasAttribute("download") || (anchor.target && anchor.target !== "_self")) return;

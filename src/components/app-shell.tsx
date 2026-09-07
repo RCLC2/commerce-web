@@ -16,7 +16,7 @@ import { Drawer } from "./ui/overlay";
 
 const nav = [
   { href: "/categories", label: "카테고리", icon: Grid2X2 },
-  { href: "/market-feed", label: "마켓 피드", icon: Store },
+  { href: "/markets", label: "마켓", icon: Store },
   { href: "/today-outfit", label: "오늘의 코디", icon: Shirt },
   { href: "/", label: "홈", icon: Home, primary: true },
   { href: "/likes", label: "좋아요", icon: Heart },
@@ -26,7 +26,7 @@ const nav = [
 
 const primaryMenuItems = [
   { href: "/popular-products", label: "인기 상품" },
-  { href: "/popular-markets", label: "인기 마켓" },
+  { href: "/markets", label: "마켓" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -211,8 +211,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="font-bold text-content-primary">쇼핑</p>
             <div className="mt-2 grid [&>a]:flex [&>a]:min-h-11 [&>a]:items-center">
               <Link href="/categories" className="hover:text-content-primary hover:underline">카테고리별 상품</Link>
-              <Link href="/market-feed" className="hover:text-content-primary hover:underline">마켓 피드</Link>
-              <Link href="/popular-markets" className="hover:text-content-primary hover:underline">인기 마켓</Link>
+              <Link href="/markets" className="hover:text-content-primary hover:underline">마켓</Link>
             </div>
           </div>
           <div>

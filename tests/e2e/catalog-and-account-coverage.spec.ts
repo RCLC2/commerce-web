@@ -37,9 +37,9 @@ async function createMember(
 test.describe("remaining public catalog routes against backend origin/main", () => {
   for (const target of [
     {
-      route: "/popular-markets",
+      route: "/markets",
       endpoint: "/api/v1/markets",
-      heading: "인기 마켓",
+      heading: "마켓",
       linkPrefix: "/markets/",
     },
     {
@@ -153,19 +153,20 @@ test.describe("remaining public catalog routes against backend origin/main", () 
     await expect(page.locator('a[href^="/products/"]').first()).toBeVisible();
   });
 
-  test("legacy snapshot redirects to market feed without requesting search trends", async ({ page }) => {
+  test("legacy snapshot redirects to market discovery without requesting search trends", async ({ page }) => {
     let trendingRequestCount = 0;
     page.on("request", (request) => {
       if (request.url().includes("/api/v1/search/trending")) trendingRequestCount += 1;
     });
     const marketsResponse = page.waitForResponse((response) =>
-      response.url().includes("/api/v1/markets?sort=popular&limit=6"));
+      response.url().includes("/api/v1/markets?sort=trending&limit=12"));
     await page.goto("/snapshot");
     expect((await marketsResponse).ok()).toBeTruthy();
 
-    await expect(page).toHaveURL(/\/market-feed$/);
-    await expect(page.getByRole("heading", { name: "마켓 피드", exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "팔로우할 마켓을 찾아보세요", exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/\/markets$/);
+    await expect(page.getByRole("heading", { name: "마켓", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "지금 뜨는 마켓", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "신상이 활발한 마켓", exact: true })).toBeVisible();
     expect(trendingRequestCount).toBe(0);
   });
 });

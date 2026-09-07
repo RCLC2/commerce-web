@@ -40,12 +40,9 @@ type PlacementOption = {
 };
 
 const placementCatalog: readonly PlacementOption[] = [
-  { value: "home.main_banner", label: "홈 메인 배너", format: "BANNER", allowedTargets: ["PRODUCT", "MARKET"], pricingModel: "DAILY_FLAT" },
-  { value: "home_feed.sponsored_card", label: "홈 추천 피드", format: "PRODUCT_CARD", allowedTargets: ["PRODUCT"], pricingModel: "CPM" },
+  { value: "home.feature_card", label: "홈 통합 카드 · 상품", format: "PRODUCT_CARD", allowedTargets: ["PRODUCT"], pricingModel: "CPM" },
+  { value: "home.feature_card", label: "홈 통합 카드 · 이미지", format: "BANNER", allowedTargets: ["PRODUCT", "MARKET"], pricingModel: "DAILY_FLAT" },
   { value: "search.sponsored_top", label: "검색 결과 상단", format: "PRODUCT_CARD", allowedTargets: ["PRODUCT"], pricingModel: "CPM" },
-  { value: "pdp.card_banner", label: "상품 상세 배너", format: "BANNER", allowedTargets: ["PRODUCT", "MARKET"], pricingModel: "CPM" },
-  { value: "pdp.sponsored_market", label: "상품 상세 추천 마켓", format: "MARKET_SHELF", allowedTargets: ["MARKET"], pricingModel: "CPM" },
-  { value: "home.promotion_card", label: "홈 프로모션 카드", format: "PROMOTION_CARD", allowedTargets: ["PRODUCT", "MARKET"], pricingModel: "CPM" },
   { value: "crm.push_notification", label: "푸시 알림", format: "PUSH", allowedTargets: ["PRODUCT", "MARKET"], pricingModel: "CPM" },
 ] as const;
 
@@ -57,7 +54,7 @@ export function SellerAdvertisingPage() {
   const [productQuery, setProductQuery] = useState("");
   const debouncedProductQuery = useDebouncedValue(productQuery);
   const enabled = Boolean(session.sellerToken);
-  const placement = placementDefinition(form.placementKey);
+  const placement = placementDefinition(form.placementKey, form.creativeFormat);
   const needsProduct = form.targetType === "PRODUCT";
   const productsQuery = useQuery({
     queryKey: ["seller-ad-products", session.marketID, debouncedProductQuery],
@@ -136,7 +133,7 @@ export function SellerAdvertisingPage() {
       >
         <div className="grid gap-3 lg:grid-cols-3">
           <Field label="캠페인 이름"><Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className={inputClass} placeholder="가을 신상품 피드 광고" /></Field>
-          <Field label="노출 지면"><Select value={form.placementKey} onChange={(event) => setForm(changePlacement(form, event.target.value as AdPlacement))} className={inputClass}>{placementCatalog.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></Field>
+          <Field label="노출 지면"><Select value={placementOptionValue(placement)} onChange={(event) => setForm(changePlacement(form, event.target.value))} className={inputClass}>{placementCatalog.map((option) => <option key={placementOptionValue(option)} value={placementOptionValue(option)}>{option.label}</option>)}</Select></Field>
           <Field label="광고 형식"><Input readOnly value={`${displayLabel(placement.format)} · ${displayLabel(placement.pricingModel)}`} className={inputClass} /></Field>
           <Field label="광고 대상"><Select value={form.targetType} onChange={(event) => setForm({ ...form, targetType: event.target.value as TargetType, productID: "" })} disabled={placement.allowedTargets.length === 1} className={inputClass}>{placement.allowedTargets.map((target) => <option key={target} value={target}>{target === "PRODUCT" ? "상품" : "내 마켓"}</option>)}</Select></Field>
           {needsProduct ? (
@@ -189,14 +186,14 @@ export function AdminAdvertisingPage() {
 		{createRate.isError || review.isError || adminTransition.isError ? <p className="mt-3 text-sm font-bold text-status-negative">{apiErrorMessage(createRate.error ?? review.error ?? adminTransition.error)}</p> : null}
       <ConsoleSection className="mt-5" title="지면 가격표 등록" description="CPM은 1,000회 노출당 원화, 일 임대는 하루 원화 기준으로 입력합니다.">
         <div className="grid gap-3 lg:grid-cols-3">
-          <Field label="노출 지면"><Select value={rate.placementKey} onChange={(event) => setRate({ ...rate, placementKey: event.target.value as AdPlacement })} className={inputClass}>{placementCatalog.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></Field>
-          <Field label="광고 형식"><Input readOnly value={displayLabel(placementDefinition(rate.placementKey).format)} className={inputClass} /></Field>
-          <Field label={placementDefinition(rate.placementKey).pricingModel === "DAILY_FLAT" ? "일 임대 단가 (원)" : "CPM 단가 (원)"}><Input type="number" min="1" value={rate.priceWon} onChange={(event) => setRate({ ...rate, priceWon: event.target.value })} className={inputClass} /></Field>
+          <Field label="노출 지면"><Select value={placementOptionValue(placementDefinition(rate.placementKey, rate.creativeFormat))} onChange={(event) => setRate(changeRatePlacement(rate, event.target.value))} className={inputClass}>{placementCatalog.map((option) => <option key={placementOptionValue(option)} value={placementOptionValue(option)}>{option.label}</option>)}</Select></Field>
+          <Field label="광고 형식"><Input readOnly value={displayLabel(rate.creativeFormat)} className={inputClass} /></Field>
+          <Field label={placementDefinition(rate.placementKey, rate.creativeFormat).pricingModel === "DAILY_FLAT" ? "일 임대 단가 (원)" : "CPM 단가 (원)"}><Input type="number" min="1" value={rate.priceWon} onChange={(event) => setRate({ ...rate, priceWon: event.target.value })} className={inputClass} /></Field>
         </div>
         <div className="mt-4 flex gap-3"><Button disabled={createRate.isPending || !Number(rate.priceWon)} onClick={() => createRate.mutate()}>{createRate.isPending ? "등록 중" : "가격표 등록"}</Button></div>
       </ConsoleSection>
       <ConsoleSection className="mt-5" title="활성 가격표">
-        <DataTable columns={["지면", "과금 방식", "단가", "상태"]} rows={rates.map((item) => [placementLabel(ratePlacement(item)), displayLabel(ratePricingModel(item)), formatWon(ratePriceMicros(item)), <StatusBadge key="status" value={item.status} />])} />
+        <DataTable columns={["지면", "형식", "과금 방식", "단가", "상태"]} rows={rates.map((item) => [placementLabel(ratePlacement(item)), displayLabel(item.creative_format), displayLabel(ratePricingModel(item)), formatWon(ratePriceMicros(item)), <StatusBadge key="status" value={item.status} />])} />
       </ConsoleSection>
       <ConsoleSection className="mt-5" title="캠페인 검수" action={<Input value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} className={inputClass} placeholder="반려할 때 사유 입력" aria-label="반려 사유" />}>
         <DataTable
@@ -273,11 +270,11 @@ function campaignMetrics(campaigns: AdCampaign[]) {
 }
 
 function emptyCampaignForm() {
-  return { name: "", productID: "", targetType: "PRODUCT" as TargetType, placementKey: "home_feed.sponsored_card" as AdPlacement, imageURL: "", dailyBudgetWon: "", startsAt: "", endsAt: "" };
+  return { name: "", productID: "", targetType: "PRODUCT" as TargetType, placementKey: "home.feature_card" as AdPlacement, creativeFormat: "PRODUCT_CARD" as CreativeFormat, imageURL: "", dailyBudgetWon: "", startsAt: "", endsAt: "" };
 }
 
 function campaignPayload(form: ReturnType<typeof emptyCampaignForm>, marketID?: number | null) {
-  const placement = placementDefinition(form.placementKey);
+  const placement = placementDefinition(form.placementKey, form.creativeFormat);
   const targetID = form.targetType === "PRODUCT" ? Number(form.productID) : Number(marketID);
   const landingURL = form.targetType === "PRODUCT" ? `/products/${targetID}` : `/markets/${targetID}`;
   const creative: Record<string, unknown> = { format: placement.format, landing_url: landingURL };
@@ -298,7 +295,7 @@ function campaignPayload(form: ReturnType<typeof emptyCampaignForm>, marketID?: 
 }
 
 function canCreateCampaign(form: ReturnType<typeof emptyCampaignForm>, products: SellerAdProduct[], marketID?: number | null) {
-  const placement = placementDefinition(form.placementKey);
+  const placement = placementDefinition(form.placementKey, form.creativeFormat);
   if (!form.name.trim() || !form.startsAt || !form.endsAt || !placement.allowedTargets.includes(form.targetType)) return false;
   if (form.targetType === "PRODUCT" && !products.some((product) => product.id === Number(form.productID))) return false;
   if (form.targetType === "MARKET" && !marketID) return false;
@@ -313,27 +310,40 @@ function canCreateCampaign(form: ReturnType<typeof emptyCampaignForm>, products:
 }
 
 function emptyRateForm() {
-  return { placementKey: "home_feed.sponsored_card" as AdPlacement, priceWon: "" };
+  return { placementKey: "home.feature_card" as AdPlacement, creativeFormat: "PRODUCT_CARD" as CreativeFormat, priceWon: "" };
 }
 
 function ratePayload(rate: ReturnType<typeof emptyRateForm>) {
-  const pricingModel = placementDefinition(rate.placementKey).pricingModel;
-  return { placement_key: rate.placementKey, pricing_model: pricingModel, cpm_micros: pricingModel === "CPM" ? wonToMicros(rate.priceWon) : 0, daily_flat_price_micros: pricingModel === "DAILY_FLAT" ? wonToMicros(rate.priceWon) : 0, effective_from: new Date().toISOString(), status: "ACTIVE" };
+  const pricingModel = placementDefinition(rate.placementKey, rate.creativeFormat).pricingModel;
+  return { placement_key: rate.placementKey, creative_format: rate.creativeFormat, pricing_model: pricingModel, cpm_micros: pricingModel === "CPM" ? wonToMicros(rate.priceWon) : 0, daily_flat_price_micros: pricingModel === "DAILY_FLAT" ? wonToMicros(rate.priceWon) : 0, effective_from: new Date().toISOString(), status: "ACTIVE" };
 }
 
-function placementDefinition(key: AdPlacement) {
-  return placementCatalog.find((placement) => placement.value === key) ?? placementCatalog[0];
+function placementDefinition(key: AdPlacement, format: CreativeFormat) {
+  return placementCatalog.find((placement) => placement.value === key && placement.format === format) ?? placementCatalog[0];
 }
 
-function changePlacement(form: ReturnType<typeof emptyCampaignForm>, placementKey: AdPlacement) {
-  const placement = placementDefinition(placementKey);
+function placementOptionValue(placement: Pick<PlacementOption, "value" | "format">) {
+  return `${placement.value}:${placement.format}`;
+}
+
+function placementFromOptionValue(value: string) {
+  return placementCatalog.find((placement) => placementOptionValue(placement) === value) ?? placementCatalog[0];
+}
+
+function changePlacement(form: ReturnType<typeof emptyCampaignForm>, value: string) {
+  const placement = placementFromOptionValue(value);
   const targetType = placement.allowedTargets.includes(form.targetType) ? form.targetType : placement.allowedTargets[0];
-  return { ...form, placementKey, targetType, productID: targetType === "PRODUCT" ? form.productID : "", imageURL: placement.format === "BANNER" ? form.imageURL : "" };
+  return { ...form, placementKey: placement.value, creativeFormat: placement.format, targetType, productID: targetType === "PRODUCT" ? form.productID : "", imageURL: placement.format === "BANNER" ? form.imageURL : "" };
+}
+
+function changeRatePlacement(rate: ReturnType<typeof emptyRateForm>, value: string) {
+  const placement = placementFromOptionValue(value);
+  return { ...rate, placementKey: placement.value, creativeFormat: placement.format };
 }
 
 function selectProduct(form: ReturnType<typeof emptyCampaignForm>, productID: string, products: SellerAdProduct[]) {
   const product = products.find((item) => item.id === Number(productID));
-  return { ...form, productID, imageURL: placementDefinition(form.placementKey).format === "BANNER" ? product?.image_url ?? "" : form.imageURL };
+  return { ...form, productID, imageURL: placementDefinition(form.placementKey, form.creativeFormat).format === "BANNER" ? product?.image_url ?? "" : form.imageURL };
 }
 
 function isHTTPURL(value: string) {

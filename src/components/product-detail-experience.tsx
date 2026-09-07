@@ -1,7 +1,5 @@
 "use client";
 
-import { ProductDetailContent } from "./product-detail-content";
-
 import { Select } from "./ui/input";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
+import { cryptoSafeID } from "@/lib/ad-events";
 import { getEffectiveToken } from "@/lib/auth-token";
 import {
   availableOptionQuantity,
@@ -22,10 +21,12 @@ import {
 import { resolveProductDetailHtml } from "@/lib/product-detail-html";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
-import type { PdpMerchandising, Product, ProductOption } from "@/lib/types";
+import type { Product, ProductOption } from "@/lib/types";
 import { discountRate, formatPrice } from "@/lib/utils";
-import { SponsoredPlacement } from "./advertising/sponsored-placement";
-import { AlsoViewedSection } from "./pdp-merchandising-sections";
+import { CollapsibleProductDetail } from "./collapsible-product-detail";
+import { PDPReviewBanner } from "./home-placement-cards";
+import { PageJumpControls } from "./page-jump-controls";
+import { PDPShelfSection } from "./pdp-merchandising-sections";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 import { useAccessibleOverlay } from "./ui/use-accessible-overlay";
@@ -37,12 +38,14 @@ class CartPreflightError extends Error {
   }
 }
 
-export function ProductDetailExperience({ productId, initialProduct, initialMerchandising }: { productId: number; initialProduct?: Product; initialMerchandising: PdpMerchandising }) {
+export function ProductDetailExperience({ productId, initialProduct }: { productId: number; initialProduct?: Product }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const token = useSessionStore((state) => state.accessToken);
   const memberID = useSessionStore((state) => state.memberID);
+  const hydrated = useSessionStore((state) => state.hydrated);
   const effectiveToken = getEffectiveToken(token);
+  const reviewBannerRequestID = useMemo(() => `pdp-review-${productId}-${cryptoSafeID()}`, [productId]);
   const [quantity, setQuantity] = useState(1);
   const [optionID, setOptionID] = useState<number | null>(null);
   const [activeImage, setActiveImage] = useState(0);
@@ -67,6 +70,20 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
   const summaryQuery = useQuery({
     queryKey: [...queryKeys.productReviews(productId), "summary"],
     queryFn: () => api.getProductReviewSummary(productId),
+  });
+  const marketShelfQuery = useQuery({
+    queryKey: queryKeys.productMarketShelf(productId),
+    queryFn: () => api.getProductMarketShelf(productId),
+  });
+  const similarProductsQuery = useQuery({
+    queryKey: queryKeys.similarProducts(productId),
+    queryFn: () => api.getSimilarProducts(productId),
+  });
+  const reviewBannerQuery = useQuery({
+    queryKey: queryKeys.pdpReviewBanner(productId, memberID),
+    queryFn: () => api.pdpReviewBanner(productId, reviewBannerRequestID, effectiveToken),
+    enabled: hydrated,
+    retry: false,
   });
   const likedProductsQuery = useQuery({
     queryKey: queryKeys.likedProducts(memberID),
@@ -428,6 +445,13 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
         </aside>
       </div>
 
+      <PDPShelfSection
+        eyebrow="이 마켓의 추천"
+        title={`${product.market_name ?? "이 마켓"}의 추천 상품`}
+        description={marketShelfQuery.data?.mode === "NEWEST" ? "이 마켓에 새로 등록된 상품 순으로 보여드려요." : "플랫폼 추천 순서로 엄선한 이 마켓의 상품이에요."}
+        products={marketShelfQuery.data?.items ?? []}
+      />
+
       <section className="mt-10 border-y border-border-subtle py-7" aria-labelledby="review-carousel-title">
         <div className="flex items-end justify-between">
           <div>
@@ -502,21 +526,31 @@ export function ProductDetailExperience({ productId, initialProduct, initialMerc
         ) : null}
       </section>
 
-      <SponsoredPlacement placementKey="pdp.card_banner" className="mt-10" />
-
-      <SponsoredPlacement placementKey="pdp.sponsored_market" className="mt-10" />
+      <PDPReviewBanner
+        card={reviewBannerQuery.data?.card}
+        token={effectiveToken}
+        memberID={memberID}
+      />
 
       <section id="product-details" className="scroll-mt-24 pt-10">
         <div className="mx-auto max-w-3xl">
           <h2 className="text-2xl font-bold">상품 상세 정보</h2>
-          <ProductDetailContent
+          <CollapsibleProductDetail
+            key={product.id}
             className="mt-6 overflow-hidden rounded-xl bg-surface-raised text-content-primary [&_.detail-band]:px-5 [&_.detail-band]:py-12 [&_.detail-center]:mx-auto [&_.detail-center]:max-w-2xl [&_.detail-center-text]:text-center [&_.detail-hero]:bg-surface-subtle [&_.detail-eyebrow]:mt-0 [&_.detail-eyebrow]:text-xs [&_.detail-eyebrow]:font-bold [&_.detail-eyebrow]:tracking-normal [&_.detail-eyebrow]:text-action-primary [&_.detail-features_ul]:mt-5 [&_.detail-features_ul]:space-y-2 [&_.detail-features_li]:border-l-2 [&_.detail-features_li]:border-action-primary [&_.detail-features_li]:pl-3 [&_.detail-notice_.detail-center]:rounded-xl [&_.detail-notice_.detail-center]:bg-surface-subtle [&_.detail-notice_.detail-center]:p-5 [&_.detail-divider]:mx-auto [&_.detail-divider]:h-px [&_.detail-divider]:max-w-2xl [&_.detail-divider]:bg-border-subtle [&_.detail-button]:transition-colors [&_.detail-button:hover]:bg-button-primary-hover [&_.detail-button]:inline-flex [&_.detail-button]:rounded-full [&_.detail-button]:bg-content-primary [&_.detail-button]:px-5 [&_.detail-button]:py-3 [&_.detail-button]:font-bold [&_.detail-button]:text-content-inverse [&_h3]:text-2xl [&_h3]:font-bold [&_h4]:text-lg [&_h4]:font-bold [&_img]:w-full [&_p]:mt-3 [&_p]:leading-7 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border-subtle [&_td]:p-3 [&_th]:border [&_th]:border-border-subtle [&_th]:bg-surface-subtle [&_th]:p-3"
             html={detailHtml}
           />
         </div>
       </section>
 
-      <AlsoViewedSection products={initialMerchandising.also_viewed} />
+      <PDPShelfSection
+        eyebrow="비슷한 상품"
+        title="비슷한 상품 추천"
+        description="카테고리, 스타일, 가격대를 함께 살펴 골랐어요."
+        products={similarProductsQuery.data?.items ?? []}
+      />
+
+      <PageJumpControls />
 
       <div
         className={`fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 border-t border-border-subtle bg-surface-raised/95 px-4 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] backdrop-blur transition after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-4 after:bg-surface-raised ${showFloatingPurchase ? "opacity-100" : "pointer-events-none translate-y-full opacity-0"}`}

@@ -6,10 +6,11 @@ import { SponsoredDisclosure } from "./sponsored-disclosure";
 export function SponsoredBanner({ decision, onNavigate }: { decision: AdDecision; onNavigate: () => void }) {
   if (decision.creative.format !== "BANNER") return null;
   const targetName = decision.target.type === "PRODUCT" ? decision.target.product.name : decision.target.market.name;
+  const heightClass = decision.placement_key === "pdp.card_banner" ? "h-36 md:h-44" : "h-44 md:h-56";
   return (
     <article className="relative overflow-hidden rounded-2xl bg-content-primary text-content-inverse shadow-sm">
       <SponsoredDisclosure />
-      <div className="relative aspect-video md:aspect-[16/7]">
+      <div className={`relative ${heightClass}`}>
         <SafeImage
           src={decision.creative.image_url}
           alt={`${targetName} 스폰서드 배너`}
@@ -18,12 +19,12 @@ export function SponsoredBanner({ decision, onNavigate }: { decision: AdDecision
           className="object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/45 to-black/10" />
-        <Link href={decision.creative.landing_url} onClick={onNavigate} className="absolute inset-0 flex items-end p-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-white md:items-center md:p-10">
+        <Link href={decision.creative.landing_url} onClick={onNavigate} className="absolute inset-0 flex items-end p-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-white md:items-center md:p-6">
           <div className="max-w-xl pr-16">
             <p className="text-xs font-bold text-content-inverse/75">{targetName}</p>
-            <h2 className="mt-2 text-2xl font-bold md:text-4xl">{decision.creative.headline}</h2>
-            {decision.creative.body ? <p className="mt-2 line-clamp-2 text-sm text-content-inverse/80 md:text-base">{decision.creative.body}</p> : null}
-            <span className="mt-4 inline-flex rounded-full bg-surface-raised px-4 py-2 text-sm font-bold text-content-primary">{decision.creative.cta_label}</span>
+            <h2 className="mt-1 line-clamp-1 text-xl font-bold md:text-3xl">{decision.creative.headline}</h2>
+            {decision.creative.body ? <p className="mt-1 line-clamp-1 text-sm text-content-inverse/80">{decision.creative.body}</p> : null}
+            <span className="mt-3 inline-flex rounded-full bg-surface-raised px-3 py-1.5 text-xs font-bold text-content-primary">{decision.creative.cta_label}</span>
           </div>
         </Link>
       </div>

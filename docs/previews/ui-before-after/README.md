@@ -8,14 +8,14 @@
 
 | 항목 | 현재 | 개선 시안 |
 | --- | --- | --- |
-| **1. 상품 목록 필터** — 필터를 요약하고 상세 설정을 접어 첫 화면에 상품 노출 | ![현재 상품 목록](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/01-filters-before.png) | ![필터 요약 시안](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/01-filters-after.png) |
-| **2. 상품 상세 구매 영역** — 기존 구매 바를 첫 화면부터 표시하고 하단 메뉴와 높이 정리 | ![현재 구매 영역](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/02-purchase-before.png) | ![구매 바 노출 시안](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/02-purchase-after.png) |
-| **3. 하단 메뉴** — 메뉴 순서를 유지하며 홈 돌출을 없애고 아이콘·라벨 높이 통일 | ![현재 하단 메뉴](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/03-navigation-before.png) | ![하단 메뉴 정리 시안](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/03-navigation-after.png) |
-| **4. 상품 카드 여백·강조** — 가격 배치는 유지하며 제목 아래 공백 축소, 최종 금액 강조 | ![현재 상품 카드](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/04-card-before.png) | ![상품 카드 정리 시안](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/04-card-after.png) |
-| **5. 카테고리 구성** — 중첩 박스와 중복 분류·제목을 줄여 상품을 위로 배치 | ![현재 카테고리](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/05-category-before.png) | ![카테고리 단순화 시안](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/05-category-after.png) |
-| **6. 쿠폰 정보 우선순위** — 할인 혜택을 크게, 쿠폰 이름·조건은 보조 정보로 표시 | ![현재 쿠폰](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/06-coupon-before.png) | ![할인 혜택 강조 시안](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/06-coupon-after.png) |
-| **7. 모바일 푸터** — 소개 문구를 간결하게 하고 링크 그룹을 접어 높이 축소 | ![현재 푸터](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/07-footer-before.png) | ![푸터 축소 시안](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/07-footer-after.png) |
-| **8. 미등록 정보 안내** — 내부 관리용 문구 대신 상품 상세 안내 링크로 정리 | ![현재 미등록 안내](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/08-empty-before.png) | ![상품 상세 안내 시안](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/08-empty-after.png) |
-| **9. 본문 문구** — 서비스명은 유지하고 영어 섹션 라벨을 자연스러운 한국어로 통일 | ![현재 추천 영역 문구](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/09-copy-before.png) | ![한국어 문구 시안](/Users/yeongjae/commerce-web-readability/docs/previews/ui-before-after/09-copy-after.png) |
+| **1. 상품 목록 필터** — 필터를 요약하고 상세 설정을 접어 첫 화면에 상품 노출 | ![현재 상품 목록](01-filters-before.png) | ![필터 요약 시안](01-filters-after.png) |
+| **2. 상품 상세 구매 영역** — 기존 구매 바를 첫 화면부터 표시하고 하단 메뉴와 높이 정리 | ![현재 구매 영역](02-purchase-before.png) | ![구매 바 노출 시안](02-purchase-after.png) |
+| **3. 하단 메뉴** — 메뉴 순서를 유지하며 홈 돌출을 없애고 아이콘·라벨 높이 통일 | ![현재 하단 메뉴](03-navigation-before.png) | ![하단 메뉴 정리 시안](03-navigation-after.png) |
+| **4. 상품 카드 여백·강조** — 가격 배치는 유지하며 제목 아래 공백 축소, 최종 금액 강조 | ![현재 상품 카드](04-card-before.png) | ![상품 카드 정리 시안](04-card-after.png) |
+| **5. 카테고리 구성** — 중첩 박스와 중복 분류·제목을 줄여 상품을 위로 배치 | ![현재 카테고리](05-category-before.png) | ![카테고리 단순화 시안](05-category-after.png) |
+| **6. 쿠폰 정보 우선순위** — 할인 혜택을 크게, 쿠폰 이름·조건은 보조 정보로 표시 | ![현재 쿠폰](06-coupon-before.png) | ![할인 혜택 강조 시안](06-coupon-after.png) |
+| **7. 모바일 푸터** — 소개 문구를 간결하게 하고 링크 그룹을 접어 높이 축소 | ![현재 푸터](07-footer-before.png) | ![푸터 축소 시안](07-footer-after.png) |
+| **8. 미등록 정보 안내** — 내부 관리용 문구 대신 상품 상세 안내 링크로 정리 | ![현재 미등록 안내](08-empty-before.png) | ![상품 상세 안내 시안](08-empty-after.png) |
+| **9. 본문 문구** — 서비스명은 유지하고 영어 섹션 라벨을 자연스러운 한국어로 통일 | ![현재 추천 영역 문구](09-copy-before.png) | ![한국어 문구 시안](09-copy-after.png) |
 
 시안 작성일: 2026-09-06. 임시 촬영 절차는 Git에서 제외되는 `output/playwright/ui-before-after/`에 보관했다.

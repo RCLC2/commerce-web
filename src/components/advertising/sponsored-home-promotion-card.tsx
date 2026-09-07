@@ -5,7 +5,7 @@ import { SponsoredDisclosure } from "./sponsored-disclosure";
 export function SponsoredHomePromotionCard({ decision, onNavigate }: { decision: AdDecision; onNavigate: () => void }) {
   if (decision.creative.format !== "PROMOTION_CARD") return null;
   return (
-    <article className="relative overflow-hidden rounded-xl border border-action-primary/25 bg-action-secondary p-5 pr-32">
+    <article className="relative overflow-hidden rounded-xl border border-action-primary/25 bg-action-secondary p-4 pr-28">
       <SponsoredDisclosure />
       <Link href={decision.creative.landing_url} onClick={onNavigate} className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand">
         <h2 className="font-bold">{decision.creative.headline}</h2>

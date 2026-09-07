@@ -11,6 +11,8 @@ import { sellerApi } from "./api/seller";
 import { experimentApi } from "./api/experiment";
 import { onboardingApi } from "./api/onboarding";
 import { outfitApi } from "./api/outfit";
+import { homePlacementApi } from "./api/home-placements";
+import { marketDisplayApi } from "./api/market-display";
 
 export const api = {
   ...catalogApi,
@@ -26,4 +28,6 @@ export const api = {
   ...auditApi,
   ...onboardingApi,
   ...outfitApi,
+  ...homePlacementApi,
+  ...marketDisplayApi,
 };

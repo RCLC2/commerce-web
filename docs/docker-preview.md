@@ -1,9 +1,9 @@
 # Docker에서 수정 화면 사용하기
 
-프런트엔드 `commerce-web-readability`와 백엔드 `commerce-ui-support`의 현재 소스를 함께 실행한다. Docker Desktop과 Docker Compose 2.24.4 이상이 필요하다.
+프런트엔드 저장소와 백엔드 작업 폴더의 소스를 함께 실행한다. 기본 백엔드 경로는 프런트엔드의 형제 폴더 `../commerce-ui-support`이며, 다른 경로는 `COMMERCE_BACKEND_CONTEXT`로 지정한다. 장바구니 수정 API가 포함된 백엔드가 필요하다. Docker Desktop과 Docker Compose 2.24.4 이상이 필요하다.
 
 ```bash
-cd /Users/yeongjae/commerce-web-readability
+cd /path/to/commerce-web
 ./scripts/docker-preview.sh
 ```
 
