@@ -321,20 +321,40 @@ export function useDebouncedValue<T>(value: T, delay = 300) {
   return debouncedValue;
 }
 
-export function useConsoleUrlFilters(values: Record<string, string | number | undefined>) {
+export function useConsoleUrlFilters(
+  values: Record<string, string | number | undefined>,
+  onExternalChange?: (searchParams: URLSearchParams) => void,
+) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const serialized = JSON.stringify(Object.entries(values).sort(([left], [right]) => left.localeCompare(right)));
+  const previousQueryRef = useRef(searchParams.toString());
+  const onExternalChangeRef = useRef(onExternalChange);
 
   useEffect(() => {
-    const next = new URLSearchParams(searchParams.toString());
+    onExternalChangeRef.current = onExternalChange;
+  }, [onExternalChange]);
+
+  useEffect(() => {
+    const currentQuery = searchParams.toString();
+    const next = new URLSearchParams(currentQuery);
     for (const [key, value] of Object.entries(values)) {
       if (value === undefined || value === "" || value === 0 || value === "ALL") next.delete(key);
       else next.set(key, String(value));
     }
     const nextQuery = next.toString();
-    if (nextQuery !== searchParams.toString()) {
+    if (nextQuery === currentQuery) {
+      previousQueryRef.current = currentQuery;
+      return;
+    }
+    if (previousQueryRef.current !== currentQuery && onExternalChangeRef.current) {
+      onExternalChangeRef.current(new URLSearchParams(currentQuery));
+      previousQueryRef.current = currentQuery;
+      return;
+    }
+    if (nextQuery !== currentQuery) {
+      previousQueryRef.current = nextQuery;
       router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
     }
   }, [pathname, router, searchParams, serialized, values]);

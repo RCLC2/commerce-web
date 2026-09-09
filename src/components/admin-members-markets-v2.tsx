@@ -64,7 +64,12 @@ export function AdminMembersPageV2() {
   const [editStatus, setEditStatus] = useState("ACTIVE");
   const [updateResolution, setUpdateResolution] = useState<string>();
   const debouncedQuery = useDebouncedValue(query);
-  useConsoleUrlFilters({ page, q: query, role, status });
+  useConsoleUrlFilters({ page, q: query, role, status }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setRole(consoleUrlValue(next, "role", "ALL"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+  });
 
   const membersQuery = useQuery({
     queryKey: ["admin-members-v2", page, debouncedQuery, role, status],
@@ -378,7 +383,11 @@ export function AdminMarketsPageV2() {
   const [penaltyScore, setPenaltyScore] = useState("10");
   const [penaltyReason, setPenaltyReason] = useState("");
   const debouncedQuery = useDebouncedValue(query);
-  useConsoleUrlFilters({ page, q: query, status });
+  useConsoleUrlFilters({ page, q: query, status }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+  });
 
   const marketsQuery = useQuery({
     queryKey: ["admin-markets-v2", page, debouncedQuery, status],

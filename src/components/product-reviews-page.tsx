@@ -1,14 +1,17 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, BadgeCheck, Camera, Star } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, BadgeCheck, Camera, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { ApiErrorState } from "@/components/api-error-state";
 import { queryKeys } from "@/lib/query-keys";
-import type { Product, Review, ReviewSummary } from "@/lib/types";
+import type { Product, Review, ReviewImage, ReviewSummary } from "@/lib/types";
 import { PageHeading } from "./ui/page-heading";
 import { SafeImage } from "./safe-image";
+import { Button } from "./ui/button";
+import { Dialog } from "./ui/overlay";
 
 export function ProductReviewsPage({ productId, initialProduct }: { productId: number; initialProduct?: Product }) {
   const productQuery = useQuery({
@@ -107,8 +110,8 @@ function ReviewSummaryCard({ summary }: { summary: ReviewSummary }) {
 }
 
 function ReviewCard({ review }: { review: Review }) {
-  const reviewImage = review.images?.[0];
-  const reviewImageURL = reviewImage?.thumbnail_url || reviewImage?.detail_url || reviewImage?.url;
+  const reviewImages = review.images ?? [];
+  const hasReviewImages = reviewImages.some((image) => reviewImageURL(image));
 
   return (
     <article className="rounded-surface border border-border-subtle bg-surface-raised p-5 shadow-card md:p-6">
@@ -135,11 +138,79 @@ function ReviewCard({ review }: { review: Review }) {
         {review.weight_at_time ? <span className="rounded-full bg-surface-subtle px-2 py-1 text-content-secondary">{review.weight_at_time}kg</span> : null}
       </div>
 
-      <div className={`mt-4 ${reviewImageURL ? "grid gap-4 md:grid-cols-[1fr_160px]" : ""}`}>
+      <div className={`mt-4 ${hasReviewImages ? "grid gap-4 md:grid-cols-[1fr_220px]" : ""}`}>
         <p className="whitespace-pre-wrap text-sm leading-7 text-content-secondary">{review.content}</p>
-        {reviewImageURL ? <div className="relative h-40 overflow-hidden rounded-control bg-surface-subtle md:h-32"><SafeImage src={reviewImageURL} alt="리뷰 첨부 이미지" fill sizes="(max-width: 768px) 100vw, 160px" className="object-cover" /></div> : null}
+        {hasReviewImages ? <ReviewImageGallery images={reviewImages} /> : null}
       </div>
     </article>
+  );
+}
+
+function reviewImageURL(image: ReviewImage) {
+  return image.detail_url || image.url || image.thumbnail_url;
+}
+
+function ReviewImageGallery({ images }: { images: ReviewImage[] }) {
+  const availableImages = images.filter((image) => reviewImageURL(image));
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [open, setOpen] = useState(false);
+  if (!availableImages.length) return null;
+
+  const safeIndex = Math.min(activeIndex, availableImages.length - 1);
+  const activeImage = availableImages[safeIndex];
+  const activeURL = reviewImageURL(activeImage);
+  function moveImage(delta: number) {
+    setActiveIndex((current) => (current + delta + availableImages.length) % availableImages.length);
+  }
+
+  return (
+    <>
+      <div className="grid gap-2">
+        <button
+          type="button"
+          className="relative aspect-[4/3] min-h-32 overflow-hidden rounded-control bg-surface-subtle text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+          onClick={() => setOpen(true)}
+          aria-label={`리뷰 사진 ${safeIndex + 1} 크게 보기`}
+        >
+          <SafeImage src={activeURL} alt="리뷰 첨부 이미지" fill sizes="(max-width: 768px) 100vw, 220px" className="object-cover" />
+          {availableImages.length > 1 ? <span className="absolute bottom-2 right-2 rounded-full bg-black/65 px-2.5 py-1 text-xs font-bold text-content-inverse">{safeIndex + 1} / {availableImages.length}</span> : null}
+        </button>
+        {availableImages.length > 1 ? (
+          <div className="flex gap-2 overflow-x-auto pb-1" aria-label="리뷰 첨부 사진 목록">
+            {availableImages.map((image, index) => (
+              <button
+                key={image.id}
+                type="button"
+                className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-control border-2 ${index === safeIndex ? "border-action-primary" : "border-transparent"}`}
+                onClick={() => setActiveIndex(index)}
+                aria-label={`${index + 1}번 리뷰 사진 보기`}
+                aria-pressed={index === safeIndex}
+              >
+                <SafeImage src={reviewImageURL(image)} alt="" fill sizes="64px" className="object-cover" />
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      <Dialog open={open} onClose={() => setOpen(false)} title="리뷰 첨부 사진" description={`${safeIndex + 1} / ${availableImages.length}`} className="max-w-3xl">
+        <div className="relative aspect-square overflow-hidden rounded-control bg-surface-subtle sm:aspect-[4/3]">
+          <SafeImage src={activeURL} alt="리뷰 첨부 이미지 크게 보기" fill sizes="(max-width: 640px) 100vw, 768px" className="object-contain" />
+          {availableImages.length > 1 ? (
+            <>
+              <Button variant="secondary" size="icon" className="absolute left-3 top-1/2 -translate-y-1/2" onClick={() => moveImage(-1)} aria-label="이전 리뷰 사진"><ChevronLeft size={20} /></Button>
+              <Button variant="secondary" size="icon" className="absolute right-3 top-1/2 -translate-y-1/2" onClick={() => moveImage(1)} aria-label="다음 리뷰 사진"><ChevronRight size={20} /></Button>
+            </>
+          ) : null}
+        </div>
+        {availableImages.length > 1 ? (
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <Button variant="secondary" size="sm" onClick={() => moveImage(-1)}><ChevronLeft size={16} /> 이전</Button>
+            <span className="text-sm font-bold text-content-secondary">{safeIndex + 1} / {availableImages.length}</span>
+            <Button variant="secondary" size="sm" onClick={() => moveImage(1)}>다음 <ChevronRight size={16} /></Button>
+          </div>
+        ) : null}
+      </Dialog>
+    </>
   );
 }
 

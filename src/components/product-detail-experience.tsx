@@ -259,15 +259,6 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
   const engagementLoading = Boolean(effectiveToken) && (likedProductsQuery.isFetching || wishlistQuery.isFetching);
 
   useEffect(() => {
-    const imageCount = product?.images?.length ?? 0;
-    if (imageCount <= 1) return;
-    const timer = window.setInterval(() => {
-      setActiveImage((current) => (current + 1) % imageCount);
-    }, 5000);
-    return () => window.clearInterval(timer);
-  }, [product?.images?.length]);
-
-  useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 2600);
     return () => window.clearTimeout(timer);
@@ -587,7 +578,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
       <PageJumpControls />
 
       <div
-        className={`fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[var(--commerce-z-dropdown)] border-t border-border-subtle bg-surface-raised/95 px-4 py-3 shadow-float backdrop-blur transition after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-4 after:bg-surface-raised md:bottom-0 ${showFloatingPurchase ? "opacity-100" : "pointer-events-none translate-y-full opacity-0"}`}
+        className={`fixed inset-x-0 bottom-0 z-[var(--commerce-z-dropdown)] border-t border-border-subtle bg-surface-raised/95 px-4 py-3 shadow-float backdrop-blur transition after:pointer-events-none after:absolute after:top-full after:h-4 after:bg-surface-raised ${showFloatingPurchase ? "opacity-100" : "pointer-events-none translate-y-full opacity-0"}`}
         aria-hidden={!showFloatingPurchase}
         role="group"
         aria-label="빠른 구매"
@@ -646,7 +637,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
         </div>
       ) : null}
       {toast ? (
-        <div className="pointer-events-none fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[var(--commerce-z-modal)] flex justify-center md:bottom-6">
+        <div className="pointer-events-none fixed inset-x-4 bottom-6 z-[var(--commerce-z-modal)] flex justify-center">
           <Toast tone={toast.tone} className="pointer-events-auto max-w-md">{toast.message}</Toast>
         </div>
       ) : null}

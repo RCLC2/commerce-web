@@ -58,7 +58,13 @@ export function AdminProductsPageV2() {
   const [categoryID, setCategoryID] = useState(() => consoleUrlValue(searchParams, "category"));
   const [selectedID, setSelectedID] = useState<number>();
   const debouncedQuery = useDebouncedValue(query);
-  useConsoleUrlFilters({ page, q: query, status, market: marketID, category: categoryID });
+  useConsoleUrlFilters({ page, q: query, status, market: marketID, category: categoryID }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+    setMarketID(consoleUrlValue(next, "market"));
+    setCategoryID(consoleUrlValue(next, "category"));
+  });
 
   const productsQuery = useQuery({
     queryKey: ["admin-products-v2", page, debouncedQuery, status, marketID, categoryID],
@@ -255,7 +261,14 @@ export function AdminOrdersPageV2() {
   const [selectedCode, setSelectedCode] = useState<string>();
   const [cancelResolution, setCancelResolution] = useState<string>();
   const debouncedQuery = useDebouncedValue(query);
-  useConsoleUrlFilters({ page, q: query, status, market: marketID, from, to });
+  useConsoleUrlFilters({ page, q: query, status, market: marketID, from, to }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+    setMarketID(consoleUrlValue(next, "market"));
+    setFrom(consoleUrlValue(next, "from"));
+    setTo(consoleUrlValue(next, "to"));
+  });
 
   const ordersQuery = useQuery({
     queryKey: ["admin-orders-v2", page, debouncedQuery, status, marketID, from, to],
@@ -445,7 +458,13 @@ export function AdminSettlementsPageV2() {
   const [linePage, setLinePage] = useState(1);
   const [paidResolution, setPaidResolution] = useState<string>();
   const debouncedQuery = useDebouncedValue(query);
-  useConsoleUrlFilters({ page, q: query, status, month: targetMonth, market: marketID });
+  useConsoleUrlFilters({ page, q: query, status, month: targetMonth, market: marketID }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+    setTargetMonth(consoleUrlValue(next, "month"));
+    setMarketID(consoleUrlValue(next, "market"));
+  });
 
   const settlementsQuery = useQuery({
     queryKey: ["admin-settlements-v2", page, debouncedQuery, status, targetMonth, marketID],

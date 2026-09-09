@@ -265,11 +265,11 @@ function editFormErrors(form: ProductEditForm): ProductFormErrors {
   if (discountPriceError) errors.discountPrice = discountPriceError;
   if (!form.name.trim()) errors.name = "상품명을 입력해 주세요.";
   if (!Number.isSafeInteger(Number(form.categoryID)) || Number(form.categoryID) <= 0) errors.categoryID = "카테고리를 선택해 주세요.";
-  form.options.forEach((option, index) => {
+  form.options.forEach((option) => {
     const quantityError = nonNegativeIntegerError(option.quantity, "재고");
     const priceError = nonNegativeIntegerError(option.additionalPrice, "추가 금액");
-    if (quantityError) errors[`options.${index}.quantity`] = quantityError;
-    if (priceError) errors[`options.${index}.additionalPrice`] = priceError;
+    if (quantityError) errors[`options.${option.id}.quantity`] = quantityError;
+    if (priceError) errors[`options.${option.id}.additionalPrice`] = priceError;
   });
   return errors;
 }
@@ -379,7 +379,12 @@ export function SellerProductsPageV2() {
   const [createForm, setCreateForm] = useState<ProductCreateForm>(createEmptyProduct);
   const [htmlEditor, setHtmlEditor] = useState<"CREATE" | "EDIT">();
   const debouncedQuery = useDebouncedValue(query);
-  useConsoleUrlFilters({ page, q: query, status, category: categoryID });
+  useConsoleUrlFilters({ page, q: query, status, category: categoryID }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+    setCategoryID(consoleUrlValue(next, "category"));
+  });
 
   const categoriesQuery = useQuery({
     queryKey: ["seller-product-categories-v2"],
@@ -631,13 +636,17 @@ export function SellerProductsPageV2() {
               <h3 className="mb-3 font-bold">옵션</h3>
               <ConsoleTable
                 columns={["옵션", "추가 금액", "수량", "가용", "사용"]}
-                rows={productQuery.data.options.map((option, index) => [
+                rows={productQuery.data.options.map((option) => {
+                  const editOption = editForm.options.find((item) => item.id === option.id);
+                  const optionErrorKey = editOption ? `options.${editOption.id}` : "";
+                  return [
                   option.option_name + ": " + option.option_value,
-                  editing ? <><Input key="price" aria-label={`${option.option_name} ${option.option_value} 추가 금액`} className={consoleInputClass} type="number" min={0} value={editForm.options[index]?.additionalPrice ?? "0"} onChange={(event) => setEditForm({ ...editForm, options: editForm.options.map((item, itemIndex) => itemIndex === index ? { ...item, additionalPrice: event.target.value } : item) })} /><FormError message={editErrors[`options.${index}.additionalPrice`]} /></> : formatPrice(option.additional_price),
-                  editing ? <><Input key="quantity" aria-label={`${option.option_name} ${option.option_value} 수량`} className={consoleInputClass} type="number" min={0} value={editForm.options[index]?.quantity ?? "0"} onChange={(event) => setEditForm({ ...editForm, options: editForm.options.map((item, itemIndex) => itemIndex === index ? { ...item, quantity: event.target.value } : item) })} /><FormError message={editErrors[`options.${index}.quantity`]} /></> : String(option.quantity) + "개",
+                  editing ? <><Input key="price" aria-label={`${option.option_name} ${option.option_value} 추가 금액`} className={consoleInputClass} type="number" min={0} value={editOption?.additionalPrice ?? "0"} onChange={(event) => setEditForm({ ...editForm, options: editForm.options.map((item) => item.id === option.id ? { ...item, additionalPrice: event.target.value } : item) })} /><FormError message={optionErrorKey ? editErrors[`${optionErrorKey}.additionalPrice`] : undefined} /></> : formatPrice(option.additional_price),
+                  editing ? <><Input key="quantity" aria-label={`${option.option_name} ${option.option_value} 수량`} className={consoleInputClass} type="number" min={0} value={editOption?.quantity ?? "0"} onChange={(event) => setEditForm({ ...editForm, options: editForm.options.map((item) => item.id === option.id ? { ...item, quantity: event.target.value } : item) })} /><FormError message={optionErrorKey ? editErrors[`${optionErrorKey}.quantity`] : undefined} /></> : String(option.quantity) + "개",
                   String(option.available_quantity) + "개",
-                  editing ? <label key="active" className="inline-flex items-center gap-2"><input aria-label={`${option.option_name} ${option.option_value} 사용 여부`} type="checkbox" checked={editForm.options[index]?.isActive ?? false} onChange={(event) => setEditForm({ ...editForm, options: editForm.options.map((item, itemIndex) => itemIndex === index ? { ...item, isActive: event.target.checked } : item) })} /><span className="text-xs font-bold">사용</span></label> : option.is_active ? "사용" : "중지",
-                ])}
+                  editing ? <label key="active" className="inline-flex items-center gap-2"><input aria-label={`${option.option_name} ${option.option_value} 사용 여부`} type="checkbox" checked={editOption?.isActive ?? false} onChange={(event) => setEditForm({ ...editForm, options: editForm.options.map((item) => item.id === option.id ? { ...item, isActive: event.target.checked } : item) })} /><span className="text-xs font-bold">사용</span></label> : option.is_active ? "사용" : "중지",
+                  ];
+                })}
               />
             </section>
           </div>

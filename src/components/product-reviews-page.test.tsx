@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import type { Product, Review, ReviewSummary } from "@/lib/types";
@@ -34,6 +34,10 @@ it("shows the public review summary and every review entry", async () => {
     content: "핏이 좋아요.",
     reviewer_name: "김구매",
     verified_purchase: true,
+    images: [
+      { id: 1, media_asset_id: 101, url: "/review-1.jpg", sort_order: 0, is_representative: true, content_type: "image/jpeg", size_bytes: 100 },
+      { id: 2, media_asset_id: 102, url: "/review-2.jpg", sort_order: 1, is_representative: false, content_type: "image/jpeg", size_bytes: 100 },
+    ],
   };
   const summary: ReviewSummary = {
     product_id: 1,
@@ -56,4 +60,9 @@ it("shows the public review summary and every review entry", async () => {
   expect(screen.getByText("구매 인증")).toBeVisible();
   expect(screen.getByRole("link", { name: /상품으로 돌아가기/ })).toHaveAttribute("href", "/products/1");
   expect(screen.getByRole("progressbar", { name: "5점 리뷰 비율" })).toHaveAttribute("aria-valuenow", "1");
+  expect(screen.getByRole("button", { name: "2번 리뷰 사진 보기" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "리뷰 사진 1 크게 보기" }));
+  expect(screen.getByRole("dialog", { name: "리뷰 첨부 사진" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "다음 리뷰 사진" }));
+  expect(within(screen.getByRole("dialog", { name: "리뷰 첨부 사진" })).getAllByText("2 / 2")).toHaveLength(2);
 });

@@ -96,7 +96,7 @@ export function ProductListPage() {
   const activeFilterCandidates: Array<ActiveFilter | null> = [
     selectedCategory ? { key: "category", label: `카테고리: ${selectedCategory.name}`, clear: { category: undefined } } : null,
     price && selectedPrice?.code ? { key: "price", label: selectedPrice.label, clear: { price: undefined } } : null,
-    freeShippingSelected ? { key: "shipping", label: "무료배송", clear: { shipping: undefined, tag_chip: undefined } } : null,
+    freeShippingSelected ? { key: "shipping", label: "무료배송", clear: { shipping: undefined, ...(tagChip === "FREE_SHIPPING" ? { tag_chip: undefined } : {}) } } : null,
     onSale ? { key: "sale", label: "할인중", clear: { sale: undefined } } : null,
     inStock ? { key: "stock", label: "재고 있음", clear: { stock: undefined } } : null,
     selectedTagChip && tagChip !== "FREE_SHIPPING" ? { key: "tag_chip", label: `상품 특징: ${selectedTagChip.label}`, clear: { tag_chip: undefined } } : null,
@@ -129,7 +129,7 @@ export function ProductListPage() {
             type="button"
             aria-expanded={detailFiltersOpen}
             aria-controls="product-detail-filters"
-            className="ml-auto flex min-h-9 items-center gap-1 rounded-control px-2 text-xs font-bold text-content-secondary transition-colors hover:bg-surface-subtle hover:text-content-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+            className="ml-auto flex min-h-11 items-center gap-1 rounded-control px-2 text-xs font-bold text-content-secondary transition-colors hover:bg-surface-subtle hover:text-content-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary sm:min-h-9"
             onClick={() => setDetailFiltersOpen((open) => !open)}
           >
             상세 필터
@@ -164,11 +164,11 @@ export function ProductListPage() {
 
       {activeFilters.length ? <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="적용한 필터">
         {activeFilters.map((item) => (
-          <button key={item.key} type="button" className="inline-flex h-8 items-center gap-1 rounded-full bg-surface-subtle px-3 text-xs font-bold text-content-secondary transition-colors hover:bg-action-secondary hover:text-content-primary" onClick={() => updateSearch(item.clear)} aria-label={`${item.label} 필터 해제`}>
+          <button key={item.key} type="button" className="inline-flex min-h-11 items-center gap-1 rounded-full bg-surface-subtle px-3 text-xs font-bold text-content-secondary transition-colors hover:bg-action-secondary hover:text-content-primary sm:h-8 sm:min-h-0" onClick={() => updateSearch(item.clear)} aria-label={`${item.label} 필터 해제`}>
             {item.label}<X size={13} aria-hidden="true" />
           </button>
         ))}
-        <Button variant="ghost" type="button" className="inline-flex h-8 items-center gap-1 px-2 text-xs font-bold text-content-secondary hover:text-content-primary" onClick={clearFilters}><X size={14} /> 초기화</Button>
+        <Button variant="ghost" type="button" className="inline-flex min-h-11 items-center gap-1 px-2 text-xs font-bold text-content-secondary hover:text-content-primary sm:h-8 sm:min-h-0" onClick={clearFilters}><X size={14} /> 초기화</Button>
       </div> : null}
 
       <div className="mt-5 flex items-center justify-between gap-4 border-t border-border-subtle pt-4">
@@ -177,7 +177,7 @@ export function ProductListPage() {
           <span className="sr-only">상품 정렬</span>
           <select
             aria-label="상품 정렬"
-            className="h-10 appearance-none rounded-control border border-border-interactive bg-surface-raised pl-3 pr-9 text-sm font-bold outline-none transition-colors hover:border-action-primary focus:border-action-primary focus:ring-4 focus:ring-action-primary/10"
+            className="h-11 appearance-none rounded-control border border-border-interactive bg-surface-raised pl-3 pr-9 text-sm font-bold outline-none transition-colors hover:border-action-primary focus:border-action-primary focus:ring-4 focus:ring-action-primary/10 sm:h-10"
             value={sort ?? ""}
             onChange={(event) => updateSearch({ sort: event.target.value })}
             disabled={!sortOptions.length}
