@@ -150,7 +150,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {desktopNavigationItems.map((item) => {
               const Icon = item.icon;
               return (
-                <ButtonLink key={item.href} href={item.href} variant="ghost" size="sm" className="gap-1 px-2 text-xs" aria-current={isActive(item.href) ? "page" : undefined}>
+                <ButtonLink key={item.href} href={item.href} variant="ghost" size="sm" className="gap-1 px-2 text-xs" aria-label={item.label} aria-current={isActive(item.href) ? "page" : undefined}>
                   <Icon size={16} aria-hidden="true" />
                   <span className="hidden xl:inline">{item.label}</span>
                 </ButtonLink>

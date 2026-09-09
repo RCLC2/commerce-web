@@ -4,7 +4,7 @@ import { fireEvent, render, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Dialog } from "./ui/overlay";
 import { StatusBadge } from "./console-layout";
-import { ConsoleModal } from "./console-ui";
+import { ConsoleModal, ConsoleTable } from "./console-ui";
 
 describe("ConsoleModal stack", () => {
   it("closes only the top modal for each Escape key press", () => {
@@ -50,4 +50,21 @@ it("keeps keyboard focus in the top overlay across shared and console dialogs", 
   last.focus();
   fireEvent.keyDown(window, { key: "Tab" });
   expect(first).toHaveFocus();
+});
+
+it("keeps nested table actions independent from row activation", () => {
+  const onRowClick = vi.fn();
+  const view = render(
+    <ConsoleTable
+      columns={["마켓", "관리"]}
+      rows={[["테스트 마켓", <button key="penalty" type="button">페널티</button>]]}
+      onRowClick={onRowClick}
+    />,
+  );
+
+  const actionButtons = view.getAllByRole("button", { name: "페널티" });
+  fireEvent.click(actionButtons[0]);
+  fireEvent.keyDown(actionButtons[0], { key: "Enter" });
+  expect(onRowClick).not.toHaveBeenCalled();
+  expect(view.getAllByRole("button", { name: "상세 보기" })).toHaveLength(1);
 });

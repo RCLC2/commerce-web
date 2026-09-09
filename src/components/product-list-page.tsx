@@ -70,6 +70,8 @@ export function ProductListPage() {
     enabled: informationQuery.isSuccess,
   });
   const productPage = productsQuery.data;
+  const productResultsLoading = informationQuery.isLoading || productsQuery.isPending || productsQuery.isFetching;
+  const productCountLabel = productPage ? `${productPage.total.toLocaleString("ko-KR")}개` : productResultsLoading ? "조회 중" : "—";
 
   function updateSearch(next: Record<string, string | undefined>, resetPage = true) {
     const params = new URLSearchParams(searchParams.toString());
@@ -172,7 +174,7 @@ export function ProductListPage() {
       </div> : null}
 
       <div className="mt-5 flex items-center justify-between gap-4 border-t border-border-subtle pt-4">
-        <p className="text-sm font-bold">전체 {(productPage?.total ?? informationQuery.data?.total_product_count ?? 0).toLocaleString("ko-KR")}개</p>
+        <p className="text-sm font-bold">전체 {productCountLabel}</p>
         <label className="relative shrink-0">
           <span className="sr-only">상품 정렬</span>
           <select
@@ -196,8 +198,8 @@ export function ProductListPage() {
           retryLabel="상품 목록 다시 시도"
         />
       ) : null}
-      {productsQuery.isLoading ? <p className="mt-8 text-sm text-content-secondary">상품을 불러오는 중입니다.</p> : null}
-      {!productsQuery.isLoading && productPage && !productPage.items.length ? (
+      {productResultsLoading && !informationQuery.error && !productsQuery.error ? <p className="mt-8 text-sm text-content-secondary" role="status">상품을 불러오는 중입니다.</p> : null}
+      {!productResultsLoading && productsQuery.isSuccess && productPage && !productPage.items.length ? (
         <div className="mt-8 rounded-surface border border-border-subtle bg-surface-raised p-10 text-center shadow-card"><p className="font-bold">조건에 맞는 상품이 없습니다.</p><p className="mt-1 text-sm text-content-secondary">필터를 조정해보세요.</p></div>
       ) : null}
       <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">

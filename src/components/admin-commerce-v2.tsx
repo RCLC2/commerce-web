@@ -486,12 +486,12 @@ export function AdminSettlementsPageV2() {
     enabled: Boolean(token && selectedID),
   });
   const paidMutation = useMutation({
-    mutationFn: () => adminConsoleApi.markSettlementPaid(token ?? "", selectedID ?? 0),
-    onSuccess: async () => {
-      setPaidResolution("정산 지급 완료 처리를 반영했습니다.");
+    mutationFn: (settlementID: number) => adminConsoleApi.markSettlementPaid(token ?? "", settlementID),
+    onSuccess: async (_result, settlementID) => {
+      if (selectedID === settlementID) setPaidResolution("정산 지급 완료 처리를 반영했습니다.");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-settlements-v2"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-settlement-v2", selectedID] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-settlement-v2", settlementID] }),
       ]);
     },
   });
@@ -557,13 +557,14 @@ export function AdminSettlementsPageV2() {
         title={settlementQuery.data ? `${settlementQuery.data.market_name} ${settlementQuery.data.target_month} 정산` : "정산 상세"}
         size="xl"
         onClose={() => {
+          if (paidMutation.isPending) return;
           paidMutation.reset();
           setPaidResolution(undefined);
           setSelectedID(undefined);
         }}
         footer={
           settlementQuery.data && settlementQuery.data.status !== "PAID" ? (
-            <Button type="button" disabled={paidMutation.isPending} onClick={() => confirmation.ask({ title: "정산 지급 완료", message: "이 정산을 지급 완료 상태로 변경할까요?", confirmLabel: "지급 완료 처리" }, () => paidMutation.mutate())}>지급 완료 처리</Button>
+            <Button type="button" disabled={paidMutation.isPending} onClick={() => confirmation.ask({ title: "정산 지급 완료", message: "이 정산을 지급 완료 상태로 변경할까요?", confirmLabel: "지급 완료 처리" }, () => { if (selectedID) paidMutation.mutate(selectedID); })}>지급 완료 처리</Button>
           ) : undefined
         }
       >

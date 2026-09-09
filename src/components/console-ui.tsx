@@ -19,6 +19,10 @@ type ConsoleTableProps = {
   emptyAction?: ReactNode;
 };
 
+function isInteractiveTarget(target: EventTarget | null) {
+  return target instanceof HTMLElement && Boolean(target.closest("button,a,input,select,textarea,[role='button'],[role='link']"));
+}
+
 export function ConsoleTable({
   columns,
   rows,
@@ -67,9 +71,13 @@ export function ConsoleTable({
                   onRowClick &&
                     "cursor-pointer transition hover:bg-surface-subtle focus-visible:bg-surface-subtle focus-visible:outline-2 focus-visible:-outline-offset-2",
                 )}
-                onClick={() => onRowClick?.(rowIndex)}
+                onClick={(event) => {
+                  if (isInteractiveTarget(event.target)) return;
+                  onRowClick?.(rowIndex);
+                }}
                 onKeyDown={(event) => {
                   if (!onRowClick || (event.key !== "Enter" && event.key !== " ")) return;
+                  if (event.target !== event.currentTarget) return;
                   event.preventDefault();
                   onRowClick(rowIndex);
                 }}
@@ -95,14 +103,13 @@ export function ConsoleTable({
           ));
 
           return onRowClick ? (
-            <Button variant="ghost"
+            <div
               key={rowKeys?.[rowIndex] ?? rowIndex}
-              type="button"
-              className="grid w-full gap-3 rounded-surface border border-border-subtle bg-surface-raised p-4 text-left shadow-card transition hover:border-border-interactive"
-              onClick={() => onRowClick(rowIndex)}
+              className="grid gap-3 rounded-surface border border-border-subtle bg-surface-raised p-4 shadow-card transition hover:border-border-interactive"
             >
               {content}
-            </Button>
+              <Button type="button" variant="secondary" size="sm" className="w-full" onClick={() => onRowClick(rowIndex)}>상세 보기</Button>
+            </div>
           ) : (
             <div
               key={rowKeys?.[rowIndex] ?? rowIndex}
@@ -329,7 +336,8 @@ export function useConsoleUrlFilters(
   const router = useRouter();
   const searchParams = useSearchParams();
   const serialized = JSON.stringify(Object.entries(values).sort(([left], [right]) => left.localeCompare(right)));
-  const previousQueryRef = useRef(searchParams.toString());
+  const lastObservedQueryRef = useRef(searchParams.toString());
+  const pendingQueriesRef = useRef(new Set<string>());
   const onExternalChangeRef = useRef(onExternalChange);
 
   useEffect(() => {
@@ -339,24 +347,29 @@ export function useConsoleUrlFilters(
   useEffect(() => {
     const currentQuery = searchParams.toString();
     const next = new URLSearchParams(currentQuery);
+    const observedNavigation = currentQuery !== lastObservedQueryRef.current;
+    const wasRequestedNavigation = pendingQueriesRef.current.delete(currentQuery);
+    if (observedNavigation) {
+      lastObservedQueryRef.current = currentQuery;
+      if (!wasRequestedNavigation && onExternalChangeRef.current) {
+        pendingQueriesRef.current.clear();
+        onExternalChangeRef.current(new URLSearchParams(currentQuery));
+        return;
+      }
+    }
     for (const [key, value] of Object.entries(values)) {
       if (value === undefined || value === "" || value === 0 || value === "ALL") next.delete(key);
       else next.set(key, String(value));
     }
     const nextQuery = next.toString();
     if (nextQuery === currentQuery) {
-      previousQueryRef.current = currentQuery;
       return;
     }
-    if (previousQueryRef.current !== currentQuery && onExternalChangeRef.current) {
-      onExternalChangeRef.current(new URLSearchParams(currentQuery));
-      previousQueryRef.current = currentQuery;
+    if (pendingQueriesRef.current.has(nextQuery)) {
       return;
     }
-    if (nextQuery !== currentQuery) {
-      previousQueryRef.current = nextQuery;
-      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
-    }
+    pendingQueriesRef.current.add(nextQuery);
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
   }, [pathname, router, searchParams, serialized, values]);
 }
 
