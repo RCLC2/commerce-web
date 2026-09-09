@@ -1,52 +1,47 @@
-# PDP and Seller Product Authoring
+# 상품 상세와 셀러 상품 작성
 
-This document uses the normative terms defined by the server PDP and seller product content document.
+이 문서는 서버의 상품 상세(PDP) 및 셀러 상품 콘텐츠 문서에서 정의한 표준 용어를 사용합니다.
 
-## PDP Behavior
+## 상품 상세 동작
 
-- Market Name is a Next.js `Link` to the Market Page.
-- Rating and total review count come from Review Summary. They are never calculated from review cards in the browser.
-- Purchase Summary is the only descriptive copy in the purchase panel.
-- Product Detail HTML is the long vertical section below the Review Carousel.
-- Product Image Gallery supports up to five ordered images, thumbnail selection, Gallery Drag Navigation with live translation feedback, and previous/next controls.
-- Review Carousel is horizontally scrollable and appears between the top product layout and Product Detail HTML.
-- Each Review Detail card renders the masked reviewer alias, Verified Purchase badge, purchased option, body profile when present, creation date, rating, content, and representative review image from the server response.
-- The floating action remains available while scrolling. It opens the Quick Purchase Modal with option, quantity, wishlist, and cart actions.
-- PDP Merchandising is fetched in the Next.js server route and passed into the initial PDP render.
-- PDP Card Ad and Sponsored Market Shelf appear above Product Detail HTML only when their server response values are non-null.
-- Also Viewed Shelf appears below Product Detail HTML and uses only the server-ordered products.
-- PDP Card Ad, Sponsored Market Shelf, and Also Viewed Shelf are the normative names shared with the server document.
+- **마켓명(Market Name)**은 마켓 페이지로 이동하는 Next.js `Link`입니다.
+- 별점과 전체 리뷰 수는 **리뷰 요약(Review Summary)**에서 받으며 브라우저가 리뷰 카드로 다시 계산하지 않습니다.
+- 구매 영역의 설명 문구는 **구매 요약(Purchase Summary)**만 사용합니다.
+- **상품 상세 HTML(Product Detail HTML)**은 리뷰 캐러셀 아래의 긴 세로 콘텐츠 영역입니다.
+- **상품 이미지 갤러리(Product Image Gallery)**는 순서가 있는 이미지를 최대 5개까지 지원하며 썸네일 선택, 실시간 이동 피드백이 있는 드래그 탐색, 이전·다음 조작을 제공합니다.
+- **리뷰 캐러셀(Review Carousel)**은 가로로 스크롤되며 상단 상품 영역과 상품 상세 HTML 사이에 표시합니다.
+- 각 **리뷰 상세(Review Detail)** 카드는 서버 응답의 마스킹된 작성자 별칭, 구매 인증 배지, 구매 옵션, 체형 정보, 작성일, 별점, 내용, 대표 리뷰 이미지를 표시합니다.
+- 스크롤 중에도 플로팅 구매 버튼을 유지합니다. 버튼을 누르면 옵션, 수량, 좋아요, 장바구니 동작이 있는 **빠른 구매 모달(Quick Purchase Modal)**을 엽니다.
+- **PDP 머천다이징(PDP Merchandising)**은 Next.js 서버 라우트에서 조회해 최초 렌더링에 전달합니다.
+- **PDP 카드 광고(PDP Card Ad)**와 **스폰서 마켓 선반(Sponsored Market Shelf)**은 서버 응답이 `null`이 아닐 때만 상품 상세 HTML 위에 표시합니다.
+- **함께 본 상품 선반(Also Viewed Shelf)**은 상품 상세 HTML 아래에 표시하며 서버가 정한 상품 순서를 그대로 사용합니다.
 
-## Seller Product Authoring
+## 셀러 상품 작성
 
-- Seller can enter Purchase Summary separately from Product Detail HTML.
-- The HTML editor supports source editing, local `.html` import, and preview.
-- The editor manages up to five image URLs and changes their canonical order with Left/Right controls.
-- The server sanitizes Product Detail HTML when it is saved.
-- The browser does not parse or generate Excel workbooks.
-- Template download, all-products export, and Bulk Upsert use the server Seller Product Workbook endpoints.
-- Bulk import results display created, updated, and error counts; product queries are invalidated after a successful response.
+- 셀러는 구매 요약과 상품 상세 HTML을 별도로 입력할 수 있습니다.
+- HTML 편집기는 소스 편집, 로컬 `.html` 가져오기, 미리보기를 지원합니다.
+- 이미지 URL을 최대 5개까지 관리하며 왼쪽·오른쪽 조작으로 기준 순서를 바꿉니다.
+- 서버는 저장할 때 상품 상세 HTML을 정제합니다.
+- 브라우저는 Excel 통합 문서를 파싱하거나 생성하지 않습니다.
+- 양식 다운로드, 전체 상품 내보내기, 일괄 생성·수정은 서버의 셀러 상품 통합 문서 API를 사용합니다.
+- 일괄 가져오기 결과는 생성·수정·오류 건수를 표시하며 성공하면 상품 조회 캐시를 무효화합니다.
 
-## API Error Policy
+## API 오류 정책
 
-Product detail, reviews, Review Summary, merchandising, and seller product-list failures remain visible as errors. The client does not replace HTTP 404 or other failures with preview product data.
+상품 상세, 리뷰, 리뷰 요약, 머천다이징, 셀러 상품 목록 요청의 실패는 오류로 표시합니다. HTTP 404를 포함한 실패나 정상 빈 응답을 미리보기 상품 데이터로 대체하지 않습니다.
 
-## Acceptance Criteria
+## 인수 기준
 
-1. Clicking Market Name opens the corresponding Market Page.
-2. No client code derives review count or average rating.
-3. Purchase Summary does not duplicate Product Detail HTML.
-4. Gallery works with one through five images by thumbnail, live mouse/touch drag, and direction controls.
-5. Review Detail cards do not reconstruct purchase or reviewer metadata in the browser.
-6. Reviews render as a horizontal carousel above Product Detail HTML.
-7. Quick Purchase Modal is reachable while deep in long-form content.
-8. Seller can import HTML, preview it, manage image order, and save the product.
-9. Seller can download the Workbook Template, bulk upload `.xlsx`, and download the full seller catalog.
-10. API errors and empty responses are not replaced with preview data.
-12. PDP Merchandising markup is present in the server-rendered response.
-13. Null paid-placement values do not create empty PDP sections.
-14. Product shelves are horizontal carousels with hidden scrollbars and direction controls.
-
-## Delivery Workflow
-
-This repository is changed in an isolated worktree from fetched `origin/main`. No commit is created before user approval; approved commits are split into logical units.
+1. 마켓명을 누르면 해당 마켓 페이지로 이동합니다.
+2. 클라이언트 코드가 리뷰 수나 평균 별점을 계산하지 않습니다.
+3. 구매 요약과 상품 상세 HTML이 같은 내용을 중복 표시하지 않습니다.
+4. 이미지가 1~5개일 때 썸네일, 마우스·터치 드래그, 방향 조작으로 갤러리를 사용할 수 있습니다.
+5. 리뷰 상세 카드가 구매 정보나 작성자 메타데이터를 브라우저에서 재구성하지 않습니다.
+6. 리뷰는 상품 상세 HTML 위의 가로 캐러셀로 표시합니다.
+7. 긴 상세 콘텐츠를 읽는 중에도 빠른 구매 모달에 접근할 수 있습니다.
+8. 셀러가 HTML을 가져오고 미리 본 뒤 이미지 순서를 관리해 상품을 저장할 수 있습니다.
+9. 셀러가 통합 문서 양식을 내려받고 `.xlsx`를 일괄 업로드하며 전체 상품 목록을 내려받을 수 있습니다.
+10. API 오류와 정상 빈 응답을 미리보기 데이터로 대체하지 않습니다.
+11. PDP 머천다이징 마크업이 서버 렌더링 응답에 포함됩니다.
+12. 유료 구좌 값이 `null`이면 빈 PDP 영역을 만들지 않습니다.
+13. 상품 선반은 스크롤바를 숨긴 가로 캐러셀이며 방향 조작을 제공합니다.

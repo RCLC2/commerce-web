@@ -1,9 +1,14 @@
 "use client";
 
+import { apiErrorMessage } from "@/lib/api-client";
+
+import { Input, Select } from "./ui/input";
+
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Beaker, Play, Pause, RotateCcw, Square, Send, RefreshCw } from "lucide-react";
 import { experimentApi, type CreateExperimentPayload, type ExperimentEventType, type ExperimentStatus, type ExperimentSubjectType } from "@/lib/api/experiment";
+import { displayLabel } from "@/lib/display-labels";
 import { cn } from "@/lib/utils";
 import { AdminAuthRequired, adminLinks, useAdminToken } from "./admin-console";
 import { ConsoleHeader, ConsoleLayout, ConsoleSection, DataTable, FilterField, FilterPanel, StatusBadge, SummaryStrip } from "./console-layout";
@@ -136,7 +141,7 @@ export function AdminExperimentsPage() {
   const error = createExperiment.error ?? statusMutation.error ?? patchStatusMutation.error ?? resolveMutation.error ?? eventMutation.error ?? experimentsQuery.error ?? resultQuery.error;
 
   return (
-    <ConsoleLayout title="Admin" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
+    <ConsoleLayout title="관리자" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <ConsoleHeader
         title="실험 관리"
         description="상품 카테고리 노출 순서 같은 운영 실험을 등록하고, 배정과 이벤트 집계 결과를 확인합니다."
@@ -150,19 +155,19 @@ export function AdminExperimentsPage() {
 
       <ConsoleSection className="mt-5" title="실험 서버 연결">
         <FilterPanel>
-          <FilterField label="Experiment API base">
-            <input className="h-10 rounded-md border border-line bg-white px-3 text-sm outline-none" value={experimentBaseUrl} onChange={(event) => { setExperimentBaseUrl(event.target.value); storeValue("experimentApiBaseUrl", event.target.value); }} />
+          <FilterField label="실험 서버 주소">
+            <Input className="h-11 rounded-control border border-border-interactive bg-surface-raised px-3 text-sm outline-none" value={experimentBaseUrl} onChange={(event) => { setExperimentBaseUrl(event.target.value); storeValue("experimentApiBaseUrl", event.target.value); }} />
           </FilterField>
-          <FilterField label="Experiment admin token">
-            <input className="h-10 rounded-md border border-line bg-white px-3 text-sm outline-none" type="password" value={experimentAdminToken} onChange={(event) => { setExperimentAdminToken(event.target.value); storeValue("experimentAdminToken", event.target.value); }} />
+          <FilterField label="실험 관리자 토큰">
+            <Input className="h-11 rounded-control border border-border-interactive bg-surface-raised px-3 text-sm outline-none" type="password" value={experimentAdminToken} onChange={(event) => { setExperimentAdminToken(event.target.value); storeValue("experimentAdminToken", event.target.value); }} />
           </FilterField>
           <FilterField label="상태">
-            <div className={cn("flex h-10 items-center rounded-md border px-3 text-sm font-bold", experimentAdminToken ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-line bg-white text-muted")}>
+            <div className={cn("flex h-10 items-center rounded-md border px-3 text-sm font-bold", experimentAdminToken ? "border-status-positive-border bg-status-positive-subtle text-status-positive" : "border-border-subtle bg-surface-raised text-content-secondary")}>
               {experimentAdminToken ? "토큰 입력됨" : "토큰 필요"}
             </div>
           </FilterField>
         </FilterPanel>
-        {error ? <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{error.message}</p> : null}
+        {error ? <p className="mt-3 rounded-md bg-status-negative-subtle px-3 py-2 text-sm font-bold text-status-negative">{apiErrorMessage(error)}</p> : null}
       </ConsoleSection>
 
       <div className="mt-5">
@@ -178,39 +183,39 @@ export function AdminExperimentsPage() {
 
       <div className="mt-5 grid items-start gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
         <ConsoleSection title="실험 목록" action={<StatusBadge value={experimentsQuery.isFetching ? "INFO" : "ACTIVE"} />}>
-          <div className="max-h-[520px] overflow-y-auto rounded-md border border-line">
+          <div className="max-h-[520px] overflow-y-auto rounded-md border border-border-subtle">
             {experiments.length ? (
               experiments.map((experiment) => {
                 const selectedExperiment = experiment.id === selected?.id;
                 return (
-                  <button
+                  <Button variant="ghost"
                     key={experiment.id}
                     type="button"
-                    className={cn("block w-full border-b border-line px-3 py-3 text-left transition last:border-b-0 hover:bg-zinc-50", selectedExperiment && "bg-brand/5")}
+                    className={cn("block w-full border-b border-border-subtle px-3 py-3 text-left transition last:border-b-0 hover:bg-surface-subtle", selectedExperiment && "bg-action-primary/5")}
                     onClick={() => setSelectedID(experiment.id)}
                   >
                     <div className="flex min-w-0 items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className={cn("truncate text-sm font-black", selectedExperiment && "text-brand")}>{experiment.name}</p>
-                        <p className="mt-1 truncate text-xs font-bold text-muted">{experiment.key}</p>
+                        <p className={cn("truncate text-sm font-bold", selectedExperiment && "text-action-primary")}>{experiment.name}</p>
+                        <p className="mt-1 truncate text-xs font-bold text-content-secondary">{experiment.key}</p>
                       </div>
                       <StatusBadge value={experiment.status} />
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                      <div className="min-w-0 rounded bg-zinc-50 px-2 py-1">
-                        <p className="font-black text-muted">대상</p>
-                        <p className="truncate font-bold text-foreground">{experiment.include_anonymous ? "회원 + 비회원" : "회원만"}</p>
+                      <div className="min-w-0 rounded bg-surface-subtle px-2 py-1">
+                        <p className="font-bold text-content-secondary">대상</p>
+                        <p className="truncate font-bold text-content-primary">{experiment.include_anonymous ? "회원 + 비회원" : "회원만"}</p>
                       </div>
-                      <div className="min-w-0 rounded bg-zinc-50 px-2 py-1">
-                        <p className="font-black text-muted">지표</p>
-                        <p className="truncate font-bold text-foreground">{experiment.primary_metric}</p>
+                      <div className="min-w-0 rounded bg-surface-subtle px-2 py-1">
+                        <p className="font-bold text-content-secondary">지표</p>
+                        <p className="truncate font-bold text-content-primary">{experiment.primary_metric}</p>
                       </div>
                     </div>
-                  </button>
+                  </Button>
                 );
               })
             ) : (
-              <div className="px-4 py-10 text-center text-sm font-bold text-muted">{experimentsQuery.isFetching ? "불러오는 중입니다." : "등록된 실험이 없습니다."}</div>
+              <div className="px-4 py-10 text-center text-sm font-bold text-content-secondary">{experimentsQuery.isFetching ? "불러오는 중입니다." : "등록된 실험이 없습니다."}</div>
             )}
           </div>
         </ConsoleSection>
@@ -238,7 +243,7 @@ export function AdminExperimentsPage() {
       <div className="mt-5 grid gap-4">
         <ConsoleSection
           title="선택한 실험"
-          description={selected ? `${selected.key} / ${selected.domain}` : "실험을 선택해 주세요."}
+          description={selected ? `${selected.key} / ${displayLabel(selected.domain)}` : "실험을 선택해 주세요."}
           action={
             selected ? (
               <div className="flex flex-wrap gap-2">
@@ -257,35 +262,35 @@ export function AdminExperimentsPage() {
                   { label: "상태", value: <StatusBadge value={selected.status} /> },
                   { label: "대상", value: selected.include_anonymous ? "회원 + 비회원" : "회원만" },
                   { label: "승리군", value: result?.winner?.variant_key ?? "-" },
-                  { label: "판정", value: result?.decision ?? "-" },
+                  { label: "판정", value: displayLabel(result?.decision) },
                 ]}
               />
               <div className="mt-4 flex flex-wrap gap-2">
                 {(["DRAFT", "RUNNING", "PAUSED", "ENDED"] as ExperimentStatus[]).map((status) => (
-                  <Button key={status} size="sm" variant="secondary" disabled={patchStatusMutation.isPending} onClick={() => patchStatusMutation.mutate({ id: selected.id, status })}>{status}</Button>
+                  <Button key={status} size="sm" variant="secondary" disabled={patchStatusMutation.isPending} onClick={() => patchStatusMutation.mutate({ id: selected.id, status })}>{displayLabel(status)}</Button>
                 ))}
               </div>
               <div className="mt-4">
                 <DataTable
                   columns={["세그먼트", "트래픽"]}
                   rows={selected.variants.map((variant) => [
-                    <div key="variant"><p className="font-bold">{variant.key}</p><p className="text-xs text-muted">{variant.name}</p></div>,
+                    <div key="variant"><p className="font-bold">{variant.key}</p><p className="text-xs text-content-secondary">{variant.name}</p></div>,
                     `${variant.traffic_weight}%`,
                   ])}
                 />
               </div>
             </>
           ) : (
-            <p className="text-sm font-bold text-muted">표시할 실험이 없습니다.</p>
+            <p className="text-sm font-bold text-content-secondary">표시할 실험이 없습니다.</p>
           )}
         </ConsoleSection>
 
         <ConsoleSection title="배정, 이벤트, 결과 검증">
           <div className="grid gap-3 md:grid-cols-4">
-            <SelectField label="Subject" value={subjectType} onChange={(value) => setSubjectType(value as ExperimentSubjectType)} options={["ANONYMOUS", "MEMBER"]} />
-            <TextField label="Subject key" value={subjectKey} onChange={setSubjectKey} />
-            <SelectField label="Variant" value={selectedEventVariantKey} onChange={setEventVariantKey} options={selected?.variants.map((variant) => variant.key) ?? []} />
-            <TextField label="Revenue" type="number" value={eventRevenue} onChange={setEventRevenue} />
+            <SelectField label="대상 유형" value={subjectType} onChange={(value) => setSubjectType(value as ExperimentSubjectType)} options={["ANONYMOUS", "MEMBER"]} />
+            <TextField label="대상 식별자" value={subjectKey} onChange={setSubjectKey} />
+            <SelectField label="실험군" value={selectedEventVariantKey} onChange={setEventVariantKey} options={selected?.variants.map((variant) => variant.key) ?? []} />
+            <TextField label="매출액" type="number" value={eventRevenue} onChange={setEventRevenue} />
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button variant="secondary" disabled={!selected || resolveMutation.isPending} onClick={() => resolveMutation.mutate()}>배정 확인</Button>
@@ -306,7 +311,7 @@ export function AdminExperimentsPage() {
               ])}
             />
           </div>
-          <pre className="mt-4 max-h-72 overflow-auto rounded-md bg-zinc-950 p-3 text-xs leading-5 text-zinc-50">{JSON.stringify(lastResponse ?? result ?? {}, null, 2)}</pre>
+          <pre className="mt-4 max-h-72 overflow-auto rounded-md bg-content-primary p-3 text-xs leading-5 text-content-inverse">{JSON.stringify(lastResponse ?? result ?? {}, null, 2)}</pre>
         </ConsoleSection>
       </div>
     </ConsoleLayout>
@@ -315,20 +320,20 @@ export function AdminExperimentsPage() {
 
 function TextField({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
   return (
-    <label className="grid gap-1 text-xs font-black text-muted">
+    <label className="grid gap-1 text-xs font-bold text-content-secondary">
       {label}
-      <input className="h-10 rounded-md border border-line bg-white px-3 text-sm text-foreground outline-none" type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+      <Input className="h-11 rounded-control border border-border-interactive bg-surface-raised px-3 text-sm text-content-primary outline-none" type={type} value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }
 
 function SelectField({ label, value, options, labels, onChange }: { label: string; value: string; options: string[]; labels?: Record<string, string>; onChange: (value: string) => void }) {
   return (
-    <label className="grid gap-1 text-xs font-black text-muted">
+    <label className="grid gap-1 text-xs font-bold text-content-secondary">
       {label}
-      <select className="h-10 rounded-md border border-line bg-white px-3 text-sm font-bold text-foreground outline-none" value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map((option) => <option key={option} value={option}>{labels?.[option] ?? option}</option>)}
-      </select>
+      <Select className="h-11 rounded-control border border-border-interactive bg-surface-raised px-3 text-sm font-bold text-content-primary outline-none" value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((option) => <option key={option} value={option}>{labels?.[option] ?? displayLabel(option)}</option>)}
+      </Select>
     </label>
   );
 }

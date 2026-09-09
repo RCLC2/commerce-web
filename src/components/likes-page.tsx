@@ -1,5 +1,8 @@
 "use client";
 
+import { PageHeading } from "./ui/page-heading";
+import { Heart as PageIcon } from "lucide-react";
+
 import { useQuery } from "@tanstack/react-query";
 import { Bookmark, ChevronLeft, ChevronRight, Heart } from "lucide-react";
 import Link from "next/link";
@@ -20,14 +23,15 @@ export function LikesPage() {
   const [view, setView] = useState<CollectionView>("liked");
   const [page, setPage] = useState(1);
   const token = useSessionStore((state) => state.accessToken);
+  const memberID = useSessionStore((state) => state.memberID);
   const effectiveToken = getEffectiveToken(token);
   const likedProducts = useQuery({
-    queryKey: queryKeys.likedProducts(effectiveToken),
+    queryKey: queryKeys.likedProducts(memberID),
     queryFn: () => api.listLikedProducts(effectiveToken ?? ""),
     enabled: Boolean(effectiveToken),
   });
   const wishlistedProducts = useQuery({
-    queryKey: queryKeys.wishlist(effectiveToken),
+    queryKey: queryKeys.wishlist(memberID),
     queryFn: () => api.listWishlistedProducts(effectiveToken ?? ""),
     enabled: Boolean(effectiveToken),
   });
@@ -44,13 +48,12 @@ export function LikesPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24 pt-8">
-      <h1 className="text-2xl font-black">좋아요</h1>
-      <p className="mt-1 text-sm text-muted">좋아요한 상품과 나중에 구매하려고 찜한 상품을 구분해서 확인합니다.</p>
+      <PageHeading icon={<PageIcon />} title="좋아요" description="좋아요한 상품과 나중에 구매하려고 찜한 상품을 확인하세요." />
 
       {!effectiveToken ? (
-        <section className="mt-6 rounded-md border border-line bg-white p-6 text-sm text-muted">
+        <section className="mt-6 rounded-surface border border-border-subtle bg-surface-raised p-6 text-sm text-content-secondary shadow-card">
           내 상품 목록을 보려면 로그인해 주세요.
-          <Link href="/login?next=/likes" className="ml-2 font-black text-foreground">로그인</Link>
+          <Link href="/login?next=/likes" className="ml-2 font-bold text-content-primary">로그인</Link>
         </section>
       ) : (
         <section className="mt-8">
@@ -60,14 +63,14 @@ export function LikesPage() {
           </div>
 
           <div className="mt-6 flex items-center justify-between">
-            <h2 className="text-lg font-black">{view === "liked" ? "좋아요 상품" : "찜한 상품"}</h2>
-            {selectedQuery.isSuccess ? <span className="text-sm font-bold text-muted">{products.length}개 · {currentPage}/{totalPages}</span> : null}
+            <h2 className="text-lg font-bold">{view === "liked" ? "좋아요 상품" : "찜한 상품"}</h2>
+            {selectedQuery.isSuccess ? <span className="text-sm font-bold text-content-secondary">{products.length}개 · {currentPage}/{totalPages}</span> : null}
           </div>
 
-          {selectedQuery.isLoading ? <p className="mt-4 rounded-md border border-line bg-white p-5 text-sm text-muted">상품 목록을 불러오는 중입니다.</p> : null}
+          {selectedQuery.isLoading ? <p className="mt-4 rounded-surface border border-border-subtle bg-surface-raised p-5 text-sm text-content-secondary">상품 목록을 불러오는 중입니다.</p> : null}
           {selectedQuery.isError ? (
-            <div className="mt-4 rounded-md border border-brand/30 bg-red-50 p-5 text-sm">
-              <p className="font-bold text-brand">{apiErrorMessage(selectedQuery.error)}</p>
+            <div className="mt-4 rounded-control border border-status-negative-border bg-status-negative-subtle p-5 text-sm" role="alert">
+              <p className="font-bold text-status-negative">{apiErrorMessage(selectedQuery.error)}</p>
               <Button className="mt-3" size="sm" variant="secondary" onClick={() => void selectedQuery.refetch()}>다시 시도</Button>
             </div>
           ) : null}
@@ -76,12 +79,12 @@ export function LikesPage() {
               {pageProducts.map((product) => <ProductCard key={product.id} product={product} />)}
             </div>
           ) : null}
-          {selectedQuery.isSuccess && !pageProducts.length ? <p className="mt-4 rounded-md border border-line bg-white p-5 text-sm text-muted">{view === "liked" ? "좋아요한 상품이 없습니다." : "찜한 상품이 없습니다."}</p> : null}
+          {selectedQuery.isSuccess && !pageProducts.length ? <p className="mt-4 rounded-surface border border-border-subtle bg-surface-raised p-5 text-sm text-content-secondary">{view === "liked" ? "좋아요한 상품이 없습니다." : "찜한 상품이 없습니다."}</p> : null}
           {selectedQuery.isSuccess && products.length > PAGE_SIZE ? (
             <div className="mt-8 flex items-center justify-center gap-2">
               <Button variant="secondary" size="sm" disabled={currentPage === 1} onClick={() => setPage(Math.max(1, currentPage - 1))}><ChevronLeft size={16} /> 이전</Button>
               {Array.from({ length: totalPages }).map((_, index) => (
-                <button key={index} className={`h-9 w-9 rounded-md text-sm font-black ${currentPage === index + 1 ? "bg-foreground text-white" : "bg-white"}`} onClick={() => setPage(index + 1)}>{index + 1}</button>
+                <Button variant="ghost" key={index} className={`h-9 w-9 rounded-md text-sm font-bold ${currentPage === index + 1 ? "bg-foreground text-content-inverse" : "bg-surface-raised"}`} onClick={() => setPage(index + 1)}>{index + 1}</Button>
               ))}
               <Button variant="secondary" size="sm" disabled={currentPage === totalPages} onClick={() => setPage(Math.min(totalPages, currentPage + 1))}>다음 <ChevronRight size={16} /></Button>
             </div>
@@ -93,5 +96,5 @@ export function LikesPage() {
 }
 
 function CollectionTab({ active, icon, label, count, onClick }: { active: boolean; icon: React.ReactNode; label: string; count?: number; onClick: () => void }) {
-  return <button type="button" role="tab" aria-selected={active} className={`inline-flex h-11 items-center gap-2 rounded-full px-4 text-sm font-black ${active ? "bg-foreground text-white" : "border border-line bg-white"}`} onClick={onClick}>{icon}{label}{count === undefined ? "" : ` ${count}`}</button>;
+  return <Button variant="ghost" type="button" role="tab" aria-selected={active} className={`inline-flex h-11 items-center gap-2 rounded-full px-4 text-sm font-bold ${active ? "bg-foreground text-content-inverse" : "border border-border-subtle bg-surface-raised"}`} onClick={onClick}>{icon}{label}{count === undefined ? "" : ` ${count}`}</Button>;
 }

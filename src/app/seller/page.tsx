@@ -1,5 +1,5 @@
-import { SellerHomePage } from "@/components/seller-console";
+import { SellerHomePageV2 } from "@/components/seller-home-products-v2";
 
 export default function Seller() {
-  return <SellerHomePage />;
+  return <SellerHomePageV2 />;
 }

@@ -1,11 +1,19 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
+import { PageHeading } from "./ui/page-heading";
+import { Pagination } from "./ui/pagination";
+import { FilterChip } from "./ui/filter-chip";
+
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronDown, PackageSearch, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import type { PLPInformation, PLPProductParams } from "@/lib/types";
+import { ApiErrorState } from "./api-error-state";
 import { ProductCard } from "./product-card";
 
 function positivePage(raw: string | null) {
@@ -13,14 +21,22 @@ function positivePage(raw: string | null) {
   return Number.isInteger(page) && page > 0 ? page : 1;
 }
 
+type ActiveFilter = {
+  key: string;
+  label: string;
+  clear: Record<string, string | undefined>;
+};
+
 export function ProductListPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [detailFiltersOpen, setDetailFiltersOpen] = useState(false);
   const category = searchParams.get("category") ?? "";
   const shipping = searchParams.get("shipping") === "free" ? "free" : undefined;
   const onSale = searchParams.get("sale") === "on";
   const inStock = searchParams.get("stock") === "available";
   const tagChip = searchParams.get("tag_chip") ?? "";
+  const freeShippingSelected = Boolean(shipping) || tagChip === "FREE_SHIPPING";
   const price = searchParams.get("price") ?? "";
   const page = positivePage(searchParams.get("page"));
 
@@ -62,87 +78,129 @@ export function ProductListPage() {
       else params.delete(key);
     });
     if (resetPage) params.delete("page");
-    router.replace(`/products${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
+    router.push(`/products${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
   }
 
   function clearFilters() {
     router.replace("/products");
   }
 
+  function toggleFreeShipping() {
+    updateSearch({
+      shipping: freeShippingSelected ? undefined : "free",
+      ...(tagChip === "FREE_SHIPPING" ? { tag_chip: undefined } : {}),
+    });
+  }
+
   const selectedTagChip = informationQuery.data?.tag_chips.find((item) => item.code === tagChip);
-  const activeFilters = [
-    selectedCategory ? `카테고리: ${selectedCategory.name}` : null,
-    selectedPrice?.code ? selectedPrice.label : null,
-    shipping ? "무료배송" : null,
-    onSale ? "할인중" : null,
-    inStock ? "재고 있음" : null,
-    selectedTagChip ? `태그: ${selectedTagChip.label}` : null,
-  ].filter((item): item is string => Boolean(item));
+  const activeFilterCandidates: Array<ActiveFilter | null> = [
+    selectedCategory ? { key: "category", label: `카테고리: ${selectedCategory.name}`, clear: { category: undefined } } : null,
+    price && selectedPrice?.code ? { key: "price", label: selectedPrice.label, clear: { price: undefined } } : null,
+    freeShippingSelected ? { key: "shipping", label: "무료배송", clear: { shipping: undefined, tag_chip: undefined } } : null,
+    onSale ? { key: "sale", label: "할인중", clear: { sale: undefined } } : null,
+    inStock ? { key: "stock", label: "재고 있음", clear: { stock: undefined } } : null,
+    selectedTagChip && tagChip !== "FREE_SHIPPING" ? { key: "tag_chip", label: `상품 특징: ${selectedTagChip.label}`, clear: { tag_chip: undefined } } : null,
+  ];
+  const activeFilters = activeFilterCandidates.filter((item): item is ActiveFilter => item !== null);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-24 pt-6">
+    <main className="mx-auto max-w-6xl px-4 pb-24 pt-6 md:pb-12">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-brand">Product Listing Page</p>
-          <h1 className="mt-1 text-3xl font-black tracking-tight">{selectedCategory ? `${selectedCategory.name} 상품` : "전체 상품"}</h1>
-          <p className="mt-2 text-sm font-semibold text-muted">
-            서버가 필터링한 상품 <strong className="text-foreground">{(productPage?.total ?? informationQuery.data?.total_product_count ?? 0).toLocaleString("ko-KR")}개</strong>를 보여드립니다.
-          </p>
+          <PageHeading icon={<PackageSearch />} title={selectedCategory ? `${selectedCategory.name} 상품` : "전체 상품"} />
         </div>
 
       </div>
 
-      <div className="mt-6 flex gap-2 overflow-x-auto border-y border-line py-3">
-        <button type="button" className={`h-10 shrink-0 rounded-full px-5 text-sm font-black ${!selectedCategory ? "bg-foreground text-white" : "bg-white"}`} onClick={() => updateSearch({ category: undefined })}>전체</button>
-        {categories.map((item) => (
-          <button type="button" key={item.id} className={`h-10 shrink-0 rounded-full px-5 text-sm font-black ${selectedCategory?.id === item.id ? "bg-foreground text-white" : "bg-white"}`} onClick={() => updateSearch({ category: item.slug })}>
-            {`— `.repeat(Math.max(0, item.depth - 1))}{item.name}
-          </button>
-        ))}
+      <div className="mt-4 flex gap-1 overflow-x-auto border-y border-border-subtle py-2" role="group" aria-label="상품 카테고리">
+        <FilterChip variant="navigation" selected={!selectedCategory} onClick={() => updateSearch({ category: undefined })}>전체</FilterChip>
+        {categories.map((item) => <FilterChip variant="navigation" key={item.id} selected={selectedCategory?.id === item.id} onClick={() => updateSearch({ category: item.slug })}>{`— `.repeat(Math.max(0, item.depth - 1))}{item.name}</FilterChip>)}
       </div>
 
-      <section className="mt-4 rounded-md border border-line bg-white p-4 shadow-sm">
+      <section className="mt-5 border-y border-border-subtle py-3" aria-labelledby="product-filter-heading">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-xs font-black text-muted">가격대</span>
-          {priceRanges.map((item) => (
-            <QuickFilter
-              key={item.code || "all"}
-              active={price === item.code}
-              label={item.label}
-              onClick={() => updateSearch({ price: item.code || undefined })}
-            />
-          ))}
+          <span id="product-filter-heading" className="mr-1 text-sm font-bold">필터</span>
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="빠른 필터">
+            <QuickFilter active={onSale} label="할인중" onClick={() => updateSearch({ sale: onSale ? undefined : "on" })} />
+            <QuickFilter active={freeShippingSelected} label="무료배송" onClick={toggleFreeShipping} />
+            <QuickFilter active={inStock} label="재고 있음" onClick={() => updateSearch({ stock: inStock ? undefined : "available" })} />
+          </div>
+          <button
+            type="button"
+            aria-expanded={detailFiltersOpen}
+            aria-controls="product-detail-filters"
+            className="ml-auto flex min-h-9 items-center gap-1 rounded-control px-2 text-xs font-bold text-content-secondary transition-colors hover:bg-surface-subtle hover:text-content-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+            onClick={() => setDetailFiltersOpen((open) => !open)}
+          >
+            상세 필터
+            <ChevronDown size={16} className={`transition-transform ${detailFiltersOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+          </button>
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
-          <span className="mr-1 text-xs font-black text-muted">빠른 필터</span>
-          <QuickFilter active={onSale} label="할인중" onClick={() => updateSearch({ sale: onSale ? undefined : "on" })} />
-          <QuickFilter active={inStock} label="재고 있음" onClick={() => updateSearch({ stock: inStock ? undefined : "available" })} />
-          {(informationQuery.data?.tag_chips ?? []).map((item) => (
-            <QuickFilter
-              key={item.code}
-              active={tagChip === item.code}
-              label={item.label}
-              onClick={() => updateSearch({ tag_chip: tagChip === item.code ? undefined : item.code })}
-            />
-          ))}
-        </div>
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
-          <span className="mr-1 text-xs font-black text-muted">정렬 방식</span>
-          {sortOptions.map((item) => <QuickFilter key={item.code} active={sort === item.code} label={item.label} onClick={() => updateSearch({ sort: item.code })} />)}
-        </div>
+        {detailFiltersOpen ? (
+          <div id="product-detail-filters" className="mt-3 border-t border-border-subtle pt-4">
+            <FilterRow label="가격대">
+              {priceRanges.map((item) => (
+                <QuickFilter
+                  key={item.code || "all"}
+                  active={price === item.code}
+                  label={item.label}
+                  onClick={() => updateSearch({ price: item.code || undefined })}
+                />
+              ))}
+            </FilterRow>
+            <FilterRow label="상품 특징" divided>
+              {(informationQuery.data?.tag_chips ?? []).filter((item) => item.code !== "FREE_SHIPPING").map((item) => (
+                <QuickFilter
+                  key={item.code}
+                  active={tagChip === item.code}
+                  label={item.label}
+                  onClick={() => updateSearch({ tag_chip: tagChip === item.code ? undefined : item.code })}
+                />
+              ))}
+            </FilterRow>
+          </div>
+        ) : null}
       </section>
 
-      <div className="mt-4 flex min-h-8 flex-wrap items-center gap-2">
-        {activeFilters.map((item) => <span key={item} className="inline-flex h-8 items-center rounded-full bg-zinc-100 px-3 text-xs font-bold text-zinc-700">{item}</span>)}
-        {activeFilters.length ? <button type="button" className="inline-flex h-8 items-center gap-1 px-2 text-xs font-bold text-muted hover:text-foreground" onClick={clearFilters}><X size={14} /> 초기화</button> : null}
+      {activeFilters.length ? <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="적용한 필터">
+        {activeFilters.map((item) => (
+          <button key={item.key} type="button" className="inline-flex h-8 items-center gap-1 rounded-full bg-surface-subtle px-3 text-xs font-bold text-content-secondary transition-colors hover:bg-action-secondary hover:text-content-primary" onClick={() => updateSearch(item.clear)} aria-label={`${item.label} 필터 해제`}>
+            {item.label}<X size={13} aria-hidden="true" />
+          </button>
+        ))}
+        <Button variant="ghost" type="button" className="inline-flex h-8 items-center gap-1 px-2 text-xs font-bold text-content-secondary hover:text-content-primary" onClick={clearFilters}><X size={14} /> 초기화</Button>
+      </div> : null}
+
+      <div className="mt-5 flex items-center justify-between gap-4 border-t border-border-subtle pt-4">
+        <p className="text-sm font-bold">전체 {(productPage?.total ?? informationQuery.data?.total_product_count ?? 0).toLocaleString("ko-KR")}개</p>
+        <label className="relative shrink-0">
+          <span className="sr-only">상품 정렬</span>
+          <select
+            aria-label="상품 정렬"
+            className="h-10 appearance-none rounded-control border border-border-interactive bg-surface-raised pl-3 pr-9 text-sm font-bold outline-none transition-colors hover:border-action-primary focus:border-action-primary focus:ring-4 focus:ring-action-primary/10"
+            value={sort ?? ""}
+            onChange={(event) => updateSearch({ sort: event.target.value })}
+            disabled={!sortOptions.length}
+          >
+            {sortOptions.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
+          </select>
+          <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-content-secondary" aria-hidden="true" />
+        </label>
       </div>
 
-      {informationQuery.error || productsQuery.error ? <p className="mt-8 rounded-md border border-red-200 bg-red-50 p-4 text-sm font-bold text-brand">PLP 정보를 불러오지 못했습니다.</p> : null}
-      {productsQuery.isLoading ? <p className="mt-8 text-sm text-muted">상품을 불러오는 중입니다.</p> : null}
-      {!productsQuery.isLoading && productPage && !productPage.items.length ? (
-        <div className="mt-8 rounded-md border border-line bg-white p-10 text-center"><p className="font-black">조건에 맞는 상품이 없습니다.</p><p className="mt-1 text-sm text-muted">필터를 조정해보세요.</p></div>
+      {informationQuery.error || productsQuery.error ? (
+        <ApiErrorState
+          className="mt-8"
+          error={informationQuery.error ?? productsQuery.error}
+          onRetry={() => void (informationQuery.error ? informationQuery.refetch() : productsQuery.refetch())}
+          retryLabel="상품 목록 다시 시도"
+        />
       ) : null}
-      <div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
+      {productsQuery.isLoading ? <p className="mt-8 text-sm text-content-secondary">상품을 불러오는 중입니다.</p> : null}
+      {!productsQuery.isLoading && productPage && !productPage.items.length ? (
+        <div className="mt-8 rounded-surface border border-border-subtle bg-surface-raised p-10 text-center shadow-card"><p className="font-bold">조건에 맞는 상품이 없습니다.</p><p className="mt-1 text-sm text-content-secondary">필터를 조정해보세요.</p></div>
+      ) : null}
+      <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
         {(productPage?.items ?? []).map((product) => <ProductCard key={product.id} product={product} />)}
       </div>
 
@@ -157,17 +215,14 @@ function flattenPLPCategories(categories: PLPInformation["categories"]): PLPInfo
 }
 
 function QuickFilter({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return <button type="button" className={`h-9 rounded-full border px-4 text-sm font-black ${active ? "border-brand bg-brand text-white" : "border-line bg-white text-zinc-700"}`} onClick={onClick}>{label}</button>;
+  return <FilterChip selected={active} onClick={onClick}>{label}</FilterChip>;
 }
 
-function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (page: number) => void }) {
-  if (totalPages <= 1) return null;
-  const pages = Array.from({ length: Math.min(5, totalPages) }, (_, index) => Math.max(1, Math.min(totalPages - 4, page - 2)) + index).filter((value) => value <= totalPages);
+function FilterRow({ label, children, divided = false }: { label: string; children: React.ReactNode; divided?: boolean }) {
   return (
-    <nav aria-label="상품 페이지" className="mt-10 flex items-center justify-center gap-2">
-      <button type="button" aria-label="이전 페이지" disabled={page <= 1} onClick={() => onChange(page - 1)} className="flex h-10 w-10 items-center justify-center rounded-md border border-line bg-white disabled:opacity-30"><ChevronLeft size={18} /></button>
-      {pages.map((item) => <button type="button" key={item} aria-current={item === page ? "page" : undefined} onClick={() => onChange(item)} className={`h-10 min-w-10 rounded-md px-3 text-sm font-black ${item === page ? "bg-foreground text-white" : "border border-line bg-white"}`}>{item}</button>)}
-      <button type="button" aria-label="다음 페이지" disabled={page >= totalPages} onClick={() => onChange(page + 1)} className="flex h-10 w-10 items-center justify-center rounded-md border border-line bg-white disabled:opacity-30"><ChevronRight size={18} /></button>
-    </nav>
+    <div className={`grid gap-2 md:grid-cols-[5rem_minmax(0,1fr)] md:items-start ${divided ? "mt-4 border-t border-border-subtle pt-4" : ""}`}>
+      <span className="pt-2 text-xs font-bold text-content-secondary">{label}</span>
+      <div className="flex flex-wrap items-center gap-2">{children}</div>
+    </div>
   );
 }

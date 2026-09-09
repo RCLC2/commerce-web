@@ -1,5 +1,10 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
+import { PageHeading } from "./ui/page-heading";
+import { Grid2X2 as PageIcon } from "lucide-react";
+
 import { useQuery } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
@@ -8,6 +13,7 @@ import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import type { CommerceCategory } from "@/lib/types";
 import { ProductCard } from "./product-card";
+import { ButtonLink } from "./ui/button-link";
 
 export function CategoriesPage() {
   const [selectedSlug, setSelectedSlug] = useState<string>("");
@@ -32,62 +38,61 @@ export function CategoriesPage() {
     <main className="mx-auto max-w-6xl px-4 pb-24 pt-8">
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-black">카테고리관</h1>
-          <p className="mt-1 text-sm text-muted">어드민이 정한 순서대로 카테고리와 상품 구좌를 보여드립니다.</p>
+          <PageHeading icon={<PageIcon />} title="카테고리관" description="카테고리별 상품과 인기 상품을 확인하세요." />
         </div>
-        <Link href="/products" className="inline-flex h-10 items-center gap-1 rounded-md border border-brand/30 bg-brand/10 px-4 text-sm font-bold text-brand hover:bg-brand/15">
+        <ButtonLink href="/products" variant="secondary" size="sm">
           전체 상품
           <ChevronRight size={16} />
-        </Link>
+        </ButtonLink>
       </div>
 
-      {isLoading ? <p className="mt-6 text-sm text-muted">카테고리를 불러오는 중입니다.</p> : null}
+      {isLoading ? <p className="mt-6 text-sm text-content-secondary">카테고리를 불러오는 중입니다.</p> : null}
 
-      <section className="mt-6 overflow-hidden rounded-md border border-line bg-white">
-        <div className="flex gap-2 overflow-x-auto border-b border-line p-3">
+      <section className="mt-6 overflow-hidden rounded-surface border border-border-subtle bg-surface-raised shadow-card">
+        <div className="flex gap-2 overflow-x-auto border-b border-border-subtle p-3">
           {orderedCategories.map((category) => (
-            <button
+            <Button variant="ghost"
               key={category.id}
-              className={`h-10 shrink-0 rounded-md px-4 text-sm font-black ${selectedCategory?.id === category.id ? "bg-brand/10 text-brand ring-1 ring-brand/25" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"}`}
+              className={`h-10 shrink-0 rounded-control px-4 text-sm font-bold ${selectedCategory?.id === category.id ? "bg-action-primary/10 text-action-primary ring-1 ring-brand/25" : "border border-border-subtle bg-surface-raised text-content-secondary hover:bg-surface-subtle"}`}
               onClick={() => setSelectedSlug(category.slug)}
             >
               {category.name}
-            </button>
+            </Button>
           ))}
         </div>
         {selectedCategory ? (
           <div className="grid gap-6 p-4 lg:grid-cols-[280px_1fr]">
             <aside className="space-y-3">
-              <Link href={selectedCategory.href} className="block rounded-md border border-brand/20 bg-brand/10 px-4 py-4 text-brand">
-                <p className="text-lg font-black">{selectedCategory.name}</p>
-                <p className="mt-1 text-xs font-bold text-brand/70">{selectedCategory.category_ids?.length ?? 1}개 카테고리 묶음</p>
+              <Link href={selectedCategory.href} className="block rounded-md border border-action-primary/20 bg-action-primary/10 px-4 py-4 text-action-primary">
+                <p className="text-lg font-bold">{selectedCategory.name}</p>
+                <p className="mt-1 text-xs font-bold text-action-primary/70">{selectedCategory.category_ids?.length ?? 1}개 카테고리 묶음</p>
               </Link>
               <div className="flex flex-wrap gap-2 lg:block lg:space-y-2">
                 {filterChips.map((category) => (
-                  <button
+                  <Button variant="ghost"
                     key={category.id}
-                    className={`rounded-md px-3 py-2 text-left text-sm font-bold lg:w-full ${activeFilter?.id === category.id ? "bg-brand/10 text-brand ring-1 ring-brand/25" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"}`}
+                    className={`rounded-control px-3 py-2 text-left text-sm font-bold lg:w-full ${activeFilter?.id === category.id ? "bg-action-primary/10 text-action-primary ring-1 ring-brand/25" : "border border-border-subtle bg-surface-raised text-content-secondary hover:bg-surface-subtle"}`}
                     onClick={() => setSelectedSlug(category.slug)}
                   >
                     {category.name}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </aside>
             <div>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-black">{activeFilter?.name ?? selectedCategory.name} 실시간 상품</h2>
-                  <p className="mt-1 text-sm text-muted">하위 카테고리 기준으로 즉시 필터링됩니다.</p>
+                  <h2 className="text-xl font-bold">{activeFilter?.name ?? selectedCategory.name} 실시간 상품</h2>
+                  <p className="mt-1 text-sm text-content-secondary">하위 카테고리 기준으로 즉시 필터링됩니다.</p>
                 </div>
-                <Link href={activeFilter?.href ?? selectedCategory.href} className="text-sm font-black text-brand">상품 더보기</Link>
+                <Link href={activeFilter?.href ?? selectedCategory.href} className="text-sm font-bold text-action-primary">상품 더보기</Link>
               </div>
               {filteredProducts.length ? (
                 <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 md:grid-cols-4">
                   {filteredProducts.map((product) => <ProductCard key={product.id} product={product} />)}
                 </div>
               ) : (
-                <div className="mt-4 rounded-md bg-zinc-50 p-8 text-center text-sm font-bold text-muted">아직 연결된 상품이 없습니다.</div>
+                <div className="mt-4 rounded-surface border border-dashed border-border-subtle bg-surface-raised p-8 text-center text-sm font-bold text-content-secondary">아직 연결된 상품이 없습니다.</div>
               )}
             </div>
           </div>

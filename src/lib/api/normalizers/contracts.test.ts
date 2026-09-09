@@ -23,6 +23,7 @@ import {
   normalizeCouponDefinition,
   normalizeIssuableCouponQuote,
   normalizeOwnedCoupon,
+  normalizePublicProduct,
   normalizeSellerProduct,
   normalizeSettlement,
 } from "./contracts";
@@ -76,6 +77,29 @@ describe("contract normalizers", () => {
       Description: "{\"text\":\"설명\"}",
       Options: [{ ID: 40, ReservedQuantity: 1, SafetyQuantity: 2 }],
     });
+  });
+
+  it("keeps PDP HTML embedded in the server-side description payload", () => {
+    const product = parseContract(productSchema, {
+      id: 11,
+      market_id: 20,
+      category_id: 30,
+      name: "베이지 니트",
+      description: JSON.stringify({
+        text: "부드러운 베이지 니트입니다.",
+        html: '<section class="detail-band"><img src="https://images.pexels.com/photos/11/product.jpeg" alt="베이지 니트"></section>',
+      }),
+      base_price: 35000,
+      discount_price: 0,
+      shipping_type: "NORMAL",
+      popularity_score: 0,
+      status: "SELLING",
+    }, "/products/11");
+
+    const normalized = normalizePublicProduct(product);
+
+    expect(normalized.description).toBe("부드러운 베이지 니트입니다.");
+    expect(normalized.detail_html).toContain("images.pexels.com/photos/11/product.jpeg");
   });
 
   it("drops sensitive admin member fields and normalizes settlements", () => {

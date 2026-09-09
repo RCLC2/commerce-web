@@ -1,19 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import type { Product } from "@/lib/types";
-import { discountRate, formatPrice } from "@/lib/utils";
+import { Store } from "lucide-react";
+import type { Product, ProductBadgeTone } from "@/lib/types";
+import { couponPriceForProduct } from "@/lib/product-card-pricing";
+import { ProductCardPrice } from "./product-card-price";
 import { SafeImage } from "./safe-image";
 
-export function ProductCard({ product, imageAspect = "aspect-square" }: { product: Product; imageAspect?: string }) {
-  const saleRate = discountRate(product.base_price, product.discount_price);
-  const price = product.discount_price || product.base_price;
-  const discountAmount = Math.max(0, product.base_price - price);
+export function ProductCard({
+  product,
+  imageAspect = "aspect-square",
+  compact = false,
+}: {
+  product: Product;
+  imageAspect?: string;
+  compact?: boolean;
+}) {
+  const couponPrice = couponPriceForProduct(product);
 
   return (
-    <article className="group">
+    <article className="group min-w-0">
       <Link href={`/products/${product.id}`} className="block">
-        <div className={`relative ${imageAspect} overflow-hidden rounded-md bg-zinc-100`}>
+        <div className={`relative ${imageAspect} overflow-hidden rounded-control bg-surface-subtle`}>
           <SafeImage
             src={product.image_url}
             alt={product.name}
@@ -23,31 +31,26 @@ export function ProductCard({ product, imageAspect = "aspect-square" }: { produc
           />
         </div>
       </Link>
-      <div className="mt-3 space-y-1.5">
-        <Link href={`/markets/${product.market?.id ?? product.market_id}`} className="inline-flex w-fit text-xs font-semibold text-muted underline-offset-2 hover:text-foreground hover:underline">
-          {product.market?.name ?? product.market_name ?? `마켓 ${product.market_id}`}
+      <div className={compact ? "mt-2 space-y-1" : "mt-2.5 space-y-1.5"}>
+        <Link href={`/markets/${product.market?.id ?? product.market_id}`} className="inline-flex max-w-full items-center gap-1 text-xs font-medium text-content-secondary underline-offset-2 hover:text-content-primary hover:underline">
+          <Store size={13} className="shrink-0" aria-hidden="true" /><span className="truncate">{product.market?.name ?? product.market_name ?? `마켓 ${product.market_id}`}</span>
         </Link>
         <Link href={`/products/${product.id}`} className="block">
-          <h3 className="line-clamp-2 min-h-10 text-sm font-medium leading-5 group-hover:underline">{product.name}</h3>
+          <h3 className={`${compact ? "line-clamp-1" : "line-clamp-2"} text-sm font-bold leading-5 text-content-primary hover:underline`}>{product.name}</h3>
         </Link>
-        <div className="rounded-md bg-zinc-50 px-2.5 py-2">
-          <p className="text-[11px] font-bold text-muted">판매가</p>
-          <div className="mt-0.5 flex items-baseline gap-1.5">
-            {saleRate > 0 ? <span className="text-base font-black text-brand">{saleRate}%</span> : null}
-            <strong className="text-lg font-black tracking-tight">{formatPrice(price)}</strong>
-          </div>
-          {discountAmount > 0 ? (
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
-              <span className="text-muted">원가 <del>{formatPrice(product.base_price)}</del></span>
-              <span className="font-black text-brand">-{formatPrice(discountAmount)} 할인</span>
-            </div>
-          ) : (
-            <p className="mt-1 text-[11px] text-muted">원가와 동일</p>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-1">
-          {(product.tag_chips ?? []).slice(0, 4).map((chip) => (
-            <ProductChip key={chip.code} label={chip.label} tone={chip.tone} />
+        <ProductCardPrice
+          basePrice={product.base_price}
+          discountPrice={product.discount_price}
+          couponPrice={couponPrice}
+          variant={compact ? "compact" : "default"}
+          className={compact ? "!mt-1" : ""}
+        />
+        <div className="flex flex-wrap items-center gap-x-1 text-xs">
+          {(product.tag_chips ?? []).slice(0, compact ? 2 : 4).map((chip, index) => (
+            <span key={chip.code} className="inline-flex items-center gap-1">
+              {index ? <span className="text-content-tertiary" aria-hidden="true">·</span> : null}
+              <ProductChip label={chip.label} tone={chip.tone} />
+            </span>
           ))}
         </div>
       </div>
@@ -55,16 +58,13 @@ export function ProductCard({ product, imageAspect = "aspect-square" }: { produc
   );
 }
 
-function ProductChip({ label, tone }: { label: string; tone: string }) {
-  const toneClasses: Record<string, string> = {
-    shipping: "bg-emerald-50 text-emerald-700",
-    delivery: "bg-sky-50 text-sky-700",
-    exclusive: "bg-amber-50 text-amber-800",
-    promotion: "bg-amber-50 text-amber-800",
-    new: "bg-brand text-white",
-    default: "bg-zinc-100 text-zinc-600",
+function ProductChip({ label, tone }: { label: string; tone: ProductBadgeTone }) {
+  const tones: Record<ProductBadgeTone, string> = {
+    shipping: "text-status-positive",
+    delivery: "text-content-secondary",
+    exclusive: "text-status-warning",
+    new: "text-content-primary",
+    default: "text-content-secondary",
   };
-  const toneClass = toneClasses[tone] ?? toneClasses.default;
-
-  return <span className={`rounded-sm px-1.5 py-0.5 text-[11px] font-bold ${toneClass}`}>{label}</span>;
+  return <span className={`font-bold ${tones[tone]}`}>{label}</span>;
 }

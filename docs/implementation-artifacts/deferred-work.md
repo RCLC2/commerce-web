@@ -1,12 +1,11 @@
-- source_spec: `docs/implementation-artifacts/spec-frontend-api-contract-recovery.md`
-  summary: Next.js와 전이 의존성의 high 등급 보안 권고를 별도 의존성 업그레이드 작업으로 처리한다.
-  evidence: `npm audit --omit=dev --audit-level=high`가 기존 `next@16.2.7` 및 포함된 PostCSS·Sharp에 3건을 보고하며, 자동 수정은 현재 명시 범위를 벗어난 `next@16.2.12` 강제 업그레이드를 요구한다.
-- source_spec: `docs/implementation-artifacts/spec-frontend-origin-main-contract-followup.md`
-  summary: 쿠폰 견적 요청 금액이 유한한 안전 정수인지 검증하는 입력 경계를 별도 작업으로 보강한다.
-  evidence: 기존 `customer.ts` 구현은 `NaN`·`Infinity`·안전 정수 범위 밖 값을 `Math.max`와 `Math.floor`에 통과시켜 잘못된 `order_amount` 쿼리를 만들 수 있으며, 이번 응답 계약 복구에서 새로 생긴 문제는 아니다.
-- source_spec: none
-  summary: 주문 상세에서 현재 백엔드의 배송 정보를 조회하고 고객 배송조회 기능을 연결한다.
-  evidence: 좋아요·팔로우·리뷰·쿠폰 상태 수정과 독립적으로 배포 가능한 주문 상세 기능이므로 사용자 선택에 따라 분리했다.
-- source_spec: none
-  summary: 개인화 추천과 CMS 홈 구좌를 백엔드 설정 및 회원 추천 결과에 맞게 연결한다.
-  evidence: 고객 상호작용 상태 수정과 독립적인 홈 콘텐츠 전달 기능이므로 사용자 선택에 따라 분리했다.
+- source_spec: `docs/implementation-artifacts/spec-toss-test-payments.md`
+  summary: `payment_key` 컬럼 down migration은 100자를 넘는 Toss 키가 저장된 뒤 비파괴적으로 축소되지 않는다.
+  evidence: `migrations/20260814001_expand_order_payment_key.sql`의 down 절은 varchar(100)으로 되돌리므로 운영 데이터가 있으면 rollback 전에 별도 데이터 검증이 필요하다.
+
+- source_spec: `docs/implementation-artifacts/spec-toss-test-payments.md`
+  summary: 실제 Toss 테스트 카드 브라우저 E2E를 실행하려면 실행 중인 API·DB·Temporal과 테스트 키가 필요하다.
+  evidence: 로컬 API·DB·Temporal과 Toss 테스트 키를 주입한 무목 Playwright E2E를 실행해 주문 생성·결제창 결제·success callback·서버 승인·주문 `Paid` 상태를 확인했다. 재현 영상은 PR에 첨부한다.
+
+- source_spec: `docs/implementation-artifacts/spec-toss-test-payments.md`
+  summary: 저장소의 legacy `deployments/k8s/api.yaml`은 애플리케이션 DB 환경변수도 선언하지 않아 cluster-config 주입 계약 확인이 필요하다.
+  evidence: 새 Toss 키 주입은 이 저장소가 아닌 운영 cluster-config에서 관리해야 하며, 해당 외부 저장소는 이번 worktree 범위에 없다.

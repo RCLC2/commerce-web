@@ -8,7 +8,6 @@ import {
   eventSchema,
   homeCategoryChipSchema,
   homeSectionSchema,
-  instagramTrendPageSchema,
   marketSchema,
   plpInformationSchema,
   plpProductPageSchema,
@@ -28,11 +27,27 @@ const productDetailSchema = z.object({
   today_shipping_available: z.boolean().optional(),
 });
 
+const marketShelfSchema = z.object({
+  mode: z.enum(["PLATFORM_RECOMMENDED", "NEWEST"]),
+  items: z.array(plpProductSchema),
+});
+
+const similarProductsSchema = z.object({
+  items: z.array(plpProductSchema),
+});
+
 const parseProducts = async (path: string) =>
   (await requestParsed(z.array(plpProductSchema), path)).map(normalizePublicProduct);
 
 export const catalogApi = {
-  listMarkets: () => requestParsed(z.array(marketSchema), "/api/v1/markets"),
+  listMarkets: (params: { sort?: "new" | "popular" | "trending" | "new-products"; limit?: number; offset?: number } = {}) => {
+    const search = new URLSearchParams();
+    if (params.sort) search.set("sort", params.sort);
+    if (params.limit) search.set("limit", String(params.limit));
+    if (params.offset) search.set("offset", String(params.offset));
+    const query = search.toString();
+    return requestParsed(z.array(marketSchema), `/api/v1/markets${query ? `?${query}` : ""}`);
+  },
   listCategories: () => requestParsed(z.array(categorySchema), "/api/v1/categories"),
   getPLPInformation: (): Promise<PLPInformation> =>
     requestParsed(plpInformationSchema, "/api/v1/plp-information"),
@@ -70,17 +85,6 @@ export const catalogApi = {
   listEvents: () => requestParsed(z.array(eventSchema), "/api/v1/events"),
   listHomeSections: () => requestParsed(z.array(homeSectionSchema), "/api/v1/home/sections"),
   listHomeCategoryChips: () => requestParsed(z.array(homeCategoryChipSchema), "/api/v1/home/category-chips"),
-  listTrendPosts: (params?: { limit?: number; after?: string; hashtag?: string }) => {
-    const search = new URLSearchParams();
-    if (params?.limit) search.set("limit", String(params.limit));
-    if (params?.after) search.set("after", params.after);
-    if (params?.hashtag) search.set("hashtag", params.hashtag);
-    const query = search.toString();
-    return requestParsed(
-      instagramTrendPageSchema,
-      `/api/v1/trends/posts${query ? `?${query}` : ""}`,
-    );
-  },
   getEvent: (id: number) => requestParsed(eventSchema, `/api/v1/events/${id}`),
   listProducts: (params?: { categoryID?: number; marketID?: number; sort?: string; q?: string }) => {
     const search = new URLSearchParams();
@@ -91,15 +95,14 @@ export const catalogApi = {
     const query = search.toString();
     return parseProducts(`/api/v1/products${query ? `?${query}` : ""}`);
   },
-  listPopularProducts: () => parseProducts("/api/v1/products/popular"),
-  listPromotionProducts: () => parseProducts("/api/v1/products/promotions"),
-  listRecommendedProducts: (params?: { limit?: number; offset?: number }) => {
+  listPopularProducts: (params: { limit?: number; offset?: number } = {}) => {
     const search = new URLSearchParams();
-    if (params?.limit) search.set("limit", String(params.limit));
-    if (params?.offset !== undefined) search.set("offset", String(params.offset));
+    if (params.limit) search.set("limit", String(params.limit));
+    if (params.offset !== undefined) search.set("offset", String(params.offset));
     const query = search.toString();
-    return parseProducts(`/api/v1/products/recommendations${query ? `?${query}` : ""}`);
+    return parseProducts(`/api/v1/products/popular${query ? `?${query}` : ""}`);
   },
+  listPromotionProducts: () => parseProducts("/api/v1/products/promotions"),
   listLatestProducts: () => parseProducts("/api/v1/products/latest"),
   getProduct: (id: number) =>
     requestParsed(productDetailSchema, `/api/v1/products/${id}`).then((detail) => normalizePublicProduct({
@@ -116,6 +119,14 @@ export const catalogApi = {
     requestParsed(z.array(reviewSchema), `/api/v1/products/${id}/reviews`),
   getProductReviewSummary: (id: number) =>
     requestParsed(reviewSummarySchema, `/api/v1/products/${id}/reviews/summary`),
+  getProductMarketShelf: async (id: number, limit = 10) => {
+    const shelf = await requestParsed(marketShelfSchema, `/api/v1/products/${id}/market-shelf?limit=${limit}`);
+    return { ...shelf, items: shelf.items.map(normalizePublicProduct) };
+  },
+  getSimilarProducts: async (id: number, limit = 10) => {
+    const shelf = await requestParsed(similarProductsSchema, `/api/v1/products/${id}/similar?limit=${limit}`);
+    return { items: shelf.items.map(normalizePublicProduct) };
+  },
   listActiveCarousels: () =>
     requestParsed(z.array(carouselSchema), "/api/v1/carousels/active"),
   recordCampaignClick: (campaignID: number) =>

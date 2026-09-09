@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requestParsed, requestVoid } from "../api-client";
 import {
   orderSchema,
+  marketFeedResponseSchema,
   productSchema,
   recommendationSchema,
   statusResponseSchema,
@@ -14,7 +15,7 @@ import {
   rawIssuableCouponQuoteSchema,
   rawNotificationSchema,
   rawOwnedCouponSchema,
-  rawPaymentCheckoutSchema,
+  rawPaymentRequestSchema,
   rawReviewMutationSchema,
   rawSettlementSummarySchema,
 } from "./contracts/raw";
@@ -25,7 +26,8 @@ import {
   normalizeIssuableCouponQuote,
   normalizeNotification,
   normalizeOwnedCoupon,
-  normalizePaymentCheckout,
+  normalizePaymentRequest,
+  normalizePublicProduct,
   normalizeReviewMutation,
   normalizeSettlementSummary,
 } from "./normalizers/contracts";
@@ -75,6 +77,12 @@ export const customerApi = {
     }),
   listCart: async (token: string) =>
     (await requestParsed(z.array(rawCartSchema), "/api/v1/cart", { token })).map(normalizeCartItem),
+  updateCartItems: async (token: string, payload: { cart_item_ids: number[]; option_id: number; quantity: number }) =>
+    normalizeCartItem(await requestParsed(rawCartSchema, "/api/v1/cart/items", {
+      method: "PATCH",
+      token,
+      body: JSON.stringify(payload),
+    })),
   listCoupons: async (token: string) =>
     (await requestParsed(z.array(rawOwnedCouponSchema), "/api/v1/coupons", { token }))
       .map((coupon) => normalizeOwnedCoupon(coupon)),
@@ -100,10 +108,39 @@ export const customerApi = {
   listNotifications: async (token: string) =>
     (await requestParsed(z.array(rawNotificationSchema), "/api/v1/me/notifications", { token }))
       .map(normalizeNotification),
-  listMyRecommendations: (token: string) => requestParsed(z.array(recommendationSchema), "/api/v1/me/recommendations", { token }),
+  listMyRecommendations: async (token: string, params: { limit?: number; offset?: number } = {}) => {
+    const search = new URLSearchParams();
+    if (params.limit) search.set("limit", String(params.limit));
+    if (params.offset !== undefined) search.set("offset", String(params.offset));
+    const query = search.toString();
+    const recommendations = await requestParsed(
+      z.array(recommendationSchema),
+      `/api/v1/me/recommendations${query ? `?${query}` : ""}`,
+      { token },
+    );
+    return recommendations.map((recommendation) => ({
+      ...recommendation,
+      product: normalizePublicProduct(recommendation.product),
+    }));
+  },
+  listMarketFeed: async (token: string, params: { limit?: number; cursor?: string } = {}) => {
+    const search = new URLSearchParams();
+    if (params.limit) search.set("limit", String(params.limit));
+    if (params.cursor) search.set("cursor", params.cursor);
+    const query = search.toString();
+    const feed = await requestParsed(
+      marketFeedResponseSchema,
+      `/api/v1/me/market-feed${query ? `?${query}` : ""}`,
+      { token },
+    );
+    return {
+      ...feed,
+      items: feed.items.map((item) => ({ ...item, product: normalizePublicProduct(item.product) })),
+    };
+  },
   listWishlistedProducts: (token: string) => requestParsed(z.array(productSchema), "/api/v1/me/wishlist", { token }),
   listLikedProducts: (token: string) => requestParsed(z.array(productSchema), "/api/v1/me/liked-products", { token }),
-  placeOrder: (token: string, payload: { cart_item_ids: number[]; used_coupon_id?: number; used_point: number }) =>
+  placeOrder: (token: string, payload: { cart_item_ids: number[]; used_coupon_id?: number; used_point: number; shipping_address?: { receiver: string; phone: string; zip_code: string; line1: string; line2: string } }) =>
     requestParsed(z.object({ orderCode: z.string().min(1) }), "/api/v1/orders", {
       method: "POST",
       token,
@@ -122,15 +159,21 @@ export const customerApi = {
     requestParsed(orderSchema, `/api/v1/orders/${orderCode}`, { token }),
   confirmPurchase: (token: string, orderCode: string, itemID: number) =>
     requestParsed(orderSchema, `/api/v1/orders/${orderCode}/items/${itemID}/confirm-purchase`, { method: "POST", token }),
-  createPaymentCheckout: async (token: string, orderCode: string) =>
-    normalizePaymentCheckout(await requestParsed(
-      rawPaymentCheckoutSchema,
-      `/api/v1/orders/${orderCode}/payment-checkout`,
+  createPaymentRequest: async (token: string, orderCode: string) =>
+    normalizePaymentRequest(await requestParsed(
+      rawPaymentRequestSchema,
+      `/api/v1/orders/${orderCode}/payment-request`,
       {
         method: "POST",
         token,
       },
     )),
+  completePayment: (token: string, orderCode: string, payload: { payment_key: string; order_id: string; amount: number }) =>
+    requestVoid(`/api/v1/orders/${orderCode}/complete-payment`, {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    }),
   trackDelivery: (token: string, orderCode: string, deliveryID: number) =>
     requestParsed(trackingInfoSchema, `/api/v1/orders/${orderCode}/deliveries/${deliveryID}/track`, { method: "POST", token }),
   createOrderLineReview: async (token: string, orderCode: string, itemID: number, payload: CreateOrderLineReviewPayload) =>

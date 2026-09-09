@@ -1,366 +1,99 @@
-# Commerce Web Implementation Plan
-
-## 1. Goal
-
-`commerce-web`은 고객 쇼핑 앱, 셀러 콘솔, 어드민 콘솔을 하나의 Next.js 프로젝트 안에서 제공한다.
-백엔드 `ably-commerce`의 현재 API 구현 상태를 기준으로, 먼저 실제 연결 가능한 화면을 만들고 부족한 API는 MSW와 계약 문서로 선행 정의한다.
-
-## 2. Route Strategy
-
-- Customer app: `/`, `/products/:id`, `/cart`, `/login`, `/mypage`
-- Seller console: `/seller`, `/seller/products`, `/seller/inventory`, `/seller/orders`, `/seller/settlements`, `/seller/reviews`
-- Admin console: `/admin`, `/admin/members`, `/admin/markets`, `/admin/products`, `/admin/orders`, `/admin/settlements`, `/admin/coupons`, `/admin/audit-logs`, `/admin/cms`
-
-## 3. Customer MVP Minimum Scope
-
-These items are the minimum implementation scope before seller/admin work can be considered product-complete.
-
-### Phase C1: PLP, Product Listing Page
-
-Status: required
-
-Build:
-- Product list page with category tabs, search entry, sort controls, and product cards
-- Ranking/new-arrival/sale filters
-- Pagination or infinite scroll
-- Empty, loading, and API error states
-- Mobile-first two-column grid and desktop four-column grid
-
-Backend dependency:
-- Implemented: `GET /api/v1/products`
-- TODO: `GET /api/v1/categories`
-- PLP server contract: `GET /api/v1/plp-information` supplies cached categories/count/average/filter options and `GET /api/v1/plp-products` supplies server-filtered pagination.
-- PLP terminology and API error behavior are documented in `docs/PLP.md`.
-
-### Phase C1.5: Integrated Search and Autocomplete
-
-Status: implemented
-
-Ubiquitous language:
-- **통합 검색(Integrated Search)**: one query returning product and market result pages.
-- **검색 결과 페이지(Search Result Page)**: `/search` page with independently addressable product and market pagination.
-- **검색 결과 구좌(Search Result Section)**: server-managed carousel rendered between the product and market lists.
-- **연관 상품 캐러셀(Related Product Carousel)** and **스폰서 마켓 캐러셀(Sponsored Market Carousel)**: the default search result sections.
-- **연관 검색어(Related Keyword)**: server-produced related query shown as chips.
-- **인기 검색어(Trending Search)**: ranked query with `UP`, `SAME`, or `DOWN` movement.
-- **대상 세그먼트(Audience Segment)**: `women(여성)` or `men(남성)` trending-search chip.
-
-Implemented behavior:
-- Top app-shell search routes to `/search?q=` and autocomplete uses server suggestions.
-- Product and market results use independent `product_page` and `market_page` URL parameters and render server totals.
-- `sections` render in server `sequence` order between the product and market result lists; unknown or empty sections are ignored safely.
-- Related keyword chips use `related_keywords` from the server and do not synthesize prefixes in the browser.
-- Trending chips are named 여성 and 남성 and show up, unchanged, and down movement.
-- The displayed current time is computed by the frontend every minute. The backend does not provide `captured_at`.
-- Search, suggestion, and trending request failures remain visible and are not replaced with development dummy data.
-
-Backend contract:
-- `GET /api/v1/search?q=&audience=&product_page=&market_page=&page_size=`
-- `GET /api/v1/search/suggestions?q=&limit=`
-- `GET /api/v1/search/trending?segment=women|men`
-- Search response includes paged `products`, paged `markets`, normalized `suggestions`, `related_keywords`, and ordered `sections`.
-### Phase C2: PDP, Product Detail Page
-
-Status: required
+# Commerce Web 구현 현황과 후속 작업
 
-Build:
-- Product image gallery
-- Product title, market name, price, discount, shipping type, badges
-- Option and quantity selection
-- Stock/sold-out handling
-- Add-to-cart flow
-- Review section connected to product review API
-- Sticky purchase action area on mobile
-
-Backend dependency:
-- Implemented: `GET /api/v1/products/:id`
-- Implemented: `GET /api/v1/products/:id/reviews`
-- Implemented: `POST /api/v1/cart/items`
+이 문서는 초기 단계별 구현 계획을 대신하는 현재 상태 요약입니다. 실제 라우트는 `src/app`, API 계약은 `src/lib/api`, 실행 명령은 `package.json`을 단일 기준으로 사용합니다.
 
-### Phase C3: Cart, Checkout, and Payment Flow
+## 현재 범위
 
-Status: required
+`commerce-web`은 하나의 Next.js 애플리케이션에서 다음 세 영역을 제공합니다.
 
-Build:
-- Cart item list with quantity and selected option display
-- Order sheet with shipping address, coupon, point usage, and final amount calculation
-- Order creation from selected cart items
-- Payment handoff placeholder for PortOne integration
-- Payment completion screen that calls backend complete-payment API
-- Order success and failure states
+- 고객 쇼핑: 홈, 탐색, 상품, 장바구니, 주문·결제, 회원 기능
+- 셀러 콘솔: 상품·재고·주문·정산·리뷰·광고·감사 로그
+- 관리자 콘솔: 회원·마켓·상품·주문·정산·쿠폰·CMS·광고·실험·감사 로그
 
-Backend dependency:
-- Implemented: `GET /api/v1/cart`
-- Implemented: `POST /api/v1/orders`
-- Implemented: `POST /api/v1/orders/:orderCode/complete-payment`
-- Implemented/partial: coupon and point APIs exist for customer use, but UI must verify actual route coverage.
+과거 문서의 `Status: planned` 또는 `Status: required` 표시는 현재 구현 상태를 반영하지 못하므로 제거했습니다. 화면 존재 여부는 `src/app/**/page.tsx`, API 연결 여부는 해당 도메인의 `src/lib/api/*.ts`로 확인합니다.
 
-### Phase C4: User Account, Profile Edit, and Orders
+## 고객 기능
 
-Status: required
+### 상품 탐색
 
-Build:
-- My page summary with email, role/status, notification settings, marketing consent, point balance
-- Profile edit screen for notification type, marketing consent, nighttime consent, and password change placeholder
-- My order list with status tabs
-- Order detail page with market orders, line items, payment amount, delivery state placeholder
-- Login-required guards and redirect behavior
+- `/`, `/categories`, `/products`, `/products/[id]`
+- `/search`, `/recommendations`, `/market-feed`
+- `/popular-products`, `/popular-markets`, `/markets/[id]`
+- `/events/[id]`, `/today-outfit`
 
-Backend dependency:
-- Implemented: `GET /api/v1/me`
-- Implemented: `GET /api/v1/orders`
-- Implemented: `GET /api/v1/orders/:orderCode`
-- Missing or partial: profile update API is not visible in the current server routes, so edit UI may need an API contract/MSW first.
+PLP, 카테고리, 검색, 홈 구좌와 이벤트 화면은 서버가 정한 정렬·페이지네이션·표시 메타데이터를 사용합니다. 프론트에서 임의의 상품, 태그 칩 또는 집계값을 합성하지 않습니다.
 
-### Customer MVP Acceptance Criteria
+### 거래와 회원
 
-- A user can browse PLP, open PDP, select an option, add to cart, create an order, complete payment, and see the order in My Page.
-- A logged-in user can view their profile and order history.
-- Profile edit UI is present; actual save is connected when backend update API is available.
-- All required customer pages include loading, empty, and error states.
-- MSW supports the full happy path for local development without the backend server.
+- `/cart`, `/checkout`, `/payments/toss/success`, `/payments/toss/fail`
+- `/orders/[orderCode]`
+- `/login`, `/register`, `/onboarding/preferences`
+- `/mypage`, `/mypage/profile`, `/mypage/coupons`, `/mypage/reviews`, `/likes`
 
-## 4. Shared Architecture
+주문과 결제의 서버 계약상 제약은 [백엔드 계약 개선 목록](BACKEND_CONTRACT_GAPS.md)에 기록합니다.
 
-- Role-aware navigation after login: `CUSTOMER`, `SELLER`, `ADMIN`
-- Route guards in client layout and API request layer
-- Dense dashboard UI for seller/admin areas, separate from customer commerce UI
-- TanStack Query query keys split by domain: `products`, `seller-products`, `admin-orders`, `settlements`
-- MSW handlers for all seller/admin APIs that are not yet connected in the backend
-- Audit-aware mutation forms: every sensitive admin mutation must include `reason`
+## 셀러 콘솔
 
-## 5. Seller Console Plan
+현재 라우트는 다음과 같습니다.
 
-### Phase S1: Seller Shell and Dashboard
+- `/seller`: 운영 요약
+- `/seller/products`: 상품 작성과 관리
+- `/seller/inventory`: 외부 재고 연동
+- `/seller/orders`: 주문 처리
+- `/seller/settlements`: 정산 조회
+- `/seller/reviews`: 리뷰 관리
+- `/seller/ads`: 광고 운영
+- `/seller/audit-logs`: 변경 이력 조회
 
-Status: planned
+셀러 상품 작성의 용어와 동작은 [상품 상세와 셀러 상품 작성](PDP_AND_SELLER_PRODUCTS.md)을 따릅니다.
 
-Build:
-- Seller-only layout with sidebar, top search, account/market switcher
-- Summary widgets: sales, orders, pending shipments, low-stock options, settlement amount
-- Task queue: new orders, delayed deliveries, inventory sync failures, settlement alerts
+## 관리자 콘솔
 
-Backend dependency:
-- Most dashboard aggregate APIs are not implemented yet.
-- Start with MSW and define expected response contracts.
+현재 라우트는 다음과 같습니다.
 
-### Phase S2: Product and Inventory Operations
+- `/admin`: 운영 요약
+- `/admin/members`, `/admin/markets`, `/admin/products`
+- `/admin/orders`, `/admin/settlements`, `/admin/coupons`
+- `/admin/cms`, `/admin/ads`
+- `/admin/experiments`, `/admin/tokens`
+- `/admin/audit-logs`
 
-Status: planned
+민감한 변경 요청은 서버가 요구하는 권한과 사유 필드를 보존해야 합니다. UI가 있는 것과 서버가 모든 운영 시나리오를 지원하는 것은 구분하며, 미지원 계약을 성공한 것처럼 표시하지 않습니다.
 
-Build:
-- My product list, product detail drawer, selling status controls
-- Option and stock table
-- Shopify/Cafe24 source registration forms
-- Option mapping screen
-- Inventory push action and sync status timeline
+## 데이터와 오류 처리 원칙
 
-Backend dependency:
-- Implemented: `POST /api/v1/inventory/sources`, `POST /api/v1/inventory/mappings`, `POST /api/v1/inventory/options/:optionID/push`
-- Missing or partial: seller-owned product list, integration list/update/delete, sync log query, Cafe24 provider extension
+- 실제 API 오류는 오류 상태로 표시하고 미리보기·목 데이터로 대체하지 않습니다.
+- 정상 빈 응답은 빈 상태로 표시합니다.
+- 서버 응답의 페이지네이션, 순서, 표시 문구를 프론트에서 다시 계산하지 않습니다.
+- 엔드포인트별 응답 형태 차이는 `src/lib/api/normalizers`와 계약 스키마에서 흡수합니다.
+- 고객·셀러·관리자 데이터는 TanStack Query의 도메인별 키로 분리합니다.
 
-### Phase S3: Seller Orders and Delivery
+## 현행 계약 문서
 
-Status: planned
+- [PLP 프론트 연동](PLP.md)
+- [상품 상세와 셀러 상품 작성](PDP_AND_SELLER_PRODUCTS.md)
+- [홈 카테고리 구좌](HOME_CATEGORY_CHIPS.md)
+- [이벤트 상세 페이지 계약](EVENT_DETAIL.md)
+- [백엔드 계약 개선 목록](BACKEND_CONTRACT_GAPS.md)
 
-Build:
-- Market order list filtered by status, date, shipment state
-- Order detail with line items, buyer-safe shipping info, delivery actions
-- Delivery start/complete flows
-- Cancellation/return response placeholders
+`docs/implementation-artifacts`와 `docs/superpowers`의 파일은 당시 의사결정과 구현 과정을 보존하는 기록입니다. 현재 동작과 충돌하면 소스 코드와 위 현행 문서를 우선합니다.
 
-Backend dependency:
-- Missing: market-scoped order list/detail APIs
-- Partial: delivery start/complete APIs exist but need seller ownership verification
+## 후속 작업 관리
 
-### Phase S4: Seller Settlements and Reviews
+새 화면을 포괄적인 장기 계획에 추가하지 않습니다. 다음 조건을 충족하는 작은 작업 단위로 관리합니다.
 
-Status: planned
+1. 대상 라우트와 사용자 역할을 명시합니다.
+2. 사용할 서버 엔드포인트와 응답 모델을 명시합니다.
+3. 로딩, 빈 상태, 오류 상태를 함께 정의합니다.
+4. 서버 계약이 없으면 [백엔드 계약 개선 목록](BACKEND_CONTRACT_GAPS.md)에 먼저 기록합니다.
+5. 구현과 같은 PR에서 관련 현행 문서를 갱신합니다.
 
-Build:
-- Settlement summary and monthly settlement detail
-- Settlement line items: order, commission, penalty, return shipping fee
-- Review list for seller-owned products
-- Review report/reply placeholders
+## 검증
 
-Backend dependency:
-- Implemented: `GET /api/v1/settlements/:marketID/summary`
-- Missing: seller-protected settlement detail, payout account APIs, seller product review filters
-
-## 6. Admin Console Plan
-
-### Phase A1: Admin Shell and Operational Dashboard
-
-Status: planned
-
-Build:
-- Admin-only layout with dense sidebar navigation
-- KPI cards for orders, revenue, settlements, members, products
-- Operational alerts: payment failure, delayed delivery, inventory sync failure, settlement error
-- Recent admin activity feed
-
-Backend dependency:
-- Dashboard aggregate APIs are not implemented.
-- Audit log storage exists, but audit log query API is missing.
-
-### Phase A2: Orders, Delivery, and Settlements
-
-Status: planned
-
-Build first because backend docs mark this as the highest business priority.
-
-Build:
-- Global order search and filtering by date, status, market
-- Order detail with Temporal/workflow status visibility placeholder
-- Manual delivery status controls
-- Force-cancel flow with required reason
-- Settlement prepared/paid/excluded tables
-- Penalty assignment and market restriction screens
-
-Backend dependency:
-- Partial: repositories/services exist for some operations, but admin routes are incomplete
-- Implemented: delivery start/complete and settlement summary
-- Missing: global order admin APIs, settlement finalization/payment APIs, restriction query/mutation APIs
-
-Policy notes:
-- Admin mutations that affect settlement, penalty, market restriction, or force cancellation must require a reason.
-- `PAID` settlements must be read-only.
-- Penalty score thresholds: 10+ `HIDE`, 20+ `PROMOTION_BAN`, 50+ `EXIT`.
-
-### Phase A3: Members, Markets, Products, Categories
-
-Status: planned
-
-Build:
-- Member list/search/detail
-- Member status changes and role changes
-- Market list/detail, status and restriction management
-- Product list/detail, status changes
-- Category management placeholder
-
-Backend dependency:
-- Many list/search/admin mutation APIs are missing.
-- Customer product list/detail APIs are implemented and can seed product admin UI.
-
-Policy notes:
-- Customer personal information access must create an audit log.
-- Member status and role changes should require admin reason once backend supports it.
-
-### Phase A4: Coupons, Points, CMS, Reviews
-
-Status: planned
-
-Build:
-- Coupon definition list/create/edit
-- Coupon issue management
-- Point adjustment with required reason
-- Carousel/CMS management
-- Review moderation queue
-
-Backend dependency:
-- Implemented: `POST /api/v1/carousels`, review write/list
-- Partial: coupon and point services exist but admin routes are incomplete
-- Missing: review moderation APIs, CMS update/disable APIs
-
-## 7. Backend Contract Backlog
-
-Define these contracts before building final seller/admin screens:
-
-- `GET /api/v1/products?categoryID=&sort=&limit=&offset=`
-- `GET /api/v1/categories`
-- `GET /api/v1/search?q=&limit=`
-- `GET /api/v1/search/suggestions?q=&limit=`
-- `GET /api/v1/search/trending?segment=`
-- `PATCH /api/v1/me`
-- `GET /api/v1/me/addresses`
-- `GET /api/v1/coupons/issuable`
-- `POST /api/v1/coupons/:couponID/issue`
-- `PATCH /api/v1/cart/items/:id`
-- `DELETE /api/v1/cart/items/:id`
-- `GET /api/v1/orders/:orderCode`
-- `GET /api/v1/seller/dashboard`
-- `GET /api/v1/seller/products`
-- `PATCH /api/v1/seller/products/:id/status`
-- `GET /api/v1/seller/inventory/sources`
-- `PATCH /api/v1/seller/inventory/sources/:id`
-- `GET /api/v1/seller/inventory/sync-logs`
-- `GET /api/v1/seller/orders`
-- `GET /api/v1/seller/orders/:orderCode`
-- `GET /api/v1/seller/settlements`
-- `GET /api/v1/admin/dashboard`
-- `GET /api/v1/admin/audit-logs`
-- `GET /api/v1/admin/members`
-- `PATCH /api/v1/admin/members/:id/status`
-- `GET /api/v1/admin/markets`
-- `PATCH /api/v1/admin/markets/:id/restrictions`
-- `GET /api/v1/admin/orders`
-- `POST /api/v1/admin/orders/:orderCode/force-cancel`
-- `GET /api/v1/admin/settlements`
-- `PATCH /api/v1/admin/settlements/:id/status`
-- `POST /api/v1/admin/markets/:id/penalties`
-- `GET /api/v1/admin/coupons`
-- `POST /api/v1/admin/points/adjustments`
-
-## 8. Build Order
-
-1. Complete customer PLP, PDP, cart, checkout/payment, My Page profile, and order history.
-2. Add customer MSW happy path for browse-to-payment-to-order-history.
-3. Add role-aware app shell, auth guard, and route groups for `/seller` and `/admin`.
-4. Add MSW contracts for seller/admin dashboard, products, orders, settlements, audit logs.
-5. Build seller dashboard and inventory integration screens first.
-6. Build admin orders/settlements screens first.
-7. Add member/market/product admin screens.
-8. Add coupons/points/CMS/review moderation screens.
-9. Replace MSW endpoints with real backend APIs as routes become available.
-
-## 9. Design Direction
-
-- Customer pages: app-like fashion commerce, image-heavy, mobile-first.
-- Seller pages: operational, compact, table-heavy, task-first.
-- Admin pages: dense back-office console with clear filters, audit reasons, and irreversible-state warnings.
-- Avoid marketing-style hero sections in seller/admin areas.
-## 10. PDP and Seller Product Authoring Contract
-
-The normative PDP, seller authoring, server Excel, and API error behavior is documented in [PDP_AND_SELLER_PRODUCTS.md](PDP_AND_SELLER_PRODUCTS.md). New UI and API work must use its ubiquitous language.
-
-## 11. PLP 상품 유비쿼터스 용어
-
-
-상품 목록(Product Listing Page)의 각 상품 영역은 **PLP 상품**으로 명명하며 프론트 타입은 `PLPProduct`, API 응답 모델은 `PLPProductResponse`를 사용합니다.
-
-- `market`: 마켓 ID, 이름, 프로필 이미지를 포함하며 마켓명 선택 시 `/markets/:id`로 이동합니다.
-- `tag_chips`: 서버가 노출 여부, 순서, 라벨과 톤을 확정한 배열입니다. 프론트는 배송 유형이나 기존 `tags`를 보고 칩을 추가 생성하지 않습니다.
-- 원가(`base_price`)와 판매가(`discount_price`)를 함께 표시하고 할인율과 할인액은 프론트에서 계산할 수 있습니다.
-- 마켓 페이지의 상품은 `GET /api/v1/products?marketID={marketId}`로 조회합니다.
-- 마켓 및 마켓 상품 API 오류는 데모 정보로 대체하지 않습니다.
-
-## 12. CategoryInformation 유비쿼터스 용어와 `/categories` 계약
-
-카테고리관(`/categories`)의 서버 주도 화면 계약은 **CategoryInformation**으로 부릅니다. 프론트와 백엔드, 기획 문서에서 아래 이름을 동일하게 사용합니다.
-
-- `CategoryInformation`: 카테고리 트리, 선택 카테고리, 묶음 문구, 상품 페이지, 실시간 인기 구좌를 한 번에 반환하는 응답 모델
-- `bundle_label`: `n개 카테고리 묶음`처럼 서버가 확정하는 표시 문구. 프론트에서 카테고리 수를 다시 세어 문구를 만들지 않습니다.
-- `RealtimePopularCarousel`: 선택 카테고리와 하위 카테고리 범위의 실시간 인기 상품 구좌
-- `insert_after`: 상품 대제목 바로 아래, 일반 상품 목록보다 먼저 배치하는 서버 결정값 `0`
-- `captured_at`: 실시간 인기 순위의 집계 기준 시각
-- `realtime_popularity_score`: 최근 24시간 클릭·좋아요·찜·구매확정 신호에 6시간 반감기를 적용한 서버 점수
-- 동일 점수는 기존 `popularity_score`, 상품 ID 순으로 안정 정렬하며 삭제된 마켓 상품은 PLP에서 제외합니다.
-- `pagination`: `page`, `page_size`, `has_next`로 구성하는 서버 페이지네이션 정보
-
-API:
-
-`GET /api/v1/category-information?category={slug}&page={page}&page_size={pageSize}`
-
-프론트 구현 원칙:
-
-- `상품 더보기`는 사용하지 않고 이전/다음 페이지 이동으로 즉시 다시 조회합니다.
-- 일반 상품과 `RealtimePopularCarousel`은 동일한 PLP 상품 계약을 사용하며 서버가 내려준 `tag_chips`만 표시합니다.
-- `RealtimePopularCarousel`은 홈 상품 캐러셀의 정사각 이미지 오버레이, 가로 스냅, 이전/다음 버튼 패턴을 재사용하고 순위 배지를 더해 아래 일반 PLP 그리드와 구분합니다.
-- PLP 상품의 마켓명은 `market.id`를 사용해 `/markets/:id`로 이동합니다.
-- CategoryInformation API 오류와 정상 빈 응답은 화면 검수용 데모 데이터로 대체하지 않습니다.
-
-앱 셸 원칙:
-
-- 데스크톱 헤더 우측에는 장바구니와 마이페이지 진입점을 함께 둡니다.
-- 마이페이지는 장바구니, 좋아요, 회원정보, 리뷰 관리로 이동하는 개인 허브 역할을 합니다.
-- 푸터는 탐색과 개인 메뉴를 구분하고 실제 존재하는 고객 라우트만 연결합니다.
+```bash
+npm run lint
+npm run test
+npm run build
+```
+
+실제 백엔드 또는 브라우저가 필요한 변경은 범위에 따라 `npm run test:e2e:api` 또는 `npm run test:e2e:ui`를 추가합니다.

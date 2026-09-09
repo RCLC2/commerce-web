@@ -49,7 +49,7 @@ const eventProductPageSchema = z.object({
   paging: z.object({ limit: z.number().int().positive(), offset: z.number().int().nonnegative(), has_next: z.boolean() }),
 });
 const eventRewardClaimSchema = z.object({
-  status: z.string(), event_id: identifier, reward_row_id: identifier,
+  status: z.literal("ISSUED"), event_id: identifier, reward_row_id: identifier,
   reward_type: z.enum(["COUPON", "POINT_EVENT"]), reward_id: identifier,
 });
 

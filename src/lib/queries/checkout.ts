@@ -1,9 +1,17 @@
 import type { CouponDefinition, OrderResponse } from "../types";
+import { ApiHttpError } from "../api-client";
 
 export type CheckoutOrderInput = {
   cart_item_ids: number[];
   used_coupon_id?: number;
   used_point: number;
+  shipping_address?: {
+    receiver: string;
+    phone: string;
+    zip_code: string;
+    line1: string;
+    line2: string;
+  };
 };
 
 export const CHECKOUT_RETRY_STORAGE_KEY = "commerce.checkout.retry";
@@ -16,6 +24,19 @@ export function selectedCartItemIDs(value: string | null): Set<number> | null {
 export type CheckoutRetryState = {
   memberID?: unknown;
   orderCode?: unknown;
+  cartItemIDs?: unknown;
+  usedCouponID?: unknown;
+  usedPoint?: unknown;
+  attemptedAt?: unknown;
+};
+
+export type PersistedCheckoutRetryState = {
+  memberID: number;
+  orderCode?: string;
+  cartItemIDs?: number[];
+  usedCouponID?: number;
+  usedPoint?: number;
+  attemptedAt?: string;
 };
 
 type CheckoutRetryStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -28,9 +49,10 @@ export class CheckoutOrderStateError extends Error {
   }
 }
 
-export type HostedPaymentCheckout = {
-  order_code: string;
-  checkout_url: string;
+export type TossPaymentRequest = {
+  client_key: string;
+  order_id: string;
+  order_name: string;
   amount: number;
 };
 
@@ -93,7 +115,7 @@ export function readCheckoutRetryState(
 
 export function saveCheckoutRetryState(
   storageAccess: CheckoutRetryStorageAccess,
-  state: { memberID: number; orderCode: string },
+  state: PersistedCheckoutRetryState,
 ): boolean {
   try {
     storageAccess().setItem(CHECKOUT_RETRY_STORAGE_KEY, JSON.stringify(state));
@@ -101,6 +123,48 @@ export function saveCheckoutRetryState(
   } catch {
     return false;
   }
+}
+
+export function pendingCheckoutInput(
+  state: CheckoutRetryState | null,
+  memberID: number,
+): CheckoutOrderInput | undefined {
+  if (state?.memberID !== memberID || !Array.isArray(state.cartItemIDs)) return undefined;
+  const cartItemIDs = state.cartItemIDs.filter(
+    (id): id is number => Number.isSafeInteger(id) && id > 0,
+  );
+  if (
+    cartItemIDs.length === 0
+    || cartItemIDs.length !== state.cartItemIDs.length
+    || new Set(cartItemIDs).size !== cartItemIDs.length
+  ) return undefined;
+  const usedPoint = normalizeRequestedPoints(
+    typeof state.usedPoint === "number" ? state.usedPoint : 0,
+  );
+  const usedCouponID = typeof state.usedCouponID === "number"
+    && Number.isSafeInteger(state.usedCouponID)
+    && state.usedCouponID > 0
+    ? state.usedCouponID
+    : undefined;
+  return { cart_item_ids: [...new Set(cartItemIDs)], used_coupon_id: usedCouponID, used_point: usedPoint };
+}
+
+export function findUniqueOrderByCartItemIDs(
+  orders: readonly OrderResponse[],
+  cartItemIDs: readonly number[],
+): OrderResponse | undefined {
+  const expected = new Set(cartItemIDs);
+  if (expected.size === 0 || expected.size !== cartItemIDs.length) return undefined;
+
+  const matches = orders.filter((order) => {
+    const lineItems = order.market_orders?.flatMap((marketOrder) => marketOrder.line_items) ?? [];
+    const actualIDs = lineItems.flatMap((item) => item.cart_id === undefined ? [] : [item.cart_id]);
+    return actualIDs.length === lineItems.length
+      && actualIDs.length === expected.size
+      && new Set(actualIDs).size === actualIDs.length
+      && actualIDs.every((id) => expected.has(id));
+  });
+  return matches.length === 1 ? matches[0] : undefined;
 }
 
 export function clearCheckoutRetryState(
@@ -118,27 +182,9 @@ export function shouldDiscardCheckoutRestoreStatus(status: number | undefined): 
   return status !== undefined && [400, 403, 404, 410, 422].includes(status);
 }
 
-export function safeHostedCheckoutURL(value: string): string {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    throw new CheckoutOrderStateError("결제 이동 주소가 올바르지 않습니다.");
-  }
-  if (
-    (
-      url.protocol !== "https:"
-      && !(
-        url.protocol === "http:"
-        && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
-      )
-    )
-    || url.username
-    || url.password
-  ) {
-    throw new CheckoutOrderStateError("안전하지 않은 결제 이동 주소를 차단했습니다.");
-  }
-  return url.toString();
+export function shouldDiscardCheckoutAttemptError(error: unknown): boolean {
+  return error instanceof ApiHttpError
+    && [400, 401, 403, 404, 409, 410, 422].includes(error.status ?? 0);
 }
 
 export async function submitServerAuthoritativeCheckout({
@@ -146,7 +192,9 @@ export async function submitServerAuthoritativeCheckout({
   orderInput,
   placeOrder,
   getOrder,
-  createPaymentCheckout,
+  createPaymentRequest,
+  recoverCreatedOrder,
+  onOrderAttempt,
   onOrderCreated,
   onOrderConfirmed,
 }: {
@@ -154,13 +202,32 @@ export async function submitServerAuthoritativeCheckout({
   orderInput: CheckoutOrderInput;
   placeOrder: (input: CheckoutOrderInput) => Promise<{ orderCode: string }>;
   getOrder: (orderCode: string) => Promise<OrderResponse>;
-  createPaymentCheckout: (orderCode: string) => Promise<HostedPaymentCheckout>;
+  createPaymentRequest: (orderCode: string) => Promise<TossPaymentRequest>;
+  recoverCreatedOrder?: (input: CheckoutOrderInput) => Promise<OrderResponse | undefined>;
+  onOrderAttempt?: (input: CheckoutOrderInput) => void;
   onOrderCreated: (orderCode: string) => void;
   onOrderConfirmed: (order: OrderResponse) => void;
 }) {
   let orderCode = existingOrderCode;
   if (!orderCode) {
-    orderCode = (await placeOrder(orderInput)).orderCode;
+    onOrderAttempt?.(orderInput);
+    try {
+      orderCode = (await placeOrder(orderInput)).orderCode;
+    } catch (error) {
+      let recovered: OrderResponse | undefined;
+      try {
+        recovered = await recoverCreatedOrder?.(orderInput);
+      } catch {
+        // Keep the original failure as the cause shown to the user.
+      }
+      if (!recovered) {
+        throw new CheckoutOrderStateError(
+          `주문 생성 결과를 확인할 수 없습니다. 주문 내역을 확인한 뒤 다시 시도해주세요. (${error instanceof Error ? error.message : "요청 실패"})`,
+          shouldDiscardCheckoutAttemptError(error),
+        );
+      }
+      orderCode = recovered.order_code;
+    }
     onOrderCreated(orderCode);
   }
 
@@ -182,18 +249,14 @@ export async function submitServerAuthoritativeCheckout({
   }
 
   if (!Number.isSafeInteger(amount) || amount <= 0) {
-    throw new Error("0원 이하 주문의 hosted checkout은 현재 서버에서 지원되지 않습니다.");
+    throw new Error("0원 이하 주문의 토스 테스트 결제는 지원되지 않습니다.");
   }
-  const checkout = await createPaymentCheckout(orderCode);
-  if (checkout.order_code !== orderCode) {
-    throw new CheckoutOrderStateError("결제 체크아웃의 주문 코드가 조회한 주문과 일치하지 않습니다.");
+  const paymentRequest = await createPaymentRequest(orderCode);
+  if (paymentRequest.order_id !== orderCode) {
+    throw new CheckoutOrderStateError("결제 요청의 주문 ID가 조회한 주문과 일치하지 않습니다.");
   }
-  if (checkout.amount !== amount) {
-    throw new CheckoutOrderStateError("결제 체크아웃 금액이 서버 주문 금액과 일치하지 않습니다.");
+  if (paymentRequest.amount !== amount) {
+    throw new CheckoutOrderStateError("결제 요청 금액이 서버 주문 금액과 일치하지 않습니다.");
   }
-  const checkoutUrl = safeHostedCheckoutURL(checkout.checkout_url);
-  const checkoutMode = new URL(checkoutUrl).protocol === "http:"
-    ? "loopback-mock" as const
-    : "external" as const;
-  return { orderCode, order, amount, checkoutUrl, checkoutMode, paymentSkipped: false };
+  return { orderCode, order, amount, paymentRequest, paymentSkipped: false };
 }

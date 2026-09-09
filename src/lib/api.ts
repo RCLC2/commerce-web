@@ -1,5 +1,7 @@
 import { adminApi } from "./api/admin";
+import { auditApi } from "./api/audit";
 import { authApi } from "./api/auth";
+import { advertisingApi } from "./api/advertising";
 import { catalogApi } from "./api/catalog";
 import { customerApi } from "./api/customer";
 import { eventDetailApi } from "./api/event-detail";
@@ -7,6 +9,10 @@ import { mediaApi } from "./api/media";
 import { searchApi } from "./api/search";
 import { sellerApi } from "./api/seller";
 import { experimentApi } from "./api/experiment";
+import { onboardingApi } from "./api/onboarding";
+import { outfitApi } from "./api/outfit";
+import { homePlacementApi } from "./api/home-placements";
+import { marketDisplayApi } from "./api/market-display";
 
 export const api = {
   ...catalogApi,
@@ -15,7 +21,13 @@ export const api = {
   ...authApi,
   ...customerApi,
   ...mediaApi,
+  ...advertisingApi,
   ...sellerApi,
   ...adminApi,
   ...experimentApi,
+  ...auditApi,
+  ...onboardingApi,
+  ...outfitApi,
+  ...homePlacementApi,
+  ...marketDisplayApi,
 };

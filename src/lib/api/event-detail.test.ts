@@ -35,4 +35,14 @@ describe("eventDetailApi backend contract", () => {
     expect(fetchMock.mock.calls[0][0]).toContain("/api/v1/events/10/rewards/20/claim");
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "POST" });
   });
+
+  it("rejects non-issued reward responses", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      status: "PREVIEW", event_id: 10, reward_row_id: 20, reward_type: "POINT_EVENT", reward_id: 30,
+    }), { status: 200 })));
+
+    await expect(eventDetailApi.claimEventReward("token", 10, 20)).rejects.toMatchObject({
+      kind: "contract",
+    });
+  });
 });

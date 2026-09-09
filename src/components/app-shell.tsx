@@ -1,7 +1,9 @@
 "use client";
 
+import { ButtonLink } from "@/components/ui/button-link";
+
 import { useQuery } from "@tanstack/react-query";
-import { Flame, Grid2X2, Heart, Home, Menu, Search, ShieldCheck, ShoppingBag, Star, Store, User, X } from "lucide-react";
+import { Grid2X2, Heart, Home, Menu, Search, ShieldCheck, Shirt, ShoppingBag, Star, Store, User, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -10,10 +12,11 @@ import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
+import { Drawer } from "./ui/overlay";
 
 const nav = [
   { href: "/categories", label: "카테고리", icon: Grid2X2 },
-  { href: "/snapshot", label: "트렌드관", icon: Flame },
+  { href: "/today-outfit", label: "오늘의 코디", icon: Shirt },
   { href: "/", label: "홈", icon: Home, primary: true },
   { href: "/likes", label: "좋아요", icon: Heart },
   { href: "/mypage", label: "마이페이지", icon: User },
@@ -21,8 +24,7 @@ const nav = [
 
 const primaryMenuItems = [
   { href: "/popular-products", label: "인기 상품" },
-  { href: "/popular-markets", label: "인기 마켓" },
-  { href: "/recommendations", label: "추천 상품" },
+  { href: "/markets", label: "마켓" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -49,6 +51,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isActive = (href: string) => (href === "/" ? pathname === href : pathname.startsWith(href));
   const showSuggestions = searchFocused && suggestions.length > 0;
   const searchPage = pathname.startsWith("/search");
+  const onboardingPage = pathname.startsWith("/onboarding/");
   const rootCategories = categories.filter((category) => !category.parent_id && category.level === 1);
 
   useEffect(() => {
@@ -77,21 +80,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setSearchFocused(false);
   }
 
+  if (onboardingPage) {
+    return <div className="min-h-screen bg-background">{children}</div>;
+  }
+
   return (
-    <div className="min-h-screen bg-background">
-      {!searchPage ? <header className="sticky top-0 z-30 border-b border-line bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
-          <Button variant="ghost" size="icon" aria-label="메뉴" onClick={() => setMenuOpen((value) => !value)}>
+    <div className="min-h-screen bg-canvas">
+      {!searchPage ? <header className="sticky top-0 z-30 border-b border-border-subtle bg-surface-raised/95 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-1 px-3 sm:gap-3 sm:px-4">
+          <Button variant="ghost" size="icon" aria-label="메뉴" aria-expanded={menuOpen} aria-controls="shopping-menu" onClick={() => setMenuOpen((value) => !value)}>
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </Button>
-          <Link href="/" className="text-xl font-black tracking-normal">
+          <Link href="/" className="shrink-0 whitespace-nowrap text-lg font-bold tracking-normal sm:text-xl">
             commerce
           </Link>
+          <ButtonLink href="/search" aria-label="통합 검색" variant="ghost" size="icon" className="ml-auto sm:hidden">
+            <Search size={20} />
+          </ButtonLink>
           <form
-            className="relative flex h-10 min-w-0 flex-1 items-center gap-2 rounded-md border border-line bg-zinc-50 px-3"
+            className="relative hidden h-11 min-w-0 flex-1 items-center gap-2 rounded-control border border-border-interactive bg-surface-raised px-3 transition hover:border-action-primary focus-within:border-action-primary focus-within:ring-4 focus-within:ring-action-primary/10 sm:flex"
             onSubmit={submitSearch}
           >
-            <Search size={18} className="shrink-0 text-muted" />
+            <Search size={18} className="shrink-0 text-content-secondary" />
             <input
               ref={searchInputRef}
               value={search}
@@ -104,24 +114,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 setSearchFocused(true);
               }}
               onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
-              className="w-full bg-transparent text-sm outline-none"
+              className="w-full bg-transparent text-sm outline-none placeholder:text-content-tertiary"
               placeholder="상품, 마켓, 키워드 검색"
               aria-label="통합 검색"
             />
             {showSuggestions ? (
-              <div className="absolute left-0 right-0 top-12 z-40 overflow-hidden rounded-md border border-line bg-white shadow-xl">
+              <div className="absolute left-0 right-0 top-12 z-40 overflow-hidden rounded-surface border border-border-subtle bg-surface-raised shadow-float">
                 {suggestions.map((item) => (
                   <Link
                     key={item.id}
                     href={item.href}
-                    className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-zinc-50"
+                    className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-surface-subtle"
                     onClick={() => {
                       setSearch(item.label);
                       setSearchFocused(false);
                     }}
                   >
                     <span className="font-bold">{item.label}</span>
-                    <span className="text-xs text-muted">
+                    <span className="text-xs text-content-secondary">
                       {item.type === "PRODUCT" ? "상품" : item.type === "MARKET" ? "마켓" : "키워드"}
                     </span>
                   </Link>
@@ -130,57 +140,43 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ) : null}
           </form>
           {role === "SELLER" ? (
-            <Link href="/seller" aria-label="셀러 콘솔">
-              <Button variant="ghost" size="icon" title="셀러 콘솔">
+            <ButtonLink href="/seller" aria-label="판매자 관리" variant="ghost" size="icon" title="판매자 관리">
                 <Store size={20} />
-              </Button>
-            </Link>
+              </ButtonLink>
           ) : null}
           {role === "ADMIN" ? (
-            <Link href="/admin" aria-label="어드민 콘솔">
-              <Button variant="ghost" size="icon" title="어드민 콘솔">
+            <ButtonLink href="/admin" aria-label="관리자 도구" variant="ghost" size="icon" title="관리자 도구">
                 <ShieldCheck size={20} />
-              </Button>
-            </Link>
+              </ButtonLink>
           ) : null}
-          <Link href="/cart" aria-label="장바구니">
-            <Button variant="ghost" size="icon" title="장바구니">
+          <ButtonLink href="/cart" aria-label="장바구니" variant="ghost" size="icon" title="장바구니">
               <ShoppingBag size={20} />
-            </Button>
-          </Link>
-          <Link href="/mypage" aria-label="마이페이지">
-            <Button variant="ghost" size="icon">
-              <User size={20} />
-            </Button>
-          </Link>
+            </ButtonLink>
         </div>
       </header> : null}
-      {menuOpen ? (
-        <div className="fixed inset-0 z-50">
-          <button className="absolute inset-0 bg-black/25" aria-label="메뉴 닫기" onClick={() => setMenuOpen(false)} />
-          <aside className="absolute left-0 top-0 flex h-full w-[min(360px,88vw)] min-w-0 flex-col overflow-y-auto border-r border-line bg-white p-4 shadow-xl">
-            <div className="flex items-center justify-between">
-              <p className="text-lg font-black">메뉴</p>
-              <Button variant="ghost" size="icon" aria-label="메뉴 닫기" onClick={() => setMenuOpen(false)}>
-                <X size={20} />
-              </Button>
-            </div>
+      <Drawer open={menuOpen} onClose={() => setMenuOpen(false)} title="메뉴" id="shopping-menu">
             <div className="mt-4 grid gap-2">
+              {role === "SELLER" || role === "ADMIN" ? (
+                <ButtonLink href={role === "SELLER" ? "/seller" : "/admin"} variant="secondary" onClick={() => setMenuOpen(false)}>
+                  {role === "SELLER" ? <Store size={18} /> : <ShieldCheck size={18} />}
+                  {role === "SELLER" ? "판매자 관리" : "관리자 도구"}
+                </ButtonLink>
+              ) : null}
               {primaryMenuItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
                   onClick={() => setMenuOpen(false)}
-                  className="rounded-md border border-line px-4 py-3 text-sm font-bold hover:bg-zinc-50"
+                  className="rounded-md border border-border-subtle px-4 py-3 text-sm font-bold hover:bg-surface-subtle"
                 >
                   {item.label}
                 </Link>
               ))}
             </div>
-            <div className="my-4 border-t border-line" />
-            <div className="rounded-md border border-line bg-zinc-50 p-3">
-              <div className="flex items-center gap-2 text-sm font-black">
-                <Star size={16} className="text-brand" />
+            <div className="my-4 border-t border-border-subtle" />
+            <div className="rounded-md border border-border-subtle bg-surface-subtle p-3">
+              <div className="flex items-center gap-2 text-sm font-bold">
+                <Star size={16} className="text-action-primary" />
                 상품 카테고리
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
@@ -189,48 +185,45 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     key={category.id}
                     href={category.href}
                     onClick={() => setMenuOpen(false)}
-                    className="min-w-0 rounded-md bg-white px-3 py-2 text-sm font-bold hover:bg-zinc-100"
+                    className="min-w-0 rounded-md bg-surface-raised px-3 py-2 text-sm font-bold hover:bg-surface-subtle"
                   >
                     {category.name}
                   </Link>
                 ))}
               </div>
             </div>
-          </aside>
-        </div>
-      ) : null}
+      </Drawer>
       {children}
-      <footer className="border-t border-line bg-white pb-20 md:pb-0">
-        <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 text-sm text-muted md:grid-cols-[1.2fr_1fr_1fr]">
-          <div>
-            <p className="text-lg font-black text-foreground">commerce</p>
-            <p className="mt-2 leading-6">
-              지금 사고 싶은 스타일과 좋아하는 마켓을 빠르게 탐색하는 패션 커머스 서비스입니다.
+      <footer className={cn("border-t border-border-subtle bg-surface-raised md:pb-0", /^\/products\/\d+\/?$/.test(pathname) ? "pb-[calc(10rem+env(safe-area-inset-bottom))]" : "pb-[calc(5rem+env(safe-area-inset-bottom))]")}>
+        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-5 gap-y-5 px-4 py-6 text-sm text-content-secondary md:grid-cols-[1.2fr_1fr_1fr] md:gap-6">
+          <div className="col-span-2 md:col-span-1">
+            <p className="text-lg font-bold text-content-primary">commerce</p>
+            <p className="mt-1 text-xs leading-5">
+              좋아하는 스타일과 마켓을 한곳에서.
             </p>
           </div>
           <div>
-            <p className="font-black text-foreground">쇼핑</p>
-            <div className="mt-3 grid gap-2">
-              <Link href="/categories" className="hover:text-foreground">카테고리별 상품</Link>
-              <Link href="/popular-markets" className="hover:text-foreground">인기 마켓</Link>
+            <p className="font-bold text-content-primary">쇼핑</p>
+            <div className="mt-2 grid [&>a]:flex [&>a]:min-h-11 [&>a]:items-center">
+              <Link href="/categories" className="hover:text-content-primary hover:underline">카테고리별 상품</Link>
+              <Link href="/markets" className="hover:text-content-primary hover:underline">마켓</Link>
             </div>
           </div>
           <div>
-            <p className="font-black text-foreground">내 쇼핑</p>
-            <div className="mt-3 grid gap-2">
+            <p className="font-bold text-content-primary">내 쇼핑</p>
+            <div className="mt-2 grid [&>a]:flex [&>a]:min-h-11 [&>a]:items-center">
               {token ? (
                 <>
-                  <Link href="/mypage" className="hover:text-foreground">주문 조회</Link>
-                  <Link href="/cart" className="hover:text-foreground">장바구니</Link>
-                  <Link href="/likes" className="hover:text-foreground">좋아요</Link>
-                  <button type="button" className="w-fit hover:text-foreground" onClick={() => { logout(); router.push("/"); }}>로그아웃</button>
+                  <Link href="/mypage" className="hover:text-content-primary hover:underline">마이페이지</Link>
+                  <Link href="/likes" className="hover:text-content-primary hover:underline">좋아요</Link>
+                  <Button variant="ghost" type="button" className="w-fit min-h-11 px-0 text-left hover:text-action-primary hover:underline" onClick={() => { logout(); router.push("/"); }}>로그아웃</Button>
                 </>
-              ) : <Link href="/login" className="hover:text-foreground">로그인</Link>}
+              ) : <Link href="/login" className="hover:text-content-primary hover:underline">로그인</Link>}
             </div>
           </div>
         </div>
       </footer>
-      <nav className="fixed inset-x-0 bottom-0 z-50 isolate border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur md:hidden" aria-label="하단 주요 메뉴">
+      <nav className="fixed inset-x-0 bottom-0 z-[var(--commerce-z-mobile-cta)] isolate border-t border-border-subtle bg-surface-raised/95 pb-[env(safe-area-inset-bottom)] shadow-mobile-nav backdrop-blur md:hidden" aria-label="하단 주요 메뉴">
         <div className="mx-auto grid h-16 max-w-6xl grid-cols-5 px-1" data-session-role={role ?? "guest"}>
           {nav.map((item) => {
             const Icon = item.icon;
@@ -239,15 +232,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
+                aria-label={item.label}
+                aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1 rounded-md text-xs font-bold text-muted transition hover:text-foreground",
-                  item.primary && "mx-auto -mt-4 h-16 w-16 rounded-full border border-line bg-white text-muted shadow-lg",
-                  active && !item.primary && "text-brand",
-                  active && item.primary && "bg-brand text-white",
+                  "min-w-0 flex flex-col items-center justify-start gap-1 rounded-md pt-2 text-xs font-medium leading-4 text-content-secondary transition hover:text-content-primary",
+                  item.primary && "mx-auto -mt-4 h-14 w-14 justify-center pt-0 rounded-full border border-border-subtle bg-surface-raised text-content-secondary shadow-float sm:h-16 sm:w-16",
+                  active && !item.primary && "text-action-primary",
+                  active && item.primary && "border-action-primary bg-action-primary text-content-on-brand hover:bg-button-primary-hover hover:text-content-on-brand",
                 )}
               >
-                <Icon size={20} />
-                {item.label}
+                <Icon size={20} aria-hidden="true" strokeWidth={active ? 2.5 : 2} />
+                <span className="w-full text-center break-keep">{item.href === "/mypage" ? <>마이<wbr className="sm:hidden" />페이지</> : item.label}</span>
               </Link>
             );
           })}
