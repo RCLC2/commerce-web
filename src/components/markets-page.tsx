@@ -39,7 +39,7 @@ export function MarketsPage() {
 
   return (
     <main className="mx-auto min-h-[70vh] max-w-6xl px-4 pb-28 pt-8">
-      <header className="overflow-hidden rounded-3xl border border-rose-100 bg-gradient-to-br from-action-secondary via-surface-raised to-orange-50 px-6 py-8 text-content-primary md:px-10 md:py-11">
+      <header className="overflow-hidden rounded-feature border border-border-subtle bg-gradient-to-br from-action-secondary via-surface-raised to-surface-raised px-6 py-8 text-content-primary md:px-10 md:py-11">
         <div className="flex items-center gap-3 text-action-primary">
           <Store size={19} aria-hidden="true" />
           <p className="text-xs font-bold tracking-normal">마켓 둘러보기</p>
@@ -129,14 +129,14 @@ function MarketDiscoverySection({
 
       {isLoading ? <MarketGridSkeleton /> : null}
       {error ? (
-        <div className="mt-6 rounded-2xl border border-action-primary/30 bg-red-50 p-5 text-sm" role="status">
-          <p className="font-bold text-action-primary">{title}을 불러오지 못했습니다.</p>
+        <div className="mt-6 rounded-surface border border-status-negative-border bg-status-negative-subtle p-5 text-sm" role="alert">
+          <p className="font-bold text-status-negative">{title}을 불러오지 못했습니다.</p>
           <p className="mt-2 text-content-secondary">{apiErrorMessage(error)}</p>
           <Button className="mt-4" size="sm" variant="secondary" onClick={onRetry}>다시 불러오기</Button>
         </div>
       ) : null}
       {!isLoading && !error && markets.length === 0 ? (
-        <p className="mt-6 rounded-2xl border border-dashed border-border-subtle px-5 py-8 text-center text-sm text-content-secondary">{emptyMessage}</p>
+        <p className="mt-6 rounded-surface border border-dashed border-border-subtle bg-surface-raised px-5 py-8 text-center text-sm text-content-secondary">{emptyMessage}</p>
       ) : null}
       {markets.length ? (
         <div className="no-scrollbar mt-6 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3 md:gap-5">
@@ -155,7 +155,7 @@ function MarketCard({ market, rank, metric }: { market: Market; rank: number; me
   return (
     <Link
       href={`/markets/${market.id}`}
-      className="group w-[72vw] max-w-[280px] shrink-0 snap-start overflow-hidden rounded-2xl border border-border-subtle bg-surface-raised transition hover:-translate-y-1 hover:border-zinc-300 hover:shadow-lg sm:w-64 lg:w-[calc((100%-3.75rem)/4)] lg:max-w-none"
+      className="group w-[72vw] max-w-[280px] shrink-0 snap-start overflow-hidden rounded-surface border border-border-subtle bg-surface-raised transition hover:-translate-y-1 hover:border-border-interactive hover:shadow-float sm:w-64 lg:w-[calc((100%-3.75rem)/4)] lg:max-w-none"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-surface-subtle">
         <SafeImage
@@ -167,7 +167,7 @@ function MarketCard({ market, rank, metric }: { market: Market; rank: number; me
           className="object-cover transition duration-300 group-hover:scale-105"
         />
         <span className="absolute left-3 top-3 rounded-full bg-black/70 px-2.5 py-1 text-xs font-bold text-content-inverse backdrop-blur">{rank}</span>
-        <span className="absolute bottom-3 left-3 rounded-full bg-surface-raised/95 px-2.5 py-1 text-xs font-bold text-action-primary shadow-sm">{activityLabel}</span>
+        <span className="absolute bottom-3 left-3 rounded-full bg-surface-raised/95 px-2.5 py-1 text-xs font-bold text-action-primary shadow-card">{activityLabel}</span>
       </div>
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">
@@ -199,7 +199,7 @@ function FollowingSection({
   if (!hydrated) return null;
   if (!authenticated) {
     return (
-      <section className="mt-12 flex flex-col gap-4 rounded-2xl border border-border-subtle bg-surface-subtle p-5 sm:flex-row sm:items-center sm:justify-between" aria-label="팔로우 중 안내">
+      <section className="mt-12 flex flex-col gap-4 rounded-surface border border-border-subtle bg-surface-raised p-5 sm:flex-row sm:items-center sm:justify-between" aria-label="팔로우 중 안내">
         <div>
           <h2 className="font-bold">좋아하는 마켓의 새 소식을 놓치지 마세요</h2>
           <p className="mt-1 text-sm leading-6 text-content-secondary">로그인하고 마켓을 팔로우하면 신상품을 이곳에서 따로 모아볼 수 있어요.</p>
@@ -225,14 +225,14 @@ function FollowingSection({
       </div>
       {isLoading ? <FollowingSkeleton /> : null}
       {error ? (
-        <div className="mt-5 rounded-xl bg-red-50 p-4 text-sm" role="status">
-          <p className="font-bold text-action-primary">팔로우 중 새 소식을 불러오지 못했습니다.</p>
+        <div className="mt-5 rounded-control border border-status-negative-border bg-status-negative-subtle p-4 text-sm" role="alert">
+          <p className="font-bold text-status-negative">팔로우 중 새 소식을 불러오지 못했습니다.</p>
           <p className="mt-1 text-content-secondary">{apiErrorMessage(error)}</p>
           <Button className="mt-3" size="sm" variant="secondary" onClick={onRetry}>다시 시도</Button>
         </div>
       ) : null}
       {!isLoading && !error && items.length === 0 ? (
-        <p className="mt-5 rounded-xl bg-surface-subtle px-5 py-6 text-sm text-content-secondary">아직 도착한 새 상품이 없습니다. 위에서 관심 있는 마켓을 발견해 보세요.</p>
+        <p className="mt-5 rounded-surface border border-dashed border-border-subtle bg-surface-raised px-5 py-6 text-sm text-content-secondary">아직 도착한 새 상품이 없습니다. 위에서 관심 있는 마켓을 발견해 보세요.</p>
       ) : null}
       {items.length ? (
         <div className="no-scrollbar mt-5 flex snap-x gap-4 overflow-x-auto pb-3">
@@ -261,11 +261,11 @@ function FollowingProduct({ item }: { item: MarketFeedItem }) {
 }
 
 function MarketGridSkeleton() {
-  return <div className="mt-6 flex gap-3 overflow-hidden md:gap-5" aria-label="마켓 목록 불러오는 중">{Array.from({ length: 4 }, (_, index) => <div key={index} className="aspect-[4/3] w-[72vw] max-w-[280px] shrink-0 animate-pulse rounded-2xl bg-surface-subtle sm:w-64 lg:w-[calc((100%-3.75rem)/4)] lg:max-w-none" />)}</div>;
+  return <div className="mt-6 flex gap-3 overflow-hidden md:gap-5" aria-label="마켓 목록 불러오는 중">{Array.from({ length: 4 }, (_, index) => <div key={index} className="aspect-[4/3] w-[72vw] max-w-[280px] shrink-0 animate-pulse rounded-surface bg-surface-subtle sm:w-64 lg:w-[calc((100%-3.75rem)/4)] lg:max-w-none" />)}</div>;
 }
 
 function FollowingSkeleton() {
-  return <div className="mt-5 flex gap-4 overflow-hidden" aria-label="팔로우 중 새 상품 불러오는 중">{Array.from({ length: 4 }, (_, index) => <div key={index} className="h-64 w-48 shrink-0 animate-pulse rounded-2xl bg-surface-subtle" />)}</div>;
+  return <div className="mt-5 flex gap-4 overflow-hidden" aria-label="팔로우 중 새 상품 불러오는 중">{Array.from({ length: 4 }, (_, index) => <div key={index} className="h-64 w-48 shrink-0 animate-pulse rounded-surface bg-surface-subtle" />)}</div>;
 }
 
 function formatPublishedAt(value: string) {

@@ -50,6 +50,13 @@ function useResolvedSellerContext(token: string | null) {
   const marketID = useSellerContextMarketID();
   return useQuery({ queryKey: ["seller-context", marketID], queryFn: () => api.sellerContext(token ?? "", marketID), enabled: Boolean(token) });
 }
+
+function nonNegativeIntegerError(value: string, label: string) {
+  if (!value.trim()) return `${label}을(를) 입력해 주세요.`;
+  if (!/^\d+$/.test(value.trim())) return `${label}은(는) 0 이상의 정수로 입력해 주세요.`;
+  return null;
+}
+
 function SellerAuthRequired() {
   return (
     <ConsoleLayout title="판매자" subtitle="마켓 운영 콘솔" links={sellerLinks}>
@@ -178,7 +185,12 @@ export function SellerInventoryPage() {
     },
   });
   const pushStock = useMutation({
-    mutationFn: () => api.pushInventoryOptionStock(effectiveToken, Number(stockForm.option_id), Number(stockForm.quantity)),
+    mutationFn: () => {
+      if (!stockForm.option_id) throw new Error("동기화할 옵션을 선택해 주세요.");
+      const validationError = nonNegativeIntegerError(stockForm.quantity, "재고 수량");
+      if (validationError) throw new Error(validationError);
+      return api.pushInventoryOptionStock(effectiveToken, Number(stockForm.option_id), Number(stockForm.quantity));
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["seller-inventory-logs", resolvedMarketID] });
       void queryClient.invalidateQueries({ queryKey: ["seller-inventory-options", resolvedMarketID] });
@@ -197,6 +209,7 @@ export function SellerInventoryPage() {
   const filteredSources = sourceStatus === "ALL" ? sources : sources.filter((source) => source.status === sourceStatus);
   const filteredLogs = logs.filter((log) => (logStatus === "ALL" || log.status === logStatus) && (logProvider === "ALL" || log.provider === logProvider));
   const sourceValidationError = inventorySourceValidationError(sourceForm);
+  const stockQuantityError = nonNegativeIntegerError(stockForm.quantity, "재고 수량");
 
   function updateTokenForm(sourceID: number, key: "access_token" | "webhook_secret" | "refresh_token" | "client_secret", value: string) {
     setTokenForm((current) => {
@@ -263,7 +276,7 @@ export function SellerInventoryPage() {
             <label className="flex h-10 items-center gap-2 rounded-md border border-border-subtle px-3 text-sm font-bold"><input type="checkbox" checked={mappingForm.disconnect_if_necessary} onChange={(event) => setMappingForm((current) => ({ ...current, disconnect_if_necessary: event.target.checked }))} /> 필요 시 기존 연결 해제</label>
             <Button disabled={!mappingForm.inventory_source_id || !mappingForm.product_option_id || registerMapping.isPending} onClick={() => registerMapping.mutate()}>{registerMapping.isPending ? "매핑 중" : "매핑 저장"}</Button>
           </div>
-          <div className="grid content-start gap-3"><Select className="h-11 rounded-control border border-border-interactive bg-surface-raised px-3 text-sm font-bold" value={stockForm.option_id} onChange={(event) => setStockForm((current) => ({ ...current, option_id: event.target.value }))}><option value="">동기화 옵션 선택</option>{options.map((option) => <option key={option.id} value={option.id}>{option.product_name} · 현재 {option.quantity}개</option>)}</Select><InventoryInput label="반영할 재고 수량" type="number" value={stockForm.quantity} onChange={(value) => setStockForm((current) => ({ ...current, quantity: value }))} /><div className="flex gap-2"><Button variant="secondary" disabled={!stockForm.option_id || pullStock.isPending} onClick={() => pullStock.mutate()}>{pullStock.isPending ? "조회 중" : "Pull"}</Button><Button disabled={!stockForm.option_id || stockForm.quantity === "" || pushStock.isPending} onClick={() => pushStock.mutate()}>{pushStock.isPending ? "반영 중" : "Push"}</Button></div></div>
+          <div className="grid content-start gap-3"><Select className="h-11 rounded-control border border-border-interactive bg-surface-raised px-3 text-sm font-bold" value={stockForm.option_id} onChange={(event) => setStockForm((current) => ({ ...current, option_id: event.target.value }))}><option value="">동기화 옵션 선택</option>{options.map((option) => <option key={option.id} value={option.id}>{option.product_name} · 현재 {option.quantity}개</option>)}</Select><InventoryInput label="반영할 재고 수량" type="number" min={0} step={1} value={stockForm.quantity} onChange={(value) => setStockForm((current) => ({ ...current, quantity: value }))} />{stockQuantityError ? <p className="text-xs font-bold text-status-warning" role="alert">{stockQuantityError}</p> : null}<div className="flex gap-2"><Button variant="secondary" disabled={!stockForm.option_id || pullStock.isPending} onClick={() => pullStock.mutate()}>{pullStock.isPending ? "조회 중" : "Pull"}</Button><Button disabled={!stockForm.option_id || Boolean(stockQuantityError) || pushStock.isPending} onClick={() => pushStock.mutate()}>{pushStock.isPending ? "반영 중" : "Push"}</Button></div></div>
         </div>
         <PaginationBar
           page={optionPageData?.page ?? optionPage}
@@ -283,13 +296,15 @@ export function SellerInventoryPage() {
   );
 }
 
-function InventoryInput({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
+function InventoryInput({ label, value, onChange, type = "text", min, step }: { label: string; value: string; onChange: (value: string) => void; type?: string; min?: number; step?: number }) {
   return (
     <Input
       type={type}
       className="h-11 min-w-0 rounded-control border border-border-interactive px-3 text-sm outline-none focus:border-foreground"
       value={value}
       onChange={(event) => onChange(event.target.value)}
+      min={min}
+      step={step}
       placeholder={label}
       aria-label={label}
     />

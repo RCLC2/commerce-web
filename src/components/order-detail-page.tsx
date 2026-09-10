@@ -97,7 +97,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
 
   return (
     <main className="mx-auto max-w-4xl px-4 pb-24 pt-8">
-      <div className="rounded-md border border-border-subtle bg-surface-raised p-5">
+      <div className="rounded-surface border border-border-subtle bg-surface-raised p-5 shadow-card">
         <PageHeading icon={<PageIcon />} title="주문 상세" description={`주문 번호 ${order.order_code}`} />
         <p className="mt-1 text-sm text-content-secondary">{order.ordered_at ? new Date(order.ordered_at).toLocaleString("ko-KR") : "-"}</p>
         <div className="mt-5 grid gap-3 md:grid-cols-3">
@@ -108,7 +108,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
         <OrderProgress status={order.status} />
       </div>
 
-      <section className="mt-6 rounded-md border border-border-subtle bg-surface-raised p-5">
+      <section className="mt-6 rounded-surface border border-border-subtle bg-surface-raised p-5 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold">배송 정보</h2>
@@ -129,7 +129,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
           <InfoBox label="배송 상태" value={statusLabel(order.delivery?.status ?? order.status)} />
         </div>
         {trackingInfo ? (
-          <div className="mt-4 rounded-md bg-surface-subtle p-3 text-sm">
+          <div className="mt-4 rounded-control border border-border-subtle bg-surface-raised p-3 text-sm">
             <p className="font-bold">{statusLabel(trackingInfo.Status ?? trackingInfo.status ?? "배송 조회 결과")}</p>
             <p className="mt-1 text-content-secondary">{trackingInfo.Location ?? trackingInfo.location ?? "위치 정보 없음"}</p>
             <p className="mt-1 text-content-secondary">{trackingInfo.Description ?? trackingInfo.description ?? ""}</p>
@@ -140,20 +140,28 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
 
       <section className="mt-6 rounded-md border border-border-subtle bg-surface-raised p-5">
         <h2 className="text-lg font-bold">배송지</h2>
-        <p className="mt-3 text-sm text-content-secondary">현재 주문의 배송지 정보를 확인할 수 없습니다.</p>
+        {order.delivery?.receiver_name || order.delivery?.receiver_phone || order.delivery?.address ? (
+          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+            <InfoBox label="받는 분" value={order.delivery.receiver_name || "-"} />
+            <InfoBox label="연락처" value={order.delivery.receiver_phone || "-"} />
+            <div className="sm:col-span-2"><InfoBox label="주소" value={order.delivery.address || "-"} /></div>
+          </dl>
+        ) : (
+          <p className="mt-3 text-sm text-content-secondary">주문에 저장된 배송지를 확인하지 못했습니다.</p>
+        )}
       </section>
 
       <section className="mt-6 space-y-4">
         <h2 className="text-lg font-bold">주문 상품</h2>
         {myReviews.isFetching ? <p className="text-xs text-content-secondary">리뷰 작성 여부를 확인하는 중입니다.</p> : null}
         {myReviews.error ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-status-negative-border bg-status-negative-subtle p-3 text-xs font-bold text-action-primary">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-status-negative-border bg-status-negative-subtle p-3 text-xs font-bold text-status-negative" role="alert">
             <p>리뷰 작성 여부를 확인하지 못해 중복 작성을 막기 위해 작성 버튼을 숨겼습니다.</p>
             <Button size="sm" variant="secondary" onClick={() => void myReviews.refetch()}>다시 확인</Button>
           </div>
         ) : null}
         {order.market_orders?.map((marketOrder) => (
-          <div key={marketOrder.id} className="rounded-md border border-border-subtle bg-surface-raised p-4">
+          <div key={marketOrder.id} className="rounded-surface border border-border-subtle bg-surface-raised p-4 shadow-card">
             <div className="flex justify-between text-sm">
               <span className="font-bold">마켓 #{marketOrder.market_id}</span>
               <span className="text-content-secondary">{statusLabel(marketOrder.status)}</span>
@@ -222,7 +230,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
         ))}
       </section>
 
-      <section className="mt-6 rounded-md border border-border-subtle bg-surface-raised p-5">
+      <section className="mt-6 rounded-surface border border-border-subtle bg-surface-raised p-5 shadow-card">
         <h2 className="text-lg font-bold">결제</h2>
         <div className="mt-4 space-y-2 text-sm">
           <PriceRow label="상품 금액" value={order.total_order_price} />
@@ -300,7 +308,7 @@ function OrderItemActions({
 
 function InfoBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-surface-subtle p-3">
+    <div className="rounded-control border border-border-subtle bg-surface-raised p-3">
       <p className="text-xs text-content-secondary">{label}</p>
       <p className="mt-1 font-bold">{value}</p>
     </div>

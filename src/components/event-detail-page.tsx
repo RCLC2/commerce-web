@@ -176,9 +176,9 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
 
       {event.rewards.length ? (
         <section className="py-8" aria-labelledby="event-benefits-title">
-          <div className="rounded-3xl bg-surface-subtle p-4 md:p-6">
+          <div className="rounded-feature border border-border-subtle bg-surface-raised p-4 shadow-card md:p-6">
             <div className="mb-5 flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-raised text-[#ff3f55] shadow-sm"><Gift size={19} /></span>
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-raised text-action-primary shadow-card"><Gift size={19} /></span>
               <div>
                 <h2 id="event-benefits-title" className="text-xl font-bold tracking-[-0.03em]">이벤트 혜택</h2>
                 <p className="mt-0.5 text-xs text-content-tertiary">받기 버튼을 눌러 내 쿠폰함에 저장하세요.</p>
@@ -249,7 +249,7 @@ function FilterSelect({ label, value, options, onChange }: { label: string; valu
 }
 
 function ProductSkeleton() {
-  return <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="aspect-square animate-pulse rounded-md bg-border-subtle" />)}</div>;
+  return <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="aspect-square animate-pulse rounded-control bg-surface-subtle" />)}</div>;
 }
 
 function MarketCarousels({ products }: { products: EventProduct[] }) {
@@ -293,10 +293,10 @@ function MarketCarousel({ market }: {
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const slide = (direction: -1 | 1) => carouselRef.current?.scrollBy({ left: direction * 640, behavior: "smooth" });
   return (
-    <article className="overflow-hidden rounded-2xl border border-border-subtle bg-surface-raised">
-      <div className="flex items-center justify-between gap-3 border-b border-border-subtle bg-surface-subtle/70 p-4 md:p-5">
+    <article className="overflow-hidden rounded-surface border border-border-subtle bg-surface-raised shadow-card">
+      <div className="flex items-center justify-between gap-3 border-b border-border-subtle bg-surface-raised p-4 md:p-5">
         <Link href={`/markets/${market.id}`} className="flex min-w-0 items-center gap-3">
-          <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-border-subtle bg-surface-subtle">
+          <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-control border border-border-subtle bg-surface-subtle">
             <SafeImage src={market.profileImageURL} alt={market.name} fill sizes="56px" className="object-cover" />
           </span>
           <span className="min-w-0">

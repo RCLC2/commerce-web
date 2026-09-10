@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import type { CommerceCategory } from "@/lib/types";
 import { ProductCard } from "./product-card";
+import { ButtonLink } from "./ui/button-link";
 
 export function CategoriesPage() {
   const [selectedSlug, setSelectedSlug] = useState<string>("");
@@ -39,20 +40,20 @@ export function CategoriesPage() {
         <div>
           <PageHeading icon={<PageIcon />} title="카테고리관" description="카테고리별 상품과 인기 상품을 확인하세요." />
         </div>
-        <Link href="/products" className="inline-flex h-10 items-center gap-1 rounded-md border border-action-primary/30 bg-action-primary/10 px-4 text-sm font-bold text-action-primary hover:bg-action-primary/15">
+        <ButtonLink href="/products" variant="secondary" size="sm">
           전체 상품
           <ChevronRight size={16} />
-        </Link>
+        </ButtonLink>
       </div>
 
       {isLoading ? <p className="mt-6 text-sm text-content-secondary">카테고리를 불러오는 중입니다.</p> : null}
 
-      <section className="mt-6 overflow-hidden rounded-md border border-border-subtle bg-surface-raised">
+      <section className="mt-6 overflow-hidden rounded-surface border border-border-subtle bg-surface-raised shadow-card">
         <div className="flex gap-2 overflow-x-auto border-b border-border-subtle p-3">
           {orderedCategories.map((category) => (
             <Button variant="ghost"
               key={category.id}
-              className={`h-10 shrink-0 rounded-md px-4 text-sm font-bold ${selectedCategory?.id === category.id ? "bg-action-primary/10 text-action-primary ring-1 ring-brand/25" : "bg-surface-subtle text-content-secondary hover:bg-border-subtle"}`}
+              className={`h-10 shrink-0 rounded-control px-4 text-sm font-bold ${selectedCategory?.id === category.id ? "bg-action-primary/10 text-action-primary ring-1 ring-brand/25" : "border border-border-subtle bg-surface-raised text-content-secondary hover:bg-surface-subtle"}`}
               onClick={() => setSelectedSlug(category.slug)}
             >
               {category.name}
@@ -70,7 +71,7 @@ export function CategoriesPage() {
                 {filterChips.map((category) => (
                   <Button variant="ghost"
                     key={category.id}
-                    className={`rounded-md px-3 py-2 text-left text-sm font-bold lg:w-full ${activeFilter?.id === category.id ? "bg-action-primary/10 text-action-primary ring-1 ring-brand/25" : "bg-surface-subtle text-content-secondary hover:bg-border-subtle"}`}
+                    className={`rounded-control px-3 py-2 text-left text-sm font-bold lg:w-full ${activeFilter?.id === category.id ? "bg-action-primary/10 text-action-primary ring-1 ring-brand/25" : "border border-border-subtle bg-surface-raised text-content-secondary hover:bg-surface-subtle"}`}
                     onClick={() => setSelectedSlug(category.slug)}
                   >
                     {category.name}
@@ -91,7 +92,7 @@ export function CategoriesPage() {
                   {filteredProducts.map((product) => <ProductCard key={product.id} product={product} />)}
                 </div>
               ) : (
-                <div className="mt-4 rounded-md bg-surface-subtle p-8 text-center text-sm font-bold text-content-secondary">아직 연결된 상품이 없습니다.</div>
+                <div className="mt-4 rounded-surface border border-dashed border-border-subtle bg-surface-raised p-8 text-center text-sm font-bold text-content-secondary">아직 연결된 상품이 없습니다.</div>
               )}
             </div>
           </div>

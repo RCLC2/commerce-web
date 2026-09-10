@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const inputVariants = cva(
@@ -30,5 +31,10 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(fun
 export type SelectProps = React.ComponentPropsWithoutRef<"select"> & VariantProps<typeof inputVariants>;
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(function Select({ className, state, ...props }, ref) {
-  return <select ref={ref} className={cn(inputVariants({ state }), className)} {...props} />;
+  return (
+    <span className="relative block w-full">
+      <select ref={ref} className={cn(inputVariants({ state }), "appearance-none pr-10", className)} {...props} />
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-content-secondary" aria-hidden="true" />
+    </span>
+  );
 });

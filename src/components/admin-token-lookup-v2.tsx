@@ -71,6 +71,8 @@ export function AdminTokenLookupPageV2() {
         <div className="mt-4">
           <ConsoleTable
             columns={["마켓", "셀러", "상태", "작업"]}
+            loading={marketsQuery.isLoading}
+            emptyText={query ? "검색 조건에 맞는 마켓이 없습니다." : "셀러 접속이 가능한 마켓이 없습니다."}
             rows={markets.map((market) => [
               <div key="market"><p className="font-bold">{market.name}</p><p className="text-xs text-content-secondary">{market.business_number}</p></div>,
               <span key="seller" className="break-all">{market.seller_email}</span>,

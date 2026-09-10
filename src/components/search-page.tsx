@@ -12,6 +12,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
+import { scrollCarouselByCard } from "@/lib/carousel";
 import type { Market, Product, SearchResultSection } from "@/lib/types";
 import { couponPriceForProduct } from "@/lib/product-card-pricing";
 import { formatFollowerCount } from "@/lib/utils";
@@ -109,7 +110,7 @@ function SearchExperience({
   }
 
   function slide(sectionID: number, direction: "prev" | "next") {
-    carouselRefs.current.get(sectionID)?.scrollBy({ left: direction === "prev" ? -720 : 720, behavior: "smooth" });
+    scrollCarouselByCard(carouselRefs.current.get(sectionID) ?? null, direction === "prev" ? -1 : 1);
   }
 
   return (
@@ -118,7 +119,7 @@ function SearchExperience({
         <Button variant="ghost" size="icon" type="button" aria-label="뒤로가기" onClick={goBack} className="flex h-11 w-11 shrink-0 items-center justify-center">
           <ArrowLeft size={27} />
         </Button>
-        <div className="relative flex h-12 min-w-0 flex-1 items-center gap-2 rounded-md bg-surface-subtle px-3">
+        <div className="relative flex h-12 min-w-0 flex-1 items-center gap-2 rounded-control border border-border-interactive bg-surface-raised px-3">
           <Search size={20} className="shrink-0 text-content-secondary" />
           <Input value={input} onChange={(event) => setInput(event.target.value)} className="w-full bg-transparent text-lg font-bold outline-none" placeholder="상품, 마켓, 키워드 검색" aria-label="검색어 입력" autoFocus />
           {input ? <Button variant="ghost" size="icon" type="button" aria-label="검색어 지우기" onClick={() => setInput("")} className="text-content-secondary"><XCircle size={22} /></Button> : null}
@@ -140,7 +141,7 @@ function SearchExperience({
           </div>
           <div className="mt-6">
             {trendingQuery.isLoading ? <p className="text-sm text-content-secondary">인기 검색어를 불러오는 중입니다.</p> : null}
-            {trendingQuery.isError ? <div className="rounded-md border border-action-primary/30 bg-status-negative-subtle p-4 text-sm"><p className="font-bold text-action-primary">인기 검색어를 불러오지 못했습니다.</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void trendingQuery.refetch()}>다시 시도</Button></div> : null}
+            {trendingQuery.isError ? <div className="rounded-control border border-status-negative-border bg-status-negative-subtle p-4 text-sm" role="alert"><p className="font-bold text-status-negative">인기 검색어를 불러오지 못했습니다.</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void trendingQuery.refetch()}>다시 시도</Button></div> : null}
             {trendingQuery.isSuccess && !trendingQuery.data.items.length ? <p className="text-sm text-content-secondary">표시할 인기 검색어가 없습니다.</p> : null}
             {(trending?.items ?? []).map((item) => (
               <Button variant="ghost" key={item.keyword} className="flex h-14 w-full items-center justify-between text-left" onClick={() => goToSearch(item.keyword)}>
@@ -204,8 +205,8 @@ function SearchCarousel({ section, setRef, onSlide }: { section: SearchResultSec
 
 function CompactProductCard({ product }: { product: Product }) {
   return (
-    <Link href={"/products/" + product.id} className="flex h-36 w-[72vw] max-w-72 shrink-0 snap-start gap-3 rounded-md border border-border-subtle bg-surface-raised p-3">
-      <div className="relative aspect-square h-full shrink-0 overflow-hidden rounded-md bg-surface-subtle">
+    <Link href={"/products/" + product.id} className="flex h-36 w-[72vw] max-w-72 shrink-0 snap-start gap-3 rounded-surface border border-border-subtle bg-surface-raised p-3 shadow-card">
+      <div className="relative aspect-square h-full shrink-0 overflow-hidden rounded-control bg-surface-subtle">
         <SafeImage src={product.image_url} alt={product.name} fill sizes="120px" className="object-cover" />
       </div>
       <div className="min-w-0 py-1">
@@ -218,14 +219,14 @@ function CompactProductCard({ product }: { product: Product }) {
 }
 
 function CompactMarketCard({ market }: { market: Market }) {
-  return <Link href={`/markets/${market.id}`} className="flex h-36 w-[72vw] max-w-72 shrink-0 snap-start gap-3 rounded-md border border-border-subtle bg-surface-raised p-3"><div className="relative h-full w-24 shrink-0 overflow-hidden rounded-md bg-surface-subtle"><SafeImage src={market.profile_image_url} alt={market.name} fill sizes="96px" className="object-cover" /></div><div className="min-w-0 py-1"><div className="flex items-center gap-1"><Store size={14} className="text-action-primary" /><p className="truncate font-bold">{market.name}</p></div><p className="mt-2 line-clamp-2 text-xs leading-5 text-content-secondary">{market.description}</p><p className="mt-3 text-xs font-bold text-action-primary">팔로워 {formatFollowerCount(market.follower_count ?? 0)}</p></div></Link>;
+  return <Link href={`/markets/${market.id}`} className="flex h-36 w-[72vw] max-w-72 shrink-0 snap-start gap-3 rounded-surface border border-border-subtle bg-surface-raised p-3 shadow-card"><div className="relative h-full w-24 shrink-0 overflow-hidden rounded-control bg-surface-subtle"><SafeImage src={market.profile_image_url} alt={market.name} fill sizes="96px" className="object-cover" /></div><div className="min-w-0 py-1"><div className="flex items-center gap-1"><Store size={14} className="text-action-primary" /><p className="truncate font-bold">{market.name}</p></div><p className="mt-2 line-clamp-2 text-xs leading-5 text-content-secondary">{market.description}</p><p className="mt-3 text-xs font-bold text-action-primary">팔로워 {formatFollowerCount(market.follower_count ?? 0)}</p></div></Link>;
 }
 
 function MarketCard({ market }: { market: Market }) {
   return (
-    <article className="rounded-md border border-border-subtle bg-surface-raised p-4 md:p-5">
+    <article className="rounded-surface border border-border-subtle bg-surface-raised p-4 shadow-card md:p-5">
       <div className="flex gap-4">
-      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-surface-subtle"><SafeImage src={market.profile_image_url} alt="" fill sizes="64px" className="object-cover" /></div>
+      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-control bg-surface-subtle"><SafeImage src={market.profile_image_url} alt="" fill sizes="64px" className="object-cover" /></div>
       <div className="min-w-0"><div className="flex items-center gap-1"><Store size={14} className="text-action-primary" /><p className="truncate font-bold">{market.name}</p></div><p className="mt-1 line-clamp-2 text-xs leading-5 text-content-secondary">{market.description}</p><p className="mt-1 text-xs font-bold text-content-secondary">팔로워 {formatFollowerCount(market.follower_count ?? 0)}</p></div>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
@@ -243,7 +244,7 @@ function MarketCard({ market }: { market: Market }) {
 
 function MarketPopularProductCard({ product }: { product: Product }) {
   return (
-    <Link href={`/products/${product.id}`} className="group relative block aspect-square overflow-hidden rounded-md bg-surface-subtle">
+    <Link href={`/products/${product.id}`} className="group relative block aspect-square overflow-hidden rounded-control bg-surface-subtle">
       <SafeImage src={product.image_url} alt={product.name} fill sizes="128px" className="object-cover transition duration-300 group-hover:scale-[1.03]" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
       <div className="absolute inset-x-0 bottom-0 p-2 text-content-inverse">
@@ -256,12 +257,12 @@ function MarketPopularProductCard({ product }: { product: Product }) {
 }
 
 function MarketMetric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return <div className="rounded-md bg-surface-subtle p-3"><p className="flex items-center gap-1 text-xs font-bold text-content-secondary">{icon}{label}</p><p className="mt-1 text-sm font-bold">{value}</p></div>;
+  return <div className="rounded-control border border-border-subtle bg-surface-raised p-3 shadow-card"><p className="flex items-center gap-1 text-xs font-bold text-content-secondary">{icon}{label}</p><p className="mt-1 text-sm font-bold">{value}</p></div>;
 }
 
 function ResultListHeader({ title, total }: { title: string; total: number }) { return <div className="mb-4 mt-8 flex items-center justify-between"><h2 className="text-xl font-bold">{title}</h2><span className="text-sm font-bold text-content-secondary">총 {total.toLocaleString("ko-KR")}개</span></div>; }
-function EmptyBox({ message }: { message: string }) { return <p className="rounded-md border border-border-subtle bg-surface-raised p-5 text-sm text-content-secondary">{message}</p>; }
+function EmptyBox({ message }: { message: string }) { return <p className="rounded-surface border border-border-subtle bg-surface-raised p-5 text-sm text-content-secondary">{message}</p>; }
 function ErrorBox({ error, onRetry }: { error: unknown; onRetry: () => void }) { return <ApiErrorState error={error} onRetry={onRetry} retryLabel="검색 다시 시도" />; }
-function LoadingGrid() { return <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="aspect-square animate-pulse rounded-md bg-border-subtle" />)}</div>; }
+function LoadingGrid() { return <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="aspect-square animate-pulse rounded-control bg-surface-subtle" />)}</div>; }
 function TrendIcon({ trend }: { trend: "UP" | "DOWN" | "SAME" }) { if (trend === "UP") return <ArrowUp size={18} className="text-status-negative" />; if (trend === "DOWN") return <ArrowDown size={18} className="text-status-info" />; return <Minus size={18} className="text-content-secondary" />; }
 function positivePage(value: string | null) { const parsed = Number(value); return Number.isInteger(parsed) && parsed > 0 ? parsed : 1; }

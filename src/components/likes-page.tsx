@@ -51,7 +51,7 @@ export function LikesPage() {
       <PageHeading icon={<PageIcon />} title="좋아요" description="좋아요한 상품과 나중에 구매하려고 찜한 상품을 확인하세요." />
 
       {!effectiveToken ? (
-        <section className="mt-6 rounded-md border border-border-subtle bg-surface-raised p-6 text-sm text-content-secondary">
+        <section className="mt-6 rounded-surface border border-border-subtle bg-surface-raised p-6 text-sm text-content-secondary shadow-card">
           내 상품 목록을 보려면 로그인해 주세요.
           <Link href="/login?next=/likes" className="ml-2 font-bold text-content-primary">로그인</Link>
         </section>
@@ -67,9 +67,9 @@ export function LikesPage() {
             {selectedQuery.isSuccess ? <span className="text-sm font-bold text-content-secondary">{products.length}개 · {currentPage}/{totalPages}</span> : null}
           </div>
 
-          {selectedQuery.isLoading ? <p className="mt-4 rounded-md border border-border-subtle bg-surface-raised p-5 text-sm text-content-secondary">상품 목록을 불러오는 중입니다.</p> : null}
+          {selectedQuery.isLoading ? <p className="mt-4 rounded-surface border border-border-subtle bg-surface-raised p-5 text-sm text-content-secondary">상품 목록을 불러오는 중입니다.</p> : null}
           {selectedQuery.isError ? (
-            <div className="mt-4 rounded-md border border-action-primary/30 bg-status-negative-subtle p-5 text-sm">
+            <div className="mt-4 rounded-control border border-status-negative-border bg-status-negative-subtle p-5 text-sm" role="alert">
               <p className="font-bold text-status-negative">{apiErrorMessage(selectedQuery.error)}</p>
               <Button className="mt-3" size="sm" variant="secondary" onClick={() => void selectedQuery.refetch()}>다시 시도</Button>
             </div>
@@ -79,7 +79,7 @@ export function LikesPage() {
               {pageProducts.map((product) => <ProductCard key={product.id} product={product} />)}
             </div>
           ) : null}
-          {selectedQuery.isSuccess && !pageProducts.length ? <p className="mt-4 rounded-md border border-border-subtle bg-surface-raised p-5 text-sm text-content-secondary">{view === "liked" ? "좋아요한 상품이 없습니다." : "찜한 상품이 없습니다."}</p> : null}
+          {selectedQuery.isSuccess && !pageProducts.length ? <p className="mt-4 rounded-surface border border-border-subtle bg-surface-raised p-5 text-sm text-content-secondary">{view === "liked" ? "좋아요한 상품이 없습니다." : "찜한 상품이 없습니다."}</p> : null}
           {selectedQuery.isSuccess && products.length > PAGE_SIZE ? (
             <div className="mt-8 flex items-center justify-center gap-2">
               <Button variant="secondary" size="sm" disabled={currentPage === 1} onClick={() => setPage(Math.max(1, currentPage - 1))}><ChevronLeft size={16} /> 이전</Button>

@@ -29,7 +29,7 @@ export function EquipmentLook({
   const disclosureID = `outfit-${look.id}-image-disclosure`;
 
   return (
-    <article className="w-full shrink-0 overflow-hidden rounded-3xl border border-action-primary/25 bg-surface-raised">
+    <article className="w-full shrink-0 overflow-hidden rounded-feature border border-action-primary/25 bg-surface-raised">
       <div data-testid="outfit-image-stage" className="relative min-h-[650px] overflow-hidden bg-[radial-gradient(circle_at_50%_42%,#fff_0_22%,#fff1f2_23%_51%,#f8fafc_72%)] px-2 pt-4 sm:min-h-[560px] sm:px-4">
         <div className="relative z-10 text-center">
           <p className="text-xs font-bold tracking-normal text-action-primary">코디 {String(position).padStart(2, "0")} · 날씨에 맞는 스타일</p>
@@ -37,7 +37,7 @@ export function EquipmentLook({
         </div>
 
         <div className="pointer-events-none absolute left-1/2 top-[47%] h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-action-primary/35 shadow-[0_0_0_34px_rgba(255,228,230,0.28)] sm:h-80 sm:w-80" />
-        <div className="absolute left-1/2 top-[47%] h-[400px] w-[300px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[2rem] bg-surface-subtle shadow-[0_18px_32px_rgba(15,23,42,0.18)] sm:h-[440px] sm:w-[330px]">
+        <div className="absolute left-1/2 top-[47%] h-[400px] w-[300px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-feature bg-surface-subtle shadow-float sm:h-[440px] sm:w-[330px]">
           <SafeImage
             src={look.image_url}
             alt={`${look.title} AI 코디 연출 이미지`}
@@ -59,7 +59,7 @@ export function EquipmentLook({
             tabIndex={active ? 0 : -1}
             aria-controls={outfitProductAnchorID(look.id, item.product.id)}
             aria-label={`${item.slot_label} ${item.product.name}, 상품 목록에서 보기`}
-            className={`absolute z-10 grid min-h-16 w-[42%] max-w-44 grid-cols-[42px_minmax(0,1fr)] items-center gap-2 rounded-2xl border border-border-subtle bg-surface-raised/95 p-2 text-left shadow-[0_10px_24px_rgba(15,23,42,0.12)] transition hover:border-action-primary hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:grid-cols-[50px_minmax(0,1fr)] ${slotPositions[item.slot]}`}
+            className={`absolute z-10 grid min-h-16 w-[42%] max-w-44 grid-cols-[42px_minmax(0,1fr)] items-center gap-2 rounded-surface border border-border-subtle bg-surface-raised/95 p-2 text-left shadow-card transition hover:border-action-primary hover:shadow-float focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:grid-cols-[50px_minmax(0,1fr)] ${slotPositions[item.slot]}`}
             onClick={() => onProductSelect(item.product.id)}
           >
             <span className="relative block h-10 w-10 overflow-hidden rounded-xl bg-surface-subtle sm:h-12 sm:w-12" aria-hidden="true">
@@ -74,8 +74,8 @@ export function EquipmentLook({
         ))}
       </div>
 
-      <footer data-testid="outfit-point-bar" className="m-4 rounded-2xl bg-content-primary px-4 py-3 text-center text-xs leading-5 text-content-inverse shadow-xl sm:mx-24 sm:text-xs">
-        <strong className="text-rose-300">오늘의 코디 포인트</strong>
+      <footer data-testid="outfit-point-bar" className="m-4 rounded-surface bg-content-primary px-4 py-3 text-center text-xs leading-5 text-content-inverse shadow-float sm:mx-24 sm:text-xs">
+        <strong className="text-focus-on-brand">오늘의 코디 포인트</strong>
         <span className="mx-1 text-content-inverse/50">·</span>
         {look.reason}
       </footer>

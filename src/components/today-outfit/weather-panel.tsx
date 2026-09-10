@@ -77,7 +77,7 @@ export function WeatherPanel({
           const presentation = weatherPresentation(day.weatherCode);
           const Icon = iconComponents[presentation.icon];
           return (
-            <div key={day.time} className={`rounded-2xl border bg-surface-raised px-2 py-3 text-center ${index === 0 ? "border-2 border-action-primary bg-action-primary/5" : "border-border-subtle"}`}>
+            <div key={day.time} className={`rounded-surface border bg-surface-raised px-2 py-3 text-center ${index === 0 ? "border-2 border-action-primary bg-action-primary/5" : "border-border-subtle"}`}>
               <p className="text-xs font-bold">{index === 0 ? "오늘" : formatWeekday(day.time, forecast.timezone)}</p>
               <Icon size={24} className="mx-auto my-2 text-action-primary" />
               <p className="text-xs text-content-secondary"><strong className="text-action-primary">{Math.round(day.temperatureMax)}°</strong> / {Math.round(day.temperatureMin)}°</p>
@@ -86,7 +86,7 @@ export function WeatherPanel({
         })}
       </div>
 
-      <div className={`relative mt-3 min-h-44 overflow-hidden rounded-3xl bg-gradient-to-br ${themeClasses[theme]} p-5 text-content-inverse shadow-xl sm:p-6`}>
+      <div className={`relative mt-3 min-h-44 overflow-hidden rounded-feature bg-gradient-to-br ${themeClasses[theme]} p-5 text-content-inverse shadow-float sm:p-6`}>
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-20 right-[12%] h-40 w-40 rounded-full bg-status-warning-subtle/10 shadow-[0_0_55px_rgba(254,215,170,0.15)]" />
         {theme === "night" ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20 [background-image:radial-gradient(circle,#fff_1px,transparent_1px)] [background-size:31px_31px]" /> : null}
         <div className="relative z-10 flex flex-col justify-between gap-5 sm:flex-row">
@@ -123,7 +123,7 @@ export function WeatherPanel({
 }
 
 function WeatherStat({ icon: Icon, label, value }: { icon: ComponentType<{ size?: number }>; label: string; value: string }) {
-  return <div className="rounded-2xl bg-surface-raised p-3 text-content-primary shadow-sm"><p className="flex items-center gap-1 text-xs font-medium text-content-secondary"><Icon size={13} /> {label}</p><strong className="mt-1 block text-base font-bold tabular-nums">{value}</strong></div>;
+  return <div className="rounded-surface bg-surface-raised p-3 text-content-primary shadow-card"><p className="flex items-center gap-1 text-xs font-medium text-content-secondary"><Icon size={13} /> {label}</p><strong className="mt-1 block text-base font-bold tabular-nums">{value}</strong></div>;
 }
 
 function formatWeekday(time: number, timezone: string) {

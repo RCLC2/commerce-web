@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { inputVariants } from "./ui/input";
@@ -14,7 +15,13 @@ type ConsoleTableProps = {
   onRowClick?: (index: number) => void;
   rowKeys?: Array<string | number>;
   emptyText?: string;
+  loading?: boolean;
+  emptyAction?: ReactNode;
 };
+
+function isInteractiveTarget(target: EventTarget | null) {
+  return target instanceof HTMLElement && Boolean(target.closest("button,a,input,select,textarea,[role='button'],[role='link']"));
+}
 
 export function ConsoleTable({
   columns,
@@ -22,11 +29,21 @@ export function ConsoleTable({
   onRowClick,
   rowKeys,
   emptyText = "표시할 데이터가 없습니다.",
+  loading = false,
+  emptyAction,
 }: ConsoleTableProps) {
+  if (loading) {
+    return (
+      <div className="rounded-xl border border-dashed border-border-subtle bg-surface-raised px-5 py-12 text-center text-sm font-bold text-content-secondary" role="status">
+        목록을 불러오는 중입니다.
+      </div>
+    );
+  }
   if (!rows.length) {
     return (
-      <div className="rounded-xl border border-dashed border-border-subtle bg-surface-raised px-5 py-12 text-center text-sm font-bold text-content-secondary">
-        {emptyText}
+      <div className="grid place-items-center gap-3 rounded-xl border border-dashed border-border-subtle bg-surface-raised px-5 py-12 text-center text-sm font-bold text-content-secondary">
+        <span>{emptyText}</span>
+        {emptyAction}
       </div>
     );
   }
@@ -35,7 +52,7 @@ export function ConsoleTable({
     <>
       <div className="hidden overflow-x-auto rounded-xl border border-border-subtle bg-surface-raised md:block">
         <table className="w-full min-w-[760px] table-auto border-collapse text-left">
-          <thead className="border-b border-border-subtle bg-surface-subtle">
+          <thead className="border-b border-border-subtle bg-surface-raised">
             <tr>
               {columns.map((column) => (
                 <th key={column} scope="col" className="px-4 py-3 text-xs font-bold text-content-secondary">
@@ -54,9 +71,13 @@ export function ConsoleTable({
                   onRowClick &&
                     "cursor-pointer transition hover:bg-surface-subtle focus-visible:bg-surface-subtle focus-visible:outline-2 focus-visible:-outline-offset-2",
                 )}
-                onClick={() => onRowClick?.(rowIndex)}
+                onClick={(event) => {
+                  if (isInteractiveTarget(event.target)) return;
+                  onRowClick?.(rowIndex);
+                }}
                 onKeyDown={(event) => {
                   if (!onRowClick || (event.key !== "Enter" && event.key !== " ")) return;
+                  if (event.target !== event.currentTarget) return;
                   event.preventDefault();
                   onRowClick(rowIndex);
                 }}
@@ -82,18 +103,17 @@ export function ConsoleTable({
           ));
 
           return onRowClick ? (
-            <Button variant="ghost"
+            <div
               key={rowKeys?.[rowIndex] ?? rowIndex}
-              type="button"
-              className="grid w-full gap-3 rounded-xl border border-border-subtle bg-surface-raised p-4 text-left shadow-sm transition hover:border-border-interactive"
-              onClick={() => onRowClick(rowIndex)}
+              className="grid gap-3 rounded-surface border border-border-subtle bg-surface-raised p-4 shadow-card transition hover:border-border-interactive"
             >
               {content}
-            </Button>
+              <Button type="button" variant="secondary" size="sm" className="w-full" onClick={() => onRowClick(rowIndex)}>상세 보기</Button>
+            </div>
           ) : (
             <div
               key={rowKeys?.[rowIndex] ?? rowIndex}
-              className="grid gap-3 rounded-xl border border-border-subtle bg-surface-raised p-4 shadow-sm"
+              className="grid gap-3 rounded-surface border border-border-subtle bg-surface-raised p-4 shadow-card"
             >
               {content}
             </div>
@@ -185,7 +205,7 @@ export function ConsoleModal({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          "flex max-h-[94vh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface-raised shadow-2xl sm:rounded-2xl",
+          "flex max-h-[94vh] w-full flex-col overflow-hidden rounded-t-surface bg-surface-raised shadow-float sm:rounded-surface",
           size === "md" && "sm:max-w-2xl",
           size === "lg" && "sm:max-w-4xl",
           size === "xl" && "sm:max-w-6xl",
@@ -216,21 +236,87 @@ export function ConsoleModal({
   );
 }
 
+type ConsoleConfirmOptions = {
+  title: string;
+  message: ReactNode;
+  confirmLabel?: string;
+  danger?: boolean;
+};
+
+export function useConsoleConfirm() {
+  const [request, setRequest] = useState<{
+    options: ConsoleConfirmOptions;
+    onConfirm: () => void;
+  }>();
+
+  function ask(options: ConsoleConfirmOptions, onConfirm: () => void) {
+    setRequest({ options, onConfirm });
+  }
+
+  const dialog = request ? (
+    <ConsoleModal
+      open
+      size="md"
+      title={request.options.title}
+      onClose={() => setRequest(undefined)}
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={() => setRequest(undefined)}>취소</Button>
+          <Button
+            type="button"
+            variant={request.options.danger ? "danger" : "primary"}
+            onClick={() => {
+              const onConfirm = request.onConfirm;
+              setRequest(undefined);
+              onConfirm();
+            }}
+          >
+            {request.options.confirmLabel ?? "확인"}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm leading-6 text-content-secondary">{request.options.message}</p>
+    </ConsoleModal>
+  ) : null;
+
+  return { ask, dialog };
+}
+
 export function DetailGrid({ children }: { children: ReactNode }) {
-  return <dl className="grid gap-4 rounded-xl bg-surface-subtle p-4 sm:grid-cols-2">{children}</dl>;
+  return <dl className="grid gap-4 rounded-xl border border-border-subtle bg-surface-raised p-4 sm:grid-cols-2">{children}</dl>;
 }
 
 export function DetailItem({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-xs font-bold text-content-secondary">{label}</dt>
-      <dd className="mt-1 min-w-0 break-words text-sm font-bold">{children || "-"}</dd>
+      <dd className="mt-1 min-w-0 break-words text-sm font-bold">{children === null || children === undefined || children === "" ? "-" : children}</dd>
     </div>
   );
 }
 
 export function ModalLoading() {
   return <div className="py-16 text-center text-sm font-bold text-content-secondary">상세 정보를 불러오는 중입니다.</div>;
+}
+
+export function ModalQueryState({
+  isLoading,
+  error,
+  onRetry,
+}: {
+  isLoading: boolean;
+  error: unknown;
+  onRetry: () => void;
+}) {
+  if (isLoading) return <ModalLoading />;
+  if (!error) return <div className="py-16 text-center text-sm font-bold text-content-secondary">상세 정보를 찾을 수 없습니다.</div>;
+  return (
+    <div className="grid place-items-center gap-3 py-16 text-center">
+      <p className="text-sm font-bold text-status-negative">상세 정보를 불러오지 못했습니다.</p>
+      <Button type="button" size="sm" variant="secondary" onClick={onRetry}>상세 다시 불러오기</Button>
+    </div>
+  );
 }
 
 export function useDebouncedValue<T>(value: T, delay = 300) {
@@ -240,6 +326,126 @@ export function useDebouncedValue<T>(value: T, delay = 300) {
     return () => window.clearTimeout(timer);
   }, [delay, value]);
   return debouncedValue;
+}
+
+export type ConsoleUrlSyncState = {
+  lastObservedQuery: string;
+  desiredQuery: string;
+  latestRequestedQuery?: string;
+  supersededQueries: string[];
+};
+
+export function createConsoleUrlSyncState(initialQuery: string): ConsoleUrlSyncState {
+  return {
+    lastObservedQuery: initialQuery,
+    desiredQuery: initialQuery,
+    supersededQueries: [],
+  };
+}
+
+export function advanceConsoleUrlSync(
+  state: ConsoleUrlSyncState,
+  currentQuery: string,
+  desiredQuery: string,
+  isHistoryNavigation = false,
+): { state: ConsoleUrlSyncState; action: "none" | "replace" | "external" } {
+  const supersededQueries = new Set(state.supersededQueries);
+  let latestRequestedQuery = state.latestRequestedQuery;
+  let action: "none" | "replace" | "external" = "none";
+  let staleRequestedNavigation = false;
+
+  if (currentQuery !== state.lastObservedQuery) {
+    if (isHistoryNavigation) {
+      latestRequestedQuery = undefined;
+      supersededQueries.clear();
+      action = "external";
+    } else if (currentQuery === latestRequestedQuery) {
+      latestRequestedQuery = undefined;
+    } else if (supersededQueries.has(currentQuery)) {
+      supersededQueries.delete(currentQuery);
+      staleRequestedNavigation = true;
+    } else {
+      latestRequestedQuery = undefined;
+      supersededQueries.clear();
+      action = "external";
+    }
+  }
+
+  const desiredChanged = desiredQuery !== state.desiredQuery;
+  if (action !== "external" && desiredQuery !== currentQuery) {
+    if (desiredChanged && latestRequestedQuery && latestRequestedQuery !== desiredQuery) {
+      supersededQueries.add(latestRequestedQuery);
+    }
+    if (desiredChanged || latestRequestedQuery !== desiredQuery || staleRequestedNavigation) {
+      latestRequestedQuery = desiredQuery;
+      action = "replace";
+    }
+  }
+
+  return {
+    state: {
+      lastObservedQuery: currentQuery,
+      desiredQuery,
+      latestRequestedQuery,
+      supersededQueries: Array.from(supersededQueries).slice(-16),
+    },
+    action,
+  };
+}
+
+export function useConsoleUrlFilters(
+  values: Record<string, string | number | undefined>,
+  onExternalChange?: (searchParams: URLSearchParams) => void,
+) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const serialized = JSON.stringify(Object.entries(values).sort(([left], [right]) => left.localeCompare(right)));
+  const syncStateRef = useRef(createConsoleUrlSyncState(searchParams.toString()));
+  const historyNavigationRef = useRef(false);
+  const onExternalChangeRef = useRef(onExternalChange);
+
+  useEffect(() => {
+    onExternalChangeRef.current = onExternalChange;
+  }, [onExternalChange]);
+
+  useEffect(() => {
+    const markHistoryNavigation = () => {
+      historyNavigationRef.current = true;
+    };
+    window.addEventListener("popstate", markHistoryNavigation);
+    return () => window.removeEventListener("popstate", markHistoryNavigation);
+  }, []);
+
+  useEffect(() => {
+    const currentQuery = searchParams.toString();
+    const next = new URLSearchParams(currentQuery);
+    const serializedValues = JSON.parse(serialized) as Array<[string, string | number | null]>;
+    for (const [key, value] of serializedValues) {
+      if (value === null || value === "" || value === 0 || value === "ALL") next.delete(key);
+      else next.set(key, String(value));
+    }
+    const nextQuery = next.toString();
+    const result = advanceConsoleUrlSync(
+      syncStateRef.current,
+      currentQuery,
+      nextQuery,
+      historyNavigationRef.current,
+    );
+    syncStateRef.current = result.state;
+    historyNavigationRef.current = false;
+    if (result.action === "external") {
+      onExternalChangeRef.current?.(new URLSearchParams(currentQuery));
+      return;
+    }
+    if (result.action === "replace") {
+      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
+    }
+  }, [pathname, router, searchParams, serialized]);
+}
+
+export function consoleUrlValue(searchParams: { get: (key: string) => string | null }, key: string, fallback = "") {
+  return searchParams.get(key) ?? fallback;
 }
 
 export const consoleInputClass = cn(inputVariants(), "h-11 min-w-0 font-medium");

@@ -92,7 +92,7 @@ export function HomeFeatureCard({
   if (!card.image_url) return <HomeContextTextCard card={card} token={token} memberID={memberID} />;
 
   const visual = (
-    <article className={`relative overflow-hidden rounded-2xl bg-content-primary text-content-inverse shadow-sm ${compact ? "h-36 md:h-44" : "h-44 md:h-56"}`}>
+    <article className={`relative overflow-hidden rounded-surface bg-content-primary text-content-inverse shadow-card ${compact ? "h-36 md:h-44" : "h-44 md:h-56"}`}>
       <SafeImage src={card.image_url} alt={card.headline ?? "홈 이벤트"} fill sizes="(max-width: 768px) 100vw, 1152px" className="object-cover" />
       <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/35 to-transparent" />
       <div className="absolute inset-0 flex items-end p-5 md:items-center md:p-7">

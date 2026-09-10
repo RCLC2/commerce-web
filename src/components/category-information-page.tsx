@@ -11,6 +11,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Pagination } from "./ui/pagination";
 import { FilterChip } from "./ui/filter-chip";
 import { api } from "@/lib/api";
+import { scrollCarouselByCard } from "@/lib/carousel";
 import type { CommerceCategory, Product } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import { ProductCard } from "./product-card";
@@ -59,7 +60,7 @@ export function CategoryInformationPage() {
   if (informationQuery.error || !information || !selected) {
     return (
       <main className="mx-auto max-w-6xl px-4 py-16">
-        <div className="rounded-md border border-status-negative-border bg-status-negative-subtle p-8 text-center">
+        <div className="rounded-surface border border-status-negative-border bg-status-negative-subtle p-8 text-center shadow-card" role="alert">
           <h1 className="text-xl font-bold text-status-negative">카테고리관을 불러오지 못했습니다.</h1>
           <p className="mt-2 text-sm text-status-negative">잠시 후 다시 시도해주세요.</p>
           <Button className="mt-5" variant="secondary" onClick={() => void informationQuery.refetch()}>다시 시도</Button>
@@ -125,7 +126,7 @@ export function CategoryInformationPage() {
               <ProductGrid products={products} />
             </>
           ) : (
-            <div className="mt-5 rounded-md bg-surface-subtle p-12 text-center text-sm font-bold text-content-secondary">이 카테고리에 등록된 상품이 없습니다.</div>
+            <div className="mt-5 rounded-surface border border-dashed border-border-subtle bg-surface-raised p-12 text-center text-sm font-bold text-content-secondary">이 카테고리에 등록된 상품이 없습니다.</div>
           )}
 
           <Pagination page={information.pagination.page} totalPages={information.pagination.total_pages} hasNext={information.pagination.has_next} disabled={informationQuery.isFetching} onChange={changePage} />
@@ -143,10 +144,7 @@ function ProductGrid({ products }: { products: Product[] }) {
 function RealtimePopularCarousel({ carousel }: { carousel: NonNullable<Awaited<ReturnType<typeof api.getCategoryInformation>>["realtime_popular_carousel"]> }) {
   const carouselRef = useRef<HTMLDivElement | null>(null);
   function slide(direction: "prev" | "next") {
-    carouselRef.current?.scrollBy({
-      left: direction === "prev" ? -640 : 640,
-      behavior: "smooth",
-    });
+    scrollCarouselByCard(carouselRef.current, direction === "prev" ? -1 : 1);
   }
 
   return (
@@ -176,12 +174,12 @@ function RankedPopularSquareCard({ product, rank }: { product: Product; rank: nu
   const marketName = product.market?.name ?? product.market_name ?? `마켓 ${marketId}`;
 
   return (
-    <article className="group relative aspect-square overflow-hidden rounded-md bg-surface-subtle">
+    <article className="group relative aspect-square overflow-hidden rounded-control bg-surface-subtle">
       <Link href={`/products/${product.id}`} className="absolute inset-0">
         <SafeImage src={product.image_url} alt={product.name} fill sizes="(max-width: 640px) 62vw, 208px" className="object-cover transition duration-300 group-hover:scale-[1.03]" />
       </Link>
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-black/5" />
-      <span className="absolute left-2 top-2 z-20 flex h-8 min-w-8 items-center justify-center rounded-md bg-surface-raised px-2 text-sm font-bold text-action-primary shadow-sm">{rank}</span>
+      <span className="absolute left-2 top-2 z-20 flex h-8 min-w-8 items-center justify-center rounded-control bg-surface-raised px-2 text-sm font-bold text-action-primary shadow-card">{rank}</span>
       <div className="absolute inset-x-0 bottom-0 z-20 p-3 text-content-inverse">
         <Link href={`/markets/${marketId}`} className="inline-flex max-w-full items-center gap-1 text-xs font-medium text-content-inverse/90 hover:text-content-inverse hover:underline">
           <Store size={13} className="shrink-0" aria-hidden="true" /><span className="truncate">{marketName}</span>
@@ -216,5 +214,5 @@ function compareCategoryOrder(a: CommerceCategory, b: CommerceCategory) {
 }
 
 function CategoryLoading() {
-  return <main className="mx-auto max-w-6xl animate-pulse px-4 py-8"><div className="h-16 rounded-md bg-border-subtle" /><div className="mt-6 h-11 w-2/3 rounded-md bg-border-subtle" /><div className="mt-7 grid grid-cols-2 gap-4 md:grid-cols-4">{Array.from({ length: 8 }, (_, index) => <div key={index}><div className="aspect-square rounded-md bg-border-subtle" /><div className="mt-3 h-4 rounded bg-border-subtle" /></div>)}</div></main>;
+  return <main className="mx-auto max-w-6xl animate-pulse px-4 py-8"><div className="h-16 rounded-surface bg-surface-subtle" /><div className="mt-6 h-11 w-2/3 rounded-control bg-surface-subtle" /><div className="mt-7 grid grid-cols-2 gap-4 md:grid-cols-4">{Array.from({ length: 8 }, (_, index) => <div key={index}><div className="aspect-square rounded-control bg-surface-subtle" /><div className="mt-3 h-4 rounded-control bg-surface-subtle" /></div>)}</div></main>;
 }

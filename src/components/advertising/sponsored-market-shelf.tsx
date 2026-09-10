@@ -15,7 +15,7 @@ export function SponsoredMarketShelf({ decision, onNavigate }: { decision: AdDec
   const market = decision.target.market;
   const slide = (direction: -1 | 1) => carouselRef.current?.scrollBy({ left: direction * 620, behavior: "smooth" });
   return (
-    <section className="relative rounded-2xl border border-action-primary/25 bg-surface-raised p-4 pt-10 shadow-sm">
+    <section className="relative rounded-surface border border-action-primary/25 bg-surface-raised p-4 pt-10 shadow-card">
       <SponsoredDisclosure />
       <div className="flex items-end justify-between gap-4">
         <div className="min-w-0">
@@ -30,7 +30,7 @@ export function SponsoredMarketShelf({ decision, onNavigate }: { decision: AdDec
       <div ref={carouselRef} className="no-scrollbar mt-4 flex snap-x gap-3 overflow-x-auto scroll-smooth pb-1">
         {market.products.map((product) => (
           <Link key={product.id} href={`/products/${product.id}`} onClick={onNavigate} className="group w-32 shrink-0 snap-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand md:w-36">
-            <div className="relative aspect-square overflow-hidden rounded-lg bg-surface-subtle">
+            <div className="relative aspect-square overflow-hidden rounded-control bg-surface-subtle">
               <SafeImage src={product.image_url} alt={product.name} fill sizes="144px" className="object-cover transition group-hover:scale-[1.03]" />
             </div>
             <p className="mt-2 line-clamp-2 min-h-10 text-sm font-bold">{product.name}</p>

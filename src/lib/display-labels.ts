@@ -26,3 +26,11 @@ export function paymentMethodLabel(value: string | null | undefined) {
   };
   return value ? methods[value] ?? value : "결제 수단 미확인";
 }
+
+export function shippingTypeLabel(value: string | null | undefined) {
+  const types: Record<string, string> = {
+    NORMAL: "일반 배송",
+    FREE: "무료 배송",
+  };
+  return value ? types[value] ?? value : "배송 유형 미확인";
+}

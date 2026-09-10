@@ -48,7 +48,7 @@ export function EquipmentSlider({
         aria-label={`오늘의 코디 ${total}개`}
         aria-roledescription="슬라이드 목록"
         tabIndex={0}
-        className="relative touch-pan-y overflow-hidden rounded-3xl outline-none ring-brand focus-visible:ring-2"
+        className="relative touch-pan-y overflow-hidden rounded-feature outline-none ring-brand focus-visible:ring-2"
         onKeyDown={(event) => {
           if (event.key === "ArrowLeft") move(-1);
           if (event.key === "ArrowRight") move(1);
@@ -73,8 +73,8 @@ export function EquipmentSlider({
           ))}
         </div>
 
-        <Button variant="ghost" size="icon" type="button" aria-label="이전 코디" className="absolute left-2 top-1/2 z-20 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-surface-raised shadow-xl hover:text-action-primary sm:left-4" onClick={() => move(-1)}><ChevronLeft size={25} /></Button>
-        <Button variant="ghost" size="icon" type="button" aria-label="다음 코디" className="absolute right-2 top-1/2 z-20 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-surface-raised shadow-xl hover:text-action-primary sm:right-4" onClick={() => move(1)}><ChevronRight size={25} /></Button>
+        <Button variant="ghost" size="icon" type="button" aria-label="이전 코디" className="absolute left-2 top-1/2 z-20 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-surface-raised shadow-float hover:text-action-primary sm:left-4" onClick={() => move(-1)}><ChevronLeft size={25} /></Button>
+        <Button variant="ghost" size="icon" type="button" aria-label="다음 코디" className="absolute right-2 top-1/2 z-20 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-surface-raised shadow-float hover:text-action-primary sm:right-4" onClick={() => move(1)}><ChevronRight size={25} /></Button>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-center gap-2" aria-label="코디 위치">

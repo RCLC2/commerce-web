@@ -71,13 +71,13 @@ export function MyPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-28 pt-7">
-      <section className="rounded-2xl border border-border-subtle bg-surface-raised p-5 md:p-7">
+      <section className="border-b border-border-subtle pb-6 md:pb-8">
         <div className="flex items-start justify-between gap-3">
           <PageHeading className="[&_h1]:text-xl sm:[&_h1]:text-3xl" icon={<PageIcon />} eyebrow="마이페이지" title={`${profile?.email?.split("@")[0] || "회원"}님`} />
           <Button variant="secondary" size="sm" onClick={() => { logout(); router.push("/login"); }}>로그아웃</Button>
         </div>
         {profile?.email ? <p className="mt-3 break-all text-sm text-content-secondary">{profile.email}</p> : null}
-        <div className="mt-6 grid grid-cols-3 divide-x divide-border-subtle rounded-xl bg-surface-subtle px-2 py-4 text-center">
+        <div className="mt-6 grid grid-cols-3 divide-x divide-border-subtle rounded-surface border border-action-primary/15 bg-action-secondary/45 px-2 py-4 text-center">
           <div><p className="text-xs text-content-secondary">포인트</p><p className="mt-1 font-bold">{profileQuery.isSuccess ? formatPrice(profile?.point_balance ?? 0) : "확인 필요"}</p></div>
           <div><p className="text-xs text-content-secondary">보유 쿠폰</p><p className="mt-1 font-bold">{couponsQuery.isSuccess ? `${couponsQuery.data.length}장` : "확인 필요"}</p></div>
           <div><p className="text-xs text-content-secondary">전체 주문</p><p className="mt-1 font-bold">{ordersQuery.isSuccess ? `${orders.length}건` : "확인 필요"}</p></div>
@@ -91,14 +91,14 @@ export function MyPage() {
         <Shortcut href="/mypage/reviews" icon={<MessageSquareText size={19} />} label="리뷰 관리" />
       </section>
 
-      {queryError ? <div className="mt-5 rounded-xl border border-action-primary/30 bg-status-negative-subtle p-4 text-sm"><p className="font-bold text-status-negative">{apiErrorMessage(queryError)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => { void profileQuery.refetch(); void ordersQuery.refetch(); void couponsQuery.refetch(); void issuableQuery.refetch(); void addressesQuery.refetch(); }}>다시 시도</Button></div> : null}
+      {queryError ? <div className="mt-5 rounded-control border border-status-negative-border bg-status-negative-subtle p-4 text-sm" role="alert"><p className="font-bold text-status-negative">{apiErrorMessage(queryError)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => { void profileQuery.refetch(); void ordersQuery.refetch(); void couponsQuery.refetch(); void issuableQuery.refetch(); void addressesQuery.refetch(); }}>다시 시도</Button></div> : null}
 
       <section className="mt-6 grid gap-3 md:grid-cols-2">
         <BenefitCard title="발급 가능한 쿠폰" value={issuableQuery.isSuccess ? `${issuableQuery.data.length}장` : "확인 필요"} href="/mypage/coupons?view=issuable" />
         <BenefitCard title="발급한 쿠폰" value={couponsQuery.isSuccess ? `${couponsQuery.data.length}장` : "확인 필요"} href="/mypage/coupons?view=owned" />
       </section>
 
-      <section className="mt-4 rounded-2xl border border-border-subtle bg-surface-raised p-5">
+      <section className="mt-4 rounded-surface border border-border-subtle bg-surface-raised p-5 shadow-card">
         <div className="flex items-center justify-between gap-3"><h2 className="font-bold">기본 배송지</h2>{defaultAddress ? <Button variant="ghost" className="text-sm font-bold text-action-primary" onClick={() => { saveAddress.reset(); setAddressDraft({ ...defaultAddress }); setEditingAddress(true); }}>편집하기</Button> : null}</div>
         {addressesQuery.isError ? (
           <p className="mt-3 text-sm font-bold text-action-primary">배송지를 불러오지 못했습니다. 위의 다시 시도를 눌러주세요.</p>
@@ -126,9 +126,9 @@ export function MyPage() {
           {filteredOrders.map((order) => {
             const item = firstOrderItem(order);
             const product = item ? item.product ?? productByID.get(item.product_id) : undefined;
-            return <Link key={order.id} href={`/orders/${order.order_code}`} className="block rounded-xl border border-border-subtle bg-surface-raised p-4 hover:bg-surface-subtle"><div className="flex gap-3"><div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-surface-subtle"><SafeImage src={product?.image_url} alt="" fill sizes="80px" className="object-cover" /></div><div className="min-w-0 flex-1"><div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:gap-3"><div className="min-w-0 max-w-full"><p className="font-bold">{orderStatusLabel(order.status)}</p><p className="mt-1 truncate text-sm font-bold">{product?.name ?? `상품 #${item?.product_id ?? "-"}`}</p></div><p className="shrink-0 whitespace-nowrap font-bold tabular-nums">{formatPrice(order.total_order_price - order.total_discount_price - order.used_point)}</p></div><p className="mt-2 text-xs text-content-secondary">{order.ordered_at ? new Date(order.ordered_at).toLocaleDateString("ko-KR") : ""} · {order.order_code}</p></div></div></Link>;
+            return <Link key={order.id} href={`/orders/${order.order_code}`} className="block rounded-surface border border-border-subtle bg-surface-raised p-4 shadow-card transition hover:border-border-interactive"><div className="flex gap-3"><div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-control bg-surface-subtle"><SafeImage src={product?.image_url} alt="" fill sizes="80px" className="object-cover" /></div><div className="min-w-0 flex-1"><div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:gap-3"><div className="min-w-0 max-w-full"><p className="font-bold">{orderStatusLabel(order.status)}</p><p className="mt-1 truncate text-sm font-bold">{product?.name ?? `상품 #${item?.product_id ?? "-"}`}</p></div><p className="shrink-0 whitespace-nowrap font-bold tabular-nums">{formatPrice(order.total_order_price - order.total_discount_price - order.used_point)}</p></div><p className="mt-2 text-xs text-content-secondary">{order.ordered_at ? new Date(order.ordered_at).toLocaleDateString("ko-KR") : ""} · {order.order_code}</p></div></div></Link>;
           })}
-          {ordersQuery.isSuccess && !filteredOrders.length ? <div className="rounded-md border border-border-subtle bg-surface-raised p-8 text-center text-sm text-content-secondary">조건에 맞는 주문이 없습니다.</div> : null}
+          {ordersQuery.isSuccess && !filteredOrders.length ? <div className="rounded-surface border border-border-subtle bg-surface-raised p-8 text-center text-sm text-content-secondary">조건에 맞는 주문이 없습니다.</div> : null}
         </div>
       </section>
     </main>
@@ -136,11 +136,11 @@ export function MyPage() {
 }
 
 function Shortcut({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
-  return <Link href={href} className="flex items-center gap-2 rounded-xl border border-border-subtle bg-surface-raised p-4 text-sm font-bold hover:border-action-primary/30"><span className="text-action-primary">{icon}</span>{label}</Link>;
+  return <Link href={href} className="flex items-center gap-2 rounded-control border border-border-subtle bg-surface-raised p-4 text-sm font-bold shadow-card hover:border-action-primary/30"><span className="text-action-primary">{icon}</span><span className="min-w-0 flex-1">{label}</span><ChevronRight size={16} className="shrink-0 text-content-tertiary" aria-hidden="true" /></Link>;
 }
 
 function BenefitCard({ title, value, href }: { title: string; value: string; href: string }) {
-  return <div className="rounded-2xl border border-border-subtle bg-surface-raised p-5"><div className="flex items-center gap-2 text-sm font-bold text-content-secondary"><Ticket size={17} className="text-action-primary" />{title}</div><div className="mt-3 flex items-end justify-between"><p className="text-2xl font-bold">{value}</p><Link href={href} className="inline-flex items-center text-sm font-bold text-action-primary">더보기 <ChevronRight size={16} /></Link></div></div>;
+  return <div className="rounded-surface border border-border-subtle bg-surface-raised p-5 shadow-card"><div className="flex items-center gap-2 text-sm font-bold text-content-secondary"><Ticket size={17} className="text-action-primary" />{title}</div><div className="mt-3 flex items-end justify-between"><p className="text-2xl font-bold">{value}</p><Link href={href} className="inline-flex items-center text-sm font-bold text-action-primary">더보기 <ChevronRight size={16} /></Link></div></div>;
 }
 
 function AddressInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {

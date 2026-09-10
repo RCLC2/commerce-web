@@ -16,17 +16,21 @@ import { Drawer } from "./ui/overlay";
 
 const nav = [
   { href: "/categories", label: "카테고리", icon: Grid2X2 },
-  { href: "/markets", label: "마켓", icon: Store },
   { href: "/today-outfit", label: "오늘의 코디", icon: Shirt },
   { href: "/", label: "홈", icon: Home, primary: true },
   { href: "/likes", label: "좋아요", icon: Heart },
-  { href: "/cart", label: "장바구니", icon: ShoppingBag },
   { href: "/mypage", label: "마이페이지", icon: User },
 ];
 
 const primaryMenuItems = [
   { href: "/popular-products", label: "인기 상품" },
   { href: "/markets", label: "마켓" },
+];
+
+const desktopNavigationItems = [
+  { href: "/today-outfit", label: "오늘의 코디", icon: Shirt },
+  { href: "/likes", label: "좋아요", icon: Heart },
+  { href: "/mypage", label: "마이페이지", icon: User },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -54,6 +58,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const showSuggestions = searchFocused && suggestions.length > 0;
   const searchPage = pathname.startsWith("/search");
   const onboardingPage = pathname.startsWith("/onboarding/");
+  const hideMobilePrimaryNav = pathname === "/checkout" || /^\/products\/\d+\/?$/.test(pathname);
   const rootCategories = categories.filter((category) => !category.parent_id && category.level === 1);
 
   useEffect(() => {
@@ -100,7 +105,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Search size={20} />
           </ButtonLink>
           <form
-            className="relative hidden h-11 min-w-0 flex-1 items-center gap-2 rounded-control border border-border-interactive bg-surface-subtle px-3 transition hover:border-action-primary focus-within:border-action-primary focus-within:bg-surface-raised focus-within:ring-4 focus-within:ring-action-primary/10 sm:flex"
+            className="relative hidden h-11 min-w-0 flex-1 items-center gap-2 rounded-control border border-border-interactive bg-surface-raised px-3 transition hover:border-action-primary focus-within:border-action-primary focus-within:ring-4 focus-within:ring-action-primary/10 sm:flex"
             onSubmit={submitSearch}
           >
             <Search size={18} className="shrink-0 text-content-secondary" />
@@ -141,21 +146,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             ) : null}
           </form>
+          <nav className="hidden shrink-0 items-center gap-1 lg:flex" aria-label="주요 메뉴">
+            {desktopNavigationItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <ButtonLink key={item.href} href={item.href} variant="ghost" size="sm" className="gap-1 px-2 text-xs" aria-label={item.label} aria-current={isActive(item.href) ? "page" : undefined}>
+                  <Icon size={16} aria-hidden="true" />
+                  <span className="hidden xl:inline">{item.label}</span>
+                </ButtonLink>
+              );
+            })}
+          </nav>
           {role === "SELLER" ? (
-            <ButtonLink href="/seller" aria-label="판매자 관리" variant="ghost" size="icon" title="판매자 관리" className="hidden sm:inline-flex">
+            <ButtonLink href="/seller" aria-label="판매자 관리" variant="ghost" size="icon" title="판매자 관리">
                 <Store size={20} />
               </ButtonLink>
           ) : null}
           {role === "ADMIN" ? (
-            <ButtonLink href="/admin" aria-label="관리자 도구" variant="ghost" size="icon" title="관리자 도구" className="hidden sm:inline-flex">
+            <ButtonLink href="/admin" aria-label="관리자 도구" variant="ghost" size="icon" title="관리자 도구">
                 <ShieldCheck size={20} />
               </ButtonLink>
           ) : null}
           <ButtonLink href="/cart" aria-label="장바구니" variant="ghost" size="icon" title="장바구니">
               <ShoppingBag size={20} />
-            </ButtonLink>
-          <ButtonLink href="/mypage" aria-label="마이페이지" variant="ghost" size="icon">
-              <User size={20} />
             </ButtonLink>
         </div>
       </header> : null}
@@ -168,6 +181,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </ButtonLink>
               ) : null}
               {primaryMenuItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMenuOpen(false)}
+                  className="rounded-md border border-border-subtle px-4 py-3 text-sm font-bold hover:bg-surface-subtle"
+                >
+                  {item.label}
+                </Link>
+              ))}
+              {desktopNavigationItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -199,7 +222,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
       </Drawer>
       {children}
-      <footer className={cn("border-t border-border-subtle bg-surface-raised", /^\/products\/\d+\/?$/.test(pathname) ? "pb-[calc(10rem+env(safe-area-inset-bottom))]" : "pb-[calc(5rem+env(safe-area-inset-bottom))]")}>
+      <footer className={cn("border-t border-border-subtle bg-surface-raised md:pb-0", hideMobilePrimaryNav ? "pb-6" : /^\/products\/\d+\/?$/.test(pathname) ? "pb-[calc(10rem+env(safe-area-inset-bottom))]" : "pb-[calc(5rem+env(safe-area-inset-bottom))]")}>
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-5 gap-y-5 px-4 py-6 text-sm text-content-secondary md:grid-cols-[1.2fr_1fr_1fr] md:gap-6">
           <div className="col-span-2 md:col-span-1">
             <p className="text-lg font-bold text-content-primary">commerce</p>
@@ -219,8 +242,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="mt-2 grid [&>a]:flex [&>a]:min-h-11 [&>a]:items-center">
               {token ? (
                 <>
-                  <Link href="/mypage" className="hover:text-content-primary hover:underline">주문 조회</Link>
-                  <Link href="/cart" className="hover:text-content-primary hover:underline">장바구니</Link>
+                  <Link href="/mypage" className="hover:text-content-primary hover:underline">마이페이지</Link>
                   <Link href="/likes" className="hover:text-content-primary hover:underline">좋아요</Link>
                   <Button variant="ghost" type="button" className="w-fit min-h-11 px-0 text-left hover:text-action-primary hover:underline" onClick={() => { logout(); router.push("/"); }}>로그아웃</Button>
                 </>
@@ -229,8 +251,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
-      <nav className="fixed inset-x-0 bottom-0 z-50 isolate border-t border-border-subtle bg-surface-raised/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_20px_rgb(23_23_27_/_6%)] backdrop-blur" aria-label="하단 주요 메뉴">
-        <div className="mx-auto grid h-16 max-w-6xl grid-cols-7 px-1" data-session-role={role ?? "guest"}>
+      {!hideMobilePrimaryNav ? <nav className="fixed inset-x-0 bottom-0 z-[var(--commerce-z-mobile-cta)] isolate border-t border-border-subtle bg-surface-raised/95 pb-[env(safe-area-inset-bottom)] shadow-mobile-nav backdrop-blur md:hidden" aria-label="하단 주요 메뉴">
+        <div className="mx-auto grid h-16 max-w-6xl grid-cols-5 px-1" data-session-role={role ?? "guest"}>
           {nav.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
@@ -242,7 +264,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "min-w-0 flex flex-col items-center justify-start gap-1 rounded-md pt-2 text-xs font-medium leading-4 text-content-secondary transition hover:text-content-primary",
-                  item.primary && "mx-auto -mt-4 h-14 w-14 justify-center pt-0 rounded-full border border-border-subtle bg-surface-raised text-content-secondary shadow-lg sm:h-16 sm:w-16",
+                  item.primary && "mx-auto -mt-4 h-14 w-14 justify-center pt-0 rounded-full border border-border-subtle bg-surface-raised text-content-secondary shadow-float sm:h-16 sm:w-16",
                   active && !item.primary && "text-action-primary",
                   active && item.primary && "border-action-primary bg-action-primary text-content-on-brand hover:bg-button-primary-hover hover:text-content-on-brand",
                 )}
@@ -253,7 +275,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </div>
-      </nav>
+      </nav> : null}
     </div>
   );
 }

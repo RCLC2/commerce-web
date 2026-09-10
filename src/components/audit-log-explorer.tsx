@@ -256,6 +256,7 @@ export function AuditLogExplorer({ scope, token }: { scope: AuditScope; token: s
       >
         <ConsoleTable
           columns={["발생 시각", "행위자", "변경", "대상", "귀속", "상세"]}
+          loading={logsQuery.isLoading}
           rowKeys={logs.map((log) => log.id)}
           rows={logs.map((log) => [
             new Date(log.occurred_at).toLocaleString("ko-KR"),
@@ -347,7 +348,7 @@ function AuditLogDetail({ log, onClose }: { log: AuditLog | null; onClose: () =>
 function JsonPanel({ title, value }: { title: string; value: unknown }) {
   return (
     <section className="min-w-0 overflow-hidden rounded-xl border border-border-subtle bg-content-primary">
-      <h3 className="border-b border-white/10 px-4 py-3 text-sm font-bold text-content-inverse">{title}</h3>
+      <h3 className="border-b border-content-inverse/10 px-4 py-3 text-sm font-bold text-content-inverse">{title}</h3>
       <pre className="max-h-[420px] overflow-auto p-4 text-xs leading-6 text-content-inverse">{formatJSON(value)}</pre>
     </section>
   );

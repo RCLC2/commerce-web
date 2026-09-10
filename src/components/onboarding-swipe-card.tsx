@@ -89,7 +89,7 @@ export function OnboardingSwipeCard({
         }
       }}
     >
-      <div className="overflow-hidden rounded-[28px] border border-black/5 bg-surface-raised shadow-[0_24px_70px_rgba(0,0,0,0.14)]">
+      <div className="overflow-hidden rounded-feature border border-border-subtle bg-surface-raised shadow-float">
         <div className="relative aspect-[4/5] bg-surface-subtle">
           <Image
             src={item.product.image_url}
@@ -126,7 +126,7 @@ export function OnboardingSwipeCard({
         <Button variant="ghost" size="icon"
           type="button"
           aria-label="별로예요"
-          className={cn("flex h-14 items-center justify-center gap-2 rounded-2xl border border-status-negative-border bg-surface-raised text-base font-bold text-action-primary shadow-sm transition hover:-translate-y-0.5 hover:bg-action-secondary active:translate-y-0")}
+          className={cn("flex h-14 items-center justify-center gap-2 rounded-control border border-status-negative-border bg-surface-raised text-base font-bold text-action-primary shadow-card transition hover:-translate-y-0.5 hover:bg-action-secondary active:translate-y-0")}
           onClick={() => onChoose("DISLIKE", "BUTTON")}
         >
           <X size={24} strokeWidth={3} /> 별로예요
@@ -134,7 +134,7 @@ export function OnboardingSwipeCard({
         <Button variant="ghost" size="icon"
           type="button"
           aria-label="좋아요"
-          className="flex h-14 items-center justify-center gap-2 rounded-2xl border border-status-positive-border bg-surface-raised text-base font-bold text-status-positive shadow-sm transition hover:-translate-y-0.5 hover:bg-status-positive-subtle active:translate-y-0"
+          className="flex h-14 items-center justify-center gap-2 rounded-control border border-status-positive-border bg-surface-raised text-base font-bold text-status-positive shadow-card transition hover:-translate-y-0.5 hover:bg-status-positive-subtle active:translate-y-0"
           onClick={() => onChoose("LIKE", "BUTTON")}
         >
           <Check size={24} strokeWidth={3} /> 좋아요

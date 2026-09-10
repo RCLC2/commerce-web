@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayLabel, paymentMethodLabel } from "./display-labels";
+import { displayLabel, paymentMethodLabel, shippingTypeLabel } from "./display-labels";
 import { orderStatusLabel } from "./order-utils";
 
 describe("display labels", () => {
@@ -11,5 +11,7 @@ describe("display labels", () => {
     expect(orderStatusLabel("PAID")).toBe("결제 완료");
     expect(orderStatusLabel("RETURN_REQUESTED")).toBe("반품 요청");
     expect(paymentMethodLabel("CARD")).toBe("카드");
+    expect(shippingTypeLabel("NORMAL")).toBe("일반 배송");
+    expect(shippingTypeLabel("FREE")).toBe("무료 배송");
   });
 });

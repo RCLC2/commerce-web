@@ -22,19 +22,13 @@ export function ProductCardPrice({ basePrice, discountPrice, couponPrice, classN
   }
 
   return (
-    <div className={cn("grid min-w-0 gap-1 text-left", variant === "compact" && "mt-3", className)}>
-      <p className="text-xs font-medium leading-4 text-content-secondary">판매가</p>
-      <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        {saving || pricing.compareAtPrice !== undefined ? (
-          <div className="flex min-w-0 flex-wrap items-baseline gap-x-1 gap-y-1">
-            {saving ? <p className={cn("text-xs font-medium leading-4", isCoupon ? "text-promotion" : "text-action-primary")} aria-label={saving}>{pricing.state === "sale" ? `${pricing.saleRate}%` : saving}</p> : null}
-            {pricing.compareAtPrice !== undefined ? <del className="whitespace-nowrap text-xs font-medium leading-4 text-content-secondary">{formatPrice(pricing.compareAtPrice)}</del> : null}
-          </div>
-        ) : null}
+    <div className={cn("min-w-0 text-left", variant === "compact" && "mt-3", className)}>
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+        {saving ? <p className={cn("text-xs font-bold leading-5", isCoupon ? "text-promotion" : "text-action-primary")} aria-label={saving}>{pricing.state === "sale" ? `${pricing.saleRate}%` : saving}</p> : null}
         <strong className={cn("inline-flex max-w-full flex-wrap items-baseline gap-x-1 font-bold tabular-nums", variant === "compact" ? "text-sm leading-5" : "text-base leading-5", isCoupon ? "text-promotion" : pricing.state === "sale" ? "text-action-primary" : "text-content-primary")} aria-label={`${label} ${formatPrice(pricing.finalPrice)}`}>
-          {pricing.state !== "regular" ? <span className="whitespace-nowrap">{label}</span> : null}
           <span className="whitespace-nowrap">{formatPrice(pricing.finalPrice)}</span>
         </strong>
+        {pricing.compareAtPrice !== undefined ? <del className="whitespace-nowrap text-xs font-medium leading-5 text-content-secondary">{formatPrice(pricing.compareAtPrice)}</del> : null}
       </div>
     </div>
   );

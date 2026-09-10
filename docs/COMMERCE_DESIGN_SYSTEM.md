@@ -12,6 +12,7 @@
 
 | Role | Color | Minimum checked contrast |
 | --- | --- | --- |
+| 2026-09-09 | 일반 상태·카드·하단 고정 메뉴의 semantic token 적용 확대 | 마켓 오류·팔로우 안내·이벤트 티켓·온보딩 카드·오늘의 코디와 모바일 메뉴가 직접 색상·그림자 대신 상태·표면·레이어 토큰을 사용한다. 이미지·날씨 오버레이용 그라디언트는 시각적 구분을 위해 유지한다. |
 | Content primary | `#17171b` | 17.88:1 on white |
 | Content secondary | `#5c5e66` | 6.47:1 on white |
 | Content tertiary | `#6d6f79` | 4.54:1 on subtle surface |

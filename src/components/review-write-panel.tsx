@@ -157,7 +157,7 @@ export function ReviewWritePanel({ token, memberID, orderCode, lineItemID, produ
 
   return (
     <form
-      className="mt-4 rounded-md border border-border-subtle bg-surface-subtle p-4"
+      className="mt-4 rounded-surface border border-border-subtle bg-surface-raised p-4 shadow-card"
       onSubmit={(event) => {
         event.preventDefault();
         if (canSubmit) {
@@ -212,7 +212,7 @@ export function ReviewWritePanel({ token, memberID, orderCode, lineItemID, produ
               <Button variant="ghost" size="icon"
                 type="button"
                 aria-label={`${image.filename} 제거`}
-                className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-surface-raised/90 text-content-primary shadow-sm"
+            className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-surface-raised/90 text-content-primary shadow-card"
                 onClick={() => removeImage(image.s3Key)}
               >
                 <X size={14} />

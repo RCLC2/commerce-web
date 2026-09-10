@@ -10,7 +10,8 @@ type SafeImageProps = Omit<ImageProps, "src"> & {
 };
 
 export function SafeImage({ src, alt, ...props }: SafeImageProps) {
-  const [failed, setFailed] = useState(false);
+  const [failedSource, setFailedSource] = useState<string>();
+  const failed = Boolean(src && failedSource === src);
   const resolvedSrc = failed || !src ? FALLBACK_SRC : src;
 
   return (
@@ -20,7 +21,7 @@ export function SafeImage({ src, alt, ...props }: SafeImageProps) {
       alt={alt}
       onError={() => {
         if (resolvedSrc !== FALLBACK_SRC) {
-          setFailed(true);
+          setFailedSource(src ?? undefined);
         }
       }}
     />

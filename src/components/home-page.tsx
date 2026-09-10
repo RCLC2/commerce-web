@@ -156,19 +156,19 @@ export function HomePage() {
         ) : events.length ? (
           <EventCarousel events={events} />
         ) : eventsQuery.isLoading ? (
-          <div className="h-52 animate-pulse rounded-md bg-border-subtle md:h-72" />
+          <div className="h-52 animate-pulse rounded-surface bg-surface-subtle md:h-72" />
         ) : <p className="rounded-md border border-border-subtle bg-surface-raised p-6 text-sm text-content-secondary">진행 중인 이벤트가 없습니다.</p>}
       </section>
 
-      <section className="rounded-2xl border border-border-subtle bg-surface-raised p-3 shadow-sm" aria-label="홈 카테고리와 이벤트">
+      <section className="rounded-surface border border-border-subtle bg-surface-raised p-3 shadow-card" aria-label="홈 카테고리와 이벤트">
         {homeCategoryChipsQuery.isError ? <ApiErrorState className="m-3" error={homeCategoryChipsQuery.error} onRetry={() => void homeCategoryChipsQuery.refetch()} retryLabel="카테고리 다시 시도" /> : null}
         {homeCategoryChipsQuery.isLoading ? <p className="p-3 text-sm text-content-secondary">카테고리를 불러오는 중입니다.</p> : null}
         {homeCategoryChipsQuery.isSuccess && displayHomeCategoryChips.length === 0 ? <p className="p-3 text-sm text-content-secondary">표시할 홈 카테고리가 없습니다.</p> : null}
         <div className="grid grid-cols-[repeat(auto-fit,minmax(72px,1fr))] gap-1.5">
           {displayHomeCategoryChips.map((chip) => (
-            <Link key={chip.id} href={chip.href} className={`relative flex min-h-20 flex-col items-center justify-center gap-1 rounded-xl p-1 transition hover:-translate-y-0.5 ${chip.chip_type === "CATEGORY_EVENT" ? "bg-action-secondary hover:bg-action-secondary" : "hover:bg-surface-subtle"}`}>
+            <Link key={chip.id} href={chip.href} className={`relative flex min-h-20 flex-col items-center justify-center gap-1 rounded-control p-1 transition hover:-translate-y-0.5 ${chip.chip_type === "CATEGORY_EVENT" ? "bg-action-secondary hover:bg-action-secondary" : "hover:bg-surface-subtle"}`}>
               {chip.chip_type === "CATEGORY_EVENT" ? <span className="absolute right-1.5 top-1.5 rounded-full bg-action-primary px-1.5 py-0.5 text-xs font-bold tracking-wide text-content-inverse">이벤트</span> : null}
-              <span className={`flex h-10 w-10 items-center justify-center rounded-full ${chip.chip_type === "CATEGORY_EVENT" ? "bg-surface-raised shadow-sm" : "bg-surface-subtle"} text-action-primary`}>
+              <span className={`flex h-10 w-10 items-center justify-center rounded-full ${chip.chip_type === "CATEGORY_EVENT" ? "bg-surface-raised shadow-card" : "border border-border-subtle bg-surface-raised"} text-action-primary`}>
                 <SafeImage src={chip.icon_url} alt="" width={24} height={24} className="h-6 w-6 object-contain" />
               </span>
               <span className="line-clamp-1 text-center text-xs font-bold">{chip.title}</span>
@@ -213,7 +213,7 @@ export function HomePage() {
         ) : recommendationQuery.isLoading ? (
           <div className="grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
             {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="aspect-square animate-pulse rounded-md bg-border-subtle" />
+              <div key={index} className="aspect-square animate-pulse rounded-control bg-surface-subtle" />
             ))}
           </div>
         ) : (
@@ -273,7 +273,7 @@ export function EventCarousel({ events }: { events: CommerceEvent[] }) {
 
   return (
     <div
-      className="relative overflow-hidden rounded-md border border-border-subtle bg-surface-raised"
+      className="relative overflow-hidden rounded-surface border border-border-subtle bg-surface-raised shadow-card"
       role="region"
       aria-label="진행 중인 이벤트"
       onMouseEnter={() => setIsHovered(true)}
@@ -365,7 +365,7 @@ function ProductCarouselSection({
       {isLoading ? (
         <div className="flex gap-3 overflow-hidden md:gap-4">
           {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className="h-56 w-[42vw] shrink-0 animate-pulse rounded-md bg-border-subtle sm:w-48 md:w-52" />
+            <div key={index} className="h-56 w-[42vw] shrink-0 animate-pulse rounded-control bg-surface-subtle sm:w-48 md:w-52" />
           ))}
         </div>
       ) : error ? (
