@@ -172,6 +172,7 @@ export function AdminMembersPageV2() {
   }
 
   function cancelMemberEdit() {
+    if (updateMember.isPending) return;
     if (memberEditIsDirty()) {
       confirmation.ask({ title: "회원 변경 취소", message: "저장하지 않은 권한·상태 변경을 버릴까요?", confirmLabel: "변경 버리기", danger: true }, discardMemberEdit);
       return;
@@ -281,7 +282,7 @@ export function AdminMembersPageV2() {
           tab === "INFO" && memberQuery.data ? (
             <>
               {editing ? (
-                <Button type="button" variant="secondary" onClick={cancelMemberEdit}>
+                <Button type="button" variant="secondary" disabled={updateMember.isPending} onClick={cancelMemberEdit}>
                   취소
                 </Button>
               ) : null}
@@ -307,7 +308,10 @@ export function AdminMembersPageV2() {
           className="mb-5"
           ariaLabel="회원 상세 탭"
           value={tab}
-          onValueChange={(value) => setTab(value as "INFO" | "ORDERS")}
+          onValueChange={(value) => {
+            if (updateMember.isPending) return;
+            setTab(value as "INFO" | "ORDERS");
+          }}
           items={[{ value: "INFO", label: "회원 정보" }, { value: "ORDERS", label: "주문 내역" }]}
         />
         {tab === "INFO" ? (
@@ -318,7 +322,7 @@ export function AdminMembersPageV2() {
               <DetailItem label="이메일">{memberQuery.data.email}</DetailItem>
               <DetailItem label="권한">
                 {editing ? (
-                  <Select className={consoleInputClass} value={editRole} onChange={(event) => setEditRole(event.target.value)}>
+                  <Select className={consoleInputClass} value={editRole} onChange={(event) => setEditRole(event.target.value)} disabled={updateMember.isPending}>
                     <option value="MEMBER">일반 회원</option>
                     <option value="SELLER">판매자</option>
                     <option value="ADMIN">관리자</option>
@@ -329,7 +333,7 @@ export function AdminMembersPageV2() {
               </DetailItem>
               <DetailItem label="상태">
                 {editing ? (
-                  <Select className={consoleInputClass} value={editStatus} onChange={(event) => setEditStatus(event.target.value)}>
+                  <Select className={consoleInputClass} value={editStatus} onChange={(event) => setEditStatus(event.target.value)} disabled={updateMember.isPending}>
                     <option value="ACTIVE">활성</option>
                     <option value="PENDING">대기</option>
                     <option value="SUSPENDED">정지</option>

@@ -4,7 +4,12 @@ import { fireEvent, render, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Dialog } from "./ui/overlay";
 import { StatusBadge } from "./console-layout";
-import { ConsoleModal, ConsoleTable } from "./console-ui";
+import {
+  advanceConsoleUrlSync,
+  ConsoleModal,
+  ConsoleTable,
+  createConsoleUrlSyncState,
+} from "./console-ui";
 
 describe("ConsoleModal stack", () => {
   it("closes only the top modal for each Escape key press", () => {
@@ -67,4 +72,33 @@ it("keeps nested table actions independent from row activation", () => {
   fireEvent.keyDown(actionButtons[0], { key: "Enter" });
   expect(onRowClick).not.toHaveBeenCalled();
   expect(view.getAllByRole("button", { name: "상세 보기" })).toHaveLength(1);
+});
+
+it("replaces the URL again when a rapid filter change returns to an earlier query", () => {
+  let state = createConsoleUrlSyncState("");
+
+  let result = advanceConsoleUrlSync(state, "", "q=a");
+  expect(result.action).toBe("replace");
+  state = result.state;
+
+  result = advanceConsoleUrlSync(state, "", "q=ab");
+  expect(result.action).toBe("replace");
+  state = result.state;
+
+  result = advanceConsoleUrlSync(state, "", "q=a");
+  expect(result.action).toBe("replace");
+  state = result.state;
+
+  result = advanceConsoleUrlSync(state, "q=ab", "q=a");
+  expect(result.action).toBe("replace");
+  expect(result.state.latestRequestedQuery).toBe("q=a");
+  state = result.state;
+
+  result = advanceConsoleUrlSync(state, "q=a", "q=a");
+  expect(result.action).toBe("none");
+  result = advanceConsoleUrlSync(result.state, "q=ab", "q=a", true);
+  expect(result.action).toBe("external");
+
+  result = advanceConsoleUrlSync(result.state, "q=a", "q=a", true);
+  expect(result.action).toBe("external");
 });

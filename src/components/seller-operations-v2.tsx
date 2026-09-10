@@ -47,6 +47,16 @@ function filterStatus(value: string) {
   return value === "ALL" ? undefined : value;
 }
 
+export function shipmentFormIsDirty(
+  shipmentEditing: boolean,
+  carrier: string,
+  invoice: string,
+  delivery?: { carrier?: string | null; tracking_number?: string | null },
+) {
+  if (!shipmentEditing) return false;
+  return carrier !== (delivery?.carrier ?? "") || invoice !== (delivery?.tracking_number ?? "");
+}
+
 export function SellerOrdersPageV2() {
   const { token, marketID, marketName } = useSellerConsoleContext();
   const queryClient = useQueryClient();
@@ -233,7 +243,7 @@ export function SellerOrdersPageV2() {
         size="xl"
         onClose={() => {
           if (shippingPending) return;
-          const dirty = shipmentEditing && order?.delivery && (carrier !== (order.delivery.carrier ?? "") || invoice !== (order.delivery.tracking_number ?? ""));
+          const dirty = shipmentFormIsDirty(shipmentEditing, carrier, invoice, order?.delivery);
           if (dirty) {
             confirmation.ask({ title: "주문 상세 닫기", message: "저장하지 않은 배송 정보를 버릴까요?", confirmLabel: "변경 버리기", danger: true }, () => {
               registerInvoice.reset();

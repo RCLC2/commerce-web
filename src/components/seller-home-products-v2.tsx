@@ -479,6 +479,7 @@ export function SellerProductsPageV2() {
   }
 
   function cancelProductEditing() {
+    if (updateMutation.isPending) return;
     const dirty = Boolean(
       editForm &&
         productQuery.data &&
@@ -577,7 +578,7 @@ export function SellerProductsPageV2() {
         footer={
           productQuery.data ? (
             <>
-              {editing ? <Button type="button" variant="secondary" onClick={cancelProductEditing}>취소</Button> : null}
+              {editing ? <Button type="button" variant="secondary" disabled={updateMutation.isPending} onClick={cancelProductEditing}>취소</Button> : null}
               <Button type="button" disabled={updateMutation.isPending || (editing && !canSaveEdit)} onClick={() => editing ? updateMutation.mutate() : setEditing(true)}>
                 {editing ? "변경 저장" : "수정"}
               </Button>
@@ -594,23 +595,23 @@ export function SellerProductsPageV2() {
               </div>
               {editing ? (
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <FilterField label="상품명"><Input className={consoleInputClass} value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} /><FormError message={editErrors.name} /></FilterField>
+                  <FilterField label="상품명"><Input className={consoleInputClass} value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} disabled={updateMutation.isPending} /><FormError message={editErrors.name} /></FilterField>
                   <FilterField label="카테고리">
-                    <Select className={consoleInputClass} value={editForm.categoryID} onChange={(event) => setEditForm({ ...editForm, categoryID: event.target.value })}>
+                    <Select className={consoleInputClass} value={editForm.categoryID} onChange={(event) => setEditForm({ ...editForm, categoryID: event.target.value })} disabled={updateMutation.isPending}>
                       {categories.map((category) => <option key={category.id} value={category.id}>{categoryLabel(category)}</option>)}
                     </Select>
                     <FormError message={editErrors.categoryID} />
                   </FilterField>
-                  <FilterField label="정가"><Input className={consoleInputClass} type="number" min={0} value={editForm.basePrice} onChange={(event) => setEditForm({ ...editForm, basePrice: event.target.value })} /><FormError message={editErrors.basePrice} /></FilterField>
-                  <FilterField label="할인가"><Input className={consoleInputClass} type="number" min={0} value={editForm.discountPrice} onChange={(event) => setEditForm({ ...editForm, discountPrice: event.target.value })} /><FormError message={editErrors.discountPrice} /></FilterField>
+                  <FilterField label="정가"><Input className={consoleInputClass} type="number" min={0} value={editForm.basePrice} onChange={(event) => setEditForm({ ...editForm, basePrice: event.target.value })} disabled={updateMutation.isPending} /><FormError message={editErrors.basePrice} /></FilterField>
+                  <FilterField label="할인가"><Input className={consoleInputClass} type="number" min={0} value={editForm.discountPrice} onChange={(event) => setEditForm({ ...editForm, discountPrice: event.target.value })} disabled={updateMutation.isPending} /><FormError message={editErrors.discountPrice} /></FilterField>
                   <FilterField label="배송 유형">
-                    <Select className={consoleInputClass} value={editForm.shippingType} onChange={(event) => setEditForm({ ...editForm, shippingType: event.target.value })}><option value="NORMAL">일반 배송</option><option value="FREE">무료 배송</option></Select>
+                    <Select className={consoleInputClass} value={editForm.shippingType} onChange={(event) => setEditForm({ ...editForm, shippingType: event.target.value })} disabled={updateMutation.isPending}><option value="NORMAL">일반 배송</option><option value="FREE">무료 배송</option></Select>
                   </FilterField>
                   <FilterField label="상태">
-                    <Select className={consoleInputClass} value={editForm.status} onChange={(event) => setEditForm({ ...editForm, status: event.target.value })}><option value="SELLING">판매중</option><option value="SOLD_OUT">품절</option><option value="HIDE">숨김</option></Select>
+                    <Select className={consoleInputClass} value={editForm.status} onChange={(event) => setEditForm({ ...editForm, status: event.target.value })} disabled={updateMutation.isPending}><option value="SELLING">판매중</option><option value="SOLD_OUT">품절</option><option value="HIDE">숨김</option></Select>
                   </FilterField>
-                  <FilterField label="대표 이미지 URL"><Input className={consoleInputClass} value={editForm.imageURL} onChange={(event) => setEditForm({ ...editForm, imageURL: event.target.value })} /></FilterField>
-                  <FilterField label="요약 설명"><Input className={consoleInputClass} value={editForm.summary} onChange={(event) => setEditForm({ ...editForm, summary: event.target.value })} /></FilterField>
+                  <FilterField label="대표 이미지 URL"><Input className={consoleInputClass} value={editForm.imageURL} onChange={(event) => setEditForm({ ...editForm, imageURL: event.target.value })} disabled={updateMutation.isPending} /></FilterField>
+                  <FilterField label="요약 설명"><Input className={consoleInputClass} value={editForm.summary} onChange={(event) => setEditForm({ ...editForm, summary: event.target.value })} disabled={updateMutation.isPending} /></FilterField>
                 </div>
               ) : (
                 <DetailGrid>
@@ -628,7 +629,7 @@ export function SellerProductsPageV2() {
             <section>
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h3 className="font-bold">상세 HTML</h3>
-                {editing ? <Button type="button" size="sm" variant="secondary" onClick={() => setHtmlEditor("EDIT")}>HTML 편집</Button> : null}
+                {editing ? <Button type="button" size="sm" variant="secondary" disabled={updateMutation.isPending} onClick={() => setHtmlEditor("EDIT")}>HTML 편집</Button> : null}
               </div>
               <div className="max-h-56 overflow-y-auto whitespace-pre-wrap rounded-xl border border-border-subtle p-4 text-sm">{editForm.description || "-"}</div>
             </section>
@@ -641,10 +642,10 @@ export function SellerProductsPageV2() {
                   const optionErrorKey = editOption ? `options.${editOption.id}` : "";
                   return [
                   option.option_name + ": " + option.option_value,
-                  editing ? <><Input key="price" aria-label={`${option.option_name} ${option.option_value} 추가 금액`} className={consoleInputClass} type="number" min={0} value={editOption?.additionalPrice ?? "0"} onChange={(event) => setEditForm({ ...editForm, options: editForm.options.map((item) => item.id === option.id ? { ...item, additionalPrice: event.target.value } : item) })} /><FormError message={optionErrorKey ? editErrors[`${optionErrorKey}.additionalPrice`] : undefined} /></> : formatPrice(option.additional_price),
-                  editing ? <><Input key="quantity" aria-label={`${option.option_name} ${option.option_value} 수량`} className={consoleInputClass} type="number" min={0} value={editOption?.quantity ?? "0"} onChange={(event) => setEditForm({ ...editForm, options: editForm.options.map((item) => item.id === option.id ? { ...item, quantity: event.target.value } : item) })} /><FormError message={optionErrorKey ? editErrors[`${optionErrorKey}.quantity`] : undefined} /></> : String(option.quantity) + "개",
+                  editing ? <><Input key="price" aria-label={`${option.option_name} ${option.option_value} 추가 금액`} className={consoleInputClass} type="number" min={0} value={editOption?.additionalPrice ?? "0"} onChange={(event) => setEditForm({ ...editForm, options: editForm.options.map((item) => item.id === option.id ? { ...item, additionalPrice: event.target.value } : item) })} disabled={updateMutation.isPending} /><FormError message={optionErrorKey ? editErrors[`${optionErrorKey}.additionalPrice`] : undefined} /></> : formatPrice(option.additional_price),
+                  editing ? <><Input key="quantity" aria-label={`${option.option_name} ${option.option_value} 수량`} className={consoleInputClass} type="number" min={0} value={editOption?.quantity ?? "0"} onChange={(event) => setEditForm({ ...editForm, options: editForm.options.map((item) => item.id === option.id ? { ...item, quantity: event.target.value } : item) })} disabled={updateMutation.isPending} /><FormError message={optionErrorKey ? editErrors[`${optionErrorKey}.quantity`] : undefined} /></> : String(option.quantity) + "개",
                   String(option.available_quantity) + "개",
-                  editing ? <label key="active" className="inline-flex items-center gap-2"><input aria-label={`${option.option_name} ${option.option_value} 사용 여부`} type="checkbox" checked={editOption?.isActive ?? false} onChange={(event) => setEditForm({ ...editForm, options: editForm.options.map((item) => item.id === option.id ? { ...item, isActive: event.target.checked } : item) })} /><span className="text-xs font-bold">사용</span></label> : option.is_active ? "사용" : "중지",
+                  editing ? <label key="active" className="inline-flex items-center gap-2"><input aria-label={`${option.option_name} ${option.option_value} 사용 여부`} type="checkbox" checked={editOption?.isActive ?? false} onChange={(event) => setEditForm({ ...editForm, options: editForm.options.map((item) => item.id === option.id ? { ...item, isActive: event.target.checked } : item) })} disabled={updateMutation.isPending} /><span className="text-xs font-bold">사용</span></label> : option.is_active ? "사용" : "중지",
                   ];
                 })}
               />
@@ -663,32 +664,32 @@ export function SellerProductsPageV2() {
         onClose={closeCreateModal}
         footer={
           <>
-            <Button type="button" variant="secondary" onClick={closeCreateModal}>취소</Button>
+            <Button type="button" variant="secondary" disabled={createMutation.isPending} onClick={closeCreateModal}>취소</Button>
             <Button type="button" disabled={!canCreate || createMutation.isPending} onClick={() => createMutation.mutate()}>상품 등록</Button>
           </>
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
           {createMutation.error ? <p className="sm:col-span-2 rounded-md border border-status-negative/30 bg-status-negative-subtle px-3 py-2 text-sm font-bold text-status-negative" role="alert">{apiErrorMessage(createMutation.error)}</p> : null}
-          <FilterField label="상품명"><Input className={consoleInputClass} value={createForm.name} onChange={(event) => setCreateForm({ ...createForm, name: event.target.value })} /><FormError message={createErrors.name} /></FilterField>
+          <FilterField label="상품명"><Input className={consoleInputClass} value={createForm.name} onChange={(event) => setCreateForm({ ...createForm, name: event.target.value })} disabled={createMutation.isPending} /><FormError message={createErrors.name} /></FilterField>
           <FilterField label="카테고리">
-            <Select className={consoleInputClass} value={createForm.categoryID} onChange={(event) => setCreateForm({ ...createForm, categoryID: event.target.value })}>
+            <Select className={consoleInputClass} value={createForm.categoryID} onChange={(event) => setCreateForm({ ...createForm, categoryID: event.target.value })} disabled={createMutation.isPending}>
               <option value="">카테고리 선택</option>
               {categories.map((category) => <option key={category.id} value={category.id}>{categoryLabel(category)}</option>)}
             </Select>
             <FormError message={createErrors.categoryID} />
           </FilterField>
-          <FilterField label="정가"><Input className={consoleInputClass} type="number" min={0} value={createForm.basePrice} onChange={(event) => setCreateForm({ ...createForm, basePrice: event.target.value })} /><FormError message={createErrors.basePrice} /></FilterField>
-          <FilterField label="할인가"><Input className={consoleInputClass} type="number" min={0} value={createForm.discountPrice} onChange={(event) => setCreateForm({ ...createForm, discountPrice: event.target.value })} /><FormError message={createErrors.discountPrice} /></FilterField>
-          <FilterField label="배송 유형"><Select className={consoleInputClass} value={createForm.shippingType} onChange={(event) => setCreateForm({ ...createForm, shippingType: event.target.value })}><option value="NORMAL">일반 배송</option><option value="FREE">무료 배송</option></Select></FilterField>
-          <FilterField label="상태"><Select className={consoleInputClass} value={createForm.status} onChange={(event) => setCreateForm({ ...createForm, status: event.target.value })}><option value="SELLING">판매중</option><option value="SOLD_OUT">품절</option><option value="HIDE">숨김</option></Select></FilterField>
-          <FilterField label="대표 이미지 URL"><Input className={consoleInputClass} value={createForm.imageURL} onChange={(event) => setCreateForm({ ...createForm, imageURL: event.target.value })} /></FilterField>
-          <FilterField label="요약 설명"><Input className={consoleInputClass} value={createForm.summary} onChange={(event) => setCreateForm({ ...createForm, summary: event.target.value })} /></FilterField>
-          <FilterField label="옵션명"><Input className={consoleInputClass} value={createForm.optionName} onChange={(event) => setCreateForm({ ...createForm, optionName: event.target.value })} placeholder="예: 색상" /><FormError message={createErrors.optionName} /></FilterField>
-          <FilterField label="옵션값"><Input className={consoleInputClass} value={createForm.optionValue} onChange={(event) => setCreateForm({ ...createForm, optionValue: event.target.value })} placeholder="예: 블랙" /><FormError message={createErrors.optionValue} /></FilterField>
-          <FilterField label="초기 재고"><Input className={consoleInputClass} type="number" min={0} value={createForm.optionQuantity} onChange={(event) => setCreateForm({ ...createForm, optionQuantity: event.target.value })} /><FormError message={createErrors.optionQuantity} /></FilterField>
+          <FilterField label="정가"><Input className={consoleInputClass} type="number" min={0} value={createForm.basePrice} onChange={(event) => setCreateForm({ ...createForm, basePrice: event.target.value })} disabled={createMutation.isPending} /><FormError message={createErrors.basePrice} /></FilterField>
+          <FilterField label="할인가"><Input className={consoleInputClass} type="number" min={0} value={createForm.discountPrice} onChange={(event) => setCreateForm({ ...createForm, discountPrice: event.target.value })} disabled={createMutation.isPending} /><FormError message={createErrors.discountPrice} /></FilterField>
+          <FilterField label="배송 유형"><Select className={consoleInputClass} value={createForm.shippingType} onChange={(event) => setCreateForm({ ...createForm, shippingType: event.target.value })} disabled={createMutation.isPending}><option value="NORMAL">일반 배송</option><option value="FREE">무료 배송</option></Select></FilterField>
+          <FilterField label="상태"><Select className={consoleInputClass} value={createForm.status} onChange={(event) => setCreateForm({ ...createForm, status: event.target.value })} disabled={createMutation.isPending}><option value="SELLING">판매중</option><option value="SOLD_OUT">품절</option><option value="HIDE">숨김</option></Select></FilterField>
+          <FilterField label="대표 이미지 URL"><Input className={consoleInputClass} value={createForm.imageURL} onChange={(event) => setCreateForm({ ...createForm, imageURL: event.target.value })} disabled={createMutation.isPending} /></FilterField>
+          <FilterField label="요약 설명"><Input className={consoleInputClass} value={createForm.summary} onChange={(event) => setCreateForm({ ...createForm, summary: event.target.value })} disabled={createMutation.isPending} /></FilterField>
+          <FilterField label="옵션명"><Input className={consoleInputClass} value={createForm.optionName} onChange={(event) => setCreateForm({ ...createForm, optionName: event.target.value })} placeholder="예: 색상" disabled={createMutation.isPending} /><FormError message={createErrors.optionName} /></FilterField>
+          <FilterField label="옵션값"><Input className={consoleInputClass} value={createForm.optionValue} onChange={(event) => setCreateForm({ ...createForm, optionValue: event.target.value })} placeholder="예: 블랙" disabled={createMutation.isPending} /><FormError message={createErrors.optionValue} /></FilterField>
+          <FilterField label="초기 재고"><Input className={consoleInputClass} type="number" min={0} value={createForm.optionQuantity} onChange={(event) => setCreateForm({ ...createForm, optionQuantity: event.target.value })} disabled={createMutation.isPending} /><FormError message={createErrors.optionQuantity} /></FilterField>
           <div className="grid content-end">
-            <Button type="button" variant="secondary" onClick={() => setHtmlEditor("CREATE")}>상세 HTML 편집</Button>
+            <Button type="button" variant="secondary" disabled={createMutation.isPending} onClick={() => setHtmlEditor("CREATE")}>상세 HTML 편집</Button>
           </div>
         </div>
       </ConsoleModal>
@@ -698,16 +699,21 @@ export function SellerProductsPageV2() {
         title="상세 HTML 편집"
         description="HTML 원문은 상품 등록·수정 모달과 분리해 넓게 편집합니다."
         size="xl"
-        onClose={() => setHtmlEditor(undefined)}
-        footer={<Button type="button" onClick={() => setHtmlEditor(undefined)}>편집 완료</Button>}
+        onClose={() => {
+          if (htmlEditor === "EDIT" ? updateMutation.isPending : createMutation.isPending) return;
+          setHtmlEditor(undefined);
+        }}
+        footer={<Button type="button" disabled={htmlEditor === "EDIT" ? updateMutation.isPending : createMutation.isPending} onClick={() => setHtmlEditor(undefined)}>편집 완료</Button>}
       >
         <Textarea
           className="min-h-[52vh] w-full resize-y rounded-xl border border-border-interactive bg-content-primary p-4 font-mono text-sm leading-6 text-content-inverse outline-none focus:border-border-interactive"
           value={htmlEditor === "EDIT" ? editForm?.description ?? "" : createForm.description}
           onChange={(event) => {
+            if (htmlEditor === "EDIT" ? updateMutation.isPending : createMutation.isPending) return;
             if (htmlEditor === "EDIT" && editForm) setEditForm({ ...editForm, description: event.target.value });
             if (htmlEditor === "CREATE") setCreateForm({ ...createForm, description: event.target.value });
           }}
+          disabled={htmlEditor === "EDIT" ? updateMutation.isPending : createMutation.isPending}
           placeholder="<section>상품 상세 내용을 입력하세요.</section>"
         />
       </ConsoleModal>
