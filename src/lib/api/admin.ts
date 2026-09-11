@@ -40,8 +40,16 @@ const dailyAccrualSchema = z.object({
 });
 const paidCountSchema = z.object({ paid_count: z.number().int().nonnegative() });
 const settlementActionLogsSchema = z.object({ items: z.array(rawAuditLogSchema) });
+const notificationCampaignSchema = z.object({
+  id: z.number().int().positive(), created_by_member_id: z.number().int().positive(), target_type: z.enum(["MEMBER", "SEGMENT"]), target_member_id: z.number().int().positive().nullable().optional(), segment_key: z.string().nullable().optional(), message_id: z.number().int().positive(), status: z.string(), candidate_count: z.number().int().nonnegative(), delivered_count: z.number().int().nonnegative(), excluded_count: z.number().int().nonnegative(), failed_count: z.number().int().nonnegative(), last_error: z.string().optional(), workflow_id: z.string().optional(), created_at: z.string(), started_at: z.string().nullable().optional(), completed_at: z.string().nullable().optional(),
+});
+const notificationDeliverySchema = z.object({ id: z.number().int().positive(), notification_segment_id: z.number().int().positive(), member_id: z.number().int().positive(), inbox_id: z.number().int().positive().nullable().optional(), status: z.string(), failure_code: z.string().optional(), failure_detail: z.string().optional(), attempt_count: z.number().int().nonnegative(), created_at: z.string(), delivered_at: z.string().nullable().optional(), failed_at: z.string().nullable().optional() });
 
 export const adminApi = {
+
+  notificationCampaigns: (token: string) => requestParsed(z.object({ items: z.array(notificationCampaignSchema) }), "/api/v1/admin/notification-campaigns?limit=50", { token }),
+  notificationCampaignDeliveries: (token: string, campaignID: number) => requestParsed(z.object({ items: z.array(notificationDeliverySchema) }), `/api/v1/admin/notification-campaigns/${campaignID}/deliveries?limit=100`, { token }),
+  createNotificationCampaign: (token: string, payload: { target_type: "MEMBER" | "SEGMENT"; target_member_id?: number; segment_key?: string; kind: "INFORMATION" | "MARKETING"; title: string; body: string; destination_path: string; toast_enabled: boolean; toast_expires_at?: string }) => requestParsed(notificationCampaignSchema, "/api/v1/admin/notification-campaigns", { method: "POST", token, body: JSON.stringify(payload) }),
   adminDashboard: async (token: string) =>
     normalizeAdminDashboard(await requestParsed(adminDashboardRawSchema, "/api/v1/admin/dashboard", { token })),
   adminOrderActionLogs: async (token: string) =>

@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { shouldRetryApiError } from "@/lib/api-client";
+import { NotificationProvider } from "@/components/notification-provider";
 import { useSessionStore } from "@/lib/session-store";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -18,7 +19,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }),
   );
 
- return <QueryClientProvider client={queryClient}><SessionQueryBoundary />{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SessionQueryBoundary />
+      <NotificationProvider>{children}</NotificationProvider>
+    </QueryClientProvider>
+  );
 }
 
 const privateQueryRoots = new Set([

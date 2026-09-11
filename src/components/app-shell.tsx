@@ -3,7 +3,7 @@
 import { ButtonLink } from "@/components/ui/button-link";
 
 import { useQuery } from "@tanstack/react-query";
-import { Grid2X2, Heart, Home, Menu, Search, ShieldCheck, Shirt, ShoppingBag, Star, Store, User, X } from "lucide-react";
+import { Bell, Flame, Grid2X2, Heart, Home, Menu, Search, ShieldCheck, Shirt, ShoppingBag, Star, Store, User, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -52,6 +52,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: categories = [] } = useQuery({
     queryKey: queryKeys.categories,
     queryFn: api.listCategories,
+  });
+  const { data: notificationCount } = useQuery({
+    queryKey: ["notification-unread-count", token],
+    queryFn: () => api.unreadNotificationCount(token ?? ""),
+    enabled: Boolean(token),
   });
 
   const isActive = (href: string) => (href === "/" ? pathname === href : pathname.startsWith(href));
@@ -168,8 +173,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </ButtonLink>
           ) : null}
           <ButtonLink href="/cart" aria-label="장바구니" variant="ghost" size="icon" title="장바구니">
-              <ShoppingBag size={20} />
-            </ButtonLink>
+            <ShoppingBag size={20} />
+          </ButtonLink>
+          <Link href="/notifications" aria-label="알림함" className="relative">
+            <Button variant="ghost" size="icon" title="알림함"><Bell size={20} /></Button>
+            {(notificationCount?.unread_count ?? 0) > 0 ? <span className="absolute right-0 top-0 grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1 text-[10px] font-black text-white">{Math.min(notificationCount!.unread_count, 99)}</span> : null}
+          </Link>
+          <ButtonLink href="/mypage" aria-label="마이페이지" variant="ghost" size="icon">
+            <User size={20} />
+          </ButtonLink>
         </div>
       </header> : null}
       <Drawer open={menuOpen} onClose={() => setMenuOpen(false)} title="메뉴" id="shopping-menu">
