@@ -3,9 +3,11 @@
 import { Input, Select } from "./ui/input";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import { Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/api-client";
 import { sellerConsoleApi } from "@/lib/seller-console-api";
 import { paymentMethodLabel } from "@/lib/display-labels";
 import { formatPrice } from "@/lib/utils";
@@ -21,9 +23,12 @@ import {
   ConsoleTable,
   DetailGrid,
   DetailItem,
-  ModalLoading,
+  ModalQueryState,
   PaginationBar,
   consoleInputClass,
+  consoleUrlValue,
+  useConsoleConfirm,
+  useConsoleUrlFilters,
   useDebouncedValue,
 } from "./console-ui";
 import { SafeImage } from "./safe-image";
@@ -42,18 +47,39 @@ function filterStatus(value: string) {
   return value === "ALL" ? undefined : value;
 }
 
+export function shipmentFormIsDirty(
+  shipmentEditing: boolean,
+  carrier: string,
+  invoice: string,
+  delivery?: { carrier?: string | null; tracking_number?: string | null },
+) {
+  if (!shipmentEditing) return false;
+  return carrier !== (delivery?.carrier ?? "") || invoice !== (delivery?.tracking_number ?? "");
+}
+
 export function SellerOrdersPageV2() {
   const { token, marketID, marketName } = useSellerConsoleContext();
   const queryClient = useQueryClient();
-  const [page, setPage] = useState(1);
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("ALL");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const confirmation = useConsoleConfirm();
+  const searchParams = useSearchParams();
+  const [page, setPage] = useState(() => Number(consoleUrlValue(searchParams, "page", "1")) || 1);
+  const [query, setQuery] = useState(() => consoleUrlValue(searchParams, "q"));
+  const [status, setStatus] = useState(() => consoleUrlValue(searchParams, "status", "ALL"));
+  const [from, setFrom] = useState(() => consoleUrlValue(searchParams, "from"));
+  const [to, setTo] = useState(() => consoleUrlValue(searchParams, "to"));
   const [selectedCode, setSelectedCode] = useState<string>();
   const [carrier, setCarrier] = useState("");
   const [invoice, setInvoice] = useState("");
+  const [shipmentEditing, setShipmentEditing] = useState(false);
+  const [operationResolution, setOperationResolution] = useState<string>();
   const debouncedQuery = useDebouncedValue(query);
+  useConsoleUrlFilters({ page, q: query, status, from, to }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+    setFrom(consoleUrlValue(next, "from"));
+    setTo(consoleUrlValue(next, "to"));
+  });
 
   const ordersQuery = useQuery({
     queryKey: ["seller-orders-v2", marketID, page, debouncedQuery, status, from, to],
@@ -82,12 +108,13 @@ export function SellerOrdersPageV2() {
   });
 
   useEffect(() => {
+    if (shipmentEditing) return;
     const timer = window.setTimeout(() => {
       setCarrier(orderQuery.data?.delivery?.carrier ?? "");
       setInvoice(orderQuery.data?.delivery?.tracking_number ?? "");
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [orderQuery.data]);
+  }, [orderQuery.data, shipmentEditing]);
 
   async function refreshOrder() {
     await Promise.all([
@@ -111,7 +138,11 @@ export function SellerOrdersPageV2() {
         }],
       });
     },
-    onSuccess: refreshOrder,
+    onSuccess: async () => {
+      setShipmentEditing(false);
+      setOperationResolution("송장 정보를 등록했습니다.");
+      await refreshOrder();
+    },
   });
   const completeDelivery = useMutation({
     mutationFn: () => {
@@ -120,7 +151,11 @@ export function SellerOrdersPageV2() {
       }
       return api.completeSellerPackage(token ?? "", marketID, orderQuery.data.delivery.id);
     },
-    onSuccess: refreshOrder,
+    onSuccess: async () => {
+      setShipmentEditing(false);
+      setOperationResolution("배송 완료 처리를 반영했습니다.");
+      await refreshOrder();
+    },
   });
 
   if (!token) return <SellerAuthRequiredV2 />;
@@ -130,13 +165,14 @@ export function SellerOrdersPageV2() {
   const deliveryStatus = order?.delivery?.status ?? order?.status ?? "PENDING";
   const shippingPending =
     registerInvoice.isPending || completeDelivery.isPending;
+  const shipmentFieldsEditable = !["SHIPPING", "SHIPPED", "DELIVERED", "COMPLETED", "CANCELLED"].includes(deliveryStatus);
 
   let orderAction = null;
   if (order && !["DELIVERED", "COMPLETED", "CANCELLED"].includes(deliveryStatus)) {
     if (!order.delivery?.id || deliveryStatus === "PENDING") {
-      orderAction = <Button type="button" disabled={shippingPending || !carrier || !invoice.trim()} onClick={() => registerInvoice.mutate()}>송장 등록</Button>;
+      orderAction = <Button type="button" disabled={shippingPending || !carrier || !invoice.trim()} onClick={() => confirmation.ask({ title: "송장 등록", message: `택배사 ${carrier}, 송장번호 ${invoice.trim()}로 배송을 시작할까요?`, confirmLabel: "송장 등록" }, () => registerInvoice.mutate())}>송장 등록</Button>;
     } else if (["SHIPPING", "SHIPPED"].includes(deliveryStatus)) {
-      orderAction = <Button type="button" disabled={shippingPending} onClick={() => completeDelivery.mutate()}>배송 완료</Button>;
+      orderAction = <Button type="button" disabled={shippingPending} onClick={() => confirmation.ask({ title: "배송 완료 처리", message: "이 주문을 배송 완료로 처리할까요?", confirmLabel: "배송 완료" }, () => completeDelivery.mutate())}>배송 완료</Button>;
     }
   }
 
@@ -144,7 +180,7 @@ export function SellerOrdersPageV2() {
     <SellerConsoleLayoutV2 marketName={marketName}>
       <ConsoleHeader
         title="주문/배송"
-        description="기본 30건씩 불러오며 검색·날짜·상태 필터를 서버에서 처리합니다. 목록은 조회 전용입니다."
+        description="주문번호, 상품명, 구매자, 날짜, 상태로 주문을 찾고 배송 정보를 관리합니다."
       />
       <ConsoleSection className="mt-5" title="주문 목록" description="주문을 누르면 상품, 구매자, 배송 정보와 처리 버튼을 확인할 수 있습니다.">
         <FilterPanel>
@@ -177,6 +213,8 @@ export function SellerOrdersPageV2() {
         <div className="mt-4">
           <ConsoleTable
             columns={["주문번호", "구매자", "대표 상품", "결제 금액", "정산 예정", "상태", "주문일"]}
+            loading={ordersQuery.isLoading}
+            emptyText={query || status !== "ALL" || from || to ? "검색 조건에 맞는 주문이 없습니다." : "처리할 주문이 없습니다."}
             rows={orders.map((item) => [
               <span key="code" className="font-bold">{item.order_code}</span>,
               <span key="buyer" className="break-all">{item.buyer_email}</span>,
@@ -187,7 +225,13 @@ export function SellerOrdersPageV2() {
               dateTime(item.created_at),
             ])}
             rowKeys={orders.map((item) => item.market_order_id)}
-            onRowClick={(index) => setSelectedCode(orders[index].order_code)}
+            onRowClick={(index) => {
+              registerInvoice.reset();
+              completeDelivery.reset();
+              setShipmentEditing(false);
+              setOperationResolution(undefined);
+              setSelectedCode(orders[index].order_code);
+            }}
           />
           <PaginationBar page={data?.page ?? page} totalPages={data?.total_pages ?? 1} total={data?.total ?? 0} onChange={setPage} />
         </div>
@@ -197,11 +241,29 @@ export function SellerOrdersPageV2() {
         open={Boolean(selectedCode)}
         title={selectedCode ? "주문 " + selectedCode : "주문 상세"}
         size="xl"
-        onClose={() => setSelectedCode(undefined)}
+        onClose={() => {
+          if (shippingPending) return;
+          const dirty = shipmentFormIsDirty(shipmentEditing, carrier, invoice, order?.delivery);
+          if (dirty) {
+            confirmation.ask({ title: "주문 상세 닫기", message: "저장하지 않은 배송 정보를 버릴까요?", confirmLabel: "변경 버리기", danger: true }, () => {
+              registerInvoice.reset();
+              completeDelivery.reset();
+              setShipmentEditing(false);
+              setSelectedCode(undefined);
+            });
+            return;
+          }
+          registerInvoice.reset();
+          completeDelivery.reset();
+          setShipmentEditing(false);
+          setSelectedCode(undefined);
+        }}
         footer={orderAction}
       >
         {order ? (
           <div className="grid gap-6">
+            {registerInvoice.error || completeDelivery.error ? <p className="rounded-md border border-status-negative/30 bg-status-negative-subtle px-3 py-2 text-sm font-bold text-status-negative" role="alert">{apiErrorMessage(registerInvoice.error ?? completeDelivery.error)}</p> : null}
+            {operationResolution ? <p className="rounded-md bg-status-positive-subtle px-3 py-2 text-sm font-bold text-status-positive" role="status">{operationResolution}</p> : null}
             <DetailGrid>
               <DetailItem label="구매자">{order.buyer_email}</DetailItem>
               <DetailItem label="주문 상태"><StatusBadge value={order.status} /></DetailItem>
@@ -215,14 +277,15 @@ export function SellerOrdersPageV2() {
             <section>
               <h3 className="mb-3 font-bold">배송 정보</h3>
               <div className="grid gap-3 rounded-xl bg-surface-subtle p-4 sm:grid-cols-2">
+                {!shipmentFieldsEditable ? <p className="sm:col-span-2 rounded-md border border-border-subtle bg-surface-raised px-3 py-2 text-xs font-bold text-content-secondary">배송이 시작된 주문은 택배사와 송장번호를 조회만 할 수 있습니다.</p> : null}
                 <FilterField label="택배사">
-                  <Select className={consoleInputClass} value={carrier} onChange={(event) => setCarrier(event.target.value)} disabled={["DELIVERED", "COMPLETED"].includes(deliveryStatus)}>
+                  <Select className={consoleInputClass} value={carrier} onChange={(event) => { setShipmentEditing(true); setOperationResolution(undefined); if (!shippingPending) registerInvoice.reset(); setCarrier(event.target.value); }} disabled={!shipmentFieldsEditable || shippingPending}>
                     <option value="">택배사 선택</option>
                     {(carriersQuery.data?.carriers ?? []).map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
                   </Select>
                 </FilterField>
                 <FilterField label="송장번호">
-                  <Input className={consoleInputClass} value={invoice} onChange={(event) => setInvoice(event.target.value)} placeholder="송장번호" disabled={["DELIVERED", "COMPLETED"].includes(deliveryStatus)} />
+                  <Input className={consoleInputClass} value={invoice} onChange={(event) => { setShipmentEditing(true); setOperationResolution(undefined); if (!shippingPending) registerInvoice.reset(); setInvoice(event.target.value); }} placeholder="송장번호" disabled={!shipmentFieldsEditable || shippingPending} />
                 </FilterField>
                 <DetailItem label="배송 상태"><StatusBadge value={deliveryStatus} /></DetailItem>
                 <DetailItem label="수령인">{order.delivery?.receiver_name}</DetailItem>
@@ -246,18 +309,20 @@ export function SellerOrdersPageV2() {
             </section>
           </div>
         ) : (
-          <ModalLoading />
+          <ModalQueryState isLoading={orderQuery.isLoading} error={orderQuery.error} onRetry={() => void orderQuery.refetch()} />
         )}
       </ConsoleModal>
+      {confirmation.dialog}
     </SellerConsoleLayoutV2>
   );
 }
 
 export function SellerSettlementsPageV2() {
   const { token, marketID, marketName } = useSellerConsoleContext();
-  const [page, setPage] = useState(1);
-  const [status, setStatus] = useState("ALL");
-  const [targetMonth, setTargetMonth] = useState("");
+  const searchParams = useSearchParams();
+  const [page, setPage] = useState(() => Number(consoleUrlValue(searchParams, "page", "1")) || 1);
+  const [status, setStatus] = useState(() => consoleUrlValue(searchParams, "status", "ALL"));
+  const [targetMonth, setTargetMonth] = useState(() => consoleUrlValue(searchParams, "month"));
   const [selectedID, setSelectedID] = useState<number>();
   const [linePage, setLinePage] = useState(1);
 
@@ -274,6 +339,11 @@ export function SellerSettlementsPageV2() {
     enabled: Boolean(token),
     meta: { consoleDataRole: "primary" },
   });
+  useConsoleUrlFilters({ page, status, month: targetMonth }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+    setTargetMonth(consoleUrlValue(next, "month"));
+  });
   const settlementQuery = useQuery({
     queryKey: ["seller-settlement-v2", marketID, selectedID, linePage],
     queryFn: () => sellerConsoleApi.settlement(token ?? "", selectedID ?? 0, marketID, linePage),
@@ -286,7 +356,7 @@ export function SellerSettlementsPageV2() {
 
   return (
     <SellerConsoleLayoutV2 marketName={marketName}>
-      <ConsoleHeader title="정산" description="정산 목록과 주문별 상세 라인을 분리해 필요한 범위만 불러옵니다." />
+      <ConsoleHeader title="정산" description="정산월과 상태로 지급 내역을 찾고 주문별 금액을 확인할 수 있습니다." />
       <ConsoleSection className="mt-5" title="정산 목록">
         <FilterPanel>
           <FilterField label="상태">
@@ -305,6 +375,8 @@ export function SellerSettlementsPageV2() {
         <div className="mt-4">
           <ConsoleTable
             columns={["정산월", "매출", "수수료", "최종 정산", "지급 예정일", "상태"]}
+            loading={settlementsQuery.isLoading}
+            emptyText={status !== "ALL" || targetMonth ? "검색 조건에 맞는 정산이 없습니다." : "등록된 정산이 없습니다."}
             rows={settlements.map((item) => [
               <span key="month" className="font-bold">{item.target_month}</span>,
               formatPrice(item.total_sales_amount),
@@ -356,7 +428,7 @@ export function SellerSettlementsPageV2() {
             </section>
           </div>
         ) : (
-          <ModalLoading />
+          <ModalQueryState isLoading={settlementQuery.isLoading} error={settlementQuery.error} onRetry={() => void settlementQuery.refetch()} />
         )}
       </ConsoleModal>
     </SellerConsoleLayoutV2>
@@ -365,12 +437,19 @@ export function SellerSettlementsPageV2() {
 
 export function SellerReviewsPageV2() {
   const { token, marketID, marketName } = useSellerConsoleContext();
-  const [page, setPage] = useState(1);
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("ALL");
-  const [ratingX2, setRatingX2] = useState("");
+  const searchParams = useSearchParams();
+  const [page, setPage] = useState(() => Number(consoleUrlValue(searchParams, "page", "1")) || 1);
+  const [query, setQuery] = useState(() => consoleUrlValue(searchParams, "q"));
+  const [status, setStatus] = useState(() => consoleUrlValue(searchParams, "status", "ALL"));
+  const [ratingX2, setRatingX2] = useState(() => consoleUrlValue(searchParams, "rating"));
   const [selectedID, setSelectedID] = useState<number>();
   const debouncedQuery = useDebouncedValue(query);
+  useConsoleUrlFilters({ page, q: query, status, rating: ratingX2 }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+    setRatingX2(consoleUrlValue(next, "rating"));
+  });
 
   const reviewsQuery = useQuery({
     queryKey: ["seller-reviews-v2", marketID, page, debouncedQuery, status, ratingX2],
@@ -398,7 +477,7 @@ export function SellerReviewsPageV2() {
 
   return (
     <SellerConsoleLayoutV2 marketName={marketName}>
-      <ConsoleHeader title="리뷰" description="사이드바에서 항상 접근할 수 있으며, 리뷰를 누르면 상품·주문·옵션 정보를 상세 조회합니다." />
+      <ConsoleHeader title="리뷰" description="상품명, 구매자, 내용으로 리뷰를 찾고 상품·주문·옵션 정보를 확인할 수 있습니다." />
       <ConsoleSection className="mt-5" title="리뷰 목록">
         <FilterPanel>
           <FilterField label="리뷰 검색">
@@ -421,6 +500,8 @@ export function SellerReviewsPageV2() {
         <div className="mt-4">
           <ConsoleTable
             columns={["상품", "구매자", "평점", "내용", "상태", "작성일"]}
+            loading={reviewsQuery.isLoading}
+            emptyText={query || status !== "ALL" || ratingX2 ? "검색 조건에 맞는 리뷰가 없습니다." : "작성된 리뷰가 없습니다."}
             rows={reviews.map((review) => [
               <div key="product" className="flex min-w-0 items-center gap-3">
                 <div className="relative size-11 shrink-0 overflow-hidden rounded-lg bg-surface-subtle"><SafeImage src={review.product_image_url} alt="" fill sizes="44px" className="object-cover" /></div>
@@ -468,7 +549,7 @@ export function SellerReviewsPageV2() {
             </section>
           </div>
         ) : (
-          <ModalLoading />
+          <ModalQueryState isLoading={reviewQuery.isLoading} error={reviewQuery.error} onRetry={() => void reviewQuery.refetch()} />
         )}
       </ConsoleModal>
     </SellerConsoleLayoutV2>

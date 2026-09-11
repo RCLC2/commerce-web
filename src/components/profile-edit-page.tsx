@@ -69,7 +69,7 @@ export function ProfileEditPage() {
       <Link href="/mypage" className="inline-flex items-center gap-1 text-sm font-bold text-content-secondary hover:text-content-primary"><ArrowLeft size={17} /> 뒤로가기</Link>
       <PageHeading className="mt-5" icon={<PageIcon />} title="사용자 상세 정보 수정" />
       <p className="mt-2 text-sm text-content-secondary">알림 수신 설정과 리뷰에 활용할 신체 정보를 변경합니다.</p>
-      <form className="mt-6 space-y-5 rounded-2xl border border-border-subtle bg-surface-raised p-5" onSubmit={(event) => { event.preventDefault(); save.mutate(); }}>
+      <form className="mt-6 space-y-5 rounded-surface border border-border-subtle bg-surface-raised p-5 shadow-card" onSubmit={(event) => { event.preventDefault(); save.mutate(); }}>
         <Field label="이메일"><Input className="h-11 w-full rounded-control border border-border-interactive bg-surface-raised px-3 text-sm disabled:bg-surface-subtle" value={profile.data?.email ?? ""} disabled /></Field>
         <Field label="알림 방식">
           <Select className="h-11 w-full rounded-control border border-border-interactive bg-surface-raised px-3 text-sm" value={values.notification_type} onChange={(event) => change({ notification_type: event.target.value })}>
@@ -86,7 +86,7 @@ export function ProfileEditPage() {
         {save.isSuccess ? <p className="text-sm font-bold text-status-positive">저장했습니다.</p> : null}
         <Button type="submit" disabled={save.isPending}>{save.isPending ? "저장 중" : "변경사항 저장"}</Button>
       </form>
-      {onboardingPreference.data && onboardingPreference.data.status !== "NOT_ELIGIBLE" ? <section className="mt-5 rounded-2xl border border-border-subtle bg-surface-raised p-5">
+      {onboardingPreference.data && onboardingPreference.data.status !== "NOT_ELIGIBLE" ? <section className="mt-5 rounded-surface border border-border-subtle bg-surface-raised p-5 shadow-card">
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-action-primary/10 text-action-primary"><Sparkles size={19} /></span>
           <div>

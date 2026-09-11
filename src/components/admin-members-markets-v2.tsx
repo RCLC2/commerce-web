@@ -3,6 +3,7 @@
 import { Input, Select, Textarea } from "./ui/input";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
@@ -10,6 +11,7 @@ import {
   type AdminMarketListItem,
   type AdminMemberListItem,
 } from "@/lib/admin-console-api";
+import { apiErrorMessage } from "@/lib/api-client";
 import { displayLabel } from "@/lib/display-labels";
 import { formatPrice } from "@/lib/utils";
 import { AdminAuthRequired, adminLinks, useAdminToken } from "./admin-console";
@@ -26,12 +28,16 @@ import {
   ConsoleTable,
   DetailGrid,
   DetailItem,
-  ModalLoading,
+  ModalQueryState,
   PaginationBar,
   consoleInputClass,
+  consoleUrlValue,
+  useConsoleConfirm,
+  useConsoleUrlFilters,
   useDebouncedValue,
 } from "./console-ui";
 import { SafeImage } from "./safe-image";
+import { Tabs } from "./ui/tabs";
 import { Button } from "./ui/button";
 
 function normalizedFilter(value: string) {
@@ -45,17 +51,26 @@ function formatDate(value?: string) {
 export function AdminMembersPageV2() {
   const token = useAdminToken();
   const queryClient = useQueryClient();
-  const [page, setPage] = useState(1);
-  const [query, setQuery] = useState("");
-  const [role, setRole] = useState("ALL");
-  const [status, setStatus] = useState("ALL");
+  const confirmation = useConsoleConfirm();
+  const searchParams = useSearchParams();
+  const [page, setPage] = useState(() => Number(consoleUrlValue(searchParams, "page", "1")) || 1);
+  const [query, setQuery] = useState(() => consoleUrlValue(searchParams, "q"));
+  const [role, setRole] = useState(() => consoleUrlValue(searchParams, "role", "ALL"));
+  const [status, setStatus] = useState(() => consoleUrlValue(searchParams, "status", "ALL"));
   const [selectedID, setSelectedID] = useState<number>();
   const [tab, setTab] = useState<"INFO" | "ORDERS">("INFO");
   const [orderPage, setOrderPage] = useState(1);
   const [editing, setEditing] = useState(false);
   const [editRole, setEditRole] = useState("MEMBER");
   const [editStatus, setEditStatus] = useState("ACTIVE");
+  const [updateResolution, setUpdateResolution] = useState<{ memberID: number; tone: "success" | "error"; message: string }>();
   const debouncedQuery = useDebouncedValue(query);
+  useConsoleUrlFilters({ page, q: query, role, status }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setRole(consoleUrlValue(next, "role", "ALL"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+  });
 
   const membersQuery = useQuery({
     queryKey: ["admin-members-v2", page, debouncedQuery, role, status],
@@ -86,29 +101,46 @@ export function AdminMembersPageV2() {
   });
 
   useEffect(() => {
-    if (!memberQuery.data) return;
+    if (editing || !memberQuery.data) return;
     const timer = window.setTimeout(() => {
       setEditRole(memberQuery.data.role);
       setEditStatus(memberQuery.data.status);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [memberQuery.data]);
+  }, [editing, memberQuery.data]);
 
   const updateMember = useMutation({
-    mutationFn: async () => {
-      if (!selectedID || !memberQuery.data) return;
+    mutationFn: async (memberID: number) => {
+      if (!memberID || !memberQuery.data) return;
+      const changed: string[] = [];
       if (editRole !== memberQuery.data.role) {
-        await adminConsoleApi.updateMemberRole(token ?? "", selectedID, editRole);
+        await adminConsoleApi.updateMemberRole(token ?? "", memberID, editRole);
+        changed.push("권한");
       }
       if (editStatus !== memberQuery.data.status) {
-        await adminConsoleApi.updateMemberStatus(token ?? "", selectedID, editStatus);
+        await adminConsoleApi.updateMemberStatus(token ?? "", memberID, editStatus);
+        changed.push("상태");
       }
+      return changed;
     },
-    onSuccess: async () => {
+    onMutate: () => setUpdateResolution(undefined),
+    onSuccess: async (changed, memberID) => {
       setEditing(false);
+      if (selectedID === memberID) {
+        setUpdateResolution({ memberID, tone: "success", message: changed?.length ? `${changed.join("·")}을 변경했습니다.` : "변경된 내용이 없습니다." });
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-members-v2"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-member-v2", selectedID] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-member-v2", memberID] }),
+      ]);
+    },
+    onError: async (_error, memberID) => {
+      if (selectedID === memberID) {
+        setUpdateResolution({ memberID, tone: "error", message: "일부 변경 결과를 확인하지 못했습니다. 실제 회원 정보를 다시 조회했습니다." });
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-members-v2"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-member-v2", memberID] }),
       ]);
     },
   });
@@ -116,15 +148,18 @@ export function AdminMembersPageV2() {
   if (!token) return <AdminAuthRequired />;
   const data = membersQuery.data;
   const members = data?.items ?? [];
+  const currentUpdateResolution = updateResolution?.memberID === selectedID ? updateResolution : undefined;
 
   function openMember(member: AdminMemberListItem) {
+    updateMember.reset();
+    setUpdateResolution(undefined);
     setSelectedID(member.id);
     setTab("INFO");
     setOrderPage(1);
     setEditing(false);
   }
 
-  function cancelMemberEdit() {
+  function discardMemberEdit() {
     if (memberQuery.data) {
       setEditRole(memberQuery.data.role);
       setEditStatus(memberQuery.data.status);
@@ -132,11 +167,40 @@ export function AdminMembersPageV2() {
     setEditing(false);
   }
 
+  function memberEditIsDirty() {
+    return Boolean(memberQuery.data && (editRole !== memberQuery.data.role || editStatus !== memberQuery.data.status));
+  }
+
+  function cancelMemberEdit() {
+    if (updateMember.isPending) return;
+    if (memberEditIsDirty()) {
+      confirmation.ask({ title: "회원 변경 취소", message: "저장하지 않은 권한·상태 변경을 버릴까요?", confirmLabel: "변경 버리기", danger: true }, discardMemberEdit);
+      return;
+    }
+    discardMemberEdit();
+  }
+
+  function closeMemberModal() {
+    if (updateMember.isPending) return;
+    const dirty = editing && memberEditIsDirty();
+    if (dirty) {
+      confirmation.ask({ title: "회원 상세 닫기", message: "저장하지 않은 회원 변경사항을 버릴까요?", confirmLabel: "변경 버리기", danger: true }, () => {
+        setEditing(false);
+        setSelectedID(undefined);
+      });
+      return;
+    }
+    setEditing(false);
+    updateMember.reset();
+    setUpdateResolution(undefined);
+    setSelectedID(undefined);
+  }
+
   return (
     <ConsoleLayout title="관리자" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <ConsoleHeader
         title="회원 관리"
-        description="검색·권한·상태 조건을 서버에 전달하고, 목록과 상세 응답을 분리해 필요한 정보만 불러옵니다."
+        description="이메일, 권한, 상태로 회원을 찾고 상세 정보와 주문 내역을 확인할 수 있습니다."
       />
       <ConsoleSection className="mt-5" title="회원 목록" description="회원을 누르면 상세 정보, 수정, 주문 내역을 확인할 수 있습니다.">
         <FilterPanel>
@@ -186,6 +250,8 @@ export function AdminMembersPageV2() {
         <div className="mt-4">
           <ConsoleTable
             columns={["회원", "권한", "상태", "가입일"]}
+            loading={membersQuery.isLoading}
+            emptyText={query || role !== "ALL" || status !== "ALL" ? "검색 조건에 맞는 회원이 없습니다." : "등록된 회원이 없습니다."}
             rows={members.map((member) => [
               <div key="member">
                 <p className="font-bold">#{member.id}</p>
@@ -211,19 +277,26 @@ export function AdminMembersPageV2() {
         open={Boolean(selectedID)}
         title={memberQuery.data?.email ?? "회원 상세"}
         description={selectedID ? `회원 #${selectedID}` : undefined}
-        onClose={() => setSelectedID(undefined)}
+        onClose={closeMemberModal}
         footer={
           tab === "INFO" && memberQuery.data ? (
             <>
               {editing ? (
-                <Button type="button" variant="secondary" onClick={cancelMemberEdit}>
+                <Button type="button" variant="secondary" disabled={updateMember.isPending} onClick={cancelMemberEdit}>
                   취소
                 </Button>
               ) : null}
               <Button
                 type="button"
                 disabled={updateMember.isPending}
-                onClick={() => (editing ? updateMember.mutate() : setEditing(true))}
+                onClick={() => {
+                  if (!editing) {
+                    setUpdateResolution(undefined);
+                    setEditing(true);
+                    return;
+                  }
+                  if (selectedID) confirmation.ask({ title: "회원 정보 저장", message: `회원 #${selectedID}의 권한·상태 변경을 저장할까요?`, confirmLabel: "변경 저장" }, () => updateMember.mutate(selectedID));
+                }}
               >
                 {editing ? "변경 저장" : "회원 수정"}
               </Button>
@@ -231,25 +304,25 @@ export function AdminMembersPageV2() {
           ) : undefined
         }
       >
-        <div className="mb-5 flex gap-2 border-b border-border-subtle">
-          {(["INFO", "ORDERS"] as const).map((value) => (
-            <Button variant="ghost"
-              key={value}
-              type="button"
-              className={`border-b-2 px-4 py-2 text-sm font-bold ${tab === value ? "border-action-primary text-action-primary" : "border-transparent text-content-secondary"}`}
-              onClick={() => setTab(value)}
-            >
-              {value === "INFO" ? "회원 정보" : "주문 내역"}
-            </Button>
-          ))}
-        </div>
+        <Tabs
+          className="mb-5"
+          ariaLabel="회원 상세 탭"
+          value={tab}
+          onValueChange={(value) => {
+            if (updateMember.isPending) return;
+            setTab(value as "INFO" | "ORDERS");
+          }}
+          items={[{ value: "INFO", label: "회원 정보" }, { value: "ORDERS", label: "주문 내역" }]}
+        />
         {tab === "INFO" ? (
           memberQuery.data ? (
+            <>
+            {currentUpdateResolution ? <p className={`mb-4 rounded-md px-3 py-2 text-sm font-bold ${currentUpdateResolution.tone === "error" ? "bg-status-negative-subtle text-status-negative" : "bg-status-positive-subtle text-status-positive"}`} role={currentUpdateResolution.tone === "error" ? "alert" : "status"}>{currentUpdateResolution.message}</p> : null}
             <DetailGrid>
               <DetailItem label="이메일">{memberQuery.data.email}</DetailItem>
               <DetailItem label="권한">
                 {editing ? (
-                  <Select className={consoleInputClass} value={editRole} onChange={(event) => setEditRole(event.target.value)}>
+                  <Select className={consoleInputClass} value={editRole} onChange={(event) => setEditRole(event.target.value)} disabled={updateMember.isPending}>
                     <option value="MEMBER">일반 회원</option>
                     <option value="SELLER">판매자</option>
                     <option value="ADMIN">관리자</option>
@@ -260,7 +333,7 @@ export function AdminMembersPageV2() {
               </DetailItem>
               <DetailItem label="상태">
                 {editing ? (
-                  <Select className={consoleInputClass} value={editStatus} onChange={(event) => setEditStatus(event.target.value)}>
+                  <Select className={consoleInputClass} value={editStatus} onChange={(event) => setEditStatus(event.target.value)} disabled={updateMember.isPending}>
                     <option value="ACTIVE">활성</option>
                     <option value="PENDING">대기</option>
                     <option value="SUSPENDED">정지</option>
@@ -278,13 +351,17 @@ export function AdminMembersPageV2() {
               <DetailItem label="가입일">{formatDate(memberQuery.data.created_at)}</DetailItem>
               <DetailItem label="수정일">{formatDate(memberQuery.data.updated_at)}</DetailItem>
             </DetailGrid>
+            </>
           ) : (
-            <ModalLoading />
+            <ModalQueryState isLoading={memberQuery.isLoading} error={memberQuery.error} onRetry={() => void memberQuery.refetch()} />
           )
         ) : (
           <>
+            {ordersQuery.isError ? <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-status-negative-subtle p-3 text-sm font-bold text-status-negative"><p>회원 주문 내역을 불러오지 못했습니다.</p><Button size="sm" variant="secondary" onClick={() => void ordersQuery.refetch()}>주문 내역 다시 불러오기</Button></div> : null}
             <ConsoleTable
               columns={["주문번호", "대표 상품", "결제 금액", "상태", "주문일"]}
+              loading={ordersQuery.isLoading}
+              emptyText={ordersQuery.isError ? "" : "주문 내역이 없습니다."}
               rows={(ordersQuery.data?.items ?? []).map((order) => [
                 order.order_code,
                 `${order.representative_product} 외 ${Math.max(0, order.item_count - 1)}건`,
@@ -302,6 +379,7 @@ export function AdminMembersPageV2() {
           </>
         )}
       </ConsoleModal>
+      {confirmation.dialog}
     </ConsoleLayout>
   );
 }
@@ -309,14 +387,21 @@ export function AdminMembersPageV2() {
 export function AdminMarketsPageV2() {
   const token = useAdminToken();
   const queryClient = useQueryClient();
-  const [page, setPage] = useState(1);
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("ALL");
+  const confirmation = useConsoleConfirm();
+  const searchParams = useSearchParams();
+  const [page, setPage] = useState(() => Number(consoleUrlValue(searchParams, "page", "1")) || 1);
+  const [query, setQuery] = useState(() => consoleUrlValue(searchParams, "q"));
+  const [status, setStatus] = useState(() => consoleUrlValue(searchParams, "status", "ALL"));
   const [selectedID, setSelectedID] = useState<number>();
   const [penaltyMarket, setPenaltyMarket] = useState<AdminMarketListItem>();
   const [penaltyScore, setPenaltyScore] = useState("10");
   const [penaltyReason, setPenaltyReason] = useState("");
   const debouncedQuery = useDebouncedValue(query);
+  useConsoleUrlFilters({ page, q: query, status }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+  });
 
   const marketsQuery = useQuery({
     queryKey: ["admin-markets-v2", page, debouncedQuery, status],
@@ -404,6 +489,8 @@ export function AdminMarketsPageV2() {
         <div className="mt-4">
           <ConsoleTable
             columns={["마켓", "셀러", "상품", "페널티", "상태", "관리"]}
+            loading={marketsQuery.isLoading}
+            emptyText={query || status !== "ALL" ? "검색 조건에 맞는 마켓이 없습니다." : "등록된 마켓이 없습니다."}
             rows={markets.map((market) => [
               <div key="market" className="flex min-w-0 items-center gap-3">
                 <div className="relative size-11 shrink-0 overflow-hidden rounded-lg bg-surface-subtle">
@@ -425,6 +512,7 @@ export function AdminMarketsPageV2() {
                 variant="secondary"
                 onClick={(event) => {
                   event.stopPropagation();
+                  penaltyMutation.reset();
                   setPenaltyMarket(market);
                   setPenaltyScore("10");
                   setPenaltyReason("");
@@ -434,7 +522,10 @@ export function AdminMarketsPageV2() {
               </Button>,
             ])}
             rowKeys={markets.map((market) => market.id)}
-            onRowClick={(index) => setSelectedID(markets[index].id)}
+            onRowClick={(index) => {
+              statusMutation.reset();
+              setSelectedID(markets[index].id);
+            }}
           />
           <PaginationBar
             page={data?.page ?? page}
@@ -450,7 +541,11 @@ export function AdminMarketsPageV2() {
         title={marketQuery.data?.name ?? "마켓 상세"}
         description={selectedID ? `마켓 #${selectedID}` : undefined}
         size="xl"
-        onClose={() => setSelectedID(undefined)}
+        onClose={() => {
+          if (statusMutation.isPending) return;
+          statusMutation.reset();
+          setSelectedID(undefined);
+        }}
       >
         {marketQuery.data ? (
           <div className="grid gap-6">
@@ -476,13 +571,20 @@ export function AdminMarketsPageV2() {
                       size="sm"
                       variant={marketQuery.data.status === nextStatus ? "primary" : "secondary"}
                       disabled={statusMutation.isPending}
-                      onClick={() => statusMutation.mutate(nextStatus)}
+                      onClick={() => {
+                        if (nextStatus === marketQuery.data?.status) {
+                          statusMutation.mutate(nextStatus);
+                          return;
+                        }
+                        confirmation.ask({ title: "마켓 상태 변경", message: `${marketQuery.data.name}의 상태를 ${nextStatus}(으)로 변경할까요?`, confirmLabel: "상태 변경" }, () => statusMutation.mutate(nextStatus));
+                      }}
                     >
                       {nextStatus}
                     </Button>
                   ))}
                 </div>
               </div>
+              {statusMutation.error ? <p className="rounded-md border border-status-negative/30 bg-status-negative-subtle px-3 py-2 text-sm font-bold text-status-negative" role="alert">{apiErrorMessage(statusMutation.error)}</p> : null}
             </section>
 
             <section>
@@ -526,7 +628,7 @@ export function AdminMarketsPageV2() {
             </section>
           </div>
         ) : (
-          <ModalLoading />
+          <ModalQueryState isLoading={marketQuery.isLoading} error={marketQuery.error} onRetry={() => void marketQuery.refetch()} />
         )}
       </ConsoleModal>
 
@@ -535,7 +637,11 @@ export function AdminMarketsPageV2() {
         title={penaltyMarket ? `${penaltyMarket.name} 페널티 부여` : "페널티 부여"}
         description="점수와 사유를 입력하면 이 마켓에만 적용됩니다."
         size="md"
-        onClose={() => setPenaltyMarket(undefined)}
+        onClose={() => {
+          if (penaltyMutation.isPending) return;
+          penaltyMutation.reset();
+          setPenaltyMarket(undefined);
+        }}
         footer={
           <>
             <Button type="button" variant="secondary" onClick={() => setPenaltyMarket(undefined)}>취소</Button>
@@ -547,7 +653,7 @@ export function AdminMarketsPageV2() {
                 Number(penaltyScore) < 1 ||
                 Number(penaltyScore) > 100
               }
-              onClick={() => penaltyMutation.mutate()}
+              onClick={() => confirmation.ask({ title: "마켓 페널티 부여", message: `${penaltyMarket?.name ?? "이 마켓"}에 ${penaltyScore}점 페널티를 부여할까요?`, confirmLabel: "페널티 부여", danger: true }, () => penaltyMutation.mutate())}
             >
               페널티 부여
             </Button>
@@ -555,6 +661,7 @@ export function AdminMarketsPageV2() {
         }
       >
         <div className="grid gap-4 sm:grid-cols-[160px_minmax(0,1fr)]">
+          {penaltyMutation.error ? <p className="sm:col-span-2 rounded-md border border-status-negative/30 bg-status-negative-subtle px-3 py-2 text-sm font-bold text-status-negative" role="alert">{apiErrorMessage(penaltyMutation.error)}</p> : null}
           <FilterField label="점수 (1~100)">
             <Input
               className={consoleInputClass}
@@ -575,6 +682,7 @@ export function AdminMarketsPageV2() {
           </FilterField>
         </div>
       </ConsoleModal>
+      {confirmation.dialog}
     </ConsoleLayout>
   );
 }

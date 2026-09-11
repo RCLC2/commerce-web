@@ -3,10 +3,12 @@
 import { Input, Select } from "./ui/input";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { apiErrorMessage } from "@/lib/api-client";
 import { adminConsoleApi } from "@/lib/admin-console-api";
 import { orderStatusLabel } from "@/lib/order-utils";
-import { paymentMethodLabel } from "@/lib/display-labels";
+import { paymentMethodLabel, shippingTypeLabel } from "@/lib/display-labels";
 import { formatPrice } from "@/lib/utils";
 import { AdminAuthRequired, adminLinks, useAdminToken } from "./admin-console";
 import {
@@ -22,9 +24,12 @@ import {
   ConsoleTable,
   DetailGrid,
   DetailItem,
-  ModalLoading,
+  ModalQueryState,
   PaginationBar,
   consoleInputClass,
+  consoleUrlValue,
+  useConsoleConfirm,
+  useConsoleUrlFilters,
   useDebouncedValue,
 } from "./console-ui";
 import { SafeImage } from "./safe-image";
@@ -45,13 +50,21 @@ function dateTime(value?: string) {
 
 export function AdminProductsPageV2() {
   const token = useAdminToken();
-  const [page, setPage] = useState(1);
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("ALL");
-  const [marketID, setMarketID] = useState("");
-  const [categoryID, setCategoryID] = useState("");
+  const searchParams = useSearchParams();
+  const [page, setPage] = useState(() => Number(consoleUrlValue(searchParams, "page", "1")) || 1);
+  const [query, setQuery] = useState(() => consoleUrlValue(searchParams, "q"));
+  const [status, setStatus] = useState(() => consoleUrlValue(searchParams, "status", "ALL"));
+  const [marketID, setMarketID] = useState(() => consoleUrlValue(searchParams, "market"));
+  const [categoryID, setCategoryID] = useState(() => consoleUrlValue(searchParams, "category"));
   const [selectedID, setSelectedID] = useState<number>();
   const debouncedQuery = useDebouncedValue(query);
+  useConsoleUrlFilters({ page, q: query, status, market: marketID, category: categoryID }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+    setMarketID(consoleUrlValue(next, "market"));
+    setCategoryID(consoleUrlValue(next, "category"));
+  });
 
   const productsQuery = useQuery({
     queryKey: ["admin-products-v2", page, debouncedQuery, status, marketID, categoryID],
@@ -81,7 +94,7 @@ export function AdminProductsPageV2() {
     <ConsoleLayout title="관리자" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <ConsoleHeader
         title="상품 관리"
-        description="카드가 무한히 늘어나는 화면 대신, 서버 필터·페이지 단위 목록과 별도 상세 모달로 정리했습니다."
+        description="상품명, 마켓, 상태로 상품을 찾고 상품을 누르면 옵션과 이미지를 확인할 수 있습니다."
       />
       <ConsoleSection className="mt-5" title="상품 목록" description="목록은 핵심 정보만 표시하고, 상품을 누르면 옵션과 이미지를 추가 조회합니다.">
         <FilterPanel>
@@ -140,6 +153,8 @@ export function AdminProductsPageV2() {
         <div className="mt-4">
           <ConsoleTable
             columns={["상품", "마켓 / 카테고리", "판매가", "가용 재고", "상태"]}
+            loading={productsQuery.isLoading}
+            emptyText={query || status !== "ALL" || marketID || categoryID ? "검색 조건에 맞는 상품이 없습니다." : "등록된 상품이 없습니다."}
             rows={products.map((product) => [
               <div key="product" className="flex min-w-0 items-center gap-3">
                 <div className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-surface-subtle">
@@ -192,7 +207,7 @@ export function AdminProductsPageV2() {
                 <DetailItem label="마켓">{productQuery.data.market_name}</DetailItem>
                 <DetailItem label="카테고리">{productQuery.data.category_name}</DetailItem>
                 <DetailItem label="판매 상태"><StatusBadge value={productQuery.data.status} /></DetailItem>
-                <DetailItem label="배송 유형">{productQuery.data.shipping_type}</DetailItem>
+                <DetailItem label="배송 유형">{shippingTypeLabel(productQuery.data.shipping_type)}</DetailItem>
                 <DetailItem label="정가">{formatPrice(productQuery.data.base_price)}</DetailItem>
                 <DetailItem label="할인가">{productQuery.data.discount_price ? formatPrice(productQuery.data.discount_price) : "-"}</DetailItem>
                 <DetailItem label="태그">{productQuery.data.tags.join(", ") || "-"}</DetailItem>
@@ -225,7 +240,7 @@ export function AdminProductsPageV2() {
             </section>
           </div>
         ) : (
-          <ModalLoading />
+          <ModalQueryState isLoading={productQuery.isLoading} error={productQuery.error} onRetry={() => void productQuery.refetch()} />
         )}
       </ConsoleModal>
     </ConsoleLayout>
@@ -235,14 +250,25 @@ export function AdminProductsPageV2() {
 export function AdminOrdersPageV2() {
   const token = useAdminToken();
   const queryClient = useQueryClient();
-  const [page, setPage] = useState(1);
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("ALL");
-  const [marketID, setMarketID] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const confirmation = useConsoleConfirm();
+  const searchParams = useSearchParams();
+  const [page, setPage] = useState(() => Number(consoleUrlValue(searchParams, "page", "1")) || 1);
+  const [query, setQuery] = useState(() => consoleUrlValue(searchParams, "q"));
+  const [status, setStatus] = useState(() => consoleUrlValue(searchParams, "status", "ALL"));
+  const [marketID, setMarketID] = useState(() => consoleUrlValue(searchParams, "market"));
+  const [from, setFrom] = useState(() => consoleUrlValue(searchParams, "from"));
+  const [to, setTo] = useState(() => consoleUrlValue(searchParams, "to"));
   const [selectedCode, setSelectedCode] = useState<string>();
+  const [cancelResolution, setCancelResolution] = useState<string>();
   const debouncedQuery = useDebouncedValue(query);
+  useConsoleUrlFilters({ page, q: query, status, market: marketID, from, to }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+    setMarketID(consoleUrlValue(next, "market"));
+    setFrom(consoleUrlValue(next, "from"));
+    setTo(consoleUrlValue(next, "to"));
+  });
 
   const ordersQuery = useQuery({
     queryKey: ["admin-orders-v2", page, debouncedQuery, status, marketID, from, to],
@@ -267,6 +293,7 @@ export function AdminOrdersPageV2() {
   const cancelMutation = useMutation({
     mutationFn: () => adminConsoleApi.cancelOrder(token ?? "", selectedCode ?? ""),
     onSuccess: async () => {
+      setCancelResolution("주문을 취소했습니다.");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-orders-v2"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-order-v2", selectedCode] }),
@@ -280,7 +307,7 @@ export function AdminOrdersPageV2() {
 
   return (
     <ConsoleLayout title="관리자" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
-      <ConsoleHeader title="주문 관리" description="주문번호·구매자·마켓·날짜·상태 필터를 서버에서 처리합니다." />
+      <ConsoleHeader title="주문 관리" description="주문번호, 구매자, 마켓, 날짜, 상태로 원하는 주문을 빠르게 찾을 수 있습니다." />
       <ConsoleSection className="mt-5" title="주문 목록" description="목록을 누르면 구매자, 마켓별 주문, 배송지와 상품 내역을 상세 조회합니다.">
         <FilterPanel>
           <FilterField label="주문 검색">
@@ -315,6 +342,8 @@ export function AdminOrdersPageV2() {
         <div className="mt-4">
           <ConsoleTable
             columns={["주문번호", "구매자", "결제 금액", "마켓 / 상품", "상태", "주문일"]}
+            loading={ordersQuery.isLoading}
+            emptyText={query || status !== "ALL" || marketID || from || to ? "검색 조건에 맞는 주문이 없습니다." : "등록된 주문이 없습니다."}
             rows={orders.map((order) => [
               <span key="code" className="font-bold">{order.order_code}</span>,
               <span key="buyer" className="break-all">{order.buyer_email}</span>,
@@ -324,7 +353,11 @@ export function AdminOrdersPageV2() {
               dateTime(order.created_at),
             ])}
             rowKeys={orders.map((order) => order.id)}
-            onRowClick={(index) => setSelectedCode(orders[index].order_code)}
+            onRowClick={(index) => {
+              cancelMutation.reset();
+              setCancelResolution(undefined);
+              setSelectedCode(orders[index].order_code);
+            }}
           />
           <PaginationBar page={data?.page ?? page} totalPages={data?.total_pages ?? 1} total={data?.total ?? 0} onChange={setPage} />
         </div>
@@ -334,10 +367,14 @@ export function AdminOrdersPageV2() {
         open={Boolean(selectedCode)}
         title={selectedCode ? `주문 ${selectedCode}` : "주문 상세"}
         size="xl"
-        onClose={() => setSelectedCode(undefined)}
+        onClose={() => {
+          cancelMutation.reset();
+          setCancelResolution(undefined);
+          setSelectedCode(undefined);
+        }}
         footer={
           orderQuery.data && !["CANCELLED", "COMPLETED"].includes(orderQuery.data.status) ? (
-            <Button type="button" variant="secondary" disabled={cancelMutation.isPending} onClick={() => cancelMutation.mutate()}>
+            <Button type="button" variant="danger" disabled={cancelMutation.isPending} onClick={() => confirmation.ask({ title: "주문 취소", message: `주문 ${selectedCode}을 취소하면 되돌릴 수 없습니다. 계속할까요?`, confirmLabel: "주문 취소", danger: true }, () => cancelMutation.mutate())}>
               주문 취소
             </Button>
           ) : undefined
@@ -345,6 +382,8 @@ export function AdminOrdersPageV2() {
       >
         {orderQuery.data ? (
           <div className="grid gap-6">
+            {cancelMutation.error ? <p className="rounded-md border border-status-negative/30 bg-status-negative-subtle px-3 py-2 text-sm font-bold text-status-negative" role="alert">{apiErrorMessage(cancelMutation.error)}</p> : null}
+            {cancelResolution ? <p className="rounded-md bg-status-positive-subtle px-3 py-2 text-sm font-bold text-status-positive" role="status">{cancelResolution}</p> : null}
             <DetailGrid>
               <DetailItem label="구매자">{orderQuery.data.buyer.email}</DetailItem>
               <DetailItem label="주문 상태"><StatusBadge value={orderQuery.data.status} /></DetailItem>
@@ -397,9 +436,10 @@ export function AdminOrdersPageV2() {
             ))}
           </div>
         ) : (
-          <ModalLoading />
+          <ModalQueryState isLoading={orderQuery.isLoading} error={orderQuery.error} onRetry={() => void orderQuery.refetch()} />
         )}
       </ConsoleModal>
+      {confirmation.dialog}
     </ConsoleLayout>
   );
 }
@@ -407,14 +447,24 @@ export function AdminOrdersPageV2() {
 export function AdminSettlementsPageV2() {
   const token = useAdminToken();
   const queryClient = useQueryClient();
-  const [page, setPage] = useState(1);
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("ALL");
-  const [targetMonth, setTargetMonth] = useState("");
-  const [marketID, setMarketID] = useState("");
+  const confirmation = useConsoleConfirm();
+  const searchParams = useSearchParams();
+  const [page, setPage] = useState(() => Number(consoleUrlValue(searchParams, "page", "1")) || 1);
+  const [query, setQuery] = useState(() => consoleUrlValue(searchParams, "q"));
+  const [status, setStatus] = useState(() => consoleUrlValue(searchParams, "status", "ALL"));
+  const [targetMonth, setTargetMonth] = useState(() => consoleUrlValue(searchParams, "month"));
+  const [marketID, setMarketID] = useState(() => consoleUrlValue(searchParams, "market"));
   const [selectedID, setSelectedID] = useState<number>();
   const [linePage, setLinePage] = useState(1);
+  const [paidResolution, setPaidResolution] = useState<string>();
   const debouncedQuery = useDebouncedValue(query);
+  useConsoleUrlFilters({ page, q: query, status, month: targetMonth, market: marketID }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+    setTargetMonth(consoleUrlValue(next, "month"));
+    setMarketID(consoleUrlValue(next, "market"));
+  });
 
   const settlementsQuery = useQuery({
     queryKey: ["admin-settlements-v2", page, debouncedQuery, status, targetMonth, marketID],
@@ -436,11 +486,12 @@ export function AdminSettlementsPageV2() {
     enabled: Boolean(token && selectedID),
   });
   const paidMutation = useMutation({
-    mutationFn: () => adminConsoleApi.markSettlementPaid(token ?? "", selectedID ?? 0),
-    onSuccess: async () => {
+    mutationFn: (settlementID: number) => adminConsoleApi.markSettlementPaid(token ?? "", settlementID),
+    onSuccess: async (_result, settlementID) => {
+      if (selectedID === settlementID) setPaidResolution("정산 지급 완료 처리를 반영했습니다.");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-settlements-v2"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-settlement-v2", selectedID] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-settlement-v2", settlementID] }),
       ]);
     },
   });
@@ -451,7 +502,7 @@ export function AdminSettlementsPageV2() {
 
   return (
     <ConsoleLayout title="관리자" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
-      <ConsoleHeader title="정산 관리" description="정산 목록과 주문별 정산 라인을 분리하고, 월·마켓·상태 조건을 서버에서 처리합니다." />
+      <ConsoleHeader title="정산 관리" description="정산월, 마켓, 상태로 지급 내역을 찾고 주문별 금액을 확인할 수 있습니다." />
       <ConsoleSection className="mt-5" title="정산 목록">
         <FilterPanel>
           <FilterField label="마켓 검색">
@@ -476,6 +527,8 @@ export function AdminSettlementsPageV2() {
         <div className="mt-4">
           <ConsoleTable
             columns={["마켓", "정산월", "매출", "수수료", "최종 정산", "상태"]}
+            loading={settlementsQuery.isLoading}
+            emptyText={query || status !== "ALL" || targetMonth || marketID ? "검색 조건에 맞는 정산이 없습니다." : "등록된 정산이 없습니다."}
             rows={settlements.map((settlement) => [
               <div key="market">
                 <p className="font-bold">{settlement.market_name}</p>
@@ -489,6 +542,8 @@ export function AdminSettlementsPageV2() {
             ])}
             rowKeys={settlements.map((settlement) => settlement.id)}
             onRowClick={(index) => {
+              paidMutation.reset();
+              setPaidResolution(undefined);
               setSelectedID(settlements[index].id);
               setLinePage(1);
             }}
@@ -501,15 +556,22 @@ export function AdminSettlementsPageV2() {
         open={Boolean(selectedID)}
         title={settlementQuery.data ? `${settlementQuery.data.market_name} ${settlementQuery.data.target_month} 정산` : "정산 상세"}
         size="xl"
-        onClose={() => setSelectedID(undefined)}
+        onClose={() => {
+          if (paidMutation.isPending) return;
+          paidMutation.reset();
+          setPaidResolution(undefined);
+          setSelectedID(undefined);
+        }}
         footer={
           settlementQuery.data && settlementQuery.data.status !== "PAID" ? (
-            <Button type="button" disabled={paidMutation.isPending} onClick={() => paidMutation.mutate()}>지급 완료 처리</Button>
+            <Button type="button" disabled={paidMutation.isPending} onClick={() => confirmation.ask({ title: "정산 지급 완료", message: "이 정산을 지급 완료 상태로 변경할까요?", confirmLabel: "지급 완료 처리" }, () => { if (selectedID) paidMutation.mutate(selectedID); })}>지급 완료 처리</Button>
           ) : undefined
         }
       >
         {settlementQuery.data ? (
           <div className="grid gap-6">
+            {paidMutation.error ? <p className="rounded-md border border-status-negative/30 bg-status-negative-subtle px-3 py-2 text-sm font-bold text-status-negative" role="alert">{apiErrorMessage(paidMutation.error)}</p> : null}
+            {paidResolution ? <p className="rounded-md bg-status-positive-subtle px-3 py-2 text-sm font-bold text-status-positive" role="status">{paidResolution}</p> : null}
             <DetailGrid>
               <DetailItem label="상태"><StatusBadge context="settlement" value={settlementQuery.data.status} /></DetailItem>
               <DetailItem label="총 매출">{formatPrice(settlementQuery.data.total_sales_amount)}</DetailItem>
@@ -543,9 +605,10 @@ export function AdminSettlementsPageV2() {
             </section>
           </div>
         ) : (
-          <ModalLoading />
+          <ModalQueryState isLoading={settlementQuery.isLoading} error={settlementQuery.error} onRetry={() => void settlementQuery.refetch()} />
         )}
       </ConsoleModal>
+      {confirmation.dialog}
     </ConsoleLayout>
   );
 }

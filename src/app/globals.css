@@ -26,9 +26,9 @@
   --primitive-violet-700: #6d28d9;
 
   /* Semantic tokens: stable product intent, independent from the palette. */
-  --commerce-canvas: var(--primitive-neutral-25);
+  --commerce-canvas: var(--primitive-neutral-0);
   --commerce-surface: var(--primitive-neutral-0);
-  --commerce-surface-subtle: var(--primitive-neutral-50);
+  --commerce-surface-subtle: #fbfbfc;
   --commerce-surface-raised: var(--primitive-neutral-0);
   --commerce-content-primary: var(--primitive-neutral-950);
   --commerce-content-secondary: var(--primitive-neutral-700);
@@ -69,6 +69,8 @@
   --commerce-button-primary-pressed: var(--primitive-pink-700);
   --commerce-button-primary-content: var(--commerce-content-on-brand);
   --commerce-button-primary-focus: var(--commerce-focus-on-brand);
+  --commerce-button-primary-shadow: 0 1px 2px rgb(191 0 88 / 22%);
+  --commerce-button-primary-shadow-hover: 0 6px 14px rgb(201 0 92 / 30%);
   --commerce-button-secondary-bg: var(--commerce-surface-raised);
   --commerce-button-secondary-hover: var(--commerce-action-secondary);
   --commerce-button-secondary-border: var(--commerce-border-interactive);
@@ -79,6 +81,7 @@
   --commerce-radius-feature: 1.5rem;
   --commerce-shadow-float: 0 12px 32px rgb(23 23 27 / 12%);
   --commerce-shadow-card: 0 1px 2px rgb(23 23 27 / 5%);
+  --commerce-shadow-mobile-nav: 0 -4px 20px rgb(23 23 27 / 6%);
 
   /* Layout tokens: use these instead of route-specific magic values. */
   --commerce-space-1: 0.25rem;
@@ -136,6 +139,7 @@
   --color-content-tertiary: var(--commerce-content-tertiary);
   --color-content-inverse: var(--commerce-content-inverse);
   --color-content-on-brand: var(--commerce-content-on-brand);
+  --color-focus-on-brand: var(--commerce-focus-on-brand);
   --color-border-subtle: var(--commerce-border-subtle);
   --color-border-strong: var(--commerce-border-strong);
   --color-border-interactive: var(--commerce-border-interactive);
@@ -172,6 +176,9 @@
   --radius-feature: var(--commerce-radius-feature);
   --shadow-float: var(--commerce-shadow-float);
   --shadow-card: var(--commerce-shadow-card);
+  --shadow-button-primary: var(--commerce-button-primary-shadow);
+  --shadow-button-primary-hover: var(--commerce-button-primary-shadow-hover);
+  --shadow-mobile-nav: var(--commerce-shadow-mobile-nav);
   --spacing-commerce-1: var(--commerce-space-1);
   --spacing-commerce-2: var(--commerce-space-2);
   --spacing-commerce-3: var(--commerce-space-3);

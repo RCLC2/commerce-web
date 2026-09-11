@@ -126,9 +126,9 @@ export function TodayOutfitPage() {
 function OutfitLoadingState() {
   return (
     <section aria-label="오늘의 코디 불러오는 중" aria-busy="true">
-      <div className="h-7 w-52 animate-pulse rounded bg-border-subtle" />
+      <div className="h-7 w-52 animate-pulse rounded-control bg-surface-subtle" />
       <div className="mt-4 min-h-[560px] animate-pulse rounded-3xl border border-border-subtle bg-surface-subtle" />
-      <div className="mt-8 h-7 w-40 animate-pulse rounded bg-border-subtle" />
+      <div className="mt-8 h-7 w-40 animate-pulse rounded-control bg-surface-subtle" />
       <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7">
         {Array.from({ length: 7 }, (_, index) => <div key={index} className="aspect-[3/4] animate-pulse rounded-xl bg-surface-subtle" />)}
       </div>

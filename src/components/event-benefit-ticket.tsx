@@ -24,7 +24,7 @@ export function EventBenefitTicket({
   const actionBackground = isPoint ? "bg-promotion-subtle" : "bg-action-secondary";
 
   return (
-    <article className="relative flex min-h-36 overflow-hidden rounded-2xl border border-black/[0.07] bg-surface-raised shadow-[0_8px_24px_rgba(0,0,0,0.06)]">
+    <article className="relative flex min-h-36 overflow-hidden rounded-surface border border-border-subtle bg-surface-raised shadow-card">
       <div className="min-w-0 flex-1 p-5 pr-4 md:p-6">
         <div className={cn("flex items-center gap-1.5 text-xs font-bold tracking-[0.12em]", accent)}>
           {isPoint ? <Coins size={15} /> : <Ticket size={15} />}
@@ -37,15 +37,15 @@ export function EventBenefitTicket({
       </div>
 
       <div className={cn("relative flex w-[104px] shrink-0 flex-col items-center justify-center border-l border-dashed border-border-interactive px-3", actionBackground)}>
-        <span className="absolute -left-2 -top-2 h-4 w-4 rounded-full border border-black/[0.07] bg-surface-subtle" />
-        <span className="absolute -bottom-2 -left-2 h-4 w-4 rounded-full border border-black/[0.07] bg-surface-subtle" />
+        <span className="absolute -left-2 -top-2 h-4 w-4 rounded-full border border-border-subtle bg-surface-subtle" />
+        <span className="absolute -bottom-2 -left-2 h-4 w-4 rounded-full border border-border-subtle bg-surface-subtle" />
         <Button variant="ghost" size="icon"
           type="button"
           aria-label={`${reward.title} ${authenticated ? reward.button_label : "로그인 후 받기"}`}
           disabled={claimed || pending || !ready}
           onClick={onClaim}
           className={cn(
-            "flex h-12 w-12 items-center justify-center rounded-full text-content-inverse shadow-sm transition active:scale-95 disabled:cursor-default disabled:active:scale-100",
+            "flex h-12 w-12 items-center justify-center rounded-full text-content-inverse shadow-card transition active:scale-95 disabled:cursor-default disabled:active:scale-100",
             claimed ? "bg-surface-subtle text-content-secondary" : isPoint ? "bg-promotion not-disabled:hover:bg-promotion/90 not-disabled:hover:text-content-inverse" : "bg-button-primary not-disabled:hover:bg-button-primary-hover not-disabled:hover:text-content-on-brand",
           )}
         >

@@ -2,10 +2,8 @@
 
 import Link from "next/link";
 import { Store } from "lucide-react";
-import type { ComponentProps } from "react";
 import type { Product, ProductBadgeTone } from "@/lib/types";
 import { couponPriceForProduct } from "@/lib/product-card-pricing";
-import { Badge } from "./ui/badge";
 import { ProductCardPrice } from "./product-card-price";
 import { SafeImage } from "./safe-image";
 
@@ -47,9 +45,12 @@ export function ProductCard({
           variant={compact ? "compact" : "default"}
           className={compact ? "!mt-1" : ""}
         />
-        <div className="flex flex-wrap gap-1">
-          {(product.tag_chips ?? []).slice(0, compact ? 2 : 4).map((chip) => (
-            <ProductChip key={chip.code} label={chip.label} tone={chip.tone} />
+        <div className="flex flex-wrap items-center gap-x-1 text-xs">
+          {(product.tag_chips ?? []).slice(0, compact ? 2 : 4).map((chip, index) => (
+            <span key={chip.code} className="inline-flex items-center gap-1">
+              {index ? <span className="text-content-tertiary" aria-hidden="true">·</span> : null}
+              <ProductChip label={chip.label} tone={chip.tone} />
+            </span>
           ))}
         </div>
       </div>
@@ -58,12 +59,12 @@ export function ProductCard({
 }
 
 function ProductChip({ label, tone }: { label: string; tone: ProductBadgeTone }) {
-  const tones: Record<ProductBadgeTone, ComponentProps<typeof Badge>["tone"]> = {
-    shipping: "positive",
-    delivery: "brand",
-    exclusive: "warning",
-    new: "inverse",
-    default: "neutral",
+  const tones: Record<ProductBadgeTone, string> = {
+    shipping: "text-status-positive",
+    delivery: "text-content-secondary",
+    exclusive: "text-status-warning",
+    new: "text-content-primary",
+    default: "text-content-secondary",
   };
-  return <Badge tone={tones[tone]}>{label}</Badge>;
+  return <span className={`font-bold ${tones[tone]}`}>{label}</span>;
 }

@@ -2,7 +2,7 @@
 
 import { Input } from "./ui/input";
 
-import { useIsFetching, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -42,6 +42,8 @@ export function ConsoleLayout({
     const unsubscribe = queryClient.getMutationCache().subscribe((event) => {
       if (event.mutation?.state.status === "error") {
         setMutationError(event.mutation.state.error);
+      } else if (event.mutation?.state.status === "pending" || event.mutation?.state.status === "success") {
+        setMutationError(undefined);
       }
     });
     return () => {
@@ -49,26 +51,10 @@ export function ConsoleLayout({
       unsubscribe();
     };
   }, [pathname, queryClient]);
-  useIsFetching();
   const activeQueries = queryClient.getQueryCache().getAll().filter(
     (query) => query.getObserversCount() > 0,
   );
   const activeQueryErrors = activeQueries.filter((query) => query.state.status === "error");
-  const activePendingQueries = activeQueries.filter(
-    (query) => query.state.status === "pending" && query.state.fetchStatus === "fetching",
-  );
-  const primaryQueries = activeQueries.filter(
-    (query) => query.meta?.consoleDataRole === "primary",
-  );
-  const keepsChildrenMounted = activeQueries.some(
-    (query) => query.meta?.consoleKeepMounted === true,
-  );
-  const hasResolvedData = activeQueries.some((query) => query.state.data !== undefined);
-  const hasResolvedPrimaryData = primaryQueries.some((query) => query.state.data !== undefined);
-  const canRenderChildren = keepsChildrenMounted || (primaryQueries.length
-    ? hasResolvedPrimaryData
-    : activeQueries.length === 0 || hasResolvedData);
-
   return (
     <main className="mx-auto grid max-w-7xl gap-5 px-4 pb-24 pt-5 md:grid-cols-[208px_minmax(0,1fr)]">
       <aside className="h-fit min-w-0 rounded-surface border border-border-subtle bg-surface-raised p-3 md:sticky md:top-24">
@@ -107,19 +93,14 @@ export function ConsoleLayout({
         {mutationError ? (
           <Notice tone="error" title="작업을 완료하지 못했습니다." className="mb-4">{apiErrorMessage(mutationError)}</Notice>
         ) : null}
-        {!canRenderChildren && activePendingQueries.length ? (
-          <div className="rounded-surface border border-border-subtle bg-surface-raised p-8 text-center text-sm font-bold text-content-secondary">
-            데이터를 불러오는 중입니다.
-          </div>
-        ) : null}
-        {canRenderChildren ? children : null}
+        {children}
       </section>
     </main>
   );
 }
 
 export function FilterPanel({ children }: { children: React.ReactNode }) {
-  return <div className="grid gap-2 rounded-md bg-surface-subtle p-3 md:grid-cols-3 xl:grid-cols-4">{children}</div>;
+  return <div className="grid gap-2 rounded-md border border-border-subtle bg-surface-raised p-3 md:grid-cols-3 xl:grid-cols-4">{children}</div>;
 }
 
 export function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
@@ -235,7 +216,7 @@ export function SummaryStrip({ items }: { items: { label: string; value: React.R
   return (
     <div className="grid gap-2 md:grid-cols-4">
       {items.map((item) => (
-        <div key={item.label} className="rounded-md bg-surface-subtle px-3 py-3">
+        <div key={item.label} className="rounded-md border border-border-subtle bg-surface-raised px-3 py-3">
           <p className="text-xs font-bold text-content-secondary">{item.label}</p>
           <p className="mt-1 text-lg font-bold">{item.value}</p>
         </div>

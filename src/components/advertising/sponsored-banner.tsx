@@ -8,7 +8,7 @@ export function SponsoredBanner({ decision, onNavigate }: { decision: AdDecision
   const targetName = decision.target.type === "PRODUCT" ? decision.target.product.name : decision.target.market.name;
   const heightClass = decision.placement_key === "pdp.card_banner" ? "h-36 md:h-44" : "h-44 md:h-56";
   return (
-    <article className="relative overflow-hidden rounded-2xl bg-content-primary text-content-inverse shadow-sm">
+    <article className="relative overflow-hidden rounded-surface bg-content-primary text-content-inverse shadow-card">
       <SponsoredDisclosure />
       <div className={`relative ${heightClass}`}>
         <SafeImage

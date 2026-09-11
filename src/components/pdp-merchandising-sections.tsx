@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRef } from "react";
 import type { Product } from "@/lib/types";
+import { scrollCarouselByCard } from "@/lib/carousel";
 import { ProductCard } from "./product-card";
 import { Button } from "./ui/button";
 
@@ -49,7 +50,7 @@ function ProductShelf({
   if (!products.length) return null;
 
   function slide(direction: -1 | 1) {
-    carouselRef.current?.scrollBy({ left: direction * 640, behavior: "smooth" });
+    scrollCarouselByCard(carouselRef.current, direction);
   }
 
   const heading = <h2 className="mt-1 text-2xl font-bold">{title}</h2>;

@@ -76,21 +76,21 @@ export function MyReviewsPage() {
       <PageHeading className="mt-5" icon={<PageIcon />} title="리뷰 관리" />
       <p className="mt-1 text-sm text-content-secondary">작성한 리뷰를 확인하고 수정하거나 삭제할 수 있습니다.</p>
       {reviews.error ? (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-md bg-status-negative-subtle p-4 text-sm font-bold text-action-primary">
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-control border border-status-negative-border bg-status-negative-subtle p-4 text-sm font-bold text-status-negative" role="alert">
           <p>리뷰를 불러오지 못했습니다. {apiErrorMessage(reviews.error)}</p>
           <Button size="sm" variant="secondary" onClick={() => void reviews.refetch()}>다시 불러오기</Button>
         </div>
       ) : null}
       {reviews.isLoading ? <p className="mt-6 text-sm text-content-secondary">리뷰를 불러오는 중입니다.</p> : null}
-      {remove.error ? <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-status-negative-subtle p-4 text-sm font-bold text-status-negative"><p>리뷰를 삭제하지 못했습니다. {apiErrorMessage(remove.error)}</p><Button size="sm" variant="secondary" disabled={remove.isPending || remove.variables === undefined} onClick={() => void retryRemove()}>삭제 상태 확인 후 다시 시도</Button></div> : null}
-      {removeResolution ? <p className="mt-4 rounded-md bg-status-positive-subtle p-4 text-sm font-bold text-status-positive">{removeResolution}</p> : null}
-      {update.isSuccess ? <p className="mt-4 rounded-md bg-status-positive-subtle p-4 text-sm font-bold text-status-positive">리뷰를 수정했습니다.</p> : null}
+      {remove.error ? <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-control border border-status-negative-border bg-status-negative-subtle p-4 text-sm font-bold text-status-negative" role="alert"><p>리뷰를 삭제하지 못했습니다. {apiErrorMessage(remove.error)}</p><Button size="sm" variant="secondary" disabled={remove.isPending || remove.variables === undefined} onClick={() => void retryRemove()}>삭제 상태 확인 후 다시 시도</Button></div> : null}
+      {removeResolution ? <p className="mt-4 rounded-control border border-status-positive-border bg-status-positive-subtle p-4 text-sm font-bold text-status-positive" role="status">{removeResolution}</p> : null}
+      {update.isSuccess ? <p className="mt-4 rounded-control border border-status-positive-border bg-status-positive-subtle p-4 text-sm font-bold text-status-positive" role="status">리뷰를 수정했습니다.</p> : null}
       <div className="mt-6 space-y-3">
         {items.map((review) => {
           const product = byID.get(review.product_id);
           const editing = editingID === review.id;
           return (
-            <article key={review.id} className="rounded-2xl border border-border-subtle bg-surface-raised p-4">
+            <article key={review.id} className="rounded-surface border border-border-subtle bg-surface-raised p-4 shadow-card">
               <div className="flex gap-3">
                 <div className="relative h-20 w-16 shrink-0 overflow-hidden rounded-md bg-surface-subtle"><SafeImage src={product?.image_url} alt="" fill sizes="64px" className="object-cover" /></div>
                 <div className="min-w-0 flex-1">
@@ -116,7 +116,7 @@ export function MyReviewsPage() {
             </article>
           );
         })}
-        {reviews.isSuccess && !items.length ? <p className="rounded-md border border-border-subtle bg-surface-raised p-8 text-center text-sm text-content-secondary">작성한 리뷰가 없습니다.</p> : null}
+        {reviews.isSuccess && !items.length ? <p className="rounded-surface border border-border-subtle bg-surface-raised p-8 text-center text-sm text-content-secondary">작성한 리뷰가 없습니다.</p> : null}
       </div>
     </main>
   );

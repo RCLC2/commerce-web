@@ -249,7 +249,7 @@ export function OnboardingPage() {
         </div>
 
         <div className="mt-3 flex items-center gap-3">
-          <div className="h-2 flex-1 overflow-hidden rounded-full bg-border-subtle">
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-subtle">
             <div className="h-full rounded-full bg-action-primary transition-all" style={{ width: `${items.length ? (answeredCount / items.length) * 100 : 0}%` }} />
           </div>
           <span className="min-w-10 text-right text-sm font-bold">{answeredCount}/{items.length}</span>
@@ -261,7 +261,7 @@ export function OnboardingPage() {
         </div>
 
         {allAnswered ? (
-          <section className="rounded-[28px] border border-border-subtle bg-surface-raised p-8 text-center shadow-[0_24px_70px_rgba(0,0,0,0.10)]">
+          <section className="rounded-feature border border-border-subtle bg-surface-raised p-8 text-center shadow-float">
             <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-action-primary/10 text-action-primary"><Check size={32} strokeWidth={3} /></span>
             <h2 className="mt-5 text-2xl font-bold">10개 모두 골랐어요</h2>
             <p className="mt-3 text-sm leading-6 text-content-secondary">선택을 저장한 뒤 바로 맞춤 추천을 만들어드릴게요.</p>

@@ -33,6 +33,7 @@ import type { CartItem, OrderResponse, PaymentRequest } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import { TossPaymentWidget } from "./toss-payment-widget";
 import { Button } from "./ui/button";
+import { BottomActionBar } from "./ui/bottom-action-bar";
 import { Field } from "./ui/field";
 import { Input, Select } from "./ui/input";
 import { Notice } from "./ui/notice";
@@ -318,6 +319,30 @@ export function CheckoutPage() {
 
   const blockingError = cart.error ?? (!createdOrderCode ? addresses.error : null);
   const supportingError = coupons.error ?? profile.error;
+  const checkoutDisabled =
+    !retryStateReady
+    || (!createdOrderCode && (
+      !items.length
+      || !defaultAddress
+      || !Number.isSafeInteger(expectedAmount)
+      || expectedAmount <= 0
+      || pendingAttemptBlocked
+    ))
+    || Boolean(blockingError && !createdOrderCode)
+    || checkout.isPending;
+
+  function renderCheckoutButton() {
+    return (
+      <Button
+        className="w-full"
+        size="lg"
+        disabled={checkoutDisabled}
+        onClick={() => checkout.mutate()}
+      >
+        {checkout.isPending ? "처리 중" : createdOrderCode ? "결제 정보 다시 준비" : "주문 생성 후 결제"}
+      </Button>
+    );
+  }
 
   return (
     <main className="mx-auto max-w-5xl px-4 pb-28 pt-8">
@@ -344,12 +369,17 @@ export function CheckoutPage() {
         <section className="space-y-5">
           <Surface padding="sm">
             <h2 className="font-bold">기본 배송지</h2>
-            {defaultAddress ? (
+            {addresses.isPending ? (
+              <div className="mt-3 grid gap-2" role="status" aria-label="배송지 불러오는 중">
+                <span className="h-4 w-40 animate-pulse rounded-control bg-surface-subtle" />
+                <span className="h-4 w-64 animate-pulse rounded-control bg-surface-subtle" />
+              </div>
+            ) : defaultAddress ? (
               <div className="mt-3 text-sm leading-6">
                 <p className="font-bold">{defaultAddress.receiver} / {defaultAddress.phone}</p>
                 <p className="text-content-secondary">({defaultAddress.zip_code}) {defaultAddress.line1} {defaultAddress.line2}</p>
               </div>
-            ) : <p className="mt-3 text-sm text-content-secondary">등록된 기본 배송지가 없습니다.</p>}
+            ) : addresses.isSuccess ? <p className="mt-3 text-sm text-content-secondary">등록된 기본 배송지가 없습니다.</p> : null}
             {defaultAddress ? <p className="mt-3 text-xs font-bold text-status-positive">이 주소로 배송됩니다. 받는 분과 연락처를 확인해주세요.</p> : null}
           </Surface>
 
@@ -415,25 +445,7 @@ export function CheckoutPage() {
             total={serverAmount === undefined ? "주문 후 확정" : formatPrice(serverAmount)}
             footer={<>
               {!paymentRequest ? (
-                <Button
-                  className="w-full"
-                  size="lg"
-                  disabled={
-                    !retryStateReady
-                    || (!createdOrderCode && (
-                      !items.length
-                      || !defaultAddress
-                      || !Number.isSafeInteger(expectedAmount)
-                      || expectedAmount <= 0
-                      || pendingAttemptBlocked
-                    ))
-                    || Boolean(blockingError && !createdOrderCode)
-                    || checkout.isPending
-                  }
-                  onClick={() => checkout.mutate()}
-                >
-                  {checkout.isPending ? "처리 중" : createdOrderCode ? "결제 정보 다시 준비" : "주문 생성 후 결제"}
-                </Button>
+                <div className="hidden md:block">{renderCheckoutButton()}</div>
               ) : (
                 <TossPaymentWidget
                   clientKey={paymentRequest.client_key}
@@ -462,6 +474,15 @@ export function CheckoutPage() {
           />
         </aside>
       </div>
+      {!paymentRequest ? (
+        <BottomActionBar className="-mx-4 md:hidden">
+          <div className="min-w-0 flex-1 self-center">
+            <p className="text-xs font-bold text-content-secondary">결제 금액</p>
+            <p className="truncate text-lg font-bold">{serverAmount === undefined ? "주문 후 확정" : formatPrice(serverAmount)}</p>
+          </div>
+          <div className="w-1/2 shrink-0">{renderCheckoutButton()}</div>
+        </BottomActionBar>
+      ) : null}
     </main>
   );
 }
