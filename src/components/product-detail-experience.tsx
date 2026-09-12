@@ -593,7 +593,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
       <PageJumpControls />
 
       <div
-        className={`fixed inset-x-0 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[var(--commerce-z-dropdown)] border-t border-border-subtle bg-surface-raised/95 px-4 py-3 shadow-float backdrop-blur transition ${showFloatingPurchase ? "opacity-100" : "pointer-events-none translate-y-full opacity-0"}`}
+        className={`fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-[var(--commerce-z-dropdown)] border-t border-border-subtle bg-surface-raised/95 px-4 py-3 backdrop-blur transition ${showFloatingPurchase ? "opacity-100" : "pointer-events-none translate-y-full opacity-0"}`}
         aria-hidden={!showFloatingPurchase}
         role="group"
         aria-label="빠른 구매"
