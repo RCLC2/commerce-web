@@ -19,10 +19,12 @@ import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import { formatFollowerCount } from "@/lib/utils";
 import { EventBenefitTicket } from "./event-benefit-ticket";
+import { PageLayout } from "./page-layout";
 import { ProductCard } from "./product-card";
 import { ApiErrorState } from "./api-error-state";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { LoadingState } from "./ui/feedback";
 
 const EVENT_PRODUCT_PAGE_SIZE = 12;
 
@@ -140,10 +142,10 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
   });
 
   if (eventQuery.isError) {
-    return <main className="mx-auto max-w-6xl px-4 py-8 text-sm"><ApiErrorState error={eventQuery.error} onRetry={() => void eventQuery.refetch()} /></main>;
+    return <PageLayout className="text-sm"><ApiErrorState error={eventQuery.error} onRetry={() => void eventQuery.refetch()} /></PageLayout>;
   }
   if (eventQuery.isLoading || !event) {
-    return <main className="mx-auto max-w-6xl px-4 py-8 text-sm text-content-secondary">이벤트를 불러오는 중입니다.</main>;
+    return <PageLayout><LoadingState label="이벤트를 불러오는 중입니다." /></PageLayout>;
   }
 
   const schedule = event.starts_at && event.ends_at
@@ -160,7 +162,7 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
       : "from-black/75 via-black/20";
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-24">
+    <PageLayout className="pt-0">
       <section className="pt-5">
         <div className="relative h-[320px] overflow-hidden rounded-md bg-surface-subtle md:h-[420px]">
           <SafeImage src={event.image_url} alt={event.title} fill sizes="100vw" className="object-cover" priority />
@@ -235,7 +237,7 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
           {productsQuery.isFetchingNextPage ? <p className="text-center text-xs font-bold text-content-secondary">이벤트 상품을 더 불러오는 중입니다.</p> : null}
         </section>
       ) : null}
-    </main>
+    </PageLayout>
   );
 }
 

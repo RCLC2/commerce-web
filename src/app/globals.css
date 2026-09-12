@@ -1,6 +1,8 @@
 @import "tailwindcss";
+@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 
 :root {
+  --font-korean: "Pretendard Variable";
   /* Primitive palette: do not consume these directly in product screens. */
   --primitive-neutral-0: #ffffff;
   --primitive-neutral-25: #f7f7f8;

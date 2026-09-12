@@ -16,7 +16,9 @@ import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
+import { PageLayout } from "./page-layout";
 import { Button } from "./ui/button";
+import { LoadingState } from "./ui/feedback";
 
 type ProfileForm = { notification_type: string; marketing_consent: boolean; nighttime_consent: boolean; height: number; weight: number };
 
@@ -60,12 +62,12 @@ export function ProfileEditPage() {
     onSuccess: () => router.push("/onboarding/preferences"),
   });
 
-  if (!token) return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-bold">로그인이 필요합니다</h1><ButtonLink href="/login" className="mt-5">로그인하기</ButtonLink></main>;
-  if (profile.isLoading || (!profile.data && !profile.error)) return <main className="mx-auto max-w-2xl px-4 py-16 text-sm text-content-secondary">프로필을 불러오는 중입니다.</main>;
-  if (!profile.data || !values) return <main className="mx-auto max-w-2xl px-4 py-16"><p className="text-sm font-bold text-status-negative">{apiErrorMessage(profile.error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void profile.refetch()}>다시 시도</Button></main>;
+  if (!token) return <PageLayout><h1 className="text-2xl font-bold">로그인이 필요합니다</h1><ButtonLink href="/login" className="mt-5">로그인하기</ButtonLink></PageLayout>;
+  if (profile.isLoading || (!profile.data && !profile.error)) return <PageLayout><LoadingState label="프로필을 불러오는 중입니다." /></PageLayout>;
+  if (!profile.data || !values) return <PageLayout><p className="text-sm font-bold text-status-negative">{apiErrorMessage(profile.error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void profile.refetch()}>다시 시도</Button></PageLayout>;
 
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-24 pt-8">
+    <PageLayout>
       <Link href="/mypage" className="inline-flex items-center gap-1 text-sm font-bold text-content-secondary hover:text-content-primary"><ArrowLeft size={17} /> 뒤로가기</Link>
       <PageHeading className="mt-5" icon={<PageIcon />} title="사용자 상세 정보 수정" />
       <p className="mt-2 text-sm text-content-secondary">알림 수신 설정과 리뷰에 활용할 신체 정보를 변경합니다.</p>
@@ -99,7 +101,7 @@ export function ProfileEditPage() {
           다시 선택하기
         </Button>
       </section> : null}
-    </main>
+    </PageLayout>
   );
 }
 

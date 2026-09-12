@@ -1,6 +1,7 @@
 "use client";
 
 import { ButtonLink } from "@/components/ui/button-link";
+import { PageLayout } from "@/components/page-layout";
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -98,7 +99,7 @@ export function TossSuccessClient() {
   };
 
   return (
-    <main className="mx-auto max-w-xl px-4 py-16 text-center">
+    <PageLayout variant="payment">
       <h1 className="text-2xl font-bold">{state === "success" ? "결제 완료" : "토스 결제 확인"}</h1>
       <p className="mt-4 text-sm text-content-secondary">{message}</p>
       {orderId && amount ? <p className="mt-2 text-sm font-bold">{orderId} · {formatPrice(amount)}</p> : null}
@@ -114,6 +115,6 @@ export function TossSuccessClient() {
           <ButtonLink href="/mypage" variant="secondary">주문 내역</ButtonLink>
         </div>
       ) : null}
-    </main>
+    </PageLayout>
   );
 }

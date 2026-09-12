@@ -11,6 +11,7 @@ import type { OnboardingChoice, OnboardingInputMethod } from "@/lib/api/onboardi
 import { queryKeys } from "@/lib/query-keys";
 import { SerialTaskQueue } from "@/lib/serial-task-queue";
 import { useSessionStore } from "@/lib/session-store";
+import { PageLayout } from "./page-layout";
 import { Button } from "./ui/button";
 import { OnboardingSwipeCard } from "./onboarding-swipe-card";
 
@@ -232,7 +233,7 @@ export function OnboardingPage() {
   const allAnswered = items.length > 0 && answeredCount === items.length;
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,#fff1f4_0,#fafafa_42%)] px-4 pb-10 pt-[max(20px,env(safe-area-inset-top))]">
+    <PageLayout variant="onboarding">
       <div className="mx-auto max-w-md">
         <div className="flex items-center justify-between gap-3">
           <Button variant="ghost"
@@ -281,16 +282,18 @@ export function OnboardingPage() {
         ) : currentItem ? (
           <OnboardingSwipeCard key={currentItem.product.id} item={currentItem} onChoose={choose} />
         ) : (
-          <OnboardingMessage>추천 상품을 충분히 준비하지 못했어요.</OnboardingMessage>
+          <section className="flex min-h-[28rem] items-center justify-center text-center text-sm text-content-secondary">
+            추천 상품을 충분히 준비하지 못했어요.
+          </section>
         )}
 
         {syncError ? <p role="alert" className="mx-auto mt-5 max-w-sm rounded-xl bg-action-secondary px-4 py-3 text-center text-sm font-bold text-action-primary">{syncError}</p> : null}
         <p className="mt-5 text-center text-xs leading-5 text-content-secondary">키보드에서는 ← X · → O로 선택할 수 있어요.</p>
       </div>
-    </main>
+    </PageLayout>
   );
 }
 
 function OnboardingMessage({ children }: { children: React.ReactNode }) {
-  return <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6 text-center text-sm text-content-secondary">{children}</main>;
+  return <PageLayout variant="onboarding" className="flex flex-col items-center justify-center px-6 text-center text-sm text-content-secondary"><div className="w-full max-w-md">{children}</div></PageLayout>;
 }

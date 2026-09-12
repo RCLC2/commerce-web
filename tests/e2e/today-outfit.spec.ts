@@ -124,12 +124,12 @@ test.describe("today outfit", () => {
     await expect(page.getByText("06 / 10", { exact: true })).toBeVisible();
   });
 
-  test("keeps the seven-item bottom navigation visible on desktop", async ({ page }) => {
+  test("keeps the five-item bottom navigation visible on desktop", async ({ page }) => {
     await page.goto("/today-outfit");
 
     const navigation = page.getByRole("navigation", { name: "하단 주요 메뉴" });
     await expect(navigation).toBeVisible();
-    for (const label of ["카테고리", "마켓", "오늘의 코디", "홈", "좋아요", "장바구니", "마이페이지"]) {
+    for (const label of ["카테고리", "오늘의 코디", "홈", "좋아요", "마이페이지"]) {
       await expect(navigation.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
   });

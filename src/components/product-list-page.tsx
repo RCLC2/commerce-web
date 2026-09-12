@@ -14,6 +14,7 @@ import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import type { PLPInformation, PLPProductParams } from "@/lib/types";
 import { ApiErrorState } from "./api-error-state";
+import { PageLayout } from "./page-layout";
 import { ProductCard } from "./product-card";
 
 function positivePage(raw: string | null) {
@@ -106,7 +107,7 @@ export function ProductListPage() {
   const activeFilters = activeFilterCandidates.filter((item): item is ActiveFilter => item !== null);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-24 pt-6 md:pb-12">
+    <PageLayout className="pt-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <PageHeading icon={<PackageSearch />} title={selectedCategory ? `${selectedCategory.name} 상품` : "전체 상품"} />
@@ -208,7 +209,7 @@ export function ProductListPage() {
 
       {productPage ? <Pagination page={productPage.page} totalPages={productPage.total_pages} onChange={(nextPage) => updateSearch({ page: String(nextPage) }, false)} /> : null}
 
-    </main>
+    </PageLayout>
   );
 }
 

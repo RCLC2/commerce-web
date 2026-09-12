@@ -9,6 +9,7 @@ import { ApiErrorState } from "@/components/api-error-state";
 import { queryKeys } from "@/lib/query-keys";
 import type { Product, Review, ReviewImage, ReviewSummary } from "@/lib/types";
 import { PageHeading } from "./ui/page-heading";
+import { PageLayout } from "./page-layout";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 import { Dialog } from "./ui/overlay";
@@ -33,11 +34,11 @@ export function ProductReviewsPage({ productId, initialProduct }: { productId: n
   const summary = summaryQuery.data;
 
   if (!Number.isInteger(productId) || productId <= 0) {
-    return <main className="mx-auto max-w-5xl px-4 pb-24 pt-8"><ApiErrorState error={new Error("상품 정보를 찾을 수 없습니다.")} /></main>;
+    return <PageLayout><ApiErrorState error={new Error("상품 정보를 찾을 수 없습니다.")} /></PageLayout>;
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 pb-24 pt-8">
+    <PageLayout>
       <Link href={`/products/${productId}`} className="inline-flex min-h-11 items-center gap-1 text-sm font-bold text-content-secondary hover:text-content-primary">
         <ArrowLeft size={17} aria-hidden="true" /> 상품으로 돌아가기
       </Link>
@@ -74,7 +75,7 @@ export function ProductReviewsPage({ productId, initialProduct }: { productId: n
           </div>
         ) : null}
       </section>
-    </main>
+    </PageLayout>
   );
 }
 

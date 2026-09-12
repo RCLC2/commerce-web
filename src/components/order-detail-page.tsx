@@ -19,9 +19,11 @@ import { paymentMethodLabel } from "@/lib/display-labels";
 import { apiErrorMessage } from "@/lib/api-client";
 import { ApiErrorState } from "./api-error-state";
 import { formatPrice } from "@/lib/utils";
+import { PageLayout } from "./page-layout";
 import { ReviewWritePanel } from "./review-write-panel";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { LoadingState } from "./ui/feedback";
 
 const statusSteps = ["PAYMENT_PENDING", "PAID", "PLACED", "SHIPPED", "DELIVERED", "COMPLETED"];
 
@@ -77,26 +79,26 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
 
   if (!token) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-16">
+      <PageLayout>
         <h1 className="text-2xl font-bold">로그인이 필요합니다</h1>
         <ButtonLink href="/login" className="mt-5">로그인</ButtonLink>
-      </main>
+      </PageLayout>
     );
   }
 
   if (isLoading) {
-    return <main className="mx-auto max-w-4xl px-4 py-8 text-sm text-content-secondary">주문 정보를 불러오는 중입니다.</main>;
+    return <PageLayout><LoadingState label="주문 정보를 불러오는 중입니다." /></PageLayout>;
   }
 
   if (error || !order) {
-    return <main className="mx-auto max-w-4xl px-4 py-8 text-sm text-action-primary"><ApiErrorState error={error ?? new Error("주문 정보를 찾을 수 없습니다.")} onRetry={() => void refetch()} /></main>;
+    return <PageLayout className="text-sm text-action-primary"><ApiErrorState error={error ?? new Error("주문 정보를 찾을 수 없습니다.")} onRetry={() => void refetch()} /></PageLayout>;
   }
 
   const amount = order.total_order_price - order.total_discount_price - order.used_point;
   const deliveryStatus = order.delivery?.status ?? order.status;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 pb-24 pt-8">
+    <PageLayout>
       <div className="rounded-surface border border-border-subtle bg-surface-raised p-5 shadow-card">
         <PageHeading icon={<PageIcon />} title="주문 상세" description={`주문 번호 ${order.order_code}`} />
         <p className="mt-1 text-sm text-content-secondary">{order.ordered_at ? new Date(order.ordered_at).toLocaleString("ko-KR") : "-"}</p>
@@ -243,7 +245,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
       </section>
 
       {confirmPurchase.error ? <p className="mt-4 text-sm font-bold text-status-negative">{apiErrorMessage(confirmPurchase.error)}</p> : null}
-    </main>
+    </PageLayout>
   );
 }
 

@@ -6,6 +6,7 @@ import { TrendingUp as PageIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
+import { PageLayout } from "./page-layout";
 import { ProductCard } from "./product-card";
 import { Button } from "./ui/button";
 
@@ -29,7 +30,7 @@ export function SimpleProductSection({
   const products = productsQuery.data ?? [];
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-24 pt-8">
+    <PageLayout>
       <PageHeading icon={<PageIcon />} title={title} description={description} />
       {productsQuery.isLoading ? <p className="mt-8 text-sm text-content-secondary">상품을 불러오는 중입니다.</p> : null}
       {productsQuery.isError ? <div className="mt-6 rounded-control border border-status-negative-border bg-status-negative-subtle p-4 text-sm" role="alert"><p className="font-bold text-status-negative">{apiErrorMessage(productsQuery.error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void productsQuery.refetch()}>다시 시도</Button></div> : null}
@@ -39,7 +40,7 @@ export function SimpleProductSection({
           <ProductCard key={product.id} product={product} />
         ))}
       </div>
-    </main>
+    </PageLayout>
   );
 }
 

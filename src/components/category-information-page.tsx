@@ -14,6 +14,7 @@ import { api } from "@/lib/api";
 import { scrollCarouselByCard } from "@/lib/carousel";
 import type { CommerceCategory, Product } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
+import { PageLayout } from "./page-layout";
 import { ProductCard } from "./product-card";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
@@ -59,18 +60,18 @@ export function CategoryInformationPage() {
 
   if (informationQuery.error || !information || !selected) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-16">
+      <PageLayout>
         <div className="rounded-surface border border-status-negative-border bg-status-negative-subtle p-8 text-center shadow-card" role="alert">
           <h1 className="text-xl font-bold text-status-negative">카테고리관을 불러오지 못했습니다.</h1>
           <p className="mt-2 text-sm text-status-negative">잠시 후 다시 시도해주세요.</p>
           <Button className="mt-5" variant="secondary" onClick={() => void informationQuery.refetch()}>다시 시도</Button>
         </div>
-      </main>
+      </PageLayout>
     );
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-24 pt-8">
+    <PageLayout>
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
           <PageHeading icon={<PageIcon />} title="카테고리관" description="카테고리별 상품과 실시간 인기 상품을 확인하세요." />
@@ -132,7 +133,7 @@ export function CategoryInformationPage() {
           <Pagination page={information.pagination.page} totalPages={information.pagination.total_pages} hasNext={information.pagination.has_next} disabled={informationQuery.isFetching} onChange={changePage} />
         </section>
       </div>
-    </main>
+    </PageLayout>
   );
 }
 
@@ -214,5 +215,5 @@ function compareCategoryOrder(a: CommerceCategory, b: CommerceCategory) {
 }
 
 function CategoryLoading() {
-  return <main className="mx-auto max-w-6xl animate-pulse px-4 py-8"><div className="h-16 rounded-surface bg-surface-subtle" /><div className="mt-6 h-11 w-2/3 rounded-control bg-surface-subtle" /><div className="mt-7 grid grid-cols-2 gap-4 md:grid-cols-4">{Array.from({ length: 8 }, (_, index) => <div key={index}><div className="aspect-square rounded-control bg-surface-subtle" /><div className="mt-3 h-4 rounded-control bg-surface-subtle" /></div>)}</div></main>;
+  return <PageLayout className="animate-pulse"><div className="h-16 rounded-surface bg-surface-subtle" /><div className="mt-6 h-11 w-2/3 rounded-control bg-surface-subtle" /><div className="mt-7 grid grid-cols-2 gap-4 md:grid-cols-4">{Array.from({ length: 8 }, (_, index) => <div key={index}><div className="aspect-square rounded-control bg-surface-subtle" /><div className="mt-3 h-4 rounded-control bg-surface-subtle" /></div>)}</div></PageLayout>;
 }

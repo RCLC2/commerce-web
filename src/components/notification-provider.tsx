@@ -85,5 +85,5 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     return () => { disposed = true; controller?.abort(); };
   }, [memberID, queryClient, token]);
 
-  return <>{children}<div aria-live="polite" className="fixed bottom-5 right-5 z-50 flex w-[min(24rem,calc(100vw-2.5rem))] flex-col gap-3">{toasts.map((toast) => <a className="rounded-xl border border-slate-200 bg-white p-4 shadow-lg transition hover:border-slate-400" href={toast.destinationPath || "/notifications"} key={toast.id} onClick={() => setToasts((current) => current.filter((item) => item.id !== toast.id))}><p className="font-semibold text-slate-900">{toast.title}</p><p className="mt-1 text-sm text-slate-600">{toast.body}</p></a>)}</div></>;
+  return <>{children}<div aria-live="polite" className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-5 z-50 flex w-[min(24rem,calc(100vw-2.5rem))] flex-col gap-3">{toasts.map((toast) => <a className="rounded-xl border border-slate-200 bg-white p-4 shadow-lg transition hover:border-slate-400" href={toast.destinationPath || "/notifications"} key={toast.id} onClick={() => setToasts((current) => current.filter((item) => item.id !== toast.id))}><p className="font-semibold text-slate-900">{toast.title}</p><p className="mt-1 text-sm text-slate-600">{toast.body}</p></a>)}</div></>;
 }

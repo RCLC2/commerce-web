@@ -3,7 +3,7 @@
 import { ButtonLink } from "@/components/ui/button-link";
 
 import { useQuery } from "@tanstack/react-query";
-import { Bell, Flame, Grid2X2, Heart, Home, Menu, Search, ShieldCheck, Shirt, ShoppingBag, Star, Store, User, X } from "lucide-react";
+import { Bell, Grid2X2, Heart, Home, Menu, Search, ShieldCheck, Shirt, ShoppingBag, Star, Store, User, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -13,6 +13,7 @@ import { useSessionStore } from "@/lib/session-store";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { Drawer } from "./ui/overlay";
+import { SearchField } from "./ui/search-field";
 
 const nav = [
   { href: "/categories", label: "카테고리", icon: Grid2X2 },
@@ -30,7 +31,6 @@ const primaryMenuItems = [
 const desktopNavigationItems = [
   { href: "/today-outfit", label: "오늘의 코디", icon: Shirt },
   { href: "/likes", label: "좋아요", icon: Heart },
-  { href: "/mypage", label: "마이페이지", icon: User },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -41,6 +41,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [searchFocused, setSearchFocused] = useState(false);
   const role = useSessionStore((state) => state.role);
   const token = useSessionStore((state) => state.accessToken);
+  const hydrated = useSessionStore((state) => state.hydrated);
+  const isAuthenticated = hydrated && Boolean(token);
   const logout = useSessionStore((state) => state.logout);
   const hydrateSession = useSessionStore((state) => state.hydrate);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -56,14 +58,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: notificationCount } = useQuery({
     queryKey: ["notification-unread-count", token],
     queryFn: () => api.unreadNotificationCount(token ?? ""),
-    enabled: Boolean(token),
+    enabled: isAuthenticated,
   });
 
   const isActive = (href: string) => (href === "/" ? pathname === href : pathname.startsWith(href));
   const showSuggestions = searchFocused && suggestions.length > 0;
   const searchPage = pathname.startsWith("/search");
   const onboardingPage = pathname.startsWith("/onboarding/");
-  const hideMobilePrimaryNav = pathname === "/checkout" || /^\/products\/\d+\/?$/.test(pathname);
   const rootCategories = categories.filter((category) => !category.parent_id && category.level === 1);
 
   useEffect(() => {
@@ -109,12 +110,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <ButtonLink href="/search" aria-label="통합 검색" variant="ghost" size="icon" className="ml-auto sm:hidden">
             <Search size={20} />
           </ButtonLink>
-          <form
-            className="relative hidden h-11 min-w-0 flex-1 items-center gap-2 rounded-control border border-border-interactive bg-surface-raised px-3 transition hover:border-action-primary focus-within:border-action-primary focus-within:ring-4 focus-within:ring-action-primary/10 sm:flex"
-            onSubmit={submitSearch}
-          >
-            <Search size={18} className="shrink-0 text-content-secondary" />
-            <input
+          <form className="relative hidden min-w-0 flex-1 sm:block" onSubmit={submitSearch}>
+            <SearchField
               ref={searchInputRef}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -126,7 +123,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 setSearchFocused(true);
               }}
               onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
-              className="w-full bg-transparent text-sm outline-none placeholder:text-content-tertiary"
+              className="h-11"
+              icon={<Search size={18} className="shrink-0 text-content-secondary" aria-hidden="true" />}
               placeholder="상품, 마켓, 키워드 검색"
               aria-label="통합 검색"
             />
@@ -151,17 +149,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             ) : null}
           </form>
-          <nav className="hidden shrink-0 items-center gap-1 lg:flex" aria-label="주요 메뉴">
-            {desktopNavigationItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <ButtonLink key={item.href} href={item.href} variant="ghost" size="sm" className="gap-1 px-2 text-xs" aria-label={item.label} aria-current={isActive(item.href) ? "page" : undefined}>
-                  <Icon size={16} aria-hidden="true" />
-                  <span className="hidden xl:inline">{item.label}</span>
-                </ButtonLink>
-              );
-            })}
-          </nav>
           {role === "SELLER" ? (
             <ButtonLink href="/seller" aria-label="판매자 관리" variant="ghost" size="icon" title="판매자 관리">
                 <Store size={20} />
@@ -172,16 +159,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <ShieldCheck size={20} />
               </ButtonLink>
           ) : null}
-          <ButtonLink href="/cart" aria-label="장바구니" variant="ghost" size="icon" title="장바구니">
-            <ShoppingBag size={20} />
-          </ButtonLink>
-          <Link href="/notifications" aria-label="알림함" className="relative">
-            <Button variant="ghost" size="icon" title="알림함"><Bell size={20} /></Button>
-            {(notificationCount?.unread_count ?? 0) > 0 ? <span className="absolute right-0 top-0 grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1 text-[10px] font-black text-white">{Math.min(notificationCount!.unread_count, 99)}</span> : null}
-          </Link>
-          <ButtonLink href="/mypage" aria-label="마이페이지" variant="ghost" size="icon">
-            <User size={20} />
-          </ButtonLink>
+          {isAuthenticated ? (
+            <>
+              <ButtonLink href="/cart" aria-label="장바구니" variant="ghost" size="icon" title="장바구니">
+                <ShoppingBag size={20} />
+              </ButtonLink>
+              <Link href="/notifications" aria-label="알림함" className="relative">
+                <Button variant="ghost" size="icon" title="알림함"><Bell size={20} /></Button>
+                {(notificationCount?.unread_count ?? 0) > 0 ? <span className="absolute right-0 top-0 grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1 text-[10px] font-black text-white">{Math.min(notificationCount!.unread_count, 99)}</span> : null}
+              </Link>
+            </>
+          ) : null}
         </div>
       </header> : null}
       <Drawer open={menuOpen} onClose={() => setMenuOpen(false)} title="메뉴" id="shopping-menu">
@@ -234,7 +222,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
       </Drawer>
       {children}
-      <footer className={cn("border-t border-border-subtle bg-surface-raised md:pb-0", hideMobilePrimaryNav ? "pb-6" : /^\/products\/\d+\/?$/.test(pathname) ? "pb-[calc(10rem+env(safe-area-inset-bottom))]" : "pb-[calc(5rem+env(safe-area-inset-bottom))]")}>
+      <footer className={cn("border-t border-border-subtle bg-surface-raised", /^\/products\/\d+\/?$/.test(pathname) ? "pb-[calc(11rem+env(safe-area-inset-bottom))]" : "pb-[calc(5rem+env(safe-area-inset-bottom))]")}>
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-5 gap-y-5 px-4 py-6 text-sm text-content-secondary md:grid-cols-[1.2fr_1fr_1fr] md:gap-6">
           <div className="col-span-2 md:col-span-1">
             <p className="text-lg font-bold text-content-primary">commerce</p>
@@ -263,7 +251,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
-      {!hideMobilePrimaryNav ? <nav className="fixed inset-x-0 bottom-0 z-[var(--commerce-z-mobile-cta)] isolate border-t border-border-subtle bg-surface-raised/95 pb-[env(safe-area-inset-bottom)] shadow-mobile-nav backdrop-blur md:hidden" aria-label="하단 주요 메뉴">
+      <nav className="fixed inset-x-0 bottom-0 z-[var(--commerce-z-mobile-cta)] isolate border-t border-border-subtle bg-surface-raised/95 pb-[env(safe-area-inset-bottom)] shadow-mobile-nav backdrop-blur" aria-label="하단 주요 메뉴">
         <div className="mx-auto grid h-16 max-w-6xl grid-cols-5 px-1" data-session-role={role ?? "guest"}>
           {nav.map((item) => {
             const Icon = item.icon;
@@ -287,7 +275,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </div>
-      </nav> : null}
+      </nav>
     </div>
   );
 }
