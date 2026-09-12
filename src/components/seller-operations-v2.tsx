@@ -47,6 +47,16 @@ function filterStatus(value: string) {
   return value === "ALL" ? undefined : value;
 }
 
+export function shipmentFormIsDirty(
+  shipmentEditing: boolean,
+  carrier: string,
+  invoice: string,
+  delivery?: { carrier?: string | null; tracking_number?: string | null },
+) {
+  if (!shipmentEditing) return false;
+  return carrier !== (delivery?.carrier ?? "") || invoice !== (delivery?.tracking_number ?? "");
+}
+
 export function SellerOrdersPageV2() {
   const { token, marketID, marketName } = useSellerConsoleContext();
   const queryClient = useQueryClient();
@@ -63,7 +73,13 @@ export function SellerOrdersPageV2() {
   const [shipmentEditing, setShipmentEditing] = useState(false);
   const [operationResolution, setOperationResolution] = useState<string>();
   const debouncedQuery = useDebouncedValue(query);
-  useConsoleUrlFilters({ page, q: query, status, from, to });
+  useConsoleUrlFilters({ page, q: query, status, from, to }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+    setFrom(consoleUrlValue(next, "from"));
+    setTo(consoleUrlValue(next, "to"));
+  });
 
   const ordersQuery = useQuery({
     queryKey: ["seller-orders-v2", marketID, page, debouncedQuery, status, from, to],
@@ -227,7 +243,7 @@ export function SellerOrdersPageV2() {
         size="xl"
         onClose={() => {
           if (shippingPending) return;
-          const dirty = shipmentEditing && order?.delivery && (carrier !== (order.delivery.carrier ?? "") || invoice !== (order.delivery.tracking_number ?? ""));
+          const dirty = shipmentFormIsDirty(shipmentEditing, carrier, invoice, order?.delivery);
           if (dirty) {
             confirmation.ask({ title: "주문 상세 닫기", message: "저장하지 않은 배송 정보를 버릴까요?", confirmLabel: "변경 버리기", danger: true }, () => {
               registerInvoice.reset();
@@ -263,13 +279,13 @@ export function SellerOrdersPageV2() {
               <div className="grid gap-3 rounded-xl bg-surface-subtle p-4 sm:grid-cols-2">
                 {!shipmentFieldsEditable ? <p className="sm:col-span-2 rounded-md border border-border-subtle bg-surface-raised px-3 py-2 text-xs font-bold text-content-secondary">배송이 시작된 주문은 택배사와 송장번호를 조회만 할 수 있습니다.</p> : null}
                 <FilterField label="택배사">
-                  <Select className={consoleInputClass} value={carrier} onChange={(event) => { setShipmentEditing(true); setOperationResolution(undefined); registerInvoice.reset(); setCarrier(event.target.value); }} disabled={!shipmentFieldsEditable}>
+                  <Select className={consoleInputClass} value={carrier} onChange={(event) => { setShipmentEditing(true); setOperationResolution(undefined); if (!shippingPending) registerInvoice.reset(); setCarrier(event.target.value); }} disabled={!shipmentFieldsEditable || shippingPending}>
                     <option value="">택배사 선택</option>
                     {(carriersQuery.data?.carriers ?? []).map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
                   </Select>
                 </FilterField>
                 <FilterField label="송장번호">
-                  <Input className={consoleInputClass} value={invoice} onChange={(event) => { setShipmentEditing(true); setOperationResolution(undefined); registerInvoice.reset(); setInvoice(event.target.value); }} placeholder="송장번호" disabled={!shipmentFieldsEditable} />
+                  <Input className={consoleInputClass} value={invoice} onChange={(event) => { setShipmentEditing(true); setOperationResolution(undefined); if (!shippingPending) registerInvoice.reset(); setInvoice(event.target.value); }} placeholder="송장번호" disabled={!shipmentFieldsEditable || shippingPending} />
                 </FilterField>
                 <DetailItem label="배송 상태"><StatusBadge value={deliveryStatus} /></DetailItem>
                 <DetailItem label="수령인">{order.delivery?.receiver_name}</DetailItem>
@@ -323,7 +339,11 @@ export function SellerSettlementsPageV2() {
     enabled: Boolean(token),
     meta: { consoleDataRole: "primary" },
   });
-  useConsoleUrlFilters({ page, status, month: targetMonth });
+  useConsoleUrlFilters({ page, status, month: targetMonth }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+    setTargetMonth(consoleUrlValue(next, "month"));
+  });
   const settlementQuery = useQuery({
     queryKey: ["seller-settlement-v2", marketID, selectedID, linePage],
     queryFn: () => sellerConsoleApi.settlement(token ?? "", selectedID ?? 0, marketID, linePage),
@@ -424,7 +444,12 @@ export function SellerReviewsPageV2() {
   const [ratingX2, setRatingX2] = useState(() => consoleUrlValue(searchParams, "rating"));
   const [selectedID, setSelectedID] = useState<number>();
   const debouncedQuery = useDebouncedValue(query);
-  useConsoleUrlFilters({ page, q: query, status, rating: ratingX2 });
+  useConsoleUrlFilters({ page, q: query, status, rating: ratingX2 }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+    setRatingX2(consoleUrlValue(next, "rating"));
+  });
 
   const reviewsQuery = useQuery({
     queryKey: ["seller-reviews-v2", marketID, page, debouncedQuery, status, ratingX2],

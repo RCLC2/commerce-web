@@ -11,6 +11,7 @@ import {
   type AdminMarketListItem,
   type AdminMemberListItem,
 } from "@/lib/admin-console-api";
+import { apiErrorMessage } from "@/lib/api-client";
 import { displayLabel } from "@/lib/display-labels";
 import { formatPrice } from "@/lib/utils";
 import { AdminAuthRequired, adminLinks, useAdminToken } from "./admin-console";
@@ -62,9 +63,14 @@ export function AdminMembersPageV2() {
   const [editing, setEditing] = useState(false);
   const [editRole, setEditRole] = useState("MEMBER");
   const [editStatus, setEditStatus] = useState("ACTIVE");
-  const [updateResolution, setUpdateResolution] = useState<string>();
+  const [updateResolution, setUpdateResolution] = useState<{ memberID: number; tone: "success" | "error"; message: string }>();
   const debouncedQuery = useDebouncedValue(query);
-  useConsoleUrlFilters({ page, q: query, role, status });
+  useConsoleUrlFilters({ page, q: query, role, status }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setRole(consoleUrlValue(next, "role", "ALL"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+  });
 
   const membersQuery = useQuery({
     queryKey: ["admin-members-v2", page, debouncedQuery, role, status],
@@ -104,33 +110,37 @@ export function AdminMembersPageV2() {
   }, [editing, memberQuery.data]);
 
   const updateMember = useMutation({
-    mutationFn: async () => {
-      if (!selectedID || !memberQuery.data) return;
+    mutationFn: async (memberID: number) => {
+      if (!memberID || !memberQuery.data) return;
       const changed: string[] = [];
       if (editRole !== memberQuery.data.role) {
-        await adminConsoleApi.updateMemberRole(token ?? "", selectedID, editRole);
+        await adminConsoleApi.updateMemberRole(token ?? "", memberID, editRole);
         changed.push("권한");
       }
       if (editStatus !== memberQuery.data.status) {
-        await adminConsoleApi.updateMemberStatus(token ?? "", selectedID, editStatus);
+        await adminConsoleApi.updateMemberStatus(token ?? "", memberID, editStatus);
         changed.push("상태");
       }
       return changed;
     },
     onMutate: () => setUpdateResolution(undefined),
-    onSuccess: async (changed) => {
+    onSuccess: async (changed, memberID) => {
       setEditing(false);
-      setUpdateResolution(changed?.length ? `${changed.join("·")}을 변경했습니다.` : "변경된 내용이 없습니다.");
+      if (selectedID === memberID) {
+        setUpdateResolution({ memberID, tone: "success", message: changed?.length ? `${changed.join("·")}을 변경했습니다.` : "변경된 내용이 없습니다." });
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-members-v2"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-member-v2", selectedID] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-member-v2", memberID] }),
       ]);
     },
-    onError: async () => {
-      setUpdateResolution("일부 변경 결과를 확인하지 못했습니다. 실제 회원 정보를 다시 조회했습니다.");
+    onError: async (_error, memberID) => {
+      if (selectedID === memberID) {
+        setUpdateResolution({ memberID, tone: "error", message: "일부 변경 결과를 확인하지 못했습니다. 실제 회원 정보를 다시 조회했습니다." });
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-members-v2"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-member-v2", selectedID] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-member-v2", memberID] }),
       ]);
     },
   });
@@ -138,8 +148,11 @@ export function AdminMembersPageV2() {
   if (!token) return <AdminAuthRequired />;
   const data = membersQuery.data;
   const members = data?.items ?? [];
+  const currentUpdateResolution = updateResolution?.memberID === selectedID ? updateResolution : undefined;
 
   function openMember(member: AdminMemberListItem) {
+    updateMember.reset();
+    setUpdateResolution(undefined);
     setSelectedID(member.id);
     setTab("INFO");
     setOrderPage(1);
@@ -159,6 +172,7 @@ export function AdminMembersPageV2() {
   }
 
   function cancelMemberEdit() {
+    if (updateMember.isPending) return;
     if (memberEditIsDirty()) {
       confirmation.ask({ title: "회원 변경 취소", message: "저장하지 않은 권한·상태 변경을 버릴까요?", confirmLabel: "변경 버리기", danger: true }, discardMemberEdit);
       return;
@@ -177,6 +191,8 @@ export function AdminMembersPageV2() {
       return;
     }
     setEditing(false);
+    updateMember.reset();
+    setUpdateResolution(undefined);
     setSelectedID(undefined);
   }
 
@@ -266,7 +282,7 @@ export function AdminMembersPageV2() {
           tab === "INFO" && memberQuery.data ? (
             <>
               {editing ? (
-                <Button type="button" variant="secondary" onClick={cancelMemberEdit}>
+                <Button type="button" variant="secondary" disabled={updateMember.isPending} onClick={cancelMemberEdit}>
                   취소
                 </Button>
               ) : null}
@@ -279,7 +295,7 @@ export function AdminMembersPageV2() {
                     setEditing(true);
                     return;
                   }
-                  confirmation.ask({ title: "회원 정보 저장", message: `회원 #${selectedID}의 권한·상태 변경을 저장할까요?`, confirmLabel: "변경 저장" }, () => updateMember.mutate());
+                  if (selectedID) confirmation.ask({ title: "회원 정보 저장", message: `회원 #${selectedID}의 권한·상태 변경을 저장할까요?`, confirmLabel: "변경 저장" }, () => updateMember.mutate(selectedID));
                 }}
               >
                 {editing ? "변경 저장" : "회원 수정"}
@@ -292,18 +308,21 @@ export function AdminMembersPageV2() {
           className="mb-5"
           ariaLabel="회원 상세 탭"
           value={tab}
-          onValueChange={(value) => setTab(value as "INFO" | "ORDERS")}
+          onValueChange={(value) => {
+            if (updateMember.isPending) return;
+            setTab(value as "INFO" | "ORDERS");
+          }}
           items={[{ value: "INFO", label: "회원 정보" }, { value: "ORDERS", label: "주문 내역" }]}
         />
         {tab === "INFO" ? (
           memberQuery.data ? (
             <>
-            {updateResolution ? <p className="mb-4 rounded-md bg-status-positive-subtle px-3 py-2 text-sm font-bold text-status-positive" role="status">{updateResolution}</p> : null}
+            {currentUpdateResolution ? <p className={`mb-4 rounded-md px-3 py-2 text-sm font-bold ${currentUpdateResolution.tone === "error" ? "bg-status-negative-subtle text-status-negative" : "bg-status-positive-subtle text-status-positive"}`} role={currentUpdateResolution.tone === "error" ? "alert" : "status"}>{currentUpdateResolution.message}</p> : null}
             <DetailGrid>
               <DetailItem label="이메일">{memberQuery.data.email}</DetailItem>
               <DetailItem label="권한">
                 {editing ? (
-                  <Select className={consoleInputClass} value={editRole} onChange={(event) => setEditRole(event.target.value)}>
+                  <Select className={consoleInputClass} value={editRole} onChange={(event) => setEditRole(event.target.value)} disabled={updateMember.isPending}>
                     <option value="MEMBER">일반 회원</option>
                     <option value="SELLER">판매자</option>
                     <option value="ADMIN">관리자</option>
@@ -314,7 +333,7 @@ export function AdminMembersPageV2() {
               </DetailItem>
               <DetailItem label="상태">
                 {editing ? (
-                  <Select className={consoleInputClass} value={editStatus} onChange={(event) => setEditStatus(event.target.value)}>
+                  <Select className={consoleInputClass} value={editStatus} onChange={(event) => setEditStatus(event.target.value)} disabled={updateMember.isPending}>
                     <option value="ACTIVE">활성</option>
                     <option value="PENDING">대기</option>
                     <option value="SUSPENDED">정지</option>
@@ -378,7 +397,11 @@ export function AdminMarketsPageV2() {
   const [penaltyScore, setPenaltyScore] = useState("10");
   const [penaltyReason, setPenaltyReason] = useState("");
   const debouncedQuery = useDebouncedValue(query);
-  useConsoleUrlFilters({ page, q: query, status });
+  useConsoleUrlFilters({ page, q: query, status }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+  });
 
   const marketsQuery = useQuery({
     queryKey: ["admin-markets-v2", page, debouncedQuery, status],
@@ -489,6 +512,7 @@ export function AdminMarketsPageV2() {
                 variant="secondary"
                 onClick={(event) => {
                   event.stopPropagation();
+                  penaltyMutation.reset();
                   setPenaltyMarket(market);
                   setPenaltyScore("10");
                   setPenaltyReason("");
@@ -498,7 +522,10 @@ export function AdminMarketsPageV2() {
               </Button>,
             ])}
             rowKeys={markets.map((market) => market.id)}
-            onRowClick={(index) => setSelectedID(markets[index].id)}
+            onRowClick={(index) => {
+              statusMutation.reset();
+              setSelectedID(markets[index].id);
+            }}
           />
           <PaginationBar
             page={data?.page ?? page}
@@ -514,7 +541,11 @@ export function AdminMarketsPageV2() {
         title={marketQuery.data?.name ?? "마켓 상세"}
         description={selectedID ? `마켓 #${selectedID}` : undefined}
         size="xl"
-        onClose={() => setSelectedID(undefined)}
+        onClose={() => {
+          if (statusMutation.isPending) return;
+          statusMutation.reset();
+          setSelectedID(undefined);
+        }}
       >
         {marketQuery.data ? (
           <div className="grid gap-6">
@@ -553,6 +584,7 @@ export function AdminMarketsPageV2() {
                   ))}
                 </div>
               </div>
+              {statusMutation.error ? <p className="rounded-md border border-status-negative/30 bg-status-negative-subtle px-3 py-2 text-sm font-bold text-status-negative" role="alert">{apiErrorMessage(statusMutation.error)}</p> : null}
             </section>
 
             <section>
@@ -605,7 +637,11 @@ export function AdminMarketsPageV2() {
         title={penaltyMarket ? `${penaltyMarket.name} 페널티 부여` : "페널티 부여"}
         description="점수와 사유를 입력하면 이 마켓에만 적용됩니다."
         size="md"
-        onClose={() => setPenaltyMarket(undefined)}
+        onClose={() => {
+          if (penaltyMutation.isPending) return;
+          penaltyMutation.reset();
+          setPenaltyMarket(undefined);
+        }}
         footer={
           <>
             <Button type="button" variant="secondary" onClick={() => setPenaltyMarket(undefined)}>취소</Button>
@@ -625,6 +661,7 @@ export function AdminMarketsPageV2() {
         }
       >
         <div className="grid gap-4 sm:grid-cols-[160px_minmax(0,1fr)]">
+          {penaltyMutation.error ? <p className="sm:col-span-2 rounded-md border border-status-negative/30 bg-status-negative-subtle px-3 py-2 text-sm font-bold text-status-negative" role="alert">{apiErrorMessage(penaltyMutation.error)}</p> : null}
           <FilterField label="점수 (1~100)">
             <Input
               className={consoleInputClass}

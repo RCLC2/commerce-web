@@ -19,6 +19,10 @@ type ConsoleTableProps = {
   emptyAction?: ReactNode;
 };
 
+function isInteractiveTarget(target: EventTarget | null) {
+  return target instanceof HTMLElement && Boolean(target.closest("button,a,input,select,textarea,[role='button'],[role='link']"));
+}
+
 export function ConsoleTable({
   columns,
   rows,
@@ -67,9 +71,13 @@ export function ConsoleTable({
                   onRowClick &&
                     "cursor-pointer transition hover:bg-surface-subtle focus-visible:bg-surface-subtle focus-visible:outline-2 focus-visible:-outline-offset-2",
                 )}
-                onClick={() => onRowClick?.(rowIndex)}
+                onClick={(event) => {
+                  if (isInteractiveTarget(event.target)) return;
+                  onRowClick?.(rowIndex);
+                }}
                 onKeyDown={(event) => {
                   if (!onRowClick || (event.key !== "Enter" && event.key !== " ")) return;
+                  if (event.target !== event.currentTarget) return;
                   event.preventDefault();
                   onRowClick(rowIndex);
                 }}
@@ -95,14 +103,13 @@ export function ConsoleTable({
           ));
 
           return onRowClick ? (
-            <Button variant="ghost"
+            <div
               key={rowKeys?.[rowIndex] ?? rowIndex}
-              type="button"
-              className="grid w-full gap-3 rounded-surface border border-border-subtle bg-surface-raised p-4 text-left shadow-card transition hover:border-border-interactive"
-              onClick={() => onRowClick(rowIndex)}
+              className="grid gap-3 rounded-surface border border-border-subtle bg-surface-raised p-4 shadow-card transition hover:border-border-interactive"
             >
               {content}
-            </Button>
+              <Button type="button" variant="secondary" size="sm" className="w-full" onClick={() => onRowClick(rowIndex)}>상세 보기</Button>
+            </div>
           ) : (
             <div
               key={rowKeys?.[rowIndex] ?? rowIndex}
@@ -321,23 +328,120 @@ export function useDebouncedValue<T>(value: T, delay = 300) {
   return debouncedValue;
 }
 
-export function useConsoleUrlFilters(values: Record<string, string | number | undefined>) {
+export type ConsoleUrlSyncState = {
+  lastObservedQuery: string;
+  desiredQuery: string;
+  latestRequestedQuery?: string;
+  supersededQueries: string[];
+};
+
+export function createConsoleUrlSyncState(initialQuery: string): ConsoleUrlSyncState {
+  return {
+    lastObservedQuery: initialQuery,
+    desiredQuery: initialQuery,
+    supersededQueries: [],
+  };
+}
+
+export function advanceConsoleUrlSync(
+  state: ConsoleUrlSyncState,
+  currentQuery: string,
+  desiredQuery: string,
+  isHistoryNavigation = false,
+): { state: ConsoleUrlSyncState; action: "none" | "replace" | "external" } {
+  const supersededQueries = new Set(state.supersededQueries);
+  let latestRequestedQuery = state.latestRequestedQuery;
+  let action: "none" | "replace" | "external" = "none";
+  let staleRequestedNavigation = false;
+
+  if (currentQuery !== state.lastObservedQuery) {
+    if (isHistoryNavigation) {
+      latestRequestedQuery = undefined;
+      supersededQueries.clear();
+      action = "external";
+    } else if (currentQuery === latestRequestedQuery) {
+      latestRequestedQuery = undefined;
+    } else if (supersededQueries.has(currentQuery)) {
+      supersededQueries.delete(currentQuery);
+      staleRequestedNavigation = true;
+    } else {
+      latestRequestedQuery = undefined;
+      supersededQueries.clear();
+      action = "external";
+    }
+  }
+
+  const desiredChanged = desiredQuery !== state.desiredQuery;
+  if (action !== "external" && desiredQuery !== currentQuery) {
+    if (desiredChanged && latestRequestedQuery && latestRequestedQuery !== desiredQuery) {
+      supersededQueries.add(latestRequestedQuery);
+    }
+    if (desiredChanged || latestRequestedQuery !== desiredQuery || staleRequestedNavigation) {
+      latestRequestedQuery = desiredQuery;
+      action = "replace";
+    }
+  }
+
+  return {
+    state: {
+      lastObservedQuery: currentQuery,
+      desiredQuery,
+      latestRequestedQuery,
+      supersededQueries: Array.from(supersededQueries).slice(-16),
+    },
+    action,
+  };
+}
+
+export function useConsoleUrlFilters(
+  values: Record<string, string | number | undefined>,
+  onExternalChange?: (searchParams: URLSearchParams) => void,
+) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const serialized = JSON.stringify(Object.entries(values).sort(([left], [right]) => left.localeCompare(right)));
+  const syncStateRef = useRef(createConsoleUrlSyncState(searchParams.toString()));
+  const historyNavigationRef = useRef(false);
+  const onExternalChangeRef = useRef(onExternalChange);
 
   useEffect(() => {
-    const next = new URLSearchParams(searchParams.toString());
-    for (const [key, value] of Object.entries(values)) {
-      if (value === undefined || value === "" || value === 0 || value === "ALL") next.delete(key);
+    onExternalChangeRef.current = onExternalChange;
+  }, [onExternalChange]);
+
+  useEffect(() => {
+    const markHistoryNavigation = () => {
+      historyNavigationRef.current = true;
+    };
+    window.addEventListener("popstate", markHistoryNavigation);
+    return () => window.removeEventListener("popstate", markHistoryNavigation);
+  }, []);
+
+  useEffect(() => {
+    const currentQuery = searchParams.toString();
+    const next = new URLSearchParams(currentQuery);
+    const serializedValues = JSON.parse(serialized) as Array<[string, string | number | null]>;
+    for (const [key, value] of serializedValues) {
+      if (value === null || value === "" || value === 0 || value === "ALL") next.delete(key);
       else next.set(key, String(value));
     }
     const nextQuery = next.toString();
-    if (nextQuery !== searchParams.toString()) {
+    const result = advanceConsoleUrlSync(
+      syncStateRef.current,
+      currentQuery,
+      nextQuery,
+      historyNavigationRef.current,
+    );
+    syncStateRef.current = result.state;
+    historyNavigationRef.current = false;
+    if (result.action === "external") {
+      onExternalChangeRef.current?.(new URLSearchParams(currentQuery));
+      return;
+    }
+    if (result.action === "replace") {
       router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
     }
-  }, [pathname, router, searchParams, serialized, values]);
+  }, [pathname, router, searchParams, serialized]);
 }
 
 export function consoleUrlValue(searchParams: { get: (key: string) => string | null }, key: string, fallback = "") {

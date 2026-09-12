@@ -13,7 +13,6 @@ import {
   rawCartSchema,
   rawCouponDefinitionSchema,
   rawIssuableCouponQuoteSchema,
-  rawNotificationSchema,
   rawOwnedCouponSchema,
   rawPaymentRequestSchema,
   rawReviewMutationSchema,
@@ -24,7 +23,6 @@ import {
   normalizeCartItem,
   normalizeCouponDefinition,
   normalizeIssuableCouponQuote,
-  normalizeNotification,
   normalizeOwnedCoupon,
   normalizePaymentRequest,
   normalizePublicProduct,
@@ -39,6 +37,35 @@ export type CreateOrderLineReviewPayload = {
 };
 
 export type CustomerOrderListStatus = "PAYMENT_PENDING" | "PAID" | "PLACED" | "CANCELLED";
+
+const rawReviewPageSchema = z.object({
+  items: z.array(rawReviewMutationSchema),
+  next_cursor: z.string().optional(),
+});
+
+const inboxNotificationSchema = z.object({
+  id: z.number().int().positive(),
+  member_id: z.number().int().positive(),
+  message_id: z.number().int().positive(),
+  created_at: z.string(),
+  read_at: z.string().nullable().optional(),
+  toast_shown_at: z.string().nullable().optional(),
+  message: z.object({
+    id: z.number().int().positive(),
+    kind: z.enum(["INFORMATION", "MARKETING"]),
+    title: z.string(),
+    body: z.string(),
+    destination_path: z.string(),
+    toast_enabled: z.boolean(),
+    toast_expires_at: z.string().nullable().optional(),
+  }),
+});
+
+const inboxNotificationPageSchema = z.object({
+  items: z.array(inboxNotificationSchema),
+  next_cursor: z.string().optional(),
+  read_through: z.string(),
+});
 
 async function listAllOrders(token: string) {
   const pageSize = 100;
@@ -57,6 +84,20 @@ async function listAllOrders(token: string) {
     if (page.length < pageSize || unseen.length === 0) {
       return orders;
     }
+  }
+}
+
+async function collectCursorPages<T>(loadPage: (cursor?: string) => Promise<{ items: T[]; next_cursor?: string }>) {
+  const items: T[] = [];
+  const seenCursors = new Set<string>();
+  let cursor: string | undefined;
+  while (true) {
+    const page = await loadPage(cursor);
+    items.push(...page.items);
+    const nextCursor = page.next_cursor;
+    if (!nextCursor || seenCursors.has(nextCursor)) return items;
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
   }
 }
 
@@ -105,9 +146,24 @@ export const customerApi = {
     requestVoid(`/api/v1/me/addresses/${addressID}`, { method: "PATCH", token, body: JSON.stringify(payload) }),
   listMyReviews: async (token: string) =>
     (await requestParsed(z.array(rawReviewMutationSchema), "/api/v1/me/reviews", { token })).map(normalizeReviewMutation),
-  listNotifications: async (token: string) =>
-    (await requestParsed(z.array(rawNotificationSchema), "/api/v1/me/notifications", { token }))
-      .map(normalizeNotification),
+  getNotificationPage: (token: string, cursor?: string) => requestParsed(
+    inboxNotificationPageSchema,
+    `/api/v1/me/notifications?limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+    { token },
+  ),
+  unreadNotificationCount: (token: string) => requestParsed(z.object({ unread_count: z.number().int().nonnegative() }), "/api/v1/me/notifications/unread-count", { token }),
+  markAllNotificationsRead: (token: string, readThrough: string) => requestVoid("/api/v1/notifications/read-all", { method: "POST", token, body: JSON.stringify({ read_through: readThrough }) }),
+  acknowledgeNotificationToasts: (token: string, notificationIDs: number[]) => requestVoid("/api/v1/notifications/toast-ack", { method: "POST", token, body: JSON.stringify({ notification_ids: notificationIDs }) }),
+  listNotifications: async (token: string) => {
+    const items: z.infer<typeof inboxNotificationSchema>[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await customerApi.getNotificationPage(token, cursor);
+      items.push(...page.items);
+      cursor = page.next_cursor;
+    } while (cursor);
+    return items;
+  },
   listMyRecommendations: async (token: string, params: { limit?: number; offset?: number } = {}) => {
     const search = new URLSearchParams();
     if (params.limit) search.set("limit", String(params.limit));

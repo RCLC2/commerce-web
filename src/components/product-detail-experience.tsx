@@ -156,6 +156,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
   });
 
   function handleCartAction() {
+    if (addCart.isPending) return;
     if (!effectiveToken) {
       router.push("/login");
       return;
@@ -176,13 +177,17 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
     addCart.mutate();
   }
   function handleOption(option: number) {
+    if (addCart.isPending) return;
     addCart.reset();
     setOptionID(option);
     setQuantity(1);
   }
   function handleQuantity(next: number) {
+    if (addCart.isPending) return;
+    const nextQuantity = clampOptionQuantity(next, selectedOption);
+    if (nextQuantity === purchaseQuantity) return;
     addCart.reset();
-    setQuantity(clampOptionQuantity(next, selectedOption));
+    setQuantity(nextQuantity);
   }
   const likeMutation = useMutation({
     mutationFn: async (target: boolean) => {
@@ -263,7 +268,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
     if (imageCount <= 1) return;
     const timer = window.setInterval(() => {
       setActiveImage((current) => (current + 1) % imageCount);
-    }, 5000);
+    }, 5_000);
     return () => window.clearInterval(timer);
   }, [product?.images?.length]);
 
@@ -587,7 +592,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
       <PageJumpControls />
 
       <div
-        className={`fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[var(--commerce-z-dropdown)] border-t border-border-subtle bg-surface-raised/95 px-4 py-3 shadow-float backdrop-blur transition after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-4 after:bg-surface-raised md:bottom-0 ${showFloatingPurchase ? "opacity-100" : "pointer-events-none translate-y-full opacity-0"}`}
+        className={`fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[var(--commerce-z-dropdown)] border-t border-border-subtle bg-surface-raised/95 px-4 py-3 shadow-float backdrop-blur transition after:pointer-events-none after:absolute after:top-full after:h-4 after:bg-surface-raised md:bottom-0 ${showFloatingPurchase ? "opacity-100" : "pointer-events-none translate-y-full opacity-0"}`}
         aria-hidden={!showFloatingPurchase}
         role="group"
         aria-label="빠른 구매"
@@ -705,6 +710,7 @@ function PurchaseControls(props: PurchaseControlsProps) {
           className="mt-2 h-12 w-full rounded-control border border-border-interactive bg-surface-raised px-3 text-sm outline-none focus:border-foreground"
           value={props.selectedOption?.id ?? ""}
           onChange={(event) => props.onOption(Number(event.target.value))}
+          disabled={props.cartPending}
         >
           {!props.selectedOption ? <option value="">판매 가능한 옵션 없음</option> : null}
           {props.product.options?.map((option) => (
@@ -718,9 +724,9 @@ function PurchaseControls(props: PurchaseControlsProps) {
       <div className="flex items-center justify-between rounded-control border border-border-subtle p-3">
         <span className="text-sm font-bold">수량</span>
         <div className="flex items-center gap-3">
-          <Button variant="secondary" size="icon" onClick={() => props.onQuantity(Math.max(1, props.quantity - 1))} aria-label="수량 줄이기"><Minus size={16} /></Button>
+          <Button variant="secondary" size="icon" disabled={props.cartPending || props.quantity <= 1} onClick={() => props.onQuantity(Math.max(1, props.quantity - 1))} aria-label="수량 줄이기"><Minus size={16} /></Button>
           <span className="w-6 text-center font-bold">{props.quantity}</span>
-          <Button variant="secondary" size="icon" disabled={props.quantity >= props.availableQuantity} onClick={() => props.onQuantity(Math.min(props.availableQuantity, props.quantity + 1))} aria-label="수량 늘리기"><Plus size={16} /></Button>
+          <Button variant="secondary" size="icon" disabled={props.cartPending || props.quantity >= props.availableQuantity} onClick={() => props.onQuantity(Math.min(props.availableQuantity, props.quantity + 1))} aria-label="수량 늘리기"><Plus size={16} /></Button>
         </div>
       </div>
       <div className="flex items-center justify-between px-1 text-sm">

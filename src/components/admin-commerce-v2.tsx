@@ -58,7 +58,13 @@ export function AdminProductsPageV2() {
   const [categoryID, setCategoryID] = useState(() => consoleUrlValue(searchParams, "category"));
   const [selectedID, setSelectedID] = useState<number>();
   const debouncedQuery = useDebouncedValue(query);
-  useConsoleUrlFilters({ page, q: query, status, market: marketID, category: categoryID });
+  useConsoleUrlFilters({ page, q: query, status, market: marketID, category: categoryID }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+    setMarketID(consoleUrlValue(next, "market"));
+    setCategoryID(consoleUrlValue(next, "category"));
+  });
 
   const productsQuery = useQuery({
     queryKey: ["admin-products-v2", page, debouncedQuery, status, marketID, categoryID],
@@ -255,7 +261,14 @@ export function AdminOrdersPageV2() {
   const [selectedCode, setSelectedCode] = useState<string>();
   const [cancelResolution, setCancelResolution] = useState<string>();
   const debouncedQuery = useDebouncedValue(query);
-  useConsoleUrlFilters({ page, q: query, status, market: marketID, from, to });
+  useConsoleUrlFilters({ page, q: query, status, market: marketID, from, to }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+    setMarketID(consoleUrlValue(next, "market"));
+    setFrom(consoleUrlValue(next, "from"));
+    setTo(consoleUrlValue(next, "to"));
+  });
 
   const ordersQuery = useQuery({
     queryKey: ["admin-orders-v2", page, debouncedQuery, status, marketID, from, to],
@@ -445,7 +458,13 @@ export function AdminSettlementsPageV2() {
   const [linePage, setLinePage] = useState(1);
   const [paidResolution, setPaidResolution] = useState<string>();
   const debouncedQuery = useDebouncedValue(query);
-  useConsoleUrlFilters({ page, q: query, status, month: targetMonth, market: marketID });
+  useConsoleUrlFilters({ page, q: query, status, month: targetMonth, market: marketID }, (next) => {
+    setPage(Number(consoleUrlValue(next, "page", "1")) || 1);
+    setQuery(consoleUrlValue(next, "q"));
+    setStatus(consoleUrlValue(next, "status", "ALL"));
+    setTargetMonth(consoleUrlValue(next, "month"));
+    setMarketID(consoleUrlValue(next, "market"));
+  });
 
   const settlementsQuery = useQuery({
     queryKey: ["admin-settlements-v2", page, debouncedQuery, status, targetMonth, marketID],
@@ -467,12 +486,12 @@ export function AdminSettlementsPageV2() {
     enabled: Boolean(token && selectedID),
   });
   const paidMutation = useMutation({
-    mutationFn: () => adminConsoleApi.markSettlementPaid(token ?? "", selectedID ?? 0),
-    onSuccess: async () => {
-      setPaidResolution("정산 지급 완료 처리를 반영했습니다.");
+    mutationFn: (settlementID: number) => adminConsoleApi.markSettlementPaid(token ?? "", settlementID),
+    onSuccess: async (_result, settlementID) => {
+      if (selectedID === settlementID) setPaidResolution("정산 지급 완료 처리를 반영했습니다.");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-settlements-v2"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-settlement-v2", selectedID] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-settlement-v2", settlementID] }),
       ]);
     },
   });
@@ -538,13 +557,14 @@ export function AdminSettlementsPageV2() {
         title={settlementQuery.data ? `${settlementQuery.data.market_name} ${settlementQuery.data.target_month} 정산` : "정산 상세"}
         size="xl"
         onClose={() => {
+          if (paidMutation.isPending) return;
           paidMutation.reset();
           setPaidResolution(undefined);
           setSelectedID(undefined);
         }}
         footer={
           settlementQuery.data && settlementQuery.data.status !== "PAID" ? (
-            <Button type="button" disabled={paidMutation.isPending} onClick={() => confirmation.ask({ title: "정산 지급 완료", message: "이 정산을 지급 완료 상태로 변경할까요?", confirmLabel: "지급 완료 처리" }, () => paidMutation.mutate())}>지급 완료 처리</Button>
+            <Button type="button" disabled={paidMutation.isPending} onClick={() => confirmation.ask({ title: "정산 지급 완료", message: "이 정산을 지급 완료 상태로 변경할까요?", confirmLabel: "지급 완료 처리" }, () => { if (selectedID) paidMutation.mutate(selectedID); })}>지급 완료 처리</Button>
           ) : undefined
         }
       >
