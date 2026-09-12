@@ -1,12 +1,15 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Bell } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
 import { useSessionStore } from "@/lib/session-store";
 import { Button } from "./ui/button";
+import { LoginRequiredState } from "./ui/feedback";
+import { PageLayout } from "./page-layout";
 
 export function NotificationsPage() {
   const token = useSessionStore((state) => state.accessToken) ?? "";
@@ -20,12 +23,22 @@ export function NotificationsPage() {
 
   useEffect(() => {
     const boundary = page.data?.read_through;
-    if (!boundary || openedBoundary.current === boundary || markAll.isPending) return;
+    if (!token || !boundary || openedBoundary.current === boundary || markAll.isPending) return;
     openedBoundary.current = boundary;
     markAll.mutate(boundary);
-  }, [page.data?.read_through, markAll]);
+  }, [page.data?.read_through, markAll, token]);
 
-  if (!token) return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-black">알림함</h1><p className="mt-2 text-sm text-muted">로그인 후 알림을 확인하세요.</p><Link href="/login"><Button className="mt-5">로그인하기</Button></Link></main>;
+  if (!token) {
+    return (
+      <PageLayout className="max-w-3xl">
+        <LoginRequiredState
+          icon={<Bell className="size-7" />}
+          description="새로운 알림을 확인하려면 로그인해주세요."
+          loginHref="/login?next=/notifications"
+        />
+      </PageLayout>
+    );
+  }
   if (page.isLoading) return <main className="mx-auto max-w-3xl px-4 py-12 text-sm text-muted">알림함을 불러오는 중입니다.</main>;
   if (page.error) return <main className="mx-auto max-w-3xl px-4 py-12"><p className="text-sm font-bold text-brand">{apiErrorMessage(page.error)}</p><Button className="mt-3" size="sm" onClick={() => void page.refetch()}>다시 시도</Button></main>;
 

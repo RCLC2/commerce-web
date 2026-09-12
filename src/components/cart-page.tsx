@@ -16,9 +16,10 @@ import { groupCartItemsForDisplay, selectedCartItemIDsForGroups } from "@/lib/ca
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import { formatPrice } from "@/lib/utils";
+import { PageLayout } from "./page-layout";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
-import { EmptyState, LoadingState } from "./ui/feedback";
+import { EmptyState, LoadingState, LoginRequiredState } from "./ui/feedback";
 import { Notice } from "./ui/notice";
 import { OrderSummary } from "./ui/order-summary";
 import { QuantityStepper } from "./ui/quantity-stepper";
@@ -101,7 +102,15 @@ export function CartPage() {
   }
 
   if (!token) {
-    return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-bold">로그인이 필요합니다</h1><ButtonLink href="/login" className="mt-5">로그인하기</ButtonLink></main>;
+    return (
+      <PageLayout>
+        <LoginRequiredState
+          icon={<ShoppingBag className="size-7" />}
+          description="장바구니에 담은 상품을 확인하려면 로그인해주세요."
+          loginHref="/login?next=/cart"
+        />
+      </PageLayout>
+    );
   }
 
   function toggleGroup(cartItemIDs: readonly number[]) {
@@ -126,7 +135,7 @@ export function CartPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 pb-32 pt-8">
+    <PageLayout>
       <div className="flex items-end justify-between gap-4">
         <PageHeading icon={<PageIcon />} title="장바구니" description="상품의 옵션과 수량을 확인하고 주문하세요." />
         {displayGroups.length ? <p className="shrink-0 whitespace-nowrap text-xs font-bold text-content-secondary">{selectedGroups.length}/{displayGroups.length}개 선택</p> : null}
@@ -177,6 +186,6 @@ export function CartPage() {
           />
         </aside>
       </div>
-    </main>
+    </PageLayout>
   );
 }

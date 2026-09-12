@@ -31,6 +31,7 @@ import {
 import { useSessionStore } from "@/lib/session-store";
 import type { CartItem, OrderResponse, PaymentRequest } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
+import { PageLayout } from "./page-layout";
 import { TossPaymentWidget } from "./toss-payment-widget";
 import { Button } from "./ui/button";
 import { BottomActionBar } from "./ui/bottom-action-bar";
@@ -314,7 +315,7 @@ export function CheckoutPage() {
   });
 
   if (!token) {
-    return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-bold">로그인이 필요합니다</h1><ButtonLink href="/login" className="mt-5">로그인하기</ButtonLink></main>;
+    return <PageLayout><h1 className="text-2xl font-bold">로그인이 필요합니다</h1><ButtonLink href="/login" className="mt-5">로그인하기</ButtonLink></PageLayout>;
   }
 
   const blockingError = cart.error ?? (!createdOrderCode ? addresses.error : null);
@@ -345,7 +346,7 @@ export function CheckoutPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 pb-28 pt-8">
+    <PageLayout>
       <PageHeading icon={<PageIcon />} title="주문서" />
       {!createdOrderCode && requestedCartItemIDs !== null && cart.isSuccess && !items.length ? (
         <Notice className="mt-5" tone="warning" title="선택한 장바구니 상품을 찾을 수 없습니다."><Link href="/cart" className="font-bold underline">장바구니에서 다시 선택해주세요.</Link></Notice>
@@ -483,6 +484,6 @@ export function CheckoutPage() {
           <div className="w-1/2 shrink-0">{renderCheckoutButton()}</div>
         </BottomActionBar>
       ) : null}
-    </main>
+    </PageLayout>
   );
 }

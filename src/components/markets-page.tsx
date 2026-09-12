@@ -10,6 +10,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import type { Market, MarketFeedItem } from "@/lib/types";
 import { formatFollowerCount } from "@/lib/utils";
+import { PageLayout } from "./page-layout";
 import { ProductCard } from "./product-card";
 import { SafeImage } from "./safe-image";
 import { ButtonLink } from "./ui/button-link";
@@ -38,7 +39,7 @@ export function MarketsPage() {
   });
 
   return (
-    <main className="mx-auto min-h-[70vh] max-w-6xl px-4 pb-28 pt-8">
+    <PageLayout className="min-h-[70vh] pb-28 md:pb-28">
       <header className="overflow-hidden rounded-feature border border-border-subtle bg-gradient-to-br from-action-secondary via-surface-raised to-surface-raised px-6 py-8 text-content-primary md:px-10 md:py-11">
         <div className="flex items-center gap-3 text-action-primary">
           <Store size={19} aria-hidden="true" />
@@ -87,7 +88,7 @@ export function MarketsPage() {
         onRetry={() => void newProductsQuery.refetch()}
       />
 
-    </main>
+    </PageLayout>
   );
 }
 

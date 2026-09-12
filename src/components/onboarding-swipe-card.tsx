@@ -3,10 +3,10 @@
 import { Button } from "@/components/ui/button";
 
 import { Check, X } from "lucide-react";
-import Image from "next/image";
 import { useRef, useState } from "react";
 import type { OnboardingChoice, OnboardingInputMethod, OnboardingItem } from "@/lib/api/onboarding";
 import { cn } from "@/lib/utils";
+import { SafeImage } from "./safe-image";
 
 const swipeThreshold = 88;
 
@@ -91,7 +91,7 @@ export function OnboardingSwipeCard({
     >
       <div className="overflow-hidden rounded-feature border border-border-subtle bg-surface-raised shadow-float">
         <div className="relative aspect-[4/5] bg-surface-subtle">
-          <Image
+          <SafeImage
             src={item.product.image_url}
             alt={item.product.name}
             fill

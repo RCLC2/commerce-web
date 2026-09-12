@@ -35,6 +35,19 @@ function mountCart() {
 }
 
 describe("cart editing", () => {
+  it("uses the shared guest login state without requesting cart data", () => {
+    useSessionStore.setState({ accessToken: null, memberID: null, role: null, hydrated: true });
+    mountCart();
+
+    expect(screen.getByText("로그인이 필요합니다")).toBeInTheDocument();
+    expect(screen.getByText("장바구니에 담은 상품을 확인하려면 로그인해주세요.")).toBeInTheDocument();
+    const login = screen.getByRole("link", { name: "로그인하기" });
+    expect(login).toHaveAttribute("href", "/login?next=/cart");
+    expect(login.querySelector("button")).toBeNull();
+    expect(api.listCart).not.toHaveBeenCalled();
+    expect(api.getProduct).not.toHaveBeenCalled();
+  });
+
   it("updates grouped quantities atomically and uses the persisted ID for checkout", async () => {
     mountCart();
     const increase = await screen.findByRole("button", { name: "셔츠 수량 늘리기" });

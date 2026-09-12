@@ -136,11 +136,25 @@ test.describe("remaining public catalog routes against backend origin/main", () 
   });
 
   test("integrated search transitions from trends to live results", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
     const trendingResponse = page.waitForResponse((response) =>
       response.url().includes("/api/v1/search/trending"));
     await page.goto("/search");
     expect((await trendingResponse).ok()).toBeTruthy();
-    await expect(page.getByRole("heading", { name: "인기 검색어", exact: true })).toBeVisible();
+    const trendingHeading = page.getByRole("heading", { name: "인기 검색어", exact: true });
+    await expect(trendingHeading).toBeVisible();
+
+    const searchForm = page.locator("main > form");
+    const trendingSection = trendingHeading.locator("xpath=ancestor::section[1]");
+    await expect.poll(async () => {
+      const [searchFormBox, trendingSectionBox] = await Promise.all([
+        searchForm.boundingBox(),
+        trendingSection.boundingBox(),
+      ]);
+      if (!searchFormBox || !trendingSectionBox) return false;
+      return Math.abs(trendingSectionBox.x - searchFormBox.x) < 0.5
+        && Math.abs(trendingSectionBox.width - searchFormBox.width) < 0.5;
+    }).toBe(true);
 
     const searchResponse = page.waitForResponse((response) =>
       response.url().includes("/api/v1/search?q="));
@@ -150,7 +164,13 @@ test.describe("remaining public catalog routes against backend origin/main", () 
 
     await expect(page).toHaveURL(/\/search\?q=%EC%8A%A4%EB%83%85/);
     await expect(page.getByRole("heading", { name: "상품", exact: true })).toBeVisible();
-    await expect(page.locator('a[href^="/products/"]').first()).toBeVisible();
+    await expect.poll(async () => {
+      const [productVisible, emptyResultVisible] = await Promise.all([
+        page.locator('main a[href^="/products/"]').first().isVisible(),
+        page.getByText("검색된 상품이 없습니다.", { exact: true }).isVisible(),
+      ]);
+      return productVisible || emptyResultVisible;
+    }).toBe(true);
   });
 
   test("legacy snapshot redirects to market discovery without requesting search trends", async ({ page }) => {

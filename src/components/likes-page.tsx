@@ -5,7 +5,6 @@ import { Heart as PageIcon } from "lucide-react";
 
 import { useQuery } from "@tanstack/react-query";
 import { Bookmark, ChevronLeft, ChevronRight, Heart } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
@@ -14,7 +13,9 @@ import { validCollectionPage } from "@/lib/product-engagement";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import { ProductCard } from "./product-card";
+import { PageLayout } from "./page-layout";
 import { Button } from "./ui/button";
+import { LoginRequiredState } from "./ui/feedback";
 
 const PAGE_SIZE = 20;
 type CollectionView = "liked" | "wishlist";
@@ -47,14 +48,16 @@ export function LikesPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-24 pt-8">
+    <PageLayout>
       <PageHeading icon={<PageIcon />} title="좋아요" description="좋아요한 상품과 나중에 구매하려고 찜한 상품을 확인하세요." />
 
       {!effectiveToken ? (
-        <section className="mt-6 rounded-surface border border-border-subtle bg-surface-raised p-6 text-sm text-content-secondary shadow-card">
-          내 상품 목록을 보려면 로그인해 주세요.
-          <Link href="/login?next=/likes" className="ml-2 font-bold text-content-primary">로그인</Link>
-        </section>
+        <LoginRequiredState
+          className="mt-6"
+          icon={<Heart className="size-7" />}
+          description="좋아요한 상품과 찜한 상품을 확인하려면 로그인해주세요."
+          loginHref="/login?next=/likes"
+        />
       ) : (
         <section className="mt-8">
           <div className="flex gap-2" role="tablist" aria-label="좋아요 상품 목록">
@@ -91,7 +94,7 @@ export function LikesPage() {
           ) : null}
         </section>
       )}
-    </main>
+    </PageLayout>
   );
 }
 

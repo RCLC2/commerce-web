@@ -12,6 +12,7 @@ import { useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import type { CommerceCategory } from "@/lib/types";
+import { PageLayout } from "./page-layout";
 import { ProductCard } from "./product-card";
 import { ButtonLink } from "./ui/button-link";
 
@@ -35,7 +36,7 @@ export function CategoriesPage() {
   const filteredProducts = activeIDs.length ? products.filter((product) => activeIDs.includes(product.category_id)).slice(0, 8) : products.slice(0, 8);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-24 pt-8">
+    <PageLayout>
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
           <PageHeading icon={<PageIcon />} title="카테고리관" description="카테고리별 상품과 인기 상품을 확인하세요." />
@@ -98,7 +99,7 @@ export function CategoriesPage() {
           </div>
         ) : null}
       </section>
-    </main>
+    </PageLayout>
   );
 }
 

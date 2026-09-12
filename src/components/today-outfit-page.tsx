@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import { shouldRetryApiError } from "@/lib/api-client";
 import { outfitProductAnchorID, type TodayOutfitWeather } from "@/lib/today-outfit";
 import { createFallbackWeatherForecast, normalizeCoordinates, parseWeatherForecast } from "@/lib/weather";
+import { PageLayout } from "./page-layout";
 
 const SEOUL_COORDINATES = { latitude: 37.57, longitude: 126.98 };
 
@@ -87,7 +88,7 @@ export function TodayOutfitPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-28 pt-8">
+    <PageLayout className="pb-28 md:pb-28">
       <PageHeading className="mb-7" icon={<Shirt />} title="오늘의 코디" description="지금 날씨와 실제 판매 상품을 조합한 AI 코디를 확인해 보세요." />
 
       <WeatherPanel
@@ -119,7 +120,7 @@ export function TodayOutfitPage() {
           </>
         ) : null}
       </div>
-    </main>
+    </PageLayout>
   );
 }
 

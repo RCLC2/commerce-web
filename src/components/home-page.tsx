@@ -9,14 +9,16 @@ import { cryptoSafeID } from "@/lib/ad-events";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { couponPriceForProduct } from "@/lib/product-card-pricing";
 import { queryKeys } from "@/lib/query-keys";
-import type { CMSHomeSection, CommerceEvent, Product } from "@/lib/types";
+import type { CMSHomeSection, CommerceEvent, HomeCategoryChip, Product } from "@/lib/types";
 import { useSessionStore } from "@/lib/session-store";
 import { ApiErrorState } from "./api-error-state";
 import { ProductCard } from "./product-card";
 import { ProductCardPrice } from "./product-card-price";
 import { HomeContextTextCard, HomeFeatureCard } from "./home-placement-cards";
+import { PageLayout } from "./page-layout";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { LoadingState } from "./ui/feedback";
 
 
 function productsForHomeSection(section: CMSHomeSection) {
@@ -31,6 +33,15 @@ function productsForHomeSection(section: CMSHomeSection) {
 
 function isLegacyRecommendationSection(section: CMSHomeSection) {
   return section.api_url.includes("/products/recommendations");
+}
+
+export function usesEdgeChevronControls(section: CMSHomeSection) {
+  try {
+    const pathname = new URL(section.api_url, "https://commerce.local").pathname.replace(/\/+$/, "");
+    return pathname === "/api/v1/products/popular" || pathname === "/api/v1/products/promotions";
+  } catch {
+    return false;
+  }
 }
 
 const HOME_RECOMMENDATION_PAGE_SIZE = 12;
@@ -48,6 +59,109 @@ function nextRecommendationOffset(lastPage: { products: Product[] }, pages: Arra
   }
 
   return pages.length * HOME_RECOMMENDATION_PAGE_SIZE;
+}
+
+function HomeCategoryChipLink({ chip, className }: { chip: HomeCategoryChip; className?: string }) {
+  return (
+    <Link
+      href={chip.href}
+      className={`relative flex min-h-20 flex-col items-center justify-center gap-1 rounded-control p-1 transition hover:-translate-y-0.5 ${chip.chip_type === "CATEGORY_EVENT" ? "bg-action-secondary hover:bg-action-secondary" : "hover:bg-surface-subtle"} ${className ?? ""}`}
+    >
+      {chip.chip_type === "CATEGORY_EVENT" ? <span className="absolute right-1.5 top-1.5 rounded-full bg-action-primary px-1.5 py-0.5 text-xs font-bold tracking-wide text-content-inverse">이벤트</span> : null}
+      <span className={`flex h-10 w-10 items-center justify-center rounded-full ${chip.chip_type === "CATEGORY_EVENT" ? "bg-surface-raised shadow-card" : "border border-border-subtle bg-surface-raised"} text-action-primary`}>
+        <SafeImage src={chip.icon_url} alt="" width={24} height={24} className="h-6 w-6 object-contain" />
+      </span>
+      <span className="line-clamp-1 text-center text-xs font-bold">{chip.title}</span>
+    </Link>
+  );
+}
+
+const MOBILE_CATEGORY_PAGE_SIZE = 8;
+
+function createCategoryPages(chips: HomeCategoryChip[]) {
+  return Array.from(
+    { length: Math.ceil(chips.length / MOBILE_CATEGORY_PAGE_SIZE) },
+    (_, pageIndex) => chips.slice(pageIndex * MOBILE_CATEGORY_PAGE_SIZE, (pageIndex + 1) * MOBILE_CATEGORY_PAGE_SIZE),
+  );
+}
+
+function HomeCategoryChips({ chips }: { chips: HomeCategoryChip[] }) {
+  const sliderRef = useRef<HTMLDivElement | null>(null);
+  const [activePage, setActivePage] = useState(0);
+  const pages = createCategoryPages(chips);
+  const activePageIndex = Math.min(activePage, Math.max(0, pages.length - 1));
+
+  if (chips.length === 0) return null;
+
+  function updateActivePage() {
+    const slider = sliderRef.current;
+    if (!slider) return;
+    const pageWidth = slider.clientWidth;
+    if (!pageWidth) return;
+    setActivePage(Math.min(pages.length - 1, Math.max(0, Math.round(slider.scrollLeft / pageWidth))));
+  }
+
+  function moveToPage(pageIndex: number) {
+    const slider = sliderRef.current;
+    if (!slider) return;
+    const left = slider.clientWidth * pageIndex;
+    const behavior: ScrollBehavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+
+    if (typeof slider.scrollTo === "function") {
+      slider.scrollTo({ left, behavior });
+    } else {
+      slider.scrollLeft = left;
+    }
+  }
+
+  return (
+    <>
+      <div className="sm:hidden">
+        <div
+          ref={sliderRef}
+          role="region"
+          aria-label="홈 카테고리 페이지 슬라이드"
+          className="no-scrollbar flex min-w-0 snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth motion-reduce:scroll-auto"
+          onScroll={updateActivePage}
+        >
+          {pages.map((page, pageIndex) => (
+            <div
+              key={pageIndex}
+              role="group"
+              aria-label={`카테고리 페이지 ${pageIndex + 1} / ${pages.length}`}
+              className="grid h-[10.375rem] w-full shrink-0 snap-start grid-cols-4 grid-rows-[repeat(2,5rem)] gap-1.5"
+            >
+              {page.map((chip) => <HomeCategoryChipLink key={chip.id} chip={chip} />)}
+            </div>
+          ))}
+        </div>
+        {pages.length > 1 ? (
+          <nav className="mt-1 flex h-11 items-center justify-center" aria-label="홈 카테고리 페이지 위치">
+            <p className="sr-only" aria-live="polite">카테고리 페이지 {activePageIndex + 1} / {pages.length}</p>
+            {pages.map((_, pageIndex) => {
+              const isActive = activePageIndex === pageIndex;
+              return (
+                <button
+                  key={pageIndex}
+                  type="button"
+                  className="flex h-11 w-11 items-center justify-center rounded-full transition hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary"
+                  aria-label={`카테고리 페이지 ${pageIndex + 1}로 이동`}
+                  aria-current={isActive ? "page" : undefined}
+                  onClick={() => moveToPage(pageIndex)}
+                >
+                  <span aria-hidden="true" className={`rounded-full transition-all motion-reduce:transition-none ${isActive ? "h-1.5 w-3.5 bg-action-primary" : "h-1.5 w-1.5 bg-content-secondary/45"}`} />
+                </button>
+              );
+            })}
+          </nav>
+        ) : null}
+      </div>
+
+      <div className="hidden grid-cols-[repeat(auto-fit,minmax(72px,1fr))] gap-1.5 sm:grid">
+        {chips.map((chip) => <HomeCategoryChipLink key={chip.id} chip={chip} />)}
+      </div>
+    </>
+  );
 }
 
 export function HomePage() {
@@ -149,40 +263,32 @@ export function HomePage() {
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-24">
+    <PageLayout className="pt-0">
       <section className="py-5">
         {eventsQuery.isError ? (
           <ApiErrorState error={eventsQuery.error} onRetry={() => void eventsQuery.refetch()} retryLabel="이벤트 다시 시도" />
         ) : events.length ? (
           <EventCarousel events={events} />
         ) : eventsQuery.isLoading ? (
-          <div className="h-52 animate-pulse rounded-surface bg-surface-subtle md:h-72" />
+          <LoadingState className="min-h-52 md:min-h-72" label="이벤트를 불러오는 중입니다." />
         ) : <p className="rounded-md border border-border-subtle bg-surface-raised p-6 text-sm text-content-secondary">진행 중인 이벤트가 없습니다.</p>}
       </section>
 
       <section className="rounded-surface border border-border-subtle bg-surface-raised p-3 shadow-card" aria-label="홈 카테고리와 이벤트">
         {homeCategoryChipsQuery.isError ? <ApiErrorState className="m-3" error={homeCategoryChipsQuery.error} onRetry={() => void homeCategoryChipsQuery.refetch()} retryLabel="카테고리 다시 시도" /> : null}
-        {homeCategoryChipsQuery.isLoading ? <p className="p-3 text-sm text-content-secondary">카테고리를 불러오는 중입니다.</p> : null}
+        {homeCategoryChipsQuery.isLoading ? <LoadingState className="min-h-20" label="카테고리를 불러오는 중입니다." /> : null}
         {homeCategoryChipsQuery.isSuccess && displayHomeCategoryChips.length === 0 ? <p className="p-3 text-sm text-content-secondary">표시할 홈 카테고리가 없습니다.</p> : null}
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(72px,1fr))] gap-1.5">
-          {displayHomeCategoryChips.map((chip) => (
-            <Link key={chip.id} href={chip.href} className={`relative flex min-h-20 flex-col items-center justify-center gap-1 rounded-control p-1 transition hover:-translate-y-0.5 ${chip.chip_type === "CATEGORY_EVENT" ? "bg-action-secondary hover:bg-action-secondary" : "hover:bg-surface-subtle"}`}>
-              {chip.chip_type === "CATEGORY_EVENT" ? <span className="absolute right-1.5 top-1.5 rounded-full bg-action-primary px-1.5 py-0.5 text-xs font-bold tracking-wide text-content-inverse">이벤트</span> : null}
-              <span className={`flex h-10 w-10 items-center justify-center rounded-full ${chip.chip_type === "CATEGORY_EVENT" ? "bg-surface-raised shadow-card" : "border border-border-subtle bg-surface-raised"} text-action-primary`}>
-                <SafeImage src={chip.icon_url} alt="" width={24} height={24} className="h-6 w-6 object-contain" />
-              </span>
-              <span className="line-clamp-1 text-center text-xs font-bold">{chip.title}</span>
-            </Link>
-          ))}
-        </div>
+        {homeCategoryChipsQuery.isSuccess ? <HomeCategoryChips chips={displayHomeCategoryChips} /> : null}
       </section>
-      <HomeContextTextCard
-        card={homePlacementsQuery.data?.context_text.card}
-        token={effectiveToken}
-        memberID={memberID}
-      />
+      {homePlacementsQuery.isLoading ? <LoadingState className="min-h-24" label="맞춤 혜택을 불러오는 중입니다." /> : (
+        <HomeContextTextCard
+          card={homePlacementsQuery.data?.context_text.card}
+          token={effectiveToken}
+          memberID={memberID}
+        />
+      )}
       {homeSectionsQuery.isError ? <ApiErrorState className="my-7" error={homeSectionsQuery.error} onRetry={() => void homeSectionsQuery.refetch()} retryLabel="홈 구좌 다시 시도" /> : null}
-      {homeSectionsQuery.isLoading ? <p className="py-7 text-sm text-content-secondary">홈 상품 구좌를 불러오는 중입니다.</p> : null}
+      {homeSectionsQuery.isLoading ? <LoadingState className="min-h-40" label="홈 상품 구좌를 불러오는 중입니다." /> : null}
       {homeSectionsQuery.isSuccess && displayHomeSections.length === 0 ? <p className="py-7 text-sm text-content-secondary">표시할 홈 상품 구좌가 없습니다.</p> : null}
       {displayHomeSections.map((section, index) => (
         <ProductCarouselSection
@@ -194,10 +300,11 @@ export function HomePage() {
           isSuccess={homeSectionQueries[index]?.isSuccess ?? false}
           error={homeSectionQueries[index]?.error}
           onRetry={() => void homeSectionQueries[index]?.refetch()}
+          edgeChevronControls={usesEdgeChevronControls(section)}
         />
       ))}
       <section className="py-2" aria-label="홈 추천 카드">
-        <HomeFeatureCard card={homePlacementsQuery.data?.feature_card.card} token={effectiveToken} memberID={memberID} />
+        {homePlacementsQuery.isLoading ? <LoadingState className="min-h-44" label="추천 카드를 불러오는 중입니다." /> : <HomeFeatureCard card={homePlacementsQuery.data?.feature_card.card} token={effectiveToken} memberID={memberID} />}
       </section>
 
       <section id="recommendations" className="scroll-mt-20 py-7">
@@ -211,11 +318,7 @@ export function HomePage() {
         {recommendationQuery.isError ? (
           <ApiErrorState error={recommendationQuery.error} onRetry={() => void recommendationQuery.refetch()} retryLabel="추천 다시 시도" />
         ) : recommendationQuery.isLoading ? (
-          <div className="grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="aspect-square animate-pulse rounded-control bg-surface-subtle" />
-            ))}
-          </div>
+          <LoadingState className="min-h-64" label="추천 상품을 불러오는 중입니다." />
         ) : (
           <div className="grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
             {recommendationProducts.map((product) => (
@@ -226,14 +329,17 @@ export function HomePage() {
         {recommendationQuery.isSuccess && recommendationProducts.length === 0 ? <p className="text-sm text-content-secondary">표시할 추천 상품이 없습니다.</p> : null}
         <div ref={loadMoreRef} className="h-8" aria-hidden="true" />
         {recommendationQuery.hasNextPage || recommendationQuery.isFetchingNextPage ? (
-          <p className="text-center text-xs text-content-secondary">추천 상품을 더 불러오는 중입니다.</p>
+          <LoadingState className="min-h-20" label="추천 상품을 더 불러오는 중입니다." />
         ) : null}
       </section>
-    </main>
+    </PageLayout>
   );
 }
 
 const EVENT_AUTOPLAY_INTERVAL_MS = 3_000;
+const CAROUSEL_CONTROL_SIZE_CLASSNAME = "h-12 min-h-12 w-12";
+const CAROUSEL_PRODUCT_CHEVRON_CLASSNAME = `${CAROUSEL_CONTROL_SIZE_CLASSNAME} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary`;
+const CAROUSEL_EDGE_CHEVRON_CLASSNAME = `rounded-full border-0 bg-transparent text-content-inverse shadow-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] not-disabled:hover:bg-black/35 not-disabled:hover:text-content-inverse not-disabled:active:bg-black/45 focus-visible:bg-black/45 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-content-inverse ${CAROUSEL_CONTROL_SIZE_CLASSNAME}`;
 
 export function EventCarousel({ events }: { events: CommerceEvent[] }) {
   const [eventIndex, setEventIndex] = useState(0);
@@ -306,21 +412,33 @@ export function EventCarousel({ events }: { events: CommerceEvent[] }) {
       <div className="absolute right-4 top-4 rounded-full bg-black/55 px-3 py-1 text-xs font-bold text-content-inverse">
         {currentEventIndex + 1}/{events.length}
       </div>
-      <div className="absolute inset-y-0 left-0 flex items-center px-2">
-        <Button variant="secondary" size="icon" aria-label="이전 이벤트" onClick={() => moveEvent("prev")}>
-          <ChevronLeft size={18} />
+      <div className="absolute inset-y-0 left-0 hidden items-center px-2 sm:flex">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="이전 이벤트"
+          onClick={() => moveEvent("prev")}
+          className={CAROUSEL_EDGE_CHEVRON_CLASSNAME}
+        >
+          <ChevronLeft size={24} />
         </Button>
       </div>
-      <div className="absolute inset-y-0 right-0 flex items-center px-2">
-        <Button variant="secondary" size="icon" aria-label="다음 이벤트" onClick={() => moveEvent("next")}>
-          <ChevronRight size={18} />
+      <div className="absolute inset-y-0 right-0 hidden items-center px-2 sm:flex">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="다음 이벤트"
+          onClick={() => moveEvent("next")}
+          className={CAROUSEL_EDGE_CHEVRON_CLASSNAME}
+        >
+          <ChevronRight size={24} />
         </Button>
       </div>
     </div>
   );
 }
 
-function ProductCarouselSection({
+export function ProductCarouselSection({
   title,
   description,
   products,
@@ -328,6 +446,7 @@ function ProductCarouselSection({
   isSuccess,
   error,
   onRetry,
+  edgeChevronControls,
 }: {
   title: string;
   description: string;
@@ -336,8 +455,10 @@ function ProductCarouselSection({
   isSuccess: boolean;
   error: unknown;
   onRetry: () => void;
+  edgeChevronControls: boolean;
 }) {
   const carouselRef = useRef<HTMLDivElement | null>(null);
+  const showEdgeChevronControls = edgeChevronControls && products.length > 0;
 
   function slide(direction: "prev" | "next") {
     carouselRef.current?.scrollBy({
@@ -353,30 +474,56 @@ function ProductCarouselSection({
           <h2 className="text-xl font-bold">{title}</h2>
           {description ? <p className="mt-1 text-sm text-content-secondary">{description}</p> : null}
         </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" size="icon" aria-label={`${title} 이전`} onClick={() => slide("prev")}>
-            <ChevronLeft size={18} />
-          </Button>
-          <Button variant="secondary" size="icon" aria-label={`${title} 다음`} onClick={() => slide("next")}>
-            <ChevronRight size={18} />
-          </Button>
-        </div>
+        {!edgeChevronControls ? (
+          <div className="hidden gap-2 sm:flex">
+            <Button variant="secondary" size="icon" aria-label={`${title} 이전`} onClick={() => slide("prev")} className={CAROUSEL_PRODUCT_CHEVRON_CLASSNAME}>
+              <ChevronLeft size={24} />
+            </Button>
+            <Button variant="secondary" size="icon" aria-label={`${title} 다음`} onClick={() => slide("next")} className={CAROUSEL_PRODUCT_CHEVRON_CLASSNAME}>
+              <ChevronRight size={24} />
+            </Button>
+          </div>
+        ) : null}
       </div>
       {isLoading ? (
-        <div className="flex gap-3 overflow-hidden md:gap-4">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className="h-56 w-[42vw] shrink-0 animate-pulse rounded-control bg-surface-subtle sm:w-48 md:w-52" />
-          ))}
-        </div>
+        <LoadingState className="min-h-56" label={`${title} 상품을 불러오는 중입니다.`} />
       ) : error ? (
         <ApiErrorState error={error} onRetry={onRetry} />
       ) : (
-        <div ref={carouselRef} className="no-scrollbar flex snap-x gap-3 overflow-x-auto scroll-smooth pb-1 md:gap-4">
-          {products.map((product) => (
-            <div key={`${product.id}-${title}`} className="w-[42vw] shrink-0 snap-start sm:w-48 md:w-52">
-              <PopularSquareCard product={product} />
+        <div className={showEdgeChevronControls ? "relative" : undefined}>
+          <div ref={carouselRef} className="no-scrollbar flex min-w-0 snap-x gap-3 overflow-x-auto scroll-smooth pb-1 md:gap-4">
+            {products.map((product) => (
+              <div key={`${product.id}-${title}`} className="w-[42vw] shrink-0 snap-start sm:w-48 md:w-52">
+                <PopularSquareCard product={product} />
+              </div>
+            ))}
+          </div>
+          {showEdgeChevronControls ? (
+            <div className="pointer-events-none absolute inset-y-0 left-0 hidden items-center px-2 sm:flex">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`${title} 이전`}
+                onClick={() => slide("prev")}
+                className={`${CAROUSEL_EDGE_CHEVRON_CLASSNAME} pointer-events-auto`}
+              >
+                <ChevronLeft size={24} />
+              </Button>
             </div>
-          ))}
+          ) : null}
+          {showEdgeChevronControls ? (
+            <div className="pointer-events-none absolute inset-y-0 right-0 hidden items-center px-2 sm:flex">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`${title} 다음`}
+                onClick={() => slide("next")}
+                className={`${CAROUSEL_EDGE_CHEVRON_CLASSNAME} pointer-events-auto -translate-x-2`}
+              >
+                <ChevronRight size={24} />
+              </Button>
+            </div>
+          ) : null}
         </div>
       )}
       {isSuccess && products.length === 0 ? <p className="text-sm text-content-secondary">표시할 상품이 없습니다.</p> : null}

@@ -13,6 +13,7 @@ import { orderStatusLabel } from "@/lib/order-utils";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Notice } from "./ui/notice";
+import { PageLayout } from "./page-layout";
 
 type ConsoleLink = {
   href: string;
@@ -56,7 +57,7 @@ export function ConsoleLayout({
   );
   const activeQueryErrors = activeQueries.filter((query) => query.state.status === "error");
   return (
-    <main className="mx-auto grid max-w-7xl gap-5 px-4 pb-24 pt-5 md:grid-cols-[208px_minmax(0,1fr)]">
+    <PageLayout variant="console" className="gap-5 md:grid-cols-[208px_minmax(0,1fr)]">
       <aside className="h-fit min-w-0 rounded-surface border border-border-subtle bg-surface-raised p-3 md:sticky md:top-24">
         <div className="px-3 py-2">
           <h1 className="text-lg font-bold">{title}</h1>
@@ -95,7 +96,7 @@ export function ConsoleLayout({
         ) : null}
         {children}
       </section>
-    </main>
+    </PageLayout>
   );
 }
 

@@ -1,9 +1,11 @@
 import { Suspense } from "react";
+import { PageLayout } from "@/components/page-layout";
+import { LoadingState } from "@/components/ui/feedback";
 import { SearchPage } from "@/components/search-page";
 
 export default function Search() {
   return (
-    <Suspense fallback={<main className="mx-auto max-w-6xl px-4 py-8 text-sm text-content-secondary">검색을 준비하는 중입니다.</main>}>
+    <Suspense fallback={<PageLayout className="pt-2"><LoadingState label="검색을 준비하는 중입니다." /></PageLayout>}>
       <SearchPage />
     </Suspense>
   );

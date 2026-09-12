@@ -3,8 +3,6 @@
 import { PageHeading } from "./ui/page-heading";
 import { UserRound as PageIcon } from "lucide-react";
 
-import { ButtonLink } from "@/components/ui/button-link";
-
 import { FilterChip } from "./ui/filter-chip";
 
 import { Input } from "./ui/input";
@@ -21,8 +19,10 @@ import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import type { Address } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
+import { PageLayout } from "./page-layout";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { LoginRequiredState } from "./ui/feedback";
 
 const statuses = [
   ["ALL", "전체"], ["PAYMENT_PENDING", "결제 대기"], ["PAID", "결제 완료"], ["PLACED", "주문 접수"],
@@ -64,13 +64,25 @@ export function MyPage() {
     return (status === "ALL" || order.status === status) && (!keyword || order.order_code.toLowerCase().includes(keyword) || product?.name.toLowerCase().includes(keyword));
   });
 
-  if (!token) return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-bold">마이페이지</h1><p className="mt-2 text-sm text-content-secondary">로그인하고 주문과 혜택을 확인하세요.</p><ButtonLink href="/login" className="mt-5">로그인하기</ButtonLink></main>;
+  if (!token) {
+    return (
+      <PageLayout>
+        <PageHeading icon={<PageIcon />} title="마이페이지" />
+        <LoginRequiredState
+          className="mt-6"
+          icon={<PageIcon className="size-7" />}
+          description="로그인하고 주문과 혜택을 확인하세요."
+          loginHref="/login?next=/mypage"
+        />
+      </PageLayout>
+    );
+  }
 
   const queryError = profileQuery.error ?? ordersQuery.error ?? couponsQuery.error ?? issuableQuery.error ?? addressesQuery.error;
   const profile = profileQuery.data;
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-28 pt-7">
+    <PageLayout className="pt-7">
       <section className="border-b border-border-subtle pb-6 md:pb-8">
         <div className="flex items-start justify-between gap-3">
           <PageHeading className="[&_h1]:text-xl sm:[&_h1]:text-3xl" icon={<PageIcon />} eyebrow="마이페이지" title={`${profile?.email?.split("@")[0] || "회원"}님`} />
@@ -131,7 +143,7 @@ export function MyPage() {
           {ordersQuery.isSuccess && !filteredOrders.length ? <div className="rounded-surface border border-border-subtle bg-surface-raised p-8 text-center text-sm text-content-secondary">조건에 맞는 주문이 없습니다.</div> : null}
         </div>
       </section>
-    </main>
+    </PageLayout>
   );
 }
 

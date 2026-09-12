@@ -9,6 +9,7 @@ import { Field } from "./field";
 import { Input } from "./input";
 import { Notice } from "./notice";
 import { BottomSheet, Dialog } from "./overlay";
+import { SearchField } from "./search-field";
 import { Tabs } from "./tabs";
 
 describe("commerce UI primitives", () => {
@@ -55,6 +56,16 @@ describe("commerce UI primitives", () => {
     render(<Input aria-label="검색어" />);
 
     expect(screen.getByRole("textbox", { name: "검색어" })).toHaveClass("border-border-interactive");
+  });
+
+  it("keeps search interaction styling on one field container", () => {
+    render(<SearchField aria-label="통합 검색" />);
+
+    const input = screen.getByRole("textbox", { name: "통합 검색" });
+    const field = input.closest('[data-slot="search-field"]');
+    expect(field).toHaveClass("border-border-interactive", "hover:border-action-primary", "focus-within:border-action-primary", "focus-within:ring-4");
+    expect(input).toHaveClass("border-0", "outline-none");
+    expect(input).not.toHaveClass("focus:ring-4");
   });
 
   it("moves a tab selection with arrow keys", () => {

@@ -16,6 +16,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import type { CouponDefinition } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
+import { PageLayout } from "./page-layout";
 import { Button } from "./ui/button";
 
 export function MyCouponsPage() {
@@ -64,10 +65,10 @@ export function MyCouponsPage() {
   }
 
   if (!token) {
-    return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-bold">쿠폰</h1><ButtonLink href="/login?next=/mypage/coupons" className="mt-5">로그인하기</ButtonLink></main>;
+    return <PageLayout><h1 className="text-2xl font-bold">쿠폰</h1><ButtonLink href="/login?next=/mypage/coupons" className="mt-5">로그인하기</ButtonLink></PageLayout>;
   }
 
-  return <main className="mx-auto max-w-3xl px-4 pb-24 pt-8">
+  return <PageLayout>
     <Link href="/mypage" className="inline-flex items-center gap-1 text-sm font-bold text-content-secondary"><ArrowLeft size={17} /> 뒤로가기</Link>
     <PageHeading className="mt-5" icon={<PageIcon />} title="쿠폰" description="발급 가능한 혜택과 보유한 쿠폰을 확인하세요." />
     <nav className="mt-5 flex flex-wrap gap-2" aria-label="쿠폰 목록">
@@ -95,7 +96,7 @@ export function MyCouponsPage() {
       ))}
       {selectedQuery.isSuccess && !items.length ? <p className="rounded-surface border border-border-subtle bg-surface-raised p-8 text-center text-sm text-content-secondary">표시할 쿠폰이 없습니다.</p> : null}
     </div>
-  </main>;
+  </PageLayout>;
 }
 
 function CouponHeading({ coupon }: { coupon: CouponDefinition }) {

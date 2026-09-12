@@ -26,10 +26,11 @@ import { discountRate, formatPrice } from "@/lib/utils";
 import { CollapsibleProductDetail } from "./collapsible-product-detail";
 import { PDPReviewBanner } from "./home-placement-cards";
 import { PageJumpControls } from "./page-jump-controls";
+import { PageLayout } from "./page-layout";
 import { PDPShelfSection } from "./pdp-merchandising-sections";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
-import { Toast } from "./ui/feedback";
+import { LoadingState, Toast } from "./ui/feedback";
 import { useAccessibleOverlay } from "./ui/use-accessible-overlay";
 
 class CartPreflightError extends Error {
@@ -294,10 +295,10 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
   }, [product]);
 
   if (productQuery.isLoading) {
-    return <main className="mx-auto max-w-6xl px-4 py-10">상품을 불러오는 중입니다.</main>;
+    return <PageLayout variant="product-detail" className="pt-10"><LoadingState label="상품을 불러오는 중입니다." /></PageLayout>;
   }
   if (productQuery.isError || !product) {
-    return <main className="mx-auto max-w-6xl px-4 py-10">상품을 불러오지 못했습니다.</main>;
+    return <PageLayout variant="product-detail" className="pt-10">상품을 불러오지 못했습니다.</PageLayout>;
   }
 
   const images = product.images?.length
@@ -347,7 +348,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-28 pt-5 md:pb-20 md:pt-8">
+    <PageLayout variant="product-detail">
       <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_360px] lg:grid-cols-[minmax(0,620px)_420px] lg:justify-between">
         <section>
           <div
@@ -592,7 +593,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
       <PageJumpControls />
 
       <div
-        className={`fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[var(--commerce-z-dropdown)] border-t border-border-subtle bg-surface-raised/95 px-4 py-3 shadow-float backdrop-blur transition after:pointer-events-none after:absolute after:top-full after:h-4 after:bg-surface-raised md:bottom-0 ${showFloatingPurchase ? "opacity-100" : "pointer-events-none translate-y-full opacity-0"}`}
+        className={`fixed inset-x-0 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[var(--commerce-z-dropdown)] border-t border-border-subtle bg-surface-raised/95 px-4 py-3 shadow-float backdrop-blur transition ${showFloatingPurchase ? "opacity-100" : "pointer-events-none translate-y-full opacity-0"}`}
         aria-hidden={!showFloatingPurchase}
         role="group"
         aria-label="빠른 구매"
@@ -651,11 +652,11 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
         </div>
       ) : null}
       {toast ? (
-        <div className="pointer-events-none fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[var(--commerce-z-modal)] flex justify-center md:bottom-6">
+        <div className="pointer-events-none fixed inset-x-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[var(--commerce-z-modal)] flex justify-center">
           <Toast tone={toast.tone} className="pointer-events-auto max-w-md">{toast.message}</Toast>
         </div>
       ) : null}
-    </main>
+    </PageLayout>
   );
 }
 

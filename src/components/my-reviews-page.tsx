@@ -15,6 +15,7 @@ import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
+import { PageLayout } from "./page-layout";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
@@ -68,10 +69,10 @@ export function MyReviewsPage() {
     remove.mutate(variables);
   }
 
-  if (!token) return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-bold">내 리뷰</h1><ButtonLink href="/login?next=/mypage/reviews" className="mt-5">로그인하기</ButtonLink></main>;
+  if (!token) return <PageLayout><h1 className="text-2xl font-bold">내 리뷰</h1><ButtonLink href="/login?next=/mypage/reviews" className="mt-5">로그인하기</ButtonLink></PageLayout>;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 pb-24 pt-8">
+    <PageLayout>
       <Link href="/mypage" className="inline-flex items-center gap-1 text-sm font-bold text-content-secondary hover:text-content-primary"><ArrowLeft size={17} /> 뒤로가기</Link>
       <PageHeading className="mt-5" icon={<PageIcon />} title="리뷰 관리" />
       <p className="mt-1 text-sm text-content-secondary">작성한 리뷰를 확인하고 수정하거나 삭제할 수 있습니다.</p>
@@ -118,6 +119,6 @@ export function MyReviewsPage() {
         })}
         {reviews.isSuccess && !items.length ? <p className="rounded-surface border border-border-subtle bg-surface-raised p-8 text-center text-sm text-content-secondary">작성한 리뷰가 없습니다.</p> : null}
       </div>
-    </main>
+    </PageLayout>
   );
 }

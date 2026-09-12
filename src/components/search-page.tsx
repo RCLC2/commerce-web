@@ -3,8 +3,6 @@
 import { Pagination } from "./ui/pagination";
 import { PageHeading } from "./ui/page-heading";
 
-import { Input } from "./ui/input";
-
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowLeft, ArrowUp, ChevronLeft, ChevronRight, Minus, Package, Search, Sparkles, Star, Store, Users, XCircle } from "lucide-react";
 import Link from "next/link";
@@ -18,10 +16,12 @@ import { couponPriceForProduct } from "@/lib/product-card-pricing";
 import { formatFollowerCount } from "@/lib/utils";
 import { ProductCard } from "./product-card";
 import { ProductCardPrice } from "./product-card-price";
+import { PageLayout } from "./page-layout";
 import { ApiErrorState } from "./api-error-state";
 import { SponsoredPlacement } from "./advertising/sponsored-placement";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { SearchField } from "./ui/search-field";
 
 export function SearchPage() {
   const searchParams = useSearchParams();
@@ -114,20 +114,26 @@ function SearchExperience({
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-24 pt-2">
+    <PageLayout className="pt-2">
       <form className="sticky top-0 z-30 flex h-16 items-center gap-3 bg-background/95 backdrop-blur" onSubmit={submitSearch}>
         <Button variant="ghost" size="icon" type="button" aria-label="뒤로가기" onClick={goBack} className="flex h-11 w-11 shrink-0 items-center justify-center">
           <ArrowLeft size={27} />
         </Button>
-        <div className="relative flex h-12 min-w-0 flex-1 items-center gap-2 rounded-control border border-border-interactive bg-surface-raised px-3">
-          <Search size={20} className="shrink-0 text-content-secondary" />
-          <Input value={input} onChange={(event) => setInput(event.target.value)} className="w-full bg-transparent text-lg font-bold outline-none" placeholder="상품, 마켓, 키워드 검색" aria-label="검색어 입력" autoFocus />
-          {input ? <Button variant="ghost" size="icon" type="button" aria-label="검색어 지우기" onClick={() => setInput("")} className="text-content-secondary"><XCircle size={22} /></Button> : null}
-        </div>
+        <SearchField
+          className="flex-1"
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          inputClassName="text-lg font-bold"
+          icon={<Search size={20} className="size-5 shrink-0 text-content-secondary" aria-hidden="true" />}
+          endAdornment={input ? <Button variant="ghost" size="icon" type="button" aria-label="검색어 지우기" onClick={() => setInput("")} className="text-content-secondary"><XCircle size={22} /></Button> : null}
+          placeholder="상품, 마켓, 키워드 검색"
+          aria-label="검색어 입력"
+          autoFocus
+        />
       </form>
 
       {!initialQuery ? (
-        <section className="mx-auto max-w-3xl pt-7">
+        <section className="pt-7">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <PageHeading icon={<Search />} title="인기 검색어" />
             <p className="text-sm font-bold text-content-secondary">{now ? now.toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }) : "--.-- --:--"} 현재</p>
@@ -178,7 +184,7 @@ function SearchExperience({
           {results ? <Pagination page={results.markets.page} totalPages={results.markets.total_pages} onChange={(page) => changePage("market", page)} label="마켓" /> : null}
         </div>
       )}
-    </main>
+    </PageLayout>
   );
 }
 
