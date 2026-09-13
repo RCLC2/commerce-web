@@ -187,7 +187,7 @@ describe("ProductCarouselSection", () => {
       />,
     );
 
-    expect(screen.getByText("표시할 상품이 없습니다.")).toBeVisible();
+    expect(screen.getByText("표시할 상품이 없습니다")).toBeVisible();
     expect(screen.queryByRole("button", { name: "인기 상품 이전" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "인기 상품 다음" })).not.toBeInTheDocument();
   });

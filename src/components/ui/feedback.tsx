@@ -17,8 +17,22 @@ export function LoadingSpinner({ className, ...props }: React.ComponentPropsWith
 
 export function LoadingState({ className, label = "불러오는 중입니다." }: { className?: string; label?: string }) {
   return (
-    <div className={cn("flex min-h-36 items-center justify-center text-action-primary", className)} role="status">
+    <div className={cn("flex min-h-36 items-center justify-center text-action-primary", className)} role="status" aria-label={label}>
       <LoadingSpinner className="size-12" aria-hidden="true" />
+      <span className="sr-only">{label}</span>
+    </div>
+  );
+}
+
+/** A compact loading treatment for a list, section, or other in-page region. */
+export function InlineLoadingState({ className, label = "불러오는 중입니다." }: { className?: string; label?: string }) {
+  return (
+    <div
+      className={cn("flex min-h-16 items-center justify-center text-action-primary", className)}
+      role="status"
+      aria-label={label}
+    >
+      <LoadingSpinner className="size-5" aria-hidden="true" />
       <span className="sr-only">{label}</span>
     </div>
   );

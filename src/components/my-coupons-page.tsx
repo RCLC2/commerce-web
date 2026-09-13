@@ -18,6 +18,7 @@ import type { CouponDefinition } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import { PageLayout } from "./page-layout";
 import { Button } from "./ui/button";
+import { EmptyState, InlineLoadingState, LoginRequiredState } from "./ui/feedback";
 
 export function MyCouponsPage() {
   const token = useSessionStore((state) => state.accessToken) ?? "";
@@ -65,7 +66,7 @@ export function MyCouponsPage() {
   }
 
   if (!token) {
-    return <PageLayout><h1 className="text-2xl font-bold">쿠폰</h1><ButtonLink href="/login?next=/mypage/coupons" className="mt-5">로그인하기</ButtonLink></PageLayout>;
+    return <PageLayout><PageHeading icon={<PageIcon />} title="쿠폰" /><LoginRequiredState className="mt-6" icon={<PageIcon className="size-7" />} description="쿠폰 혜택을 확인하려면 로그인해주세요." loginHref="/login?next=/mypage/coupons" /></PageLayout>;
   }
 
   return <PageLayout>
@@ -76,7 +77,7 @@ export function MyCouponsPage() {
       <ButtonLink href="/mypage/coupons?view=owned" variant={view === "owned" ? "primary" : "secondary"} aria-current={view === "owned" ? "page" : undefined} className="rounded-full">발급한 쿠폰</ButtonLink>
     </nav>
     <div className="mt-6 space-y-3">
-      {selectedQuery.isLoading ? <p className="text-sm text-content-secondary">쿠폰을 불러오는 중입니다.</p> : null}
+      {selectedQuery.isLoading ? <InlineLoadingState label="쿠폰을 불러오는 중입니다." /> : null}
       {selectedQuery.error ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-status-negative-border bg-status-negative-subtle p-4 text-sm font-bold text-status-negative" role="alert"><p>쿠폰을 불러오지 못했습니다. {apiErrorMessage(selectedQuery.error)}</p><Button size="sm" variant="secondary" onClick={() => void selectedQuery.refetch()}>다시 불러오기</Button></div> : null}
       {issue.error ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-status-negative-border bg-status-negative-subtle p-4 text-sm font-bold text-status-negative" role="alert"><p>쿠폰을 발급하지 못했습니다. {apiErrorMessage(issue.error)}</p><Button size="sm" variant="secondary" disabled={issue.isPending || issue.variables === undefined} onClick={() => void retryIssue()}>발급 상태 확인 후 다시 시도</Button></div> : null}
       {issueResolution ? <p className={`rounded-control border p-4 text-sm font-bold ${issueResolution.tone === "success" ? "border-status-positive-border bg-status-positive-subtle text-status-positive" : "border-status-warning-border bg-status-warning-subtle text-status-warning"}`} role="status">{issueResolution.message}</p> : null}
@@ -94,7 +95,13 @@ export function MyCouponsPage() {
           <p className="mt-2 text-xs leading-5 text-content-secondary">{formatPrice(item.coupon.min_order_amount)} 이상 구매 시 · {new Date(item.expires_at).toLocaleDateString("ko-KR")}까지</p>
         </article>
       ))}
-      {selectedQuery.isSuccess && !items.length ? <p className="rounded-surface border border-border-subtle bg-surface-raised p-8 text-center text-sm text-content-secondary">표시할 쿠폰이 없습니다.</p> : null}
+      {selectedQuery.isSuccess && !items.length ? (
+        <EmptyState
+          icon={<PageIcon className="size-7" />}
+          title="표시할 쿠폰이 없습니다"
+          description={view === "owned" ? "발급한 쿠폰이 생기면 이곳에서 확인할 수 있어요." : "새로운 쿠폰 혜택을 준비하고 있으니 잠시 후 다시 확인해주세요."}
+        />
+      ) : null}
     </div>
   </PageLayout>;
 }

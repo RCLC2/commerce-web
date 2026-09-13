@@ -14,6 +14,7 @@ import type { ComponentType } from "react";
 import type { WeatherForecast, WeatherIconName, WeatherTheme } from "@/lib/weather";
 import { weatherPresentation, weatherThemeAt } from "@/lib/weather";
 import { Button } from "../ui/button";
+import { LoadingSpinner } from "../ui/feedback";
 
 const iconComponents: Record<WeatherIconName, ComponentType<{ size?: number; className?: string }>> = {
   Sun,
@@ -66,7 +67,7 @@ export function WeatherPanel({
           <h2 className="text-base font-bold">이번 주 날씨</h2>
           <p className="mt-1 flex items-center gap-1 text-xs font-bold text-content-secondary">
             <MapPin size={13} />
-            {locationMode === "current" ? "현재 위치 기준" : locationMode === "checking" ? "현재 위치 확인 중" : "서울 기준"}
+            {locationMode === "current" ? "현재 위치 기준" : locationMode === "checking" ? <span className="inline-flex" role="status" aria-label="현재 위치를 확인하는 중입니다."><LoadingSpinner className="size-3" aria-hidden="true" /></span> : "서울 기준"}
           </p>
         </div>
         <p className="text-sm font-bold text-content-secondary">주간 평균 <strong className="ml-1 text-xl text-action-primary">{Math.round(forecast.weeklyAverageTemperature)}°</strong></p>
@@ -111,7 +112,7 @@ export function WeatherPanel({
 
       <div className="mt-3 flex flex-col gap-2 text-xs text-content-secondary sm:flex-row sm:items-center sm:justify-between">
         <p role={usingFixture ? "status" : undefined}>
-          {usingFixture ? "날씨를 업데이트하지 못해 예시 데이터를 표시하고 있습니다." : loading ? "최신 날씨로 업데이트 중입니다." : "15분마다 최신 예보를 확인합니다."}
+          {usingFixture ? "날씨를 업데이트하지 못해 예시 데이터를 표시하고 있습니다." : loading ? <span className="inline-flex" role="status" aria-label="최신 날씨로 업데이트하는 중입니다."><LoadingSpinner className="size-3" aria-hidden="true" /></span> : "15분마다 최신 예보를 확인합니다."}
         </p>
         <div className="flex items-center gap-3">
           {usingFixture ? <Button size="sm" variant="secondary" onClick={onRetry}>날씨 다시 시도</Button> : null}

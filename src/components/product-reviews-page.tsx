@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { ArrowLeft, BadgeCheck, Camera, ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Camera, ChevronLeft, ChevronRight, MessageSquareText, Star } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { ApiErrorState } from "@/components/api-error-state";
@@ -12,6 +12,7 @@ import { PageHeading } from "./ui/page-heading";
 import { PageLayout } from "./page-layout";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { EmptyState, InlineLoadingState } from "./ui/feedback";
 import { Dialog } from "./ui/overlay";
 
 export function ProductReviewsPage({ productId, initialProduct }: { productId: number; initialProduct?: Product }) {
@@ -54,7 +55,7 @@ export function ProductReviewsPage({ productId, initialProduct }: { productId: n
       {productQuery.error ? <ApiErrorState className="mt-6" error={productQuery.error} onRetry={() => void productQuery.refetch()} /> : null}
 
       {summaryQuery.error ? <ApiErrorState className="mt-6" error={summaryQuery.error} onRetry={() => void summaryQuery.refetch()} /> : null}
-      {summary ? <ReviewSummaryCard summary={summary} /> : summaryQuery.isLoading ? <div className="mt-7 rounded-feature border border-border-subtle bg-surface-raised p-6 text-sm text-content-secondary">별점 요약을 불러오는 중입니다.</div> : null}
+      {summary ? <ReviewSummaryCard summary={summary} /> : summaryQuery.isLoading ? <InlineLoadingState className="mt-7 min-h-28" label="별점 요약을 불러오는 중입니다." /> : null}
 
       <section className="mt-8" aria-labelledby="all-reviews-title">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -65,12 +66,16 @@ export function ProductReviewsPage({ productId, initialProduct }: { productId: n
           {summary ? <p className="text-sm font-bold text-content-secondary">총 {summary.review_count.toLocaleString("ko-KR")}개</p> : null}
         </div>
 
-        {reviewsQuery.isLoading ? <p className="mt-6 text-sm text-content-secondary">리뷰를 불러오는 중입니다.</p> : null}
+        {reviewsQuery.isLoading ? <InlineLoadingState className="mt-6" label="리뷰를 불러오는 중입니다." /> : null}
         {reviewsQuery.error ? <ApiErrorState className="mt-6" error={reviewsQuery.error} onRetry={() => void reviewsQuery.refetch()} /> : null}
         {!reviewsQuery.isLoading && !reviewsQuery.error ? (
           <div className="mt-5 space-y-4">
             {reviews.length ? reviews.map((review) => <ReviewCard key={review.id} review={review} />) : (
-              <div className="rounded-surface border border-border-subtle bg-surface-raised p-10 text-center text-sm text-content-secondary">아직 등록된 리뷰가 없습니다.</div>
+              <EmptyState
+                icon={<MessageSquareText className="size-7" />}
+                title="아직 등록된 리뷰가 없습니다"
+                description="첫 번째 구매 후기를 남겨 다른 고객의 선택을 도와주세요."
+              />
             )}
           </div>
         ) : null}

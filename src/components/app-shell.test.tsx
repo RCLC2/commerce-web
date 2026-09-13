@@ -36,6 +36,20 @@ function mountAppShell() {
 }
 
 describe("app shell authenticated header shortcuts", () => {
+  it("keeps the bottom navigation above sticky supporting UI", () => {
+    mountAppShell();
+
+    const bottomNavigation = screen.getByRole("navigation", { name: "하단 주요 메뉴" });
+
+    expect(bottomNavigation).toHaveClass(
+      "z-[var(--commerce-z-mobile-cta)]",
+      "h-[var(--commerce-bottom-nav-height)]",
+      "transform-gpu",
+    );
+    expect(screen.getByRole("link", { name: "카테고리" })).toHaveClass("h-16");
+    expect(screen.getByRole("link", { name: "홈" })).toHaveClass("h-14", "w-14");
+  });
+
   it("hides cart and notifications before session hydration and does not request the unread count", () => {
     useSessionStore.setState({ accessToken: "stale-token", memberID: 1, role: "MEMBER", hydrated: false });
 

@@ -13,6 +13,8 @@ import { SerialTaskQueue } from "@/lib/serial-task-queue";
 import { useSessionStore } from "@/lib/session-store";
 import { PageLayout } from "./page-layout";
 import { Button } from "./ui/button";
+import { ButtonLink } from "./ui/button-link";
+import { EmptyState } from "./ui/feedback";
 import { OnboardingSwipeCard } from "./onboarding-swipe-card";
 
 type FailedResponse = {
@@ -282,9 +284,13 @@ export function OnboardingPage() {
         ) : currentItem ? (
           <OnboardingSwipeCard key={currentItem.product.id} item={currentItem} onChoose={choose} />
         ) : (
-          <section className="flex min-h-[28rem] items-center justify-center text-center text-sm text-content-secondary">
-            추천 상품을 충분히 준비하지 못했어요.
-          </section>
+          <EmptyState
+            className="min-h-[28rem]"
+            icon={<Sparkles className="size-7" />}
+            title="추천 상품을 충분히 준비하지 못했어요"
+            description="잠시 후 다시 시도하거나 다른 상품을 둘러보세요."
+            action={<ButtonLink href="/products">다른 상품 둘러보기</ButtonLink>}
+          />
         )}
 
         {syncError ? <p role="alert" className="mx-auto mt-5 max-w-sm rounded-xl bg-action-secondary px-4 py-3 text-center text-sm font-bold text-action-primary">{syncError}</p> : null}

@@ -12,6 +12,7 @@ import { useSessionStore } from "@/lib/session-store";
 import { parseTossSuccessParams, type TossPaymentSuccessParams } from "@/lib/toss-payment";
 import { formatPrice } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { LoadingState } from "@/components/ui/feedback";
 
 type ConfirmationState = "waiting" | "success" | "error";
 
@@ -101,9 +102,8 @@ export function TossSuccessClient() {
   return (
     <PageLayout variant="payment">
       <h1 className="text-2xl font-bold">{state === "success" ? "결제 완료" : "토스 결제 확인"}</h1>
-      <p className="mt-4 text-sm text-content-secondary">{message}</p>
+      {state === "waiting" ? <LoadingState className="min-h-24" label={message} /> : <p className="mt-4 text-sm text-content-secondary">{message}</p>}
       {orderId && amount ? <p className="mt-2 text-sm font-bold">{orderId} · {formatPrice(amount)}</p> : null}
-      {state === "waiting" ? <p className="mt-5 text-sm text-content-secondary">잠시만 기다려주세요.</p> : null}
       {state === "success" && orderId ? (
         <ButtonLink href={`/orders/${encodeURIComponent(orderId)}`} className="mt-6">주문 상세 보기</ButtonLink>
       ) : null}

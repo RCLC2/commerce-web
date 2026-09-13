@@ -6,7 +6,7 @@ import { PageHeading } from "./ui/page-heading";
 import { Grid2X2 as PageIcon } from "lucide-react";
 
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Package } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { api } from "@/lib/api";
@@ -15,6 +15,7 @@ import type { CommerceCategory } from "@/lib/types";
 import { PageLayout } from "./page-layout";
 import { ProductCard } from "./product-card";
 import { ButtonLink } from "./ui/button-link";
+import { EmptyState, InlineLoadingState } from "./ui/feedback";
 
 export function CategoriesPage() {
   const [selectedSlug, setSelectedSlug] = useState<string>("");
@@ -47,58 +48,72 @@ export function CategoriesPage() {
         </ButtonLink>
       </div>
 
-      {isLoading ? <p className="mt-6 text-sm text-content-secondary">카테고리를 불러오는 중입니다.</p> : null}
+      {isLoading ? <InlineLoadingState className="mt-6" label="카테고리를 불러오는 중입니다." /> : null}
 
-      <section className="mt-6 overflow-hidden rounded-surface border border-border-subtle bg-surface-raised shadow-card">
-        <div className="flex gap-2 overflow-x-auto border-b border-border-subtle p-3">
-          {orderedCategories.map((category) => (
-            <Button variant="ghost"
-              key={category.id}
-              className={`h-10 shrink-0 rounded-control px-4 text-sm font-bold ${selectedCategory?.id === category.id ? "bg-action-primary/10 text-action-primary ring-1 ring-brand/25" : "border border-border-subtle bg-surface-raised text-content-secondary hover:bg-surface-subtle"}`}
-              onClick={() => setSelectedSlug(category.slug)}
-            >
-              {category.name}
-            </Button>
-          ))}
-        </div>
-        {selectedCategory ? (
-          <div className="grid gap-6 p-4 lg:grid-cols-[280px_1fr]">
-            <aside className="space-y-3">
-              <Link href={selectedCategory.href} className="block rounded-md border border-action-primary/20 bg-action-primary/10 px-4 py-4 text-action-primary">
-                <p className="text-lg font-bold">{selectedCategory.name}</p>
-                <p className="mt-1 text-xs font-bold text-action-primary/70">{selectedCategory.category_ids?.length ?? 1}개 카테고리 묶음</p>
-              </Link>
-              <div className="flex flex-wrap gap-2 lg:block lg:space-y-2">
-                {filterChips.map((category) => (
-                  <Button variant="ghost"
-                    key={category.id}
-                    className={`rounded-control px-3 py-2 text-left text-sm font-bold lg:w-full ${activeFilter?.id === category.id ? "bg-action-primary/10 text-action-primary ring-1 ring-brand/25" : "border border-border-subtle bg-surface-raised text-content-secondary hover:bg-surface-subtle"}`}
-                    onClick={() => setSelectedSlug(category.slug)}
-                  >
-                    {category.name}
-                  </Button>
-                ))}
-              </div>
-            </aside>
-            <div>
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-bold">{activeFilter?.name ?? selectedCategory.name} 실시간 상품</h2>
-                  <p className="mt-1 text-sm text-content-secondary">하위 카테고리 기준으로 즉시 필터링됩니다.</p>
-                </div>
-                <Link href={activeFilter?.href ?? selectedCategory.href} className="text-sm font-bold text-action-primary">상품 더보기</Link>
-              </div>
-              {filteredProducts.length ? (
-                <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 md:grid-cols-4">
-                  {filteredProducts.map((product) => <ProductCard key={product.id} product={product} />)}
-                </div>
-              ) : (
-                <div className="mt-4 rounded-surface border border-dashed border-border-subtle bg-surface-raised p-8 text-center text-sm font-bold text-content-secondary">아직 연결된 상품이 없습니다.</div>
-              )}
-            </div>
+      {!isLoading && !selectedCategory ? (
+        <EmptyState
+          className="mt-6"
+          icon={<PageIcon className="size-7" />}
+          title="표시할 카테고리가 없습니다"
+          description="카테고리를 준비하고 있으니 잠시 후 다시 확인해주세요."
+        />
+      ) : (
+        <section className="mt-6 overflow-hidden rounded-surface border border-border-subtle bg-surface-raised shadow-card">
+          <div className="flex gap-2 overflow-x-auto border-b border-border-subtle p-3">
+            {orderedCategories.map((category) => (
+              <Button variant="ghost"
+                key={category.id}
+                className={`h-10 shrink-0 rounded-control px-4 text-sm font-bold ${selectedCategory?.id === category.id ? "bg-action-primary/10 text-action-primary ring-1 ring-brand/25" : "border border-border-subtle bg-surface-raised text-content-secondary hover:bg-surface-subtle"}`}
+                onClick={() => setSelectedSlug(category.slug)}
+              >
+                {category.name}
+              </Button>
+            ))}
           </div>
-        ) : null}
-      </section>
+          {selectedCategory ? (
+            <div className="grid gap-6 p-4 lg:grid-cols-[280px_1fr]">
+              <aside className="space-y-3">
+                <Link href={selectedCategory.href} className="block rounded-md border border-action-primary/20 bg-action-primary/10 px-4 py-4 text-action-primary">
+                  <p className="text-lg font-bold">{selectedCategory.name}</p>
+                  <p className="mt-1 text-xs font-bold text-action-primary/70">{selectedCategory.category_ids?.length ?? 1}개 카테고리 묶음</p>
+                </Link>
+                <div className="flex flex-wrap gap-2 lg:block lg:space-y-2">
+                  {filterChips.map((category) => (
+                    <Button variant="ghost"
+                      key={category.id}
+                      className={`rounded-control px-3 py-2 text-left text-sm font-bold lg:w-full ${activeFilter?.id === category.id ? "bg-action-primary/10 text-action-primary ring-1 ring-brand/25" : "border border-border-subtle bg-surface-raised text-content-secondary hover:bg-surface-subtle"}`}
+                      onClick={() => setSelectedSlug(category.slug)}
+                    >
+                      {category.name}
+                    </Button>
+                  ))}
+                </div>
+              </aside>
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-bold">{activeFilter?.name ?? selectedCategory.name} 실시간 상품</h2>
+                    <p className="mt-1 text-sm text-content-secondary">하위 카테고리 기준으로 즉시 필터링됩니다.</p>
+                  </div>
+                  <Link href={activeFilter?.href ?? selectedCategory.href} className="text-sm font-bold text-action-primary">상품 더보기</Link>
+                </div>
+                {filteredProducts.length ? (
+                  <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 md:grid-cols-4">
+                    {filteredProducts.map((product) => <ProductCard key={product.id} product={product} />)}
+                  </div>
+                ) : (
+                  <EmptyState
+                    className="mt-4 px-4 py-6"
+                    icon={<Package className="size-7" />}
+                    title="연결된 상품이 없습니다"
+                    description="다른 카테고리를 선택하거나 잠시 후 다시 확인해주세요."
+                  />
+                )}
+              </div>
+            </div>
+          ) : null}
+        </section>
+      )}
     </PageLayout>
   );
 }

@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowLeft, ArrowUp, ChevronLeft, ChevronRight, Minus, Package, Search, Sparkles, Star, Store, Users, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import { scrollCarouselByCard } from "@/lib/carousel";
@@ -21,6 +21,7 @@ import { ApiErrorState } from "./api-error-state";
 import { SponsoredPlacement } from "./advertising/sponsored-placement";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { EmptyState, InlineLoadingState } from "./ui/feedback";
 import { SearchField } from "./ui/search-field";
 
 export function SearchPage() {
@@ -146,9 +147,15 @@ function SearchExperience({
             ))}
           </div>
           <div className="mt-6">
-            {trendingQuery.isLoading ? <p className="text-sm text-content-secondary">인기 검색어를 불러오는 중입니다.</p> : null}
+            {trendingQuery.isLoading ? <InlineLoadingState label="인기 검색어를 불러오는 중입니다." /> : null}
             {trendingQuery.isError ? <div className="rounded-control border border-status-negative-border bg-status-negative-subtle p-4 text-sm" role="alert"><p className="font-bold text-status-negative">인기 검색어를 불러오지 못했습니다.</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void trendingQuery.refetch()}>다시 시도</Button></div> : null}
-            {trendingQuery.isSuccess && !trendingQuery.data.items.length ? <p className="text-sm text-content-secondary">표시할 인기 검색어가 없습니다.</p> : null}
+            {trendingQuery.isSuccess && !trendingQuery.data.items.length ? (
+              <EmptyState
+                icon={<Search className="size-7" />}
+                title="표시할 인기 검색어가 없습니다"
+                description="다른 검색어를 입력해 원하는 상품과 마켓을 찾아보세요."
+              />
+            ) : null}
             {(trending?.items ?? []).map((item) => (
               <Button variant="ghost" key={item.keyword} className="flex h-14 w-full items-center justify-between text-left" onClick={() => goToSearch(item.keyword)}>
                 <span className="flex items-center gap-5 text-lg"><strong className="w-6 text-center">{item.rank}</strong>{item.keyword}</span>
@@ -169,7 +176,7 @@ function SearchExperience({
           </div>
           {error ? <ErrorBox error={error} onRetry={() => void refetchResults()} /> : null}
           {isLoading ? <LoadingGrid /> : null}
-          {!isLoading && !error && !results?.products.items.length ? <EmptyBox message="검색된 상품이 없습니다." /> : null}
+          {!isLoading && !error && !results?.products.items.length ? <EmptyBox icon={<Package className="size-7" />} title="검색된 상품이 없습니다" description="검색어를 바꾸거나 필터를 조정해보세요." /> : null}
           {results?.products.items.length ? <div className="mt-7 grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">{results.products.items.map((product) => <ProductCard key={product.id} product={product} />)}</div> : null}
           {results ? <Pagination page={results.products.page} totalPages={results.products.total_pages} onChange={(page) => changePage("product", page)} label="상품" /> : null}
 
@@ -179,7 +186,7 @@ function SearchExperience({
               {marketSections.map((section) => <SearchCarousel key={section.id} section={section} setRef={(node) => { if (node) carouselRefs.current.set(section.id, node); else carouselRefs.current.delete(section.id); }} onSlide={(direction) => slide(section.id, direction)} />)}
             </div>
           </div>
-          {!isLoading && !error && !results?.markets.items.length ? <EmptyBox message="검색된 마켓이 없습니다." /> : null}
+          {!isLoading && !error && !results?.markets.items.length ? <EmptyBox icon={<Store className="size-7" />} title="검색된 마켓이 없습니다" description="다른 키워드로 마켓을 찾아보세요." /> : null}
           {results?.markets.items.length ? <div className="mt-7 space-y-4">{results.markets.items.map((market) => <MarketCard key={market.id} market={market} />)}</div> : null}
           {results ? <Pagination page={results.markets.page} totalPages={results.markets.total_pages} onChange={(page) => changePage("market", page)} label="마켓" /> : null}
         </div>
@@ -267,7 +274,9 @@ function MarketMetric({ icon, label, value }: { icon: React.ReactNode; label: st
 }
 
 function ResultListHeader({ title, total }: { title: string; total: number }) { return <div className="mb-4 mt-8 flex items-center justify-between"><h2 className="text-xl font-bold">{title}</h2><span className="text-sm font-bold text-content-secondary">총 {total.toLocaleString("ko-KR")}개</span></div>; }
-function EmptyBox({ message }: { message: string }) { return <p className="rounded-surface border border-border-subtle bg-surface-raised p-5 text-sm text-content-secondary">{message}</p>; }
+function EmptyBox({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
+  return <EmptyState className="mt-7" icon={icon} title={title} description={description} />;
+}
 function ErrorBox({ error, onRetry }: { error: unknown; onRetry: () => void }) { return <ApiErrorState error={error} onRetry={onRetry} retryLabel="검색 다시 시도" />; }
 function LoadingGrid() { return <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="aspect-square animate-pulse rounded-control bg-surface-subtle" />)}</div>; }
 function TrendIcon({ trend }: { trend: "UP" | "DOWN" | "SAME" }) { if (trend === "UP") return <ArrowUp size={18} className="text-status-negative" />; if (trend === "DOWN") return <ArrowDown size={18} className="text-status-info" />; return <Minus size={18} className="text-content-secondary" />; }

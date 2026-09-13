@@ -40,6 +40,7 @@ import { Input, Select } from "./ui/input";
 import { Notice } from "./ui/notice";
 import { OrderSummary } from "./ui/order-summary";
 import { Surface } from "./ui/surface";
+import { EmptyState } from "./ui/feedback";
 
 export function CheckoutPage() {
   const router = useRouter();
@@ -380,7 +381,7 @@ export function CheckoutPage() {
                 <p className="font-bold">{defaultAddress.receiver} / {defaultAddress.phone}</p>
                 <p className="text-content-secondary">({defaultAddress.zip_code}) {defaultAddress.line1} {defaultAddress.line2}</p>
               </div>
-            ) : addresses.isSuccess ? <p className="mt-3 text-sm text-content-secondary">등록된 기본 배송지가 없습니다.</p> : null}
+            ) : addresses.isSuccess ? <EmptyState className="mt-3 px-4 py-5" icon={<PageIcon className="size-7" />} title="등록된 기본 배송지가 없습니다" description="배송지를 등록한 뒤 주문을 진행해주세요." /> : null}
             {defaultAddress ? <p className="mt-3 text-xs font-bold text-status-positive">이 주소로 배송됩니다. 받는 분과 연락처를 확인해주세요.</p> : null}
           </Surface>
 

@@ -3,6 +3,7 @@
 import { ANONYMOUS, loadTossPayments, type TossPaymentsWidgets } from "@tosspayments/tosspayments-sdk";
 import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
+import { InlineLoadingState } from "./ui/feedback";
 
 type TossPaymentWidgetProps = {
   clientKey: string;
@@ -97,7 +98,7 @@ export function TossPaymentWidget({
       <h3 className="font-bold">토스 테스트 결제</h3>
       <div id="toss-payment-methods" className="mt-3 min-h-20" />
       <div id="toss-payment-agreement" className="mt-3" />
-      {isLoading ? <p className="mt-3 text-sm text-content-secondary">결제수단을 준비하는 중입니다.</p> : null}
+      {isLoading ? <InlineLoadingState className="mt-3" label="결제수단을 준비하는 중입니다." /> : null}
       {error ? <p className="mt-3 text-sm font-bold text-action-primary">{error}</p> : null}
       {requestError ? <p className="mt-3 text-sm font-bold text-action-primary">{requestError}</p> : null}
       <Button className="mt-4 w-full" size="lg" disabled={!isReady || isSubmitting} onClick={() => void requestPayment()}>
