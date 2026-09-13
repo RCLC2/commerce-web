@@ -3,7 +3,7 @@
 import { Select } from "./ui/input";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, Bookmark, Camera, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Heart, Minus, Plus, ShoppingBag, SlidersHorizontal, Star, X } from "lucide-react";
+import { BadgeCheck, Bookmark, Camera, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Heart, MessageSquareText, Minus, Plus, ShoppingBag, SlidersHorizontal, Star, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -30,7 +30,7 @@ import { PageLayout } from "./page-layout";
 import { PDPShelfSection } from "./pdp-merchandising-sections";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
-import { LoadingState, Toast } from "./ui/feedback";
+import { EmptyState, InlineLoadingState, LoadingSpinner, LoadingState, Toast } from "./ui/feedback";
 import { useAccessibleOverlay } from "./ui/use-accessible-overlay";
 
 class CartPreflightError extends Error {
@@ -412,7 +412,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
             <Link href={`/products/${product.id}/reviews`} className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm text-content-secondary hover:text-action-primary" aria-label="상품 리뷰 모두 보기">
               <Star size={16} className="fill-brand text-action-primary" aria-hidden="true" />
               {summaryQuery.isLoading ? (
-                <span>별점을 불러오는 중입니다.</span>
+                <span className="inline-flex" role="status" aria-label="별점을 불러오는 중입니다."><LoadingSpinner className="size-4" aria-hidden="true" /></span>
               ) : summaryQuery.isError || !summary ? (
                 <span>별점 정보를 불러오지 못했습니다.</span>
               ) : (
@@ -508,7 +508,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
             ) : null}
           </div>
         </div>
-        {reviewsQuery.isLoading ? <p className="mt-5 text-sm text-content-secondary">리뷰를 불러오는 중입니다.</p> : null}
+        {reviewsQuery.isLoading ? <InlineLoadingState className="mt-5" label="리뷰를 불러오는 중입니다." /> : null}
         {reviewsQuery.isError ? <p className="mt-5 rounded-control border border-status-negative-border bg-status-negative-subtle p-3 text-sm font-bold text-status-negative" role="alert">리뷰를 불러오지 못했습니다.</p> : null}
         {!reviewsQuery.isLoading && !reviewsQuery.isError ? (
           <div className="no-scrollbar mt-5 flex snap-x gap-4 overflow-x-auto pb-3">
@@ -561,7 +561,14 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
                   </div>
                 </article>
               );
-            }) : <p className="text-sm text-content-secondary">아직 등록된 리뷰가 없습니다.</p>}
+            }) : (
+              <EmptyState
+                className="w-full"
+                icon={<MessageSquareText className="size-7" />}
+                title="아직 등록된 리뷰가 없습니다"
+                description="첫 번째 구매 후기를 남겨 다른 고객의 선택을 도와주세요."
+              />
+            )}
           </div>
         ) : null}
       </section>
@@ -593,7 +600,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
       <PageJumpControls />
 
       <div
-        className={`fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-[var(--commerce-z-dropdown)] border-t border-border-subtle bg-surface-raised/95 px-4 py-3 backdrop-blur transition ${showFloatingPurchase ? "opacity-100" : "pointer-events-none translate-y-full opacity-0"}`}
+        className={`fixed inset-x-0 bottom-[var(--commerce-bottom-nav-height)] z-[var(--commerce-z-sticky)] border-t border-border-subtle bg-surface-raised/95 px-4 py-3 backdrop-blur transition ${showFloatingPurchase ? "opacity-100" : "pointer-events-none translate-y-full opacity-0"}`}
         aria-hidden={!showFloatingPurchase}
         role="group"
         aria-label="빠른 구매"
@@ -746,11 +753,11 @@ function PurchaseControls(props: PurchaseControlsProps) {
           {props.cartPending ? "담는 중" : !props.authenticated ? "로그인 후 담기" : props.added || (props.cartError && !props.cartRetrySafe) ? "장바구니 확인" : props.cartRetrySafe ? "다시 담기" : "장바구니 담기"}
         </Button>
       </div>
-      {props.engagementLoading ? <p className="text-xs font-bold text-content-secondary">좋아요와 찜 상태를 확인하는 중입니다.</p> : null}
+      {props.engagementLoading ? <InlineLoadingState className="min-h-0 justify-start border-0 bg-transparent px-0 py-0 text-xs font-bold" label="좋아요와 찜 상태를 확인하는 중입니다." /> : null}
       {props.likeError ? <div className="rounded-control border border-status-negative-border bg-status-negative-subtle px-3 py-2 text-sm" role="alert"><p className="font-bold text-status-negative">{props.likeError}</p><Button className="mt-2" size="sm" variant="secondary" onClick={props.onRetryLike}>좋아요 다시 시도</Button></div> : null}
       {props.wishlistError ? <div className="rounded-control border border-status-negative-border bg-status-negative-subtle px-3 py-2 text-sm" role="alert"><p className="font-bold text-status-negative">{props.wishlistError}</p><Button className="mt-2" size="sm" variant="secondary" onClick={props.onRetryWishlist}>찜 다시 시도</Button></div> : null}
       {props.cartError ? <div className="rounded-control border border-status-negative-border bg-status-negative-subtle px-3 py-2 text-sm" role="alert"><p className="font-bold text-status-negative">{props.cartError}</p><Button className="mt-2" size="sm" variant="secondary" onClick={props.onCart}>{props.cartRetrySafe ? "다시 담기" : "장바구니 확인"}</Button></div> : null}
-      {props.likePending || props.wishlistPending ? <p className="text-xs font-bold text-content-secondary" role="status">상품 상태를 저장하는 중입니다.</p> : null}
+      {props.likePending || props.wishlistPending ? <InlineLoadingState className="min-h-0 justify-start border-0 bg-transparent px-0 py-0 text-xs font-bold" label="상품 상태를 저장하는 중입니다." /> : null}
       {props.added ? <p className="rounded-control border border-status-positive-border bg-status-positive-subtle px-3 py-2 text-center text-sm font-bold text-status-positive" role="status">상품을 담았습니다. 버튼을 다시 누르면 장바구니로 이동합니다.</p> : null}
     </div>
   );

@@ -3,8 +3,6 @@
 import { PageHeading } from "./ui/page-heading";
 import { UserRound as PageIcon } from "lucide-react";
 
-import { ButtonLink } from "@/components/ui/button-link";
-
 import { Input, Select } from "./ui/input";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -18,7 +16,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import { PageLayout } from "./page-layout";
 import { Button } from "./ui/button";
-import { LoadingState } from "./ui/feedback";
+import { LoadingState, LoginRequiredState } from "./ui/feedback";
 
 type ProfileForm = { notification_type: string; marketing_consent: boolean; nighttime_consent: boolean; height: number; weight: number };
 
@@ -62,7 +60,7 @@ export function ProfileEditPage() {
     onSuccess: () => router.push("/onboarding/preferences"),
   });
 
-  if (!token) return <PageLayout><h1 className="text-2xl font-bold">로그인이 필요합니다</h1><ButtonLink href="/login" className="mt-5">로그인하기</ButtonLink></PageLayout>;
+  if (!token) return <PageLayout><PageHeading icon={<PageIcon />} title="사용자 상세 정보 수정" /><LoginRequiredState className="mt-6" icon={<PageIcon className="size-7" />} description="사용자 정보를 수정하려면 로그인해주세요." loginHref="/login?next=/mypage/profile" /></PageLayout>;
   if (profile.isLoading || (!profile.data && !profile.error)) return <PageLayout><LoadingState label="프로필을 불러오는 중입니다." /></PageLayout>;
   if (!profile.data || !values) return <PageLayout><p className="text-sm font-bold text-status-negative">{apiErrorMessage(profile.error)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void profile.refetch()}>다시 시도</Button></PageLayout>;
 

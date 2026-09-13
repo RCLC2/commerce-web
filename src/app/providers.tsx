@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/reac
 import { useEffect, useRef, useState } from "react";
 import { shouldRetryApiError } from "@/lib/api-client";
 import { NotificationProvider } from "@/components/notification-provider";
+import { GlobalLoadingIndicator } from "@/components/ui/global-loading-indicator";
 import { useSessionStore } from "@/lib/session-store";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -22,6 +23,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <SessionQueryBoundary />
+      <GlobalLoadingIndicator />
       <NotificationProvider>{children}</NotificationProvider>
     </QueryClientProvider>
   );

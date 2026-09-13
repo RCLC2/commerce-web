@@ -1,7 +1,7 @@
 "use client";
 
 import { useInfiniteQuery, useQueries, useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Store } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Grid2X2, Package, Sparkles, Store } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
@@ -18,7 +18,7 @@ import { HomeContextTextCard, HomeFeatureCard } from "./home-placement-cards";
 import { PageLayout } from "./page-layout";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
-import { LoadingState } from "./ui/feedback";
+import { EmptyState, LoadingState } from "./ui/feedback";
 
 
 function productsForHomeSection(section: CMSHomeSection) {
@@ -271,13 +271,26 @@ export function HomePage() {
           <EventCarousel events={events} />
         ) : eventsQuery.isLoading ? (
           <LoadingState className="min-h-52 md:min-h-72" label="이벤트를 불러오는 중입니다." />
-        ) : <p className="rounded-md border border-border-subtle bg-surface-raised p-6 text-sm text-content-secondary">진행 중인 이벤트가 없습니다.</p>}
+        ) : (
+          <EmptyState
+            icon={<CalendarDays className="size-7" />}
+            title="진행 중인 이벤트가 없습니다"
+            description="새로운 혜택을 준비하고 있으니 조금 뒤에 다시 확인해주세요."
+          />
+        )}
       </section>
 
       <section className="rounded-surface border border-border-subtle bg-surface-raised p-3 shadow-card" aria-label="홈 카테고리와 이벤트">
         {homeCategoryChipsQuery.isError ? <ApiErrorState className="m-3" error={homeCategoryChipsQuery.error} onRetry={() => void homeCategoryChipsQuery.refetch()} retryLabel="카테고리 다시 시도" /> : null}
         {homeCategoryChipsQuery.isLoading ? <LoadingState className="min-h-20" label="카테고리를 불러오는 중입니다." /> : null}
-        {homeCategoryChipsQuery.isSuccess && displayHomeCategoryChips.length === 0 ? <p className="p-3 text-sm text-content-secondary">표시할 홈 카테고리가 없습니다.</p> : null}
+        {homeCategoryChipsQuery.isSuccess && displayHomeCategoryChips.length === 0 ? (
+          <EmptyState
+            className="p-5"
+            icon={<Grid2X2 className="size-7" />}
+            title="표시할 홈 카테고리가 없습니다."
+            description="카테고리를 준비하고 있으니 잠시 후 다시 확인해주세요."
+          />
+        ) : null}
         {homeCategoryChipsQuery.isSuccess ? <HomeCategoryChips chips={displayHomeCategoryChips} /> : null}
       </section>
       {homePlacementsQuery.isLoading ? <LoadingState className="min-h-24" label="맞춤 혜택을 불러오는 중입니다." /> : (
@@ -289,7 +302,14 @@ export function HomePage() {
       )}
       {homeSectionsQuery.isError ? <ApiErrorState className="my-7" error={homeSectionsQuery.error} onRetry={() => void homeSectionsQuery.refetch()} retryLabel="홈 구좌 다시 시도" /> : null}
       {homeSectionsQuery.isLoading ? <LoadingState className="min-h-40" label="홈 상품 구좌를 불러오는 중입니다." /> : null}
-      {homeSectionsQuery.isSuccess && displayHomeSections.length === 0 ? <p className="py-7 text-sm text-content-secondary">표시할 홈 상품 구좌가 없습니다.</p> : null}
+      {homeSectionsQuery.isSuccess && displayHomeSections.length === 0 ? (
+        <EmptyState
+          className="my-7"
+          icon={<Package className="size-7" />}
+          title="표시할 홈 상품 구좌가 없습니다"
+          description="새로운 상품 구좌를 준비하고 있으니 잠시 후 다시 확인해주세요."
+        />
+      ) : null}
       {displayHomeSections.map((section, index) => (
         <ProductCarouselSection
           key={section.id || section.api_url}
@@ -319,14 +339,19 @@ export function HomePage() {
           <ApiErrorState error={recommendationQuery.error} onRetry={() => void recommendationQuery.refetch()} retryLabel="추천 다시 시도" />
         ) : recommendationQuery.isLoading ? (
           <LoadingState className="min-h-64" label="추천 상품을 불러오는 중입니다." />
-        ) : (
+        ) : recommendationProducts.length ? (
           <div className="grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
             {recommendationProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
-        )}
-        {recommendationQuery.isSuccess && recommendationProducts.length === 0 ? <p className="text-sm text-content-secondary">표시할 추천 상품이 없습니다.</p> : null}
+        ) : recommendationQuery.isSuccess ? (
+          <EmptyState
+            icon={<Sparkles className="size-7" />}
+            title="표시할 추천 상품이 없습니다"
+            description="다른 상품을 둘러보면 취향에 맞는 추천을 준비해드릴게요."
+          />
+        ) : null}
         <div ref={loadMoreRef} className="h-8" aria-hidden="true" />
         {recommendationQuery.hasNextPage || recommendationQuery.isFetchingNextPage ? (
           <LoadingState className="min-h-20" label="추천 상품을 더 불러오는 중입니다." />
@@ -526,7 +551,13 @@ export function ProductCarouselSection({
           ) : null}
         </div>
       )}
-      {isSuccess && products.length === 0 ? <p className="text-sm text-content-secondary">표시할 상품이 없습니다.</p> : null}
+      {isSuccess && products.length === 0 ? (
+        <EmptyState
+          icon={<Package className="size-7" />}
+          title="표시할 상품이 없습니다"
+          description="새로운 상품을 준비하고 있으니 잠시 후 다시 확인해주세요."
+        />
+      ) : null}
     </section>
   );
 }

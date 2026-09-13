@@ -50,3 +50,24 @@ describe("my page guest state", () => {
     expect(api.getProduct).not.toHaveBeenCalled();
   });
 });
+
+describe("my page loading state", () => {
+  it("uses spinners instead of placeholder copy while the summary is loading", () => {
+    useSessionStore.setState({ accessToken: "token", memberID: 1, role: "MEMBER", hydrated: true });
+    vi.mocked(api.me).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(api.listAllOrders).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(api.listCoupons).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(api.listIssuableCoupons).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(api.listAddresses).mockImplementation(() => new Promise(() => {}));
+
+    mountMyPage();
+
+    expect(screen.getByRole("status", { name: "포인트를 불러오는 중입니다." })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "보유 쿠폰을 불러오는 중입니다." })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "전체 주문을 불러오는 중입니다." })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "발급 가능한 쿠폰을 불러오는 중입니다." })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "발급한 쿠폰을 불러오는 중입니다." })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "주문 내역을 불러오는 중입니다." })).toBeInTheDocument();
+    expect(screen.queryByText("확인 필요")).not.toBeInTheDocument();
+  });
+});

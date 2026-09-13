@@ -114,6 +114,7 @@
   --commerce-z-mobile-cta: 30;
   --commerce-z-dropdown: 40;
   --commerce-z-modal: 70;
+  --commerce-bottom-nav-height: calc(4rem + 1px + env(safe-area-inset-bottom));
 
   /* Legacy aliases remain while screens migrate to the semantic names. */
   --background: var(--commerce-canvas);

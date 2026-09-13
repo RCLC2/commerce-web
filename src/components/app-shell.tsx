@@ -251,7 +251,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
-      <nav className="fixed inset-x-0 bottom-0 z-[var(--commerce-z-mobile-cta)] isolate border-t border-border-subtle bg-surface-raised/95 pb-[env(safe-area-inset-bottom)] shadow-mobile-nav backdrop-blur" aria-label="하단 주요 메뉴">
+      <nav className="fixed inset-x-0 bottom-0 z-[var(--commerce-z-mobile-cta)] isolate box-border h-[var(--commerce-bottom-nav-height)] transform-gpu border-t border-border-subtle bg-surface-raised/95 pb-[env(safe-area-inset-bottom)] shadow-mobile-nav backdrop-blur" aria-label="하단 주요 메뉴">
         <div className="mx-auto grid h-16 max-w-6xl grid-cols-5 px-1" data-session-role={role ?? "guest"}>
           {nav.map((item) => {
             const Icon = item.icon;
@@ -264,6 +264,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "min-w-0 flex flex-col items-center justify-start gap-1 rounded-md pt-2 text-xs font-medium leading-4 text-content-secondary transition hover:text-content-primary",
+                  !item.primary && "h-16",
                   item.primary && "mx-auto -mt-4 h-14 w-14 justify-center pt-0 rounded-full border border-border-subtle bg-surface-raised text-content-secondary shadow-float sm:h-16 sm:w-16",
                   active && !item.primary && "text-action-primary",
                   active && item.primary && "border-action-primary bg-action-primary text-content-on-brand hover:bg-button-primary-hover hover:text-content-on-brand",

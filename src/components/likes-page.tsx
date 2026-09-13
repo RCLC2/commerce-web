@@ -15,7 +15,7 @@ import { useSessionStore } from "@/lib/session-store";
 import { ProductCard } from "./product-card";
 import { PageLayout } from "./page-layout";
 import { Button } from "./ui/button";
-import { LoginRequiredState } from "./ui/feedback";
+import { EmptyState, InlineLoadingState, LoginRequiredState } from "./ui/feedback";
 
 const PAGE_SIZE = 20;
 type CollectionView = "liked" | "wishlist";
@@ -70,7 +70,7 @@ export function LikesPage() {
             {selectedQuery.isSuccess ? <span className="text-sm font-bold text-content-secondary">{products.length}개 · {currentPage}/{totalPages}</span> : null}
           </div>
 
-          {selectedQuery.isLoading ? <p className="mt-4 rounded-surface border border-border-subtle bg-surface-raised p-5 text-sm text-content-secondary">상품 목록을 불러오는 중입니다.</p> : null}
+          {selectedQuery.isLoading ? <InlineLoadingState className="mt-4" label="상품 목록을 불러오는 중입니다." /> : null}
           {selectedQuery.isError ? (
             <div className="mt-4 rounded-control border border-status-negative-border bg-status-negative-subtle p-5 text-sm" role="alert">
               <p className="font-bold text-status-negative">{apiErrorMessage(selectedQuery.error)}</p>
@@ -82,7 +82,14 @@ export function LikesPage() {
               {pageProducts.map((product) => <ProductCard key={product.id} product={product} />)}
             </div>
           ) : null}
-          {selectedQuery.isSuccess && !pageProducts.length ? <p className="mt-4 rounded-surface border border-border-subtle bg-surface-raised p-5 text-sm text-content-secondary">{view === "liked" ? "좋아요한 상품이 없습니다." : "찜한 상품이 없습니다."}</p> : null}
+          {selectedQuery.isSuccess && !pageProducts.length ? (
+            <EmptyState
+              className="mt-4"
+              icon={view === "liked" ? <Heart className="size-7" /> : <Bookmark className="size-7" />}
+              title={view === "liked" ? "좋아요한 상품이 없습니다" : "찜한 상품이 없습니다"}
+              description={view === "liked" ? "마음에 드는 상품의 하트를 눌러 모아보세요." : "나중에 보고 싶은 상품을 찜으로 저장해보세요."}
+            />
+          ) : null}
           {selectedQuery.isSuccess && products.length > PAGE_SIZE ? (
             <div className="mt-8 flex items-center justify-center gap-2">
               <Button variant="secondary" size="sm" disabled={currentPage === 1} onClick={() => setPage(Math.max(1, currentPage - 1))}><ChevronLeft size={16} /> 이전</Button>
