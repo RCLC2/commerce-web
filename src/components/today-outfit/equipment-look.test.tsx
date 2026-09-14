@@ -15,15 +15,13 @@ describe("EquipmentLook", () => {
 
     expect(onProductSelect).toHaveBeenCalledWith(look.items[6].product.id);
     expect(screen.getAllByRole("button", { name: /상품 목록에서 보기/ })).toHaveLength(7);
-    expect(screen.getByAltText("실제 상품 코디 1 AI 코디 연출 이미지")).toBeVisible();
+    expect(screen.getByAltText("오늘의 AI 코디 연출 이미지")).toBeVisible();
   });
 
-  it("keeps the outfit point bar outside the image stage", () => {
+  it("does not render generated copy around the image", () => {
     render(<EquipmentLook look={createOutfitLook()} position={1} active onProductSelect={vi.fn()} />);
-    const stage = screen.getByTestId("outfit-image-stage");
-    const pointBar = screen.getByTestId("outfit-point-bar");
 
-    expect(stage).not.toContainElement(pointBar);
-    expect(stage.parentElement).toContainElement(pointBar);
+    expect(screen.queryByText("오늘의 코디 포인트")).not.toBeInTheDocument();
+    expect(screen.getByTestId("outfit-image-stage").parentElement).toHaveTextContent("코디 01 · 날씨에 맞는 스타일");
   });
 });

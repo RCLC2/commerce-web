@@ -1,6 +1,7 @@
 
 
-import { Button } from "@/components/ui/button";import { SafeImage } from "@/components/safe-image";
+import { Button } from "@/components/ui/button";
+import { SafeImage } from "@/components/safe-image";
 import type { OutfitLook, OutfitSlotKind } from "@/lib/today-outfit";
 import { outfitProductAnchorID } from "@/lib/today-outfit";
 import { formatPrice } from "@/lib/utils";
@@ -33,14 +34,13 @@ export function EquipmentLook({
       <div data-testid="outfit-image-stage" className="relative min-h-[650px] overflow-hidden bg-[radial-gradient(circle_at_50%_42%,#fff_0_22%,#fff1f2_23%_51%,#f8fafc_72%)] px-2 pt-4 sm:min-h-[560px] sm:px-4">
         <div className="relative z-10 text-center">
           <p className="text-xs font-bold tracking-normal text-action-primary">코디 {String(position).padStart(2, "0")} · 날씨에 맞는 스타일</p>
-          <h3 className="mt-1 text-sm font-bold sm:text-base">{look.title}</h3>
         </div>
 
         <div className="pointer-events-none absolute left-1/2 top-[47%] h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-action-primary/35 shadow-[0_0_0_34px_rgba(255,228,230,0.28)] sm:h-80 sm:w-80" />
         <div className="absolute left-1/2 top-[47%] h-[400px] w-[300px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-feature bg-surface-subtle shadow-float sm:h-[440px] sm:w-[330px]">
           <SafeImage
             src={look.image_url}
-            alt={`${look.title} AI 코디 연출 이미지`}
+            alt="오늘의 AI 코디 연출 이미지"
             aria-describedby={disclosureID}
             fill
             unoptimized
@@ -74,11 +74,6 @@ export function EquipmentLook({
         ))}
       </div>
 
-      <footer data-testid="outfit-point-bar" className="m-4 rounded-surface bg-content-primary px-4 py-3 text-center text-xs leading-5 text-content-inverse shadow-float sm:mx-24 sm:text-xs">
-        <strong className="text-focus-on-brand">오늘의 코디 포인트</strong>
-        <span className="mx-1 text-content-inverse/50">·</span>
-        {look.reason}
-      </footer>
     </article>
   );
 }

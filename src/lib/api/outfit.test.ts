@@ -18,6 +18,25 @@ describe("today outfit API contract", () => {
     ]);
     expect(new Set(response.looks[0].items.map((item) => item.product.id)).size).toBe(7);
     expect(response.looks[0].image_url).toBe("/api/v1/outfits/images/1");
+    expect(response.refresh_pending).toBe(false);
+  });
+
+  it("accepts the image-only response and limits a compatibility response to five looks", () => {
+    const response = parseTodayOutfitResponse({
+      weather_profile: "MILD",
+      generated_at: "2026-09-05T02:30:00Z",
+      refresh_pending: true,
+      looks: Array.from({ length: 10 }, (_, index) => ({
+        ...createOutfitLook(index + 1),
+        title: `legacy title ${index}`,
+        reason: `legacy reason ${index}`,
+      })),
+    });
+
+    expect(response.refresh_pending).toBe(true);
+    expect(response.looks).toHaveLength(5);
+    expect(response.looks[0]).not.toHaveProperty("title");
+    expect(response.looks[0]).not.toHaveProperty("reason");
   });
 
   it("rejects duplicate product and slot assignments", () => {
