@@ -13,8 +13,6 @@ export type OutfitItem = {
 
 export type OutfitLook = {
   id: number;
-  title: string;
-  reason: string;
   image_url: string;
   image_disclosure: string;
   items: OutfitItem[];
@@ -23,6 +21,7 @@ export type OutfitLook = {
 export type TodayOutfitResponse = {
   weather_profile: OutfitWeatherProfile;
   generated_at: string;
+  refresh_pending: boolean;
   looks: OutfitLook[];
 };
 

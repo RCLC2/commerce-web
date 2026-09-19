@@ -9,8 +9,6 @@ const outfitSlotSchema = z.enum(outfitSlotOrder);
 
 const outfitLookSchema = z.object({
   id: identifierSchema,
-  title: z.string().min(1),
-  reason: z.string().min(1),
   image_url: z.string().min(1),
   image_disclosure: z.string().min(1),
   items: z.array(z.object({
@@ -32,6 +30,7 @@ const outfitLookSchema = z.object({
 const todayOutfitSchema = z.object({
   weather_profile: z.enum(["HOT", "WARM", "MILD", "COOL", "COLD", "RAIN", "SNOW"]),
   generated_at: dateStringSchema,
+  refresh_pending: z.boolean().default(false),
   looks: z.array(outfitLookSchema).min(1).max(10),
 });
 
@@ -51,7 +50,7 @@ function normalizeTodayOutfit(response: z.infer<typeof todayOutfitSchema>): Toda
   const slotRank = new Map(outfitSlotOrder.map((slot, index) => [slot, index]));
   return {
     ...response,
-    looks: response.looks.map((look) => ({
+    looks: response.looks.slice(0, 5).map((look) => ({
       ...look,
       items: look.items
         .map((item) => ({ ...item, product: normalizePublicProduct(item.product) }))
