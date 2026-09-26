@@ -24,6 +24,11 @@ const productDetailSchema = z.object({
   lowest_price: z.number().int().nonnegative().optional(),
   delivery_type: z.string().optional(),
   delivery_label: z.string().optional(),
+  delivery: z.object({
+    expected_ship_date: z.string(),
+    expected_arrival_date: z.string(),
+    expected_arrival_label: z.string(),
+  }).optional(),
   today_shipping_available: z.boolean().optional(),
 });
 
@@ -112,6 +117,7 @@ export const catalogApi = {
       shipping_type: detail.product.shipping_type || detail.delivery_type || "NORMAL",
       delivery_type: detail.delivery_type ?? detail.product.delivery_type,
       delivery_label: detail.delivery_label ?? detail.product.delivery_label,
+      delivery: detail.delivery,
       today_shipping_available:
         detail.today_shipping_available ?? detail.product.today_shipping_available,
     })),

@@ -141,6 +141,11 @@ export type Product = {
   shipping_type: "NORMAL" | "FREE" | string;
   delivery_type?: string;
   delivery_label?: string;
+  delivery?: {
+    expected_ship_date: string;
+    expected_arrival_date: string;
+    expected_arrival_label: string;
+  };
   today_shipping_available?: boolean;
   popularity_score: number;
   realtime_popularity_score?: number;

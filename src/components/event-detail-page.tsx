@@ -24,6 +24,7 @@ import { ProductCard } from "./product-card";
 import { ApiErrorState } from "./api-error-state";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { BackButton } from "./ui/back-button";
 import { EmptyState, InlineLoadingState, LoadingState } from "./ui/feedback";
 
 const EVENT_PRODUCT_PAGE_SIZE = 12;
@@ -142,10 +143,10 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
   });
 
   if (eventQuery.isError) {
-    return <PageLayout className="text-sm"><ApiErrorState error={eventQuery.error} onRetry={() => void eventQuery.refetch()} /></PageLayout>;
+    return <PageLayout className="text-sm"><BackButton fallbackHref="/" /><ApiErrorState className="mt-4" error={eventQuery.error} onRetry={() => void eventQuery.refetch()} /></PageLayout>;
   }
   if (eventQuery.isLoading || !event) {
-    return <PageLayout><LoadingState label="이벤트를 불러오는 중입니다." /></PageLayout>;
+    return <PageLayout><BackButton fallbackHref="/" /><LoadingState className="mt-4" label="이벤트를 불러오는 중입니다." /></PageLayout>;
   }
 
   const schedule = event.starts_at && event.ends_at
@@ -163,7 +164,8 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
 
   return (
     <PageLayout className="pt-0">
-      <section className="pt-5">
+      <BackButton fallbackHref="/" className="my-3" />
+      <section>
         <div className="relative h-[320px] overflow-hidden rounded-md bg-surface-subtle md:h-[420px]">
           <SafeImage src={event.image_url} alt={event.title} fill sizes="100vw" className="object-cover" priority />
           <div className={`absolute inset-0 bg-gradient-to-t ${heroTone} to-transparent`} />

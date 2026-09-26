@@ -1,7 +1,7 @@
 "use client";
 
 import { useInfiniteQuery, useQueries, useQuery } from "@tanstack/react-query";
-import { CalendarDays, ChevronLeft, ChevronRight, Grid2X2, Package, Sparkles, Store } from "lucide-react";
+import { ChevronLeft, ChevronRight, Package, Sparkles, Store } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
@@ -229,10 +229,10 @@ export function HomePage() {
   const profileName = profile?.email?.split("@")[0] || "회원";
   const recommendationSource = recommendationQuery.data?.pages[0]?.source ?? (hydrated && !effectiveToken ? "GUEST" : undefined);
   const recommendationTitle = recommendationSource === "GUEST"
-    ? "지금 많이 보는 상품"
+    ? "많이 보는 상품"
     : recommendationSource === "FALLBACK"
       ? "요즘 인기 있는 상품"
-      : `${profileName}님을 위한 추천 상품`;
+      : `${profileName}님이 많이 보는 상품`;
   const recommendationDescription = recommendationSource === "GUEST"
     ? "로그인하면 취향과 쇼핑 활동을 반영한 추천을 볼 수 있어요."
     : recommendationSource === "FALLBACK"
@@ -271,27 +271,14 @@ export function HomePage() {
           <EventCarousel events={events} />
         ) : eventsQuery.isLoading ? (
           <LoadingState className="min-h-52 md:min-h-72" label="이벤트를 불러오는 중입니다." />
-        ) : (
-          <EmptyState
-            icon={<CalendarDays className="size-7" />}
-            title="진행 중인 이벤트가 없습니다"
-            description="새로운 혜택을 준비하고 있으니 조금 뒤에 다시 확인해주세요."
-          />
-        )}
+        ) : <p className="rounded-md border border-border-subtle bg-surface-raised p-6 text-sm text-content-secondary">진행 중인 이벤트가 없습니다.</p>}
       </section>
 
       <section className="rounded-surface border border-border-subtle bg-surface-raised p-3 shadow-card" aria-label="홈 카테고리와 이벤트">
         {homeCategoryChipsQuery.isError ? <ApiErrorState className="m-3" error={homeCategoryChipsQuery.error} onRetry={() => void homeCategoryChipsQuery.refetch()} retryLabel="카테고리 다시 시도" /> : null}
         {homeCategoryChipsQuery.isLoading ? <LoadingState className="min-h-20" label="카테고리를 불러오는 중입니다." /> : null}
-        {homeCategoryChipsQuery.isSuccess && displayHomeCategoryChips.length === 0 ? (
-          <EmptyState
-            className="p-5"
-            icon={<Grid2X2 className="size-7" />}
-            title="표시할 홈 카테고리가 없습니다."
-            description="카테고리를 준비하고 있으니 잠시 후 다시 확인해주세요."
-          />
-        ) : null}
-        {homeCategoryChipsQuery.isSuccess ? <HomeCategoryChips chips={displayHomeCategoryChips} /> : null}
+        {homeCategoryChipsQuery.isSuccess && displayHomeCategoryChips.length === 0 ? <p className="p-3 text-sm text-content-secondary">표시할 홈 카테고리가 없습니다.</p> : null}
+        {displayHomeCategoryChips.length > 0 ? <HomeCategoryChips chips={displayHomeCategoryChips} /> : null}
       </section>
       {homePlacementsQuery.isLoading ? <LoadingState className="min-h-24" label="맞춤 혜택을 불러오는 중입니다." /> : (
         <HomeContextTextCard
@@ -300,16 +287,9 @@ export function HomePage() {
           memberID={memberID}
         />
       )}
-      {homeSectionsQuery.isError ? <ApiErrorState className="my-7" error={homeSectionsQuery.error} onRetry={() => void homeSectionsQuery.refetch()} retryLabel="홈 구좌 다시 시도" /> : null}
       {homeSectionsQuery.isLoading ? <LoadingState className="min-h-40" label="홈 상품 구좌를 불러오는 중입니다." /> : null}
-      {homeSectionsQuery.isSuccess && displayHomeSections.length === 0 ? (
-        <EmptyState
-          className="my-7"
-          icon={<Package className="size-7" />}
-          title="표시할 홈 상품 구좌가 없습니다"
-          description="새로운 상품 구좌를 준비하고 있으니 잠시 후 다시 확인해주세요."
-        />
-      ) : null}
+      {homeSectionsQuery.isError ? <ApiErrorState className="my-7" error={homeSectionsQuery.error} onRetry={() => void homeSectionsQuery.refetch()} retryLabel="홈 구좌 다시 시도" /> : null}
+      {homeSectionsQuery.isSuccess && displayHomeSections.length === 0 ? <p className="py-7 text-sm text-content-secondary">표시할 홈 상품 구좌가 없습니다.</p> : null}
       {displayHomeSections.map((section, index) => (
         <ProductCarouselSection
           key={section.id || section.api_url}
@@ -323,9 +303,11 @@ export function HomePage() {
           edgeChevronControls={usesEdgeChevronControls(section)}
         />
       ))}
-      <section className="py-2" aria-label="홈 추천 카드">
-        {homePlacementsQuery.isLoading ? <LoadingState className="min-h-44" label="추천 카드를 불러오는 중입니다." /> : <HomeFeatureCard card={homePlacementsQuery.data?.feature_card.card} token={effectiveToken} memberID={memberID} />}
-      </section>
+      {homePlacementsQuery.isLoading || homePlacementsQuery.data?.feature_card.card ? (
+        <section className="py-2" aria-label="홈 추천 카드">
+          {homePlacementsQuery.isLoading ? <LoadingState className="min-h-44" label="추천 카드를 불러오는 중입니다." /> : <HomeFeatureCard card={homePlacementsQuery.data?.feature_card.card} token={effectiveToken} memberID={memberID} />}
+        </section>
+      ) : null}
 
       <section id="recommendations" className="scroll-mt-20 py-7">
         <div className="mb-4 flex items-end justify-between">

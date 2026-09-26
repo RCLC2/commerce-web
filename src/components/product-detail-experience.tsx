@@ -30,6 +30,7 @@ import { PageLayout } from "./page-layout";
 import { PDPShelfSection } from "./pdp-merchandising-sections";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { BackButton } from "./ui/back-button";
 import { EmptyState, InlineLoadingState, LoadingSpinner, LoadingState, Toast } from "./ui/feedback";
 import { useAccessibleOverlay } from "./ui/use-accessible-overlay";
 
@@ -159,7 +160,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
   function handleCartAction() {
     if (addCart.isPending) return;
     if (!effectiveToken) {
-      router.push("/login");
+      router.push(`/login?next=${encodeURIComponent(`/products/${productId}`)}`);
       return;
     }
     if (addCart.isSuccess) {
@@ -295,10 +296,10 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
   }, [product]);
 
   if (productQuery.isLoading) {
-    return <PageLayout variant="product-detail" className="pt-10"><LoadingState label="상품을 불러오는 중입니다." /></PageLayout>;
+    return <PageLayout variant="product-detail"><BackButton fallbackHref="/products" /><LoadingState className="mt-4" label="상품을 불러오는 중입니다." /></PageLayout>;
   }
   if (productQuery.isError || !product) {
-    return <PageLayout variant="product-detail" className="pt-10">상품을 불러오지 못했습니다.</PageLayout>;
+    return <PageLayout variant="product-detail"><BackButton fallbackHref="/products" /><p className="mt-4">상품을 불러오지 못했습니다.</p></PageLayout>;
   }
 
   const images = product.images?.length
@@ -349,6 +350,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
 
   return (
     <PageLayout variant="product-detail">
+      <BackButton fallbackHref="/products" className="mb-3" />
       <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_360px] lg:grid-cols-[minmax(0,620px)_420px] lg:justify-between">
         <section>
           <div
@@ -434,6 +436,20 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
                 <p className="mt-0.5 text-xl font-bold">{formatPrice(couponPrice)}</p>
               </div>
             ) : null}
+            <div className="mt-4 rounded-control border border-border-subtle bg-surface-subtle px-3 py-3 text-sm" aria-label="배송 안내">
+              <dl className="space-y-2">
+                <div className="flex gap-4">
+                  <dt className="w-14 shrink-0 font-bold text-content-secondary">배송비</dt>
+                  <dd className="font-bold">{product.shipping_type === "FREE" ? "무료배송" : "주문서에서 확인"}</dd>
+                </div>
+                {product.delivery_label ? (
+                  <div className="flex gap-4">
+                    <dt className="w-14 shrink-0 font-bold text-content-secondary">배송 안내</dt>
+                    <dd className="font-bold">{product.delivery_label}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            </div>
           </div>
 
           <div className="py-5">

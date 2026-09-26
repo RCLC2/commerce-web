@@ -13,6 +13,7 @@ import { PageLayout } from "./page-layout";
 import { ProductCard } from "./product-card";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { BackButton } from "./ui/back-button";
 import { EmptyState, InlineLoadingState, LoadingState } from "./ui/feedback";
 
 export function MarketPage({ marketId }: { marketId: number }) {
@@ -56,11 +57,12 @@ export function MarketPage({ marketId }: { marketId: number }) {
 
   const market = marketQuery.data;
   const products = productsQuery.data?.items ?? [];
-  if (marketQuery.isLoading) return <PageLayout><LoadingState label="마켓을 불러오는 중입니다." /></PageLayout>;
-  if (marketQuery.error || !market) return <PageLayout><div className="rounded-surface border border-status-negative-border bg-status-negative-subtle p-8 text-center shadow-card" role="alert"><h1 className="text-xl font-bold text-status-negative">마켓을 불러오지 못했습니다.</h1><Button className="mt-4" size="sm" variant="secondary" onClick={() => void marketQuery.refetch()}>마켓 다시 불러오기</Button></div></PageLayout>;
+  if (marketQuery.isLoading) return <PageLayout><BackButton fallbackHref="/markets" /><LoadingState className="mt-4" label="마켓을 불러오는 중입니다." /></PageLayout>;
+  if (marketQuery.error || !market) return <PageLayout><BackButton fallbackHref="/markets" /><div className="mt-4 rounded-surface border border-status-negative-border bg-status-negative-subtle p-8 text-center shadow-card" role="alert"><h1 className="text-xl font-bold text-status-negative">마켓을 불러오지 못했습니다.</h1><Button className="mt-4" size="sm" variant="secondary" onClick={() => void marketQuery.refetch()}>마켓 다시 불러오기</Button></div></PageLayout>;
 
   return (
     <PageLayout className="pt-0">
+      <BackButton fallbackHref="/markets" className="my-3" />
       <section className="overflow-hidden rounded-feature border border-border-subtle bg-surface-raised shadow-card">
         <div className="relative h-56 bg-surface-subtle md:h-72"><SafeImage src={market.cover_image_url} alt={market.name} fill sizes="100vw" className="object-cover" /></div>
         <div className="flex flex-col gap-4 p-5 md:flex-row md:items-end md:justify-between">
