@@ -27,6 +27,7 @@ describe("PageJumpControls", () => {
       "fixed",
       "bottom-[calc(11.5rem+env(safe-area-inset-bottom))]",
     );
+    expect(screen.getByRole("navigation", { name: "페이지 빠른 이동" })).not.toHaveClass("md:bottom-6");
   });
 
   it("respects reduced-motion preferences", () => {

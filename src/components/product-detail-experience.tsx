@@ -3,7 +3,7 @@
 import { Select } from "./ui/input";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, Bookmark, Camera, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Heart, Minus, Plus, ShoppingBag, SlidersHorizontal, Star, X } from "lucide-react";
+import { BadgeCheck, Bookmark, Camera, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Heart, MessageSquareText, Minus, Plus, ShoppingBag, SlidersHorizontal, Star, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -26,10 +26,12 @@ import { discountRate, formatPrice } from "@/lib/utils";
 import { CollapsibleProductDetail } from "./collapsible-product-detail";
 import { PDPReviewBanner } from "./home-placement-cards";
 import { PageJumpControls } from "./page-jump-controls";
+import { PageLayout } from "./page-layout";
 import { PDPShelfSection } from "./pdp-merchandising-sections";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
-import { Toast } from "./ui/feedback";
+import { BackButton } from "./ui/back-button";
+import { EmptyState, InlineLoadingState, LoadingSpinner, LoadingState, Toast } from "./ui/feedback";
 import { useAccessibleOverlay } from "./ui/use-accessible-overlay";
 
 class CartPreflightError extends Error {
@@ -158,7 +160,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
   function handleCartAction() {
     if (addCart.isPending) return;
     if (!effectiveToken) {
-      router.push("/login");
+      router.push(`/login?next=${encodeURIComponent(`/products/${productId}`)}`);
       return;
     }
     if (addCart.isSuccess) {
@@ -294,10 +296,10 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
   }, [product]);
 
   if (productQuery.isLoading) {
-    return <main className="mx-auto max-w-6xl px-4 py-10">상품을 불러오는 중입니다.</main>;
+    return <PageLayout variant="product-detail"><BackButton fallbackHref="/products" /><LoadingState className="mt-4" label="상품을 불러오는 중입니다." /></PageLayout>;
   }
   if (productQuery.isError || !product) {
-    return <main className="mx-auto max-w-6xl px-4 py-10">상품을 불러오지 못했습니다.</main>;
+    return <PageLayout variant="product-detail"><BackButton fallbackHref="/products" /><p className="mt-4">상품을 불러오지 못했습니다.</p></PageLayout>;
   }
 
   const images = product.images?.length
@@ -347,7 +349,8 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-28 pt-5 md:pb-20 md:pt-8">
+    <PageLayout variant="product-detail">
+      <BackButton fallbackHref="/products" className="mb-3" />
       <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_360px] lg:grid-cols-[minmax(0,620px)_420px] lg:justify-between">
         <section>
           <div
@@ -411,7 +414,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
             <Link href={`/products/${product.id}/reviews`} className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm text-content-secondary hover:text-action-primary" aria-label="상품 리뷰 모두 보기">
               <Star size={16} className="fill-brand text-action-primary" aria-hidden="true" />
               {summaryQuery.isLoading ? (
-                <span>별점을 불러오는 중입니다.</span>
+                <span className="inline-flex" role="status" aria-label="별점을 불러오는 중입니다."><LoadingSpinner className="size-4" aria-hidden="true" /></span>
               ) : summaryQuery.isError || !summary ? (
                 <span>별점 정보를 불러오지 못했습니다.</span>
               ) : (
@@ -433,6 +436,20 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
                 <p className="mt-0.5 text-xl font-bold">{formatPrice(couponPrice)}</p>
               </div>
             ) : null}
+            <div className="mt-4 rounded-control border border-border-subtle bg-surface-subtle px-3 py-3 text-sm" aria-label="배송 안내">
+              <dl className="space-y-2">
+                <div className="flex gap-4">
+                  <dt className="w-14 shrink-0 font-bold text-content-secondary">배송비</dt>
+                  <dd className="font-bold">{product.shipping_type === "FREE" ? "무료배송" : "주문서에서 확인"}</dd>
+                </div>
+                {product.delivery_label ? (
+                  <div className="flex gap-4">
+                    <dt className="w-14 shrink-0 font-bold text-content-secondary">배송 안내</dt>
+                    <dd className="font-bold">{product.delivery_label}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            </div>
           </div>
 
           <div className="py-5">
@@ -507,7 +524,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
             ) : null}
           </div>
         </div>
-        {reviewsQuery.isLoading ? <p className="mt-5 text-sm text-content-secondary">리뷰를 불러오는 중입니다.</p> : null}
+        {reviewsQuery.isLoading ? <InlineLoadingState className="mt-5" label="리뷰를 불러오는 중입니다." /> : null}
         {reviewsQuery.isError ? <p className="mt-5 rounded-control border border-status-negative-border bg-status-negative-subtle p-3 text-sm font-bold text-status-negative" role="alert">리뷰를 불러오지 못했습니다.</p> : null}
         {!reviewsQuery.isLoading && !reviewsQuery.isError ? (
           <div className="no-scrollbar mt-5 flex snap-x gap-4 overflow-x-auto pb-3">
@@ -560,7 +577,14 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
                   </div>
                 </article>
               );
-            }) : <p className="text-sm text-content-secondary">아직 등록된 리뷰가 없습니다.</p>}
+            }) : (
+              <EmptyState
+                className="w-full"
+                icon={<MessageSquareText className="size-7" />}
+                title="아직 등록된 리뷰가 없습니다"
+                description="첫 번째 구매 후기를 남겨 다른 고객의 선택을 도와주세요."
+              />
+            )}
           </div>
         ) : null}
       </section>
@@ -592,7 +616,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
       <PageJumpControls />
 
       <div
-        className={`fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[var(--commerce-z-dropdown)] border-t border-border-subtle bg-surface-raised/95 px-4 py-3 shadow-float backdrop-blur transition after:pointer-events-none after:absolute after:top-full after:h-4 after:bg-surface-raised md:bottom-0 ${showFloatingPurchase ? "opacity-100" : "pointer-events-none translate-y-full opacity-0"}`}
+        className={`fixed inset-x-0 bottom-[var(--commerce-bottom-nav-height)] z-[var(--commerce-z-sticky)] border-t border-border-subtle bg-surface-raised/95 px-4 py-3 backdrop-blur transition ${showFloatingPurchase ? "opacity-100" : "pointer-events-none translate-y-full opacity-0"}`}
         aria-hidden={!showFloatingPurchase}
         role="group"
         aria-label="빠른 구매"
@@ -651,11 +675,11 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
         </div>
       ) : null}
       {toast ? (
-        <div className="pointer-events-none fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[var(--commerce-z-modal)] flex justify-center md:bottom-6">
+        <div className="pointer-events-none fixed inset-x-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[var(--commerce-z-modal)] flex justify-center">
           <Toast tone={toast.tone} className="pointer-events-auto max-w-md">{toast.message}</Toast>
         </div>
       ) : null}
-    </main>
+    </PageLayout>
   );
 }
 
@@ -745,11 +769,11 @@ function PurchaseControls(props: PurchaseControlsProps) {
           {props.cartPending ? "담는 중" : !props.authenticated ? "로그인 후 담기" : props.added || (props.cartError && !props.cartRetrySafe) ? "장바구니 확인" : props.cartRetrySafe ? "다시 담기" : "장바구니 담기"}
         </Button>
       </div>
-      {props.engagementLoading ? <p className="text-xs font-bold text-content-secondary">좋아요와 찜 상태를 확인하는 중입니다.</p> : null}
+      {props.engagementLoading ? <InlineLoadingState className="min-h-0 justify-start border-0 bg-transparent px-0 py-0 text-xs font-bold" label="좋아요와 찜 상태를 확인하는 중입니다." /> : null}
       {props.likeError ? <div className="rounded-control border border-status-negative-border bg-status-negative-subtle px-3 py-2 text-sm" role="alert"><p className="font-bold text-status-negative">{props.likeError}</p><Button className="mt-2" size="sm" variant="secondary" onClick={props.onRetryLike}>좋아요 다시 시도</Button></div> : null}
       {props.wishlistError ? <div className="rounded-control border border-status-negative-border bg-status-negative-subtle px-3 py-2 text-sm" role="alert"><p className="font-bold text-status-negative">{props.wishlistError}</p><Button className="mt-2" size="sm" variant="secondary" onClick={props.onRetryWishlist}>찜 다시 시도</Button></div> : null}
       {props.cartError ? <div className="rounded-control border border-status-negative-border bg-status-negative-subtle px-3 py-2 text-sm" role="alert"><p className="font-bold text-status-negative">{props.cartError}</p><Button className="mt-2" size="sm" variant="secondary" onClick={props.onCart}>{props.cartRetrySafe ? "다시 담기" : "장바구니 확인"}</Button></div> : null}
-      {props.likePending || props.wishlistPending ? <p className="text-xs font-bold text-content-secondary" role="status">상품 상태를 저장하는 중입니다.</p> : null}
+      {props.likePending || props.wishlistPending ? <InlineLoadingState className="min-h-0 justify-start border-0 bg-transparent px-0 py-0 text-xs font-bold" label="상품 상태를 저장하는 중입니다." /> : null}
       {props.added ? <p className="rounded-control border border-status-positive-border bg-status-positive-subtle px-3 py-2 text-center text-sm font-bold text-status-positive" role="status">상품을 담았습니다. 버튼을 다시 누르면 장바구니로 이동합니다.</p> : null}
     </div>
   );

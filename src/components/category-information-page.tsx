@@ -3,20 +3,22 @@
 import { PageHeading } from "./ui/page-heading";
 import { Grid2X2 as PageIcon } from "lucide-react";
 
-import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Clock3, Store } from "lucide-react";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight, Clock3, Package, Store } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Pagination } from "./ui/pagination";
 import { FilterChip } from "./ui/filter-chip";
 import { api } from "@/lib/api";
 import { scrollCarouselByCard } from "@/lib/carousel";
 import type { CommerceCategory, Product } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
+import { PageLayout } from "./page-layout";
 import { ProductCard } from "./product-card";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { EmptyState, LoadingSpinner, LoadingState } from "./ui/feedback";
+import { InfiniteScrollTrigger } from "./ui/infinite-scroll-trigger";
 
 const PAGE_SIZE = 8;
 
@@ -24,21 +26,20 @@ export function CategoryInformationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedSlug = searchParams.get("category");
-  const requestedPage = Number(searchParams.get("page"));
-  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
-  function changePage(next: number, slug = selectedSlug) {
+  function selectCategory(slug: string) {
     const params = new URLSearchParams();
     if (slug) params.set("category", slug);
-    if (next > 1) params.set("page", String(next));
-    router.push(`/categories${params.size ? `?${params}` : ""}`, { scroll: false });
+    router.push(`/categories${params.size ? `?${params}` : ""}`);
   }
-  const informationQuery = useQuery({
-    queryKey: ["category-information", selectedSlug ?? "server-default", page, PAGE_SIZE],
-    queryFn: () => api.getCategoryInformation({ category: selectedSlug ?? undefined, page, pageSize: PAGE_SIZE }),
+  const informationQuery = useInfiniteQuery({
+    queryKey: ["category-information", selectedSlug ?? "server-default", PAGE_SIZE],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => api.getCategoryInformation({ category: selectedSlug ?? undefined, page: pageParam, pageSize: PAGE_SIZE }),
+    getNextPageParam: (lastPage) => lastPage.pagination.has_next ? lastPage.pagination.page + 1 : undefined,
     placeholderData: (previous) => previous,
   });
 
-  const information = informationQuery.data;
+  const information = informationQuery.data?.pages[0];
   const roots = useMemo(
     () => [...(information?.categories ?? [])].sort(compareCategoryOrder),
     [information?.categories],
@@ -46,31 +47,27 @@ export function CategoryInformationPage() {
   const selected = information?.selected_category;
   const selectedRoot = roots.find((category) => containsCategory(category, selected?.slug ?? selectedSlug ?? "")) ?? roots[0];
   const filters = selectedRoot ? [selectedRoot, ...flattenChildren(selectedRoot)] : [];
-  const products = information?.products ?? [];
+  const products = informationQuery.data?.pages.flatMap((page) => page.products) ?? [];
   const carousel = information?.realtime_popular_carousel;
-
-  function selectCategory(slug: string) {
-    changePage(1, slug);
-  }
 
   if (informationQuery.isLoading && !information) {
     return <CategoryLoading />;
   }
 
-  if (informationQuery.error || !information || !selected) {
+  if (!information || !selected) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-16">
+      <PageLayout>
         <div className="rounded-surface border border-status-negative-border bg-status-negative-subtle p-8 text-center shadow-card" role="alert">
           <h1 className="text-xl font-bold text-status-negative">카테고리관을 불러오지 못했습니다.</h1>
           <p className="mt-2 text-sm text-status-negative">잠시 후 다시 시도해주세요.</p>
           <Button className="mt-5" variant="secondary" onClick={() => void informationQuery.refetch()}>다시 시도</Button>
         </div>
-      </main>
+      </PageLayout>
     );
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-24 pt-8">
+    <PageLayout>
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
           <PageHeading icon={<PageIcon />} title="카테고리관" description="카테고리별 상품과 실시간 인기 상품을 확인하세요." />
@@ -112,12 +109,16 @@ export function CategoryInformationPage() {
           </div>
         </aside> : null}
 
-        <section className="min-w-0" aria-busy={informationQuery.isFetching}>
+        <section className="min-w-0" aria-label="카테고리 상품">
           <div className="flex items-end justify-between gap-4 border-b border-border-subtle pb-3">
             <div>
               <h2 className="text-lg font-bold">{selected.name} 상품</h2>
             </div>
-            {informationQuery.isFetching ? <span className="text-xs font-bold text-content-secondary">업데이트 중</span> : null}
+            {informationQuery.isFetching ? (
+              <span className="inline-flex shrink-0 items-center text-xs font-bold text-content-secondary" role="status" aria-live="polite" aria-label="카테고리 상품을 업데이트하는 중입니다.">
+                <LoadingSpinner className="size-4" aria-hidden="true" />
+              </span>
+            ) : null}
           </div>
 
           {products.length ? (
@@ -126,13 +127,24 @@ export function CategoryInformationPage() {
               <ProductGrid products={products} />
             </>
           ) : (
-            <div className="mt-5 rounded-surface border border-dashed border-border-subtle bg-surface-raised p-12 text-center text-sm font-bold text-content-secondary">이 카테고리에 등록된 상품이 없습니다.</div>
+            <EmptyState
+              className="mt-5"
+              icon={<Package className="size-7" />}
+              title="이 카테고리에 등록된 상품이 없습니다"
+              description="다른 카테고리를 선택하거나 새 상품이 등록된 뒤 다시 확인해주세요."
+            />
           )}
 
-          <Pagination page={information.pagination.page} totalPages={information.pagination.total_pages} hasNext={information.pagination.has_next} disabled={informationQuery.isFetching} onChange={changePage} />
+          <InfiniteScrollTrigger
+            hasMore={Boolean(informationQuery.hasNextPage)}
+            loading={informationQuery.isFetching}
+            error={informationQuery.isFetchNextPageError}
+            label="카테고리 상품"
+            onLoadMore={() => void informationQuery.fetchNextPage()}
+          />
         </section>
       </div>
-    </main>
+    </PageLayout>
   );
 }
 
@@ -214,5 +226,16 @@ function compareCategoryOrder(a: CommerceCategory, b: CommerceCategory) {
 }
 
 function CategoryLoading() {
-  return <main className="mx-auto max-w-6xl animate-pulse px-4 py-8"><div className="h-16 rounded-surface bg-surface-subtle" /><div className="mt-6 h-11 w-2/3 rounded-control bg-surface-subtle" /><div className="mt-7 grid grid-cols-2 gap-4 md:grid-cols-4">{Array.from({ length: 8 }, (_, index) => <div key={index}><div className="aspect-square rounded-control bg-surface-subtle" /><div className="mt-3 h-4 rounded-control bg-surface-subtle" /></div>)}</div></main>;
+  return (
+    <PageLayout>
+      <LoadingState className="min-h-0 justify-start py-2" label="카테고리를 불러오는 중입니다." />
+      <div className="animate-pulse" aria-hidden="true">
+        <div className="h-16 rounded-surface bg-surface-subtle" />
+        <div className="mt-6 h-11 w-2/3 rounded-control bg-surface-subtle" />
+        <div className="mt-7 grid grid-cols-2 gap-4 md:grid-cols-4">
+          {Array.from({ length: 8 }, (_, index) => <div key={index}><div className="aspect-square rounded-control bg-surface-subtle" /><div className="mt-3 h-4 rounded-control bg-surface-subtle" /></div>)}
+        </div>
+      </div>
+    </PageLayout>
+  );
 }

@@ -1,60 +1,89 @@
 "use client";
 
-import { Pagination } from "./ui/pagination";
 import { PageHeading } from "./ui/page-heading";
 
-import { Input } from "./ui/input";
-
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowLeft, ArrowUp, ChevronLeft, ChevronRight, Minus, Package, Search, Sparkles, Star, Store, Users, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import { scrollCarouselByCard } from "@/lib/carousel";
-import type { Market, Product, SearchResultSection } from "@/lib/types";
+import type { Market, Product, SearchResultSection, SearchSuggestion } from "@/lib/types";
 import { couponPriceForProduct } from "@/lib/product-card-pricing";
 import { formatFollowerCount } from "@/lib/utils";
 import { ProductCard } from "./product-card";
 import { ProductCardPrice } from "./product-card-price";
+import { PageLayout } from "./page-layout";
 import { ApiErrorState } from "./api-error-state";
 import { SponsoredPlacement } from "./advertising/sponsored-placement";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { EmptyState, InlineLoadingState } from "./ui/feedback";
+import { SearchField } from "./ui/search-field";
+import { InfiniteScrollTrigger } from "./ui/infinite-scroll-trigger";
 
 export function SearchPage() {
   const searchParams = useSearchParams();
   const query = searchParams.get("q")?.trim() ?? "";
   const audience = searchParams.get("audience") === "men" ? "men" : "women";
-  const productPage = positivePage(searchParams.get("product_page"));
-  const marketPage = positivePage(searchParams.get("market_page"));
-  const pageKey = `${query}:${audience}:${productPage}:${marketPage}`;
-  return <SearchExperience key={pageKey} initialQuery={query} audience={audience} productPage={productPage} marketPage={marketPage} />;
+  return <SearchExperience key={`${query}:${audience}`} initialQuery={query} audience={audience} />;
 }
 
 function SearchExperience({
   initialQuery,
   audience,
-  productPage,
-  marketPage,
 }: {
   initialQuery: string;
   audience: "women" | "men";
-  productPage: number;
-  marketPage: number;
 }) {
   const router = useRouter();
   const [input, setInput] = useState(initialQuery);
+  const [debouncedInput, setDebouncedInput] = useState(initialQuery);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(-1);
   const [now, setNow] = useState<Date | null>(null);
   const carouselRefs = useRef(new Map<number, HTMLDivElement>());
   const trimmedInput = input.trim();
-  const searchRequest = { q: initialQuery, audience, productPage, marketPage } as const;
-  const { data: results, isLoading, error, refetch: refetchResults } = useQuery({
-    queryKey: queryKeys.integratedSearch(searchRequest),
-    queryFn: () => api.search(searchRequest),
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedInput(trimmedInput), 180);
+    return () => window.clearTimeout(timer);
+  }, [trimmedInput]);
+  const suggestionsQuery = useQuery({
+    queryKey: ["search-page-suggestions", debouncedInput],
+    queryFn: () => api.searchSuggestions(debouncedInput),
+    enabled: searchFocused && debouncedInput.length > 0,
+  });
+  const autocompleteSuggestions = searchFocused && debouncedInput === trimmedInput
+    ? (suggestionsQuery.data ?? []).slice(0, 8)
+    : [];
+  const showSuggestionPanel = searchFocused && trimmedInput.length > 0;
+  const suggestionsPending = showSuggestionPanel && (debouncedInput !== trimmedInput || suggestionsQuery.isPending);
+  const suggestionsFailed = showSuggestionPanel && debouncedInput === trimmedInput && suggestionsQuery.isError;
+  const productResultsQuery = useInfiniteQuery({
+    queryKey: ["integrated-search-products", initialQuery, audience],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => api.search({ q: initialQuery, audience, productPage: pageParam, marketPage: 1 }),
+    getNextPageParam: (lastPage) => lastPage.products.page < lastPage.products.total_pages ? lastPage.products.page + 1 : undefined,
     enabled: initialQuery.length > 0,
   });
+  const marketResultsQuery = useInfiniteQuery({
+    queryKey: ["integrated-search-markets", initialQuery, audience],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => api.search({ q: initialQuery, audience, productPage: 1, marketPage: pageParam }),
+    getNextPageParam: (lastPage) => lastPage.markets.page < lastPage.markets.total_pages ? lastPage.markets.page + 1 : undefined,
+    enabled: initialQuery.length > 0 && productResultsQuery.isSuccess,
+    initialData: productResultsQuery.data ? { pages: [productResultsQuery.data.pages[0]], pageParams: [1] } : undefined,
+    staleTime: 60_000,
+  });
+  const results = productResultsQuery.data?.pages[0];
+  const products = productResultsQuery.data?.pages.flatMap((page) => page.products.items) ?? [];
+  const markets = marketResultsQuery.data?.pages.flatMap((page) => page.markets.items) ?? [];
+  const suggestedKeywords = [...new Set([
+    ...(results?.related_keywords ?? []),
+    ...(results?.suggestions ?? []).filter((item) => item.type === "KEYWORD").map((item) => item.label),
+  ].map((keyword) => keyword.trim()).filter((keyword) => keyword && keyword !== initialQuery))].slice(0, 4);
   const trendingQuery = useQuery({
     queryKey: queryKeys.trendingSearches(audience),
     queryFn: () => api.trendingSearches(audience),
@@ -79,6 +108,16 @@ function SearchExperience({
     const next = keyword.trim();
     if (!next) return;
     router.push(`/search?q=${encodeURIComponent(next)}&audience=${audience}`);
+    setSearchFocused(false);
+  }
+
+  function goToSuggestion(suggestion: SearchSuggestion) {
+    if (suggestion.type === "KEYWORD") {
+      goToSearch(suggestion.label);
+    } else if (suggestion.href.startsWith("/") && !suggestion.href.startsWith("//")) {
+      router.push(suggestion.href);
+      setSearchFocused(false);
+    }
   }
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
@@ -97,37 +136,58 @@ function SearchExperience({
     router.replace("/");
   }
 
-  function changePage(kind: "product" | "market", page: number) {
-    const params = new URLSearchParams({ q: initialQuery, audience });
-    if (kind === "product") {
-      params.set("product_page", String(page));
-      if (marketPage > 1) params.set("market_page", String(marketPage));
-    } else {
-      params.set("market_page", String(page));
-      if (productPage > 1) params.set("product_page", String(productPage));
-    }
-    router.push(`/search?${params.toString()}`, { scroll: false });
-  }
-
   function slide(sectionID: number, direction: "prev" | "next") {
     scrollCarouselByCard(carouselRefs.current.get(sectionID) ?? null, direction === "prev" ? -1 : 1);
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-24 pt-2">
+    <PageLayout className="pt-2">
       <form className="sticky top-0 z-30 flex h-16 items-center gap-3 bg-background/95 backdrop-blur" onSubmit={submitSearch}>
         <Button variant="ghost" size="icon" type="button" aria-label="뒤로가기" onClick={goBack} className="flex h-11 w-11 shrink-0 items-center justify-center">
           <ArrowLeft size={27} />
         </Button>
-        <div className="relative flex h-12 min-w-0 flex-1 items-center gap-2 rounded-control border border-border-interactive bg-surface-raised px-3">
-          <Search size={20} className="shrink-0 text-content-secondary" />
-          <Input value={input} onChange={(event) => setInput(event.target.value)} className="w-full bg-transparent text-lg font-bold outline-none" placeholder="상품, 마켓, 키워드 검색" aria-label="검색어 입력" autoFocus />
-          {input ? <Button variant="ghost" size="icon" type="button" aria-label="검색어 지우기" onClick={() => setInput("")} className="text-content-secondary"><XCircle size={22} /></Button> : null}
-        </div>
+        <SearchField
+          className="flex-1"
+          value={input}
+          onChange={(event) => { setInput(event.target.value); setActiveSuggestion(-1); setSearchFocused(true); }}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") { setSearchFocused(false); setActiveSuggestion(-1); }
+            if (!autocompleteSuggestions.length) return;
+            if (event.key === "ArrowDown") { event.preventDefault(); setActiveSuggestion((current) => (current + 1) % autocompleteSuggestions.length); }
+            if (event.key === "ArrowUp") { event.preventDefault(); setActiveSuggestion((current) => (current - 1 + autocompleteSuggestions.length) % autocompleteSuggestions.length); }
+            if (event.key === "Enter" && activeSuggestion >= 0) { event.preventDefault(); goToSuggestion(autocompleteSuggestions[activeSuggestion]); }
+          }}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={showSuggestionPanel}
+          aria-controls={showSuggestionPanel ? "search-page-suggestions" : undefined}
+          aria-activedescendant={activeSuggestion >= 0 ? `search-page-suggestion-${activeSuggestion}` : undefined}
+          inputClassName="text-lg font-bold"
+          icon={<Search size={20} className="size-5 shrink-0 text-content-secondary" aria-hidden="true" />}
+          endAdornment={input ? <Button variant="ghost" size="icon" type="button" aria-label="검색어 지우기" onClick={() => setInput("")} className="text-content-secondary"><XCircle size={22} /></Button> : null}
+          placeholder="상품, 마켓, 키워드 검색"
+          aria-label="검색어 입력"
+          autoFocus
+        />
+        {showSuggestionPanel ? (
+          <div id="search-page-suggestions" role="listbox" aria-label="검색어 제안" className="absolute left-14 right-0 top-full z-40 overflow-hidden rounded-surface border border-border-subtle bg-surface-raised shadow-float">
+            {suggestionsPending ? <p className="px-4 py-3 text-sm text-content-secondary" role="status">추천 검색어를 찾는 중입니다.</p> : null}
+            {suggestionsFailed ? <p className="px-4 py-3 text-sm text-content-secondary" role="status">추천 검색어를 불러오지 못했습니다. Enter를 누르면 입력한 검색어로 검색할 수 있습니다.</p> : null}
+            {!suggestionsPending && !suggestionsFailed && !autocompleteSuggestions.length ? <p className="px-4 py-3 text-sm text-content-secondary" role="status">일치하는 추천어가 없습니다. Enter를 눌러 검색해보세요.</p> : null}
+            {autocompleteSuggestions.map((suggestion, index) => (
+              <button key={suggestion.id} id={`search-page-suggestion-${index}`} type="button" role="option" aria-selected={activeSuggestion === index} onMouseDown={(event) => event.preventDefault()} onClick={() => goToSuggestion(suggestion)} className={`flex min-h-11 w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm hover:bg-surface-subtle ${activeSuggestion === index ? "bg-action-secondary" : ""}`}>
+                <span className="truncate font-bold">{suggestion.label}</span>
+                <span className="shrink-0 text-xs text-content-secondary">{suggestion.type === "PRODUCT" ? "상품" : suggestion.type === "MARKET" ? "마켓" : "검색어"}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
       </form>
 
       {!initialQuery ? (
-        <section className="mx-auto max-w-3xl pt-7">
+        <section className="pt-7">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <PageHeading icon={<Search />} title="인기 검색어" />
             <p className="text-sm font-bold text-content-secondary">{now ? now.toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }) : "--.-- --:--"} 현재</p>
@@ -140,9 +200,15 @@ function SearchExperience({
             ))}
           </div>
           <div className="mt-6">
-            {trendingQuery.isLoading ? <p className="text-sm text-content-secondary">인기 검색어를 불러오는 중입니다.</p> : null}
+            {trendingQuery.isLoading ? <InlineLoadingState label="인기 검색어를 불러오는 중입니다." /> : null}
             {trendingQuery.isError ? <div className="rounded-control border border-status-negative-border bg-status-negative-subtle p-4 text-sm" role="alert"><p className="font-bold text-status-negative">인기 검색어를 불러오지 못했습니다.</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => void trendingQuery.refetch()}>다시 시도</Button></div> : null}
-            {trendingQuery.isSuccess && !trendingQuery.data.items.length ? <p className="text-sm text-content-secondary">표시할 인기 검색어가 없습니다.</p> : null}
+            {trendingQuery.isSuccess && !trendingQuery.data.items.length ? (
+              <EmptyState
+                icon={<Search className="size-7" />}
+                title="표시할 인기 검색어가 없습니다"
+                description="다른 검색어를 입력해 원하는 상품과 마켓을 찾아보세요."
+              />
+            ) : null}
             {(trending?.items ?? []).map((item) => (
               <Button variant="ghost" key={item.keyword} className="flex h-14 w-full items-center justify-between text-left" onClick={() => goToSearch(item.keyword)}>
                 <span className="flex items-center gap-5 text-lg"><strong className="w-6 text-center">{item.rank}</strong>{item.keyword}</span>
@@ -161,11 +227,31 @@ function SearchExperience({
           <div className="space-y-7">
             {productSections.map((section) => <SearchCarousel key={section.id} section={section} setRef={(node) => { if (node) carouselRefs.current.set(section.id, node); else carouselRefs.current.delete(section.id); }} onSlide={(direction) => slide(section.id, direction)} />)}
           </div>
-          {error ? <ErrorBox error={error} onRetry={() => void refetchResults()} /> : null}
-          {isLoading ? <LoadingGrid /> : null}
-          {!isLoading && !error && !results?.products.items.length ? <EmptyBox message="검색된 상품이 없습니다." /> : null}
-          {results?.products.items.length ? <div className="mt-7 grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">{results.products.items.map((product) => <ProductCard key={product.id} product={product} />)}</div> : null}
-          {results ? <Pagination page={results.products.page} totalPages={results.products.total_pages} onChange={(page) => changePage("product", page)} label="상품" /> : null}
+          {productResultsQuery.isError && !results ? <ErrorBox error={productResultsQuery.error} onRetry={() => void productResultsQuery.refetch()} /> : null}
+          {productResultsQuery.isLoading ? <LoadingGrid /> : null}
+          {productResultsQuery.isSuccess && !products.length ? (
+            <EmptyBox
+              icon={<Package className="size-7" />}
+              title="검색된 상품이 없습니다"
+              description={suggestedKeywords.length ? "다른 검색어로 찾아보세요. 아래 추천 검색어를 눌러 바로 다시 검색할 수 있습니다." : "검색어를 바꿔 다시 찾아보세요."}
+              action={suggestedKeywords.length ? (
+                <div aria-label="추천 검색어">
+                  <p className="mb-2 text-xs font-bold text-content-secondary">추천 검색어</p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {suggestedKeywords.map((keyword) => <Button key={keyword} variant="secondary" size="sm" onClick={() => goToSearch(keyword)}>{keyword}</Button>)}
+                  </div>
+                </div>
+              ) : undefined}
+            />
+          ) : null}
+          {products.length ? <div className="mt-7 grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">{products.map((product) => <ProductCard key={product.id} product={product} />)}</div> : null}
+          <InfiniteScrollTrigger
+            hasMore={Boolean(productResultsQuery.hasNextPage)}
+            loading={productResultsQuery.isFetchingNextPage}
+            error={productResultsQuery.isFetchNextPageError}
+            label="검색 상품"
+            onLoadMore={() => void productResultsQuery.fetchNextPage()}
+          />
 
           <div className="mt-12 border-t border-border-subtle pt-2">
             <ResultListHeader title="마켓" total={results?.markets.total ?? 0} />
@@ -173,12 +259,20 @@ function SearchExperience({
               {marketSections.map((section) => <SearchCarousel key={section.id} section={section} setRef={(node) => { if (node) carouselRefs.current.set(section.id, node); else carouselRefs.current.delete(section.id); }} onSlide={(direction) => slide(section.id, direction)} />)}
             </div>
           </div>
-          {!isLoading && !error && !results?.markets.items.length ? <EmptyBox message="검색된 마켓이 없습니다." /> : null}
-          {results?.markets.items.length ? <div className="mt-7 space-y-4">{results.markets.items.map((market) => <MarketCard key={market.id} market={market} />)}</div> : null}
-          {results ? <Pagination page={results.markets.page} totalPages={results.markets.total_pages} onChange={(page) => changePage("market", page)} label="마켓" /> : null}
+          {marketResultsQuery.isError && !marketResultsQuery.data ? <ErrorBox error={marketResultsQuery.error} onRetry={() => void marketResultsQuery.refetch()} /> : null}
+          {marketResultsQuery.isLoading ? <InlineLoadingState label="마켓을 불러오는 중입니다." /> : null}
+          {marketResultsQuery.isSuccess && !markets.length ? <EmptyBox icon={<Store className="size-7" />} title="검색된 마켓이 없습니다" description="다른 키워드로 마켓을 찾아보세요." /> : null}
+          {markets.length ? <div className="mt-7 space-y-4">{markets.map((market) => <MarketCard key={market.id} market={market} />)}</div> : null}
+          <InfiniteScrollTrigger
+            hasMore={Boolean(marketResultsQuery.hasNextPage)}
+            loading={marketResultsQuery.isFetchingNextPage}
+            error={marketResultsQuery.isFetchNextPageError}
+            label="검색 마켓"
+            onLoadMore={() => void marketResultsQuery.fetchNextPage()}
+          />
         </div>
       )}
-    </main>
+    </PageLayout>
   );
 }
 
@@ -261,8 +355,9 @@ function MarketMetric({ icon, label, value }: { icon: React.ReactNode; label: st
 }
 
 function ResultListHeader({ title, total }: { title: string; total: number }) { return <div className="mb-4 mt-8 flex items-center justify-between"><h2 className="text-xl font-bold">{title}</h2><span className="text-sm font-bold text-content-secondary">총 {total.toLocaleString("ko-KR")}개</span></div>; }
-function EmptyBox({ message }: { message: string }) { return <p className="rounded-surface border border-border-subtle bg-surface-raised p-5 text-sm text-content-secondary">{message}</p>; }
+function EmptyBox({ icon, title, description, action }: { icon: ReactNode; title: string; description: string; action?: ReactNode }) {
+  return <EmptyState className="mt-7" icon={icon} title={title} description={description} action={action} />;
+}
 function ErrorBox({ error, onRetry }: { error: unknown; onRetry: () => void }) { return <ApiErrorState error={error} onRetry={onRetry} retryLabel="검색 다시 시도" />; }
 function LoadingGrid() { return <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{Array.from({ length: 8 }).map((_, index) => <div key={index} className="aspect-square animate-pulse rounded-control bg-surface-subtle" />)}</div>; }
 function TrendIcon({ trend }: { trend: "UP" | "DOWN" | "SAME" }) { if (trend === "UP") return <ArrowUp size={18} className="text-status-negative" />; if (trend === "DOWN") return <ArrowDown size={18} className="text-status-info" />; return <Minus size={18} className="text-content-secondary" />; }
-function positivePage(value: string | null) { const parsed = Number(value); return Number.isInteger(parsed) && parsed > 0 ? parsed : 1; }

@@ -1,6 +1,7 @@
 "use client";
 
 import { ButtonLink } from "@/components/ui/button-link";
+import { PageLayout } from "@/components/page-layout";
 
 import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
@@ -18,7 +19,7 @@ export function TossFailClient() {
   }, [hydrate]);
 
   return (
-    <main className="mx-auto max-w-xl px-4 py-16 text-center">
+    <PageLayout variant="payment">
       <h1 className="text-2xl font-bold">결제가 완료되지 않았습니다</h1>
       <p className="mt-4 text-sm text-content-secondary">{message}</p>
       {code ? <p className="mt-2 text-xs text-content-secondary">오류 코드: {code}</p> : null}
@@ -27,6 +28,6 @@ export function TossFailClient() {
         <ButtonLink href="/checkout" >결제 다시 시도</ButtonLink>
         <ButtonLink href="/mypage" variant="secondary">주문 내역</ButtonLink>
       </div>
-    </main>
+    </PageLayout>
   );
 }

@@ -2,18 +2,21 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { ArrowLeft, BadgeCheck, Camera, ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Camera, ChevronLeft, ChevronRight, MessageSquareText, Star } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { ApiErrorState } from "@/components/api-error-state";
 import { queryKeys } from "@/lib/query-keys";
 import type { Product, Review, ReviewImage, ReviewSummary } from "@/lib/types";
 import { PageHeading } from "./ui/page-heading";
+import { PageLayout } from "./page-layout";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { EmptyState, InlineLoadingState } from "./ui/feedback";
 import { Dialog } from "./ui/overlay";
 
 export function ProductReviewsPage({ productId, initialProduct }: { productId: number; initialProduct?: Product }) {
+  const [selectedRating, setSelectedRating] = useState<number | null>(null);
   const productQuery = useQuery({
     queryKey: queryKeys.product(productId),
     queryFn: () => api.getProduct(productId),
@@ -30,14 +33,15 @@ export function ProductReviewsPage({ productId, initialProduct }: { productId: n
 
   const product = productQuery.data;
   const reviews = reviewsQuery.data ?? [];
+  const visibleReviews = selectedRating === null ? reviews : reviews.filter((review) => Math.round(review.rating) === selectedRating);
   const summary = summaryQuery.data;
 
   if (!Number.isInteger(productId) || productId <= 0) {
-    return <main className="mx-auto max-w-5xl px-4 pb-24 pt-8"><ApiErrorState error={new Error("상품 정보를 찾을 수 없습니다.")} /></main>;
+    return <PageLayout><ApiErrorState error={new Error("상품 정보를 찾을 수 없습니다.")} /></PageLayout>;
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 pb-24 pt-8">
+    <PageLayout>
       <Link href={`/products/${productId}`} className="inline-flex min-h-11 items-center gap-1 text-sm font-bold text-content-secondary hover:text-content-primary">
         <ArrowLeft size={17} aria-hidden="true" /> 상품으로 돌아가기
       </Link>
@@ -53,32 +57,39 @@ export function ProductReviewsPage({ productId, initialProduct }: { productId: n
       {productQuery.error ? <ApiErrorState className="mt-6" error={productQuery.error} onRetry={() => void productQuery.refetch()} /> : null}
 
       {summaryQuery.error ? <ApiErrorState className="mt-6" error={summaryQuery.error} onRetry={() => void summaryQuery.refetch()} /> : null}
-      {summary ? <ReviewSummaryCard summary={summary} /> : summaryQuery.isLoading ? <div className="mt-7 rounded-feature border border-border-subtle bg-surface-raised p-6 text-sm text-content-secondary">별점 요약을 불러오는 중입니다.</div> : null}
+      {summary ? <ReviewSummaryCard summary={summary} selectedRating={selectedRating} onRating={(rating) => setSelectedRating((current) => current === rating ? null : rating)} /> : summaryQuery.isLoading ? <InlineLoadingState className="mt-7 min-h-28" label="별점 요약을 불러오는 중입니다." /> : null}
 
       <section className="mt-8" aria-labelledby="all-reviews-title">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-xs font-bold text-action-primary">CUSTOMER VOICE</p>
-            <h2 id="all-reviews-title" className="mt-1 text-2xl font-bold">전체 리뷰</h2>
+            <h2 id="all-reviews-title" className="mt-1 text-2xl font-bold">{selectedRating === null ? "전체 리뷰" : `${selectedRating}점 리뷰`}</h2>
           </div>
-          {summary ? <p className="text-sm font-bold text-content-secondary">총 {summary.review_count.toLocaleString("ko-KR")}개</p> : null}
+          <div className="flex items-center gap-2">
+            {selectedRating !== null ? <Button variant="ghost" size="sm" onClick={() => setSelectedRating(null)}>전체 리뷰 보기</Button> : null}
+            {summary ? <p className="text-sm font-bold text-content-secondary">총 {(selectedRating === null ? summary.review_count : visibleReviews.length).toLocaleString("ko-KR")}개</p> : null}
+          </div>
         </div>
 
-        {reviewsQuery.isLoading ? <p className="mt-6 text-sm text-content-secondary">리뷰를 불러오는 중입니다.</p> : null}
+        {reviewsQuery.isLoading ? <InlineLoadingState className="mt-6" label="리뷰를 불러오는 중입니다." /> : null}
         {reviewsQuery.error ? <ApiErrorState className="mt-6" error={reviewsQuery.error} onRetry={() => void reviewsQuery.refetch()} /> : null}
         {!reviewsQuery.isLoading && !reviewsQuery.error ? (
           <div className="mt-5 space-y-4">
-            {reviews.length ? reviews.map((review) => <ReviewCard key={review.id} review={review} />) : (
-              <div className="rounded-surface border border-border-subtle bg-surface-raised p-10 text-center text-sm text-content-secondary">아직 등록된 리뷰가 없습니다.</div>
+            {visibleReviews.length ? visibleReviews.map((review) => <ReviewCard key={review.id} review={review} />) : (
+              <EmptyState
+                icon={<MessageSquareText className="size-7" />}
+                title={selectedRating === null ? "아직 등록된 리뷰가 없습니다" : `${selectedRating}점 리뷰가 없습니다`}
+                description={selectedRating === null ? "첫 번째 구매 후기를 남겨 다른 고객의 선택을 도와주세요." : "다른 별점을 선택하거나 전체 리뷰를 확인해보세요."}
+              />
             )}
           </div>
         ) : null}
       </section>
-    </main>
+    </PageLayout>
   );
 }
 
-function ReviewSummaryCard({ summary }: { summary: ReviewSummary }) {
+function ReviewSummaryCard({ summary, selectedRating, onRating }: { summary: ReviewSummary; selectedRating: number | null; onRating: (rating: number) => void }) {
   const distribution = [5, 4, 3, 2, 1].map((rating) => ({ rating, count: reviewCount(summary, rating) }));
   const maxCount = Math.max(...distribution.map(({ count }) => count), 1);
 
@@ -96,13 +107,13 @@ function ReviewSummaryCard({ summary }: { summary: ReviewSummary }) {
 
       <div className="space-y-3" aria-label="별점 분포">
         {distribution.map(({ rating, count }) => (
-          <div key={rating} className="grid grid-cols-[2.5rem_1fr_2.5rem] items-center gap-3 text-sm">
-            <span className="font-bold text-content-secondary">{rating}점</span>
-            <div className="h-2 overflow-hidden rounded-full bg-surface-subtle" role="progressbar" aria-label={`${rating}점 리뷰 비율`} aria-valuemin={0} aria-valuemax={maxCount} aria-valuenow={count}>
-              <div className="h-full rounded-full bg-action-primary transition-all" style={{ width: `${(count / maxCount) * 100}%` }} />
-            </div>
+          <button key={rating} type="button" disabled={count === 0} aria-pressed={selectedRating === rating} aria-label={`${rating}점 리뷰 ${count}개 보기`} onClick={() => onRating(rating)} className={`grid min-h-11 w-full grid-cols-[2.5rem_1fr_2.5rem] items-center gap-3 rounded-control px-2 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary ${selectedRating === rating ? "bg-action-secondary" : "hover:bg-surface-subtle"} disabled:cursor-not-allowed disabled:opacity-50`}>
+            <span className={`font-bold ${selectedRating === rating ? "text-action-primary" : "text-content-secondary"}`}>{rating}점</span>
+            <span className="h-2 overflow-hidden rounded-full bg-surface-subtle" role="progressbar" aria-label={`${rating}점 리뷰 비율`} aria-valuemin={0} aria-valuemax={maxCount} aria-valuenow={count}>
+              <span className="block h-full rounded-full bg-action-primary transition-all" style={{ width: `${(count / maxCount) * 100}%` }} />
+            </span>
             <span className="text-right text-xs text-content-secondary">{count.toLocaleString("ko-KR")}</span>
-          </div>
+          </button>
         ))}
       </div>
     </section>
@@ -217,5 +228,6 @@ function ReviewImageGallery({ images }: { images: ReviewImage[] }) {
 function reviewCount(summary: ReviewSummary, rating: number) {
   const distribution = summary.rating_distribution;
   if (!distribution) return 0;
-  return distribution[String(rating)] ?? distribution[`${rating}.0`] ?? distribution[rating.toFixed(1)] ?? 0;
+  const whole = distribution[String(rating)] ?? distribution[rating.toFixed(1)] ?? 0;
+  return whole + (distribution[(rating - 0.5).toFixed(1)] ?? 0);
 }

@@ -14,6 +14,7 @@ import { z } from "zod";
 import { api } from "@/lib/api";
 import { safeInternalPath } from "@/lib/navigation";
 import { useSessionStore } from "@/lib/session-store";
+import { PageLayout } from "./page-layout";
 import { Button } from "./ui/button";
 import { Field } from "./ui/field";
 import { Input } from "./ui/input";
@@ -59,7 +60,7 @@ export function LoginPage() {
   });
 
   return (
-    <main className="mx-auto flex min-h-[calc(100vh-64px)] max-w-md items-center px-4 pb-24">
+    <PageLayout variant="auth">
       <Surface className="w-full" padding="lg">
       <form onSubmit={form.handleSubmit((values) => login.mutate(values))}>
         <PageHeading icon={<PageIcon />} title="로그인" />
@@ -87,6 +88,6 @@ export function LoginPage() {
         </Link>
       </form>
       </Surface>
-    </main>
+    </PageLayout>
   );
 }

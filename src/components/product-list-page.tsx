@@ -3,23 +3,21 @@
 import { Button } from "@/components/ui/button";
 
 import { PageHeading } from "./ui/page-heading";
-import { Pagination } from "./ui/pagination";
 import { FilterChip } from "./ui/filter-chip";
 
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { ChevronDown, PackageSearch, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import type { PLPInformation, PLPProductParams } from "@/lib/types";
 import { ApiErrorState } from "./api-error-state";
+import { PageLayout } from "./page-layout";
 import { ProductCard } from "./product-card";
-
-function positivePage(raw: string | null) {
-  const page = Number(raw);
-  return Number.isInteger(page) && page > 0 ? page : 1;
-}
+import { EmptyState, InlineLoadingState, LoadingSpinner } from "./ui/feedback";
+import { InfiniteScrollTrigger } from "./ui/infinite-scroll-trigger";
+import { BottomSheet } from "./ui/overlay";
 
 type ActiveFilter = {
   key: string;
@@ -27,10 +25,48 @@ type ActiveFilter = {
   clear: Record<string, string | undefined>;
 };
 
+const lastViewedProductKey = "commerce.productList.lastViewed";
+const lastViewedProductEvent = "commerce:last-viewed-product";
+
+function subscribeToLastViewedProduct(callback: () => void) {
+  window.addEventListener(lastViewedProductEvent, callback);
+  return () => window.removeEventListener(lastViewedProductEvent, callback);
+}
+
+function lastViewedProductSnapshot() {
+  return window.sessionStorage.getItem(lastViewedProductKey);
+}
+
+function serverLastViewedProductSnapshot() {
+  return null;
+}
+
+function readLastViewedProduct(stored: string | null, listURL: string): number | null {
+  try {
+    if (!stored) return null;
+    const entry = JSON.parse(stored) as { listURL?: string; productID?: number };
+    if (entry.listURL !== listURL || !entry.productID) return null;
+    return entry.productID;
+  } catch {
+    return null;
+  }
+}
+
+function rememberProduct(listURL: string, productID: number) {
+  window.sessionStorage.setItem(lastViewedProductKey, JSON.stringify({ listURL, productID }));
+  window.dispatchEvent(new Event(lastViewedProductEvent));
+}
+
 export function ProductListPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [detailFiltersOpen, setDetailFiltersOpen] = useState(false);
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [draftQuery, setDraftQuery] = useState("");
+  const listQuery = searchParams.toString();
+  const listURL = `/products${listQuery ? `?${listQuery}` : ""}`;
+  const lastViewedSnapshot = useSyncExternalStore(subscribeToLastViewedProduct, lastViewedProductSnapshot, serverLastViewedProductSnapshot);
+  const recentlyViewedProductID = readLastViewedProduct(lastViewedSnapshot, listURL);
   const category = searchParams.get("category") ?? "";
   const shipping = searchParams.get("shipping") === "free" ? "free" : undefined;
   const onSale = searchParams.get("sale") === "on";
@@ -38,7 +74,6 @@ export function ProductListPage() {
   const tagChip = searchParams.get("tag_chip") ?? "";
   const freeShippingSelected = Boolean(shipping) || tagChip === "FREE_SHIPPING";
   const price = searchParams.get("price") ?? "";
-  const page = positivePage(searchParams.get("page"));
 
   const informationQuery = useQuery({
     queryKey: queryKeys.plpInformation,
@@ -62,25 +97,67 @@ export function ProductListPage() {
     inStock,
     tagChip: tagChip || undefined,
     sort,
-    page,
   };
-  const productsQuery = useQuery({
+  const draftParams = new URLSearchParams(draftQuery);
+  const draftPrice = draftParams.get("price") ?? "";
+  const draftTagChip = draftParams.get("tag_chip") ?? "";
+  const draftFreeShipping = draftParams.get("shipping") === "free" || draftTagChip === "FREE_SHIPPING";
+  const draftSale = draftParams.get("sale") === "on";
+  const draftStock = draftParams.get("stock") === "available";
+  const draftPriceRange = priceRanges.find((item) => item.code === draftPrice) ?? priceRanges[0];
+  const draftRequest: PLPProductParams = {
+    ...request,
+    minPrice: draftPriceRange?.min_price || undefined,
+    maxPrice: draftPriceRange?.max_price || undefined,
+    shipping: draftFreeShipping ? "free" : undefined,
+    onSale: draftSale,
+    inStock: draftStock,
+    tagChip: draftTagChip || undefined,
+    page: 1,
+    pageSize: 1,
+  };
+  const draftCountQuery = useQuery({
+    queryKey: ["plp-filter-preview", draftRequest],
+    queryFn: () => api.listPLPProducts(draftRequest),
+    enabled: filterSheetOpen && informationQuery.isSuccess,
+  });
+  const productsQuery = useInfiniteQuery({
     queryKey: queryKeys.plpProducts(request),
-    queryFn: () => api.listPLPProducts(request),
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => api.listPLPProducts({ ...request, page: pageParam }),
+    getNextPageParam: (lastPage) => lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined,
     enabled: informationQuery.isSuccess,
   });
-  const productPage = productsQuery.data;
-  const productResultsLoading = informationQuery.isLoading || productsQuery.isPending || productsQuery.isFetching;
-  const productCountLabel = productPage ? `${productPage.total.toLocaleString("ko-KR")}개` : productResultsLoading ? "조회 중" : "—";
+  const productPage = productsQuery.data?.pages[0];
+  const products = productsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const productResultsLoading = informationQuery.isLoading || productsQuery.isPending;
+  const productCountLabel = productPage ? `${productPage.total.toLocaleString("ko-KR")}개` : "—";
 
-  function updateSearch(next: Record<string, string | undefined>, resetPage = true) {
+  function updateSearch(next: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams.toString());
     Object.entries(next).forEach(([key, value]) => {
       if (value) params.set(key, value);
       else params.delete(key);
     });
-    if (resetPage) params.delete("page");
+    params.delete("page");
     router.push(`/products${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
+  }
+
+  function updateDraft(next: Record<string, string | undefined>) {
+    setDraftQuery((current) => {
+      const params = new URLSearchParams(current);
+      Object.entries(next).forEach(([key, value]) => {
+        if (value) params.set(key, value);
+        else params.delete(key);
+      });
+      params.delete("page");
+      return params.toString();
+    });
+  }
+
+  function applyDraft() {
+    router.push(`/products${draftQuery ? `?${draftQuery}` : ""}`, { scroll: false });
+    setFilterSheetOpen(false);
   }
 
   function clearFilters() {
@@ -106,7 +183,7 @@ export function ProductListPage() {
   const activeFilters = activeFilterCandidates.filter((item): item is ActiveFilter => item !== null);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-24 pt-6 md:pb-12">
+    <PageLayout className="pt-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <PageHeading icon={<PackageSearch />} title={selectedCategory ? `${selectedCategory.name} 상품` : "전체 상품"} />
@@ -122,16 +199,17 @@ export function ProductListPage() {
       <section className="mt-5 border-y border-border-subtle py-3" aria-labelledby="product-filter-heading">
         <div className="flex flex-wrap items-center gap-2">
           <span id="product-filter-heading" className="mr-1 text-sm font-bold">필터</span>
-          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="빠른 필터">
+          <div className="hidden flex-wrap items-center gap-2 sm:flex" role="group" aria-label="빠른 필터">
             <QuickFilter active={onSale} label="할인중" onClick={() => updateSearch({ sale: onSale ? undefined : "on" })} />
             <QuickFilter active={freeShippingSelected} label="무료배송" onClick={toggleFreeShipping} />
             <QuickFilter active={inStock} label="재고 있음" onClick={() => updateSearch({ stock: inStock ? undefined : "available" })} />
           </div>
+          <Button className="ml-auto sm:hidden" variant="secondary" type="button" onClick={() => { setDraftQuery(listQuery); setFilterSheetOpen(true); }}>조건 선택{activeFilterCount(onSale, freeShippingSelected, inStock, price, tagChip) ? ` (${activeFilterCount(onSale, freeShippingSelected, inStock, price, tagChip)})` : ""}</Button>
           <button
             type="button"
             aria-expanded={detailFiltersOpen}
             aria-controls="product-detail-filters"
-            className="ml-auto flex min-h-11 items-center gap-1 rounded-control px-2 text-xs font-bold text-content-secondary transition-colors hover:bg-surface-subtle hover:text-content-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary sm:min-h-9"
+            className="ml-auto hidden min-h-11 items-center gap-1 rounded-control px-2 text-xs font-bold text-content-secondary transition-colors hover:bg-surface-subtle hover:text-content-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary sm:flex sm:min-h-9"
             onClick={() => setDetailFiltersOpen((open) => !open)}
           >
             상세 필터
@@ -139,7 +217,7 @@ export function ProductListPage() {
           </button>
         </div>
         {detailFiltersOpen ? (
-          <div id="product-detail-filters" className="mt-3 border-t border-border-subtle pt-4">
+          <div id="product-detail-filters" className="mt-3 hidden border-t border-border-subtle pt-4 sm:block">
             <FilterRow label="가격대">
               {priceRanges.map((item) => (
                 <QuickFilter
@@ -164,6 +242,24 @@ export function ProductListPage() {
         ) : null}
       </section>
 
+      <BottomSheet open={filterSheetOpen} onClose={() => setFilterSheetOpen(false)} title="상품 필터" description="조건을 선택한 뒤 상품 보기를 눌러 적용하세요.">
+        <div className="space-y-5">
+          <FilterRow label="혜택과 재고">
+            <QuickFilter active={draftSale} label="할인중" onClick={() => updateDraft({ sale: draftSale ? undefined : "on" })} />
+            <QuickFilter active={draftFreeShipping} label="무료배송" onClick={() => updateDraft({ shipping: draftFreeShipping ? undefined : "free", ...(draftTagChip === "FREE_SHIPPING" ? { tag_chip: undefined } : {}) })} />
+            <QuickFilter active={draftStock} label="재고 있음" onClick={() => updateDraft({ stock: draftStock ? undefined : "available" })} />
+          </FilterRow>
+          <FilterRow label="가격대">
+            {priceRanges.map((item) => <QuickFilter key={item.code || "all"} active={draftPrice === item.code} label={item.label} onClick={() => updateDraft({ price: item.code || undefined })} />)}
+          </FilterRow>
+          <FilterRow label="상품 특징">
+            {(informationQuery.data?.tag_chips ?? []).filter((item) => item.code !== "FREE_SHIPPING").map((item) => <QuickFilter key={item.code} active={draftTagChip === item.code} label={item.label} onClick={() => updateDraft({ tag_chip: draftTagChip === item.code ? undefined : item.code })} />)}
+          </FilterRow>
+        </div>
+        {draftCountQuery.isError ? <p className="mt-4 text-sm text-status-negative">상품 수를 확인하지 못했습니다. 조건은 적용할 수 있습니다.</p> : null}
+        <Button className="mt-6 w-full" size="lg" onClick={applyDraft}>{draftCountQuery.data ? `상품 ${draftCountQuery.data.total.toLocaleString("ko-KR")}개 보기` : draftCountQuery.isPending ? "상품 수 확인 중" : "상품 보기"}</Button>
+      </BottomSheet>
+
       {activeFilters.length ? <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="적용한 필터">
         {activeFilters.map((item) => (
           <button key={item.key} type="button" className="inline-flex min-h-11 items-center gap-1 rounded-full bg-surface-subtle px-3 text-xs font-bold text-content-secondary transition-colors hover:bg-action-secondary hover:text-content-primary sm:h-8 sm:min-h-0" onClick={() => updateSearch(item.clear)} aria-label={`${item.label} 필터 해제`}>
@@ -174,7 +270,7 @@ export function ProductListPage() {
       </div> : null}
 
       <div className="mt-5 flex items-center justify-between gap-4 border-t border-border-subtle pt-4">
-        <p className="text-sm font-bold">전체 {productCountLabel}</p>
+        <p className="flex items-center gap-1.5 text-sm font-bold">전체 {productResultsLoading ? <span className="inline-flex" role="status" aria-label="상품 수를 조회하는 중입니다."><LoadingSpinner className="size-4" aria-hidden="true" /></span> : productCountLabel}</p>
         <label className="relative shrink-0">
           <span className="sr-only">상품 정렬</span>
           <select
@@ -190,7 +286,7 @@ export function ProductListPage() {
         </label>
       </div>
 
-      {informationQuery.error || productsQuery.error ? (
+      {informationQuery.error || (productsQuery.error && !productPage) ? (
         <ApiErrorState
           className="mt-8"
           error={informationQuery.error ?? productsQuery.error}
@@ -198,22 +294,38 @@ export function ProductListPage() {
           retryLabel="상품 목록 다시 시도"
         />
       ) : null}
-      {productResultsLoading && !informationQuery.error && !productsQuery.error ? <p className="mt-8 text-sm text-content-secondary" role="status">상품을 불러오는 중입니다.</p> : null}
-      {!productResultsLoading && productsQuery.isSuccess && productPage && !productPage.items.length ? (
-        <div className="mt-8 rounded-surface border border-border-subtle bg-surface-raised p-10 text-center shadow-card"><p className="font-bold">조건에 맞는 상품이 없습니다.</p><p className="mt-1 text-sm text-content-secondary">필터를 조정해보세요.</p></div>
+      {productResultsLoading && !informationQuery.error && !productsQuery.error ? <InlineLoadingState className="mt-8" label="상품을 불러오는 중입니다." /> : null}
+      {!productResultsLoading && productsQuery.isSuccess && productPage && !products.length ? (
+        <EmptyState
+          className="mt-8 shadow-card"
+          icon={<PackageSearch className="size-7" />}
+          title="조건에 맞는 상품이 없습니다"
+          description={activeFilters.length ? "필터를 초기화하고 다른 상품을 둘러보세요." : "지금 표시할 상품이 없습니다. 홈에서 다른 상품을 둘러보세요."}
+          action={<Button variant="secondary" onClick={activeFilters.length ? clearFilters : () => router.push("/")}>{activeFilters.length ? "필터 초기화하고 전체 상품 보기" : "홈으로 이동"}</Button>}
+        />
       ) : null}
       <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">
-        {(productPage?.items ?? []).map((product) => <ProductCard key={product.id} product={product} />)}
+        {products.map((product) => <ProductCard key={product.id} product={product} recentlyViewed={product.id === recentlyViewedProductID} onVisit={() => rememberProduct(listURL, product.id)} />)}
       </div>
 
-      {productPage ? <Pagination page={productPage.page} totalPages={productPage.total_pages} onChange={(nextPage) => updateSearch({ page: String(nextPage) }, false)} /> : null}
+      {productPage ? <InfiniteScrollTrigger
+        hasMore={Boolean(productsQuery.hasNextPage)}
+        loading={productsQuery.isFetchingNextPage}
+        error={productsQuery.isFetchNextPageError}
+        label="상품"
+        onLoadMore={() => void productsQuery.fetchNextPage()}
+      /> : null}
 
-    </main>
+    </PageLayout>
   );
 }
 
 function flattenPLPCategories(categories: PLPInformation["categories"]): PLPInformation["categories"] {
   return categories.flatMap((category) => [category, ...flattenPLPCategories(category.children ?? [])]);
+}
+
+function activeFilterCount(onSale: boolean, freeShipping: boolean, inStock: boolean, price: string, tagChip: string) {
+  return Number(onSale) + Number(freeShipping) + Number(inStock) + Number(Boolean(price)) + Number(Boolean(tagChip && tagChip !== "FREE_SHIPPING"));
 }
 
 function QuickFilter({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {

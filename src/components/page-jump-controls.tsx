@@ -19,7 +19,7 @@ export function PageJumpControls() {
   return (
     <nav
       aria-label="페이지 빠른 이동"
-      className="fixed right-4 bottom-[calc(11.5rem+env(safe-area-inset-bottom))] z-30 flex flex-col gap-2 md:right-6 md:bottom-6 xl:right-[max(1.5rem,calc((100vw-72rem)/2-4rem))]"
+      className="fixed right-4 bottom-[calc(11.5rem+env(safe-area-inset-bottom))] z-30 flex flex-col gap-2 md:right-6 xl:right-[max(1.5rem,calc((100vw-72rem)/2-4rem))]"
     >
       <button
         type="button"

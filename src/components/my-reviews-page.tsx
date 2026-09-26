@@ -3,8 +3,6 @@
 import { PageHeading } from "./ui/page-heading";
 import { MessageSquareText as PageIcon } from "lucide-react";
 
-import { ButtonLink } from "@/components/ui/button-link";
-
 import { Select, Textarea } from "./ui/input";
 
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,8 +13,10 @@ import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
+import { PageLayout } from "./page-layout";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { EmptyState, InlineLoadingState, LoginRequiredState } from "./ui/feedback";
 
 export function MyReviewsPage() {
   const token = useSessionStore((state) => state.accessToken) ?? "";
@@ -68,10 +68,10 @@ export function MyReviewsPage() {
     remove.mutate(variables);
   }
 
-  if (!token) return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-bold">내 리뷰</h1><ButtonLink href="/login?next=/mypage/reviews" className="mt-5">로그인하기</ButtonLink></main>;
+  if (!token) return <PageLayout><PageHeading icon={<PageIcon />} title="리뷰 관리" /><LoginRequiredState className="mt-6" icon={<PageIcon className="size-7" />} description="내 리뷰를 확인하려면 로그인해주세요." loginHref="/login?next=/mypage/reviews" /></PageLayout>;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 pb-24 pt-8">
+    <PageLayout>
       <Link href="/mypage" className="inline-flex items-center gap-1 text-sm font-bold text-content-secondary hover:text-content-primary"><ArrowLeft size={17} /> 뒤로가기</Link>
       <PageHeading className="mt-5" icon={<PageIcon />} title="리뷰 관리" />
       <p className="mt-1 text-sm text-content-secondary">작성한 리뷰를 확인하고 수정하거나 삭제할 수 있습니다.</p>
@@ -81,7 +81,7 @@ export function MyReviewsPage() {
           <Button size="sm" variant="secondary" onClick={() => void reviews.refetch()}>다시 불러오기</Button>
         </div>
       ) : null}
-      {reviews.isLoading ? <p className="mt-6 text-sm text-content-secondary">리뷰를 불러오는 중입니다.</p> : null}
+      {reviews.isLoading ? <InlineLoadingState className="mt-6" label="리뷰를 불러오는 중입니다." /> : null}
       {remove.error ? <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-control border border-status-negative-border bg-status-negative-subtle p-4 text-sm font-bold text-status-negative" role="alert"><p>리뷰를 삭제하지 못했습니다. {apiErrorMessage(remove.error)}</p><Button size="sm" variant="secondary" disabled={remove.isPending || remove.variables === undefined} onClick={() => void retryRemove()}>삭제 상태 확인 후 다시 시도</Button></div> : null}
       {removeResolution ? <p className="mt-4 rounded-control border border-status-positive-border bg-status-positive-subtle p-4 text-sm font-bold text-status-positive" role="status">{removeResolution}</p> : null}
       {update.isSuccess ? <p className="mt-4 rounded-control border border-status-positive-border bg-status-positive-subtle p-4 text-sm font-bold text-status-positive" role="status">리뷰를 수정했습니다.</p> : null}
@@ -116,8 +116,14 @@ export function MyReviewsPage() {
             </article>
           );
         })}
-        {reviews.isSuccess && !items.length ? <p className="rounded-surface border border-border-subtle bg-surface-raised p-8 text-center text-sm text-content-secondary">작성한 리뷰가 없습니다.</p> : null}
+        {reviews.isSuccess && !items.length ? (
+          <EmptyState
+            icon={<PageIcon className="size-7" />}
+            title="작성한 리뷰가 없습니다"
+            description="상품을 구매한 뒤 후기를 남기면 이곳에서 관리할 수 있어요."
+          />
+        ) : null}
       </div>
-    </main>
+    </PageLayout>
   );
 }

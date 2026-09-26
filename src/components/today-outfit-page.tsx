@@ -2,7 +2,7 @@
 
 import { PageHeading } from "./ui/page-heading";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Shirt } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ApiErrorState } from "@/components/api-error-state";
@@ -11,8 +11,10 @@ import { OutfitProductList } from "@/components/today-outfit/outfit-product-list
 import { WeatherPanel, type WeatherLocationMode } from "@/components/today-outfit/weather-panel";
 import { api } from "@/lib/api";
 import { shouldRetryApiError } from "@/lib/api-client";
+import { readTodayOutfitCache, todayOutfitWeatherKey, writeTodayOutfitCache } from "@/lib/today-outfit-cache";
 import { outfitProductAnchorID, type TodayOutfitWeather } from "@/lib/today-outfit";
 import { createFallbackWeatherForecast, normalizeCoordinates, parseWeatherForecast } from "@/lib/weather";
+import { PageLayout } from "./page-layout";
 
 const SEOUL_COORDINATES = { latitude: 37.57, longitude: 126.98 };
 
@@ -21,6 +23,7 @@ export function TodayOutfitPage() {
   const [locationMode, setLocationMode] = useState<WeatherLocationMode>("seoul");
   const [activeLookID, setActiveLookID] = useState<number | null>(null);
   const [selection, setSelection] = useState<{ lookID: number; productID: number } | null>(null);
+  const queryClient = useQueryClient();
   const fallbackForecast = useMemo(() => createFallbackWeatherForecast(), []);
 
   useEffect(() => {
@@ -43,23 +46,43 @@ export function TodayOutfitPage() {
     retry: 1,
   });
   const forecast = weatherQuery.data ?? fallbackForecast;
-  const outfitWeather: TodayOutfitWeather = {
-    temperature: forecast.current.temperature,
-    apparentTemperature: forecast.current.apparentTemperature,
-    weatherCode: forecast.current.weatherCode,
-    precipitationProbability: forecast.current.precipitationProbability,
-  };
+  const {
+    temperature,
+    apparentTemperature,
+    weatherCode,
+    precipitationProbability,
+  } = forecast.current;
+  const outfitWeather: TodayOutfitWeather = useMemo(() => ({
+    temperature,
+    apparentTemperature,
+    weatherCode,
+    precipitationProbability,
+  }), [apparentTemperature, precipitationProbability, temperature, weatherCode]);
+  const outfitCacheKey = todayOutfitWeatherKey(outfitWeather);
+  const outfitQueryKey = useMemo(() => [
+    "today-outfit",
+    outfitWeather.temperature,
+    outfitWeather.apparentTemperature,
+    outfitWeather.weatherCode,
+    outfitWeather.precipitationProbability,
+  ] as const, [outfitWeather]);
+  const weatherReady = weatherQuery.isSuccess || weatherQuery.isError;
+
+  useEffect(() => {
+    if (!weatherReady) return;
+    const cached = readTodayOutfitCache(localStorage, outfitWeather);
+    if (cached) queryClient.setQueryData(outfitQueryKey, cached);
+  }, [outfitCacheKey, outfitQueryKey, outfitWeather, queryClient, weatherReady]);
+
   const outfitQuery = useQuery({
-    queryKey: [
-      "today-outfit",
-      outfitWeather.temperature,
-      outfitWeather.apparentTemperature,
-      outfitWeather.weatherCode,
-      outfitWeather.precipitationProbability,
-    ],
-    queryFn: () => api.getTodayOutfit(outfitWeather),
-    enabled: weatherQuery.isSuccess || weatherQuery.isError,
-    staleTime: 15 * 60 * 1000,
+    queryKey: outfitQueryKey,
+    queryFn: async () => {
+      const response = await api.getTodayOutfit(outfitWeather);
+      writeTodayOutfitCache(localStorage, outfitWeather, response);
+      return response;
+    },
+    enabled: weatherReady,
+    staleTime: 0,
     retry: shouldRetryApiError,
   });
   const looks = outfitQuery.data?.looks ?? [];
@@ -87,7 +110,7 @@ export function TodayOutfitPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-28 pt-8">
+    <PageLayout className="pb-28 md:pb-28">
       <PageHeading className="mb-7" icon={<Shirt />} title="오늘의 코디" description="지금 날씨와 실제 판매 상품을 조합한 AI 코디를 확인해 보세요." />
 
       <WeatherPanel
@@ -119,7 +142,7 @@ export function TodayOutfitPage() {
           </>
         ) : null}
       </div>
-    </main>
+    </PageLayout>
   );
 }
 

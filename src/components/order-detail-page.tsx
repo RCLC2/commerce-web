@@ -3,8 +3,6 @@
 import { PageHeading } from "./ui/page-heading";
 import { ReceiptText as PageIcon } from "lucide-react";
 
-import { ButtonLink } from "@/components/ui/button-link";
-
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
@@ -19,9 +17,12 @@ import { paymentMethodLabel } from "@/lib/display-labels";
 import { apiErrorMessage } from "@/lib/api-client";
 import { ApiErrorState } from "./api-error-state";
 import { formatPrice } from "@/lib/utils";
+import { PageLayout } from "./page-layout";
 import { ReviewWritePanel } from "./review-write-panel";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { BackButton } from "./ui/back-button";
+import { EmptyState, InlineLoadingState, LoadingState, LoginRequiredState } from "./ui/feedback";
 
 const statusSteps = ["PAYMENT_PENDING", "PAID", "PLACED", "SHIPPED", "DELIVERED", "COMPLETED"];
 
@@ -77,26 +78,29 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
 
   if (!token) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-16">
-        <h1 className="text-2xl font-bold">로그인이 필요합니다</h1>
-        <ButtonLink href="/login" className="mt-5">로그인</ButtonLink>
-      </main>
+      <PageLayout>
+        <BackButton fallbackHref="/mypage" className="mb-4" />
+        <PageHeading icon={<PageIcon />} title="주문 상세" />
+        <LoginRequiredState className="mt-6" icon={<PageIcon className="size-7" />} description="주문 상세를 확인하려면 로그인해주세요." loginHref={`/login?next=${encodeURIComponent(`/orders/${orderCode}`)}`} />
+      </PageLayout>
     );
   }
 
   if (isLoading) {
-    return <main className="mx-auto max-w-4xl px-4 py-8 text-sm text-content-secondary">주문 정보를 불러오는 중입니다.</main>;
+    return <PageLayout><BackButton fallbackHref="/mypage" /><LoadingState className="mt-4" label="주문 정보를 불러오는 중입니다." /></PageLayout>;
   }
 
   if (error || !order) {
-    return <main className="mx-auto max-w-4xl px-4 py-8 text-sm text-action-primary"><ApiErrorState error={error ?? new Error("주문 정보를 찾을 수 없습니다.")} onRetry={() => void refetch()} /></main>;
+    return <PageLayout className="text-sm text-action-primary"><BackButton fallbackHref="/mypage" /><ApiErrorState className="mt-4" error={error ?? new Error("주문 정보를 찾을 수 없습니다.")} onRetry={() => void refetch()} /></PageLayout>;
   }
 
   const amount = order.total_order_price - order.total_discount_price - order.used_point;
   const deliveryStatus = order.delivery?.status ?? order.status;
+  const marketOrders = order.market_orders?.filter((marketOrder) => marketOrder.line_items.length > 0) ?? [];
 
   return (
-    <main className="mx-auto max-w-4xl px-4 pb-24 pt-8">
+    <PageLayout>
+      <BackButton fallbackHref="/mypage" className="mb-4" />
       <div className="rounded-surface border border-border-subtle bg-surface-raised p-5 shadow-card">
         <PageHeading icon={<PageIcon />} title="주문 상세" description={`주문 번호 ${order.order_code}`} />
         <p className="mt-1 text-sm text-content-secondary">{order.ordered_at ? new Date(order.ordered_at).toLocaleString("ko-KR") : "-"}</p>
@@ -147,20 +151,25 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
             <div className="sm:col-span-2"><InfoBox label="주소" value={order.delivery.address || "-"} /></div>
           </dl>
         ) : (
-          <p className="mt-3 text-sm text-content-secondary">주문에 저장된 배송지를 확인하지 못했습니다.</p>
+          <EmptyState
+            className="mt-3 px-4 py-5"
+            icon={<PageIcon className="size-7" />}
+            title="주문에 저장된 배송지를 확인하지 못했습니다"
+            description="배송 상태와 주문 정보는 계속 확인할 수 있어요."
+          />
         )}
       </section>
 
       <section className="mt-6 space-y-4">
         <h2 className="text-lg font-bold">주문 상품</h2>
-        {myReviews.isFetching ? <p className="text-xs text-content-secondary">리뷰 작성 여부를 확인하는 중입니다.</p> : null}
+        {myReviews.isFetching ? <InlineLoadingState className="min-h-0 justify-start border-0 bg-transparent px-0 py-0 text-xs" label="리뷰 작성 여부를 확인하는 중입니다." /> : null}
         {myReviews.error ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-status-negative-border bg-status-negative-subtle p-3 text-xs font-bold text-status-negative" role="alert">
             <p>리뷰 작성 여부를 확인하지 못해 중복 작성을 막기 위해 작성 버튼을 숨겼습니다.</p>
             <Button size="sm" variant="secondary" onClick={() => void myReviews.refetch()}>다시 확인</Button>
           </div>
         ) : null}
-        {order.market_orders?.map((marketOrder) => (
+        {marketOrders.length ? marketOrders.map((marketOrder) => (
           <div key={marketOrder.id} className="rounded-surface border border-border-subtle bg-surface-raised p-4 shadow-card">
             <div className="flex justify-between text-sm">
               <span className="font-bold">마켓 #{marketOrder.market_id}</span>
@@ -227,7 +236,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
               })}
             </div>
           </div>
-        ))}
+        )) : <EmptyState icon={<PageIcon className="size-7" />} title="표시할 주문 상품이 없습니다" description="주문 정보는 계속 확인할 수 있어요." />}
       </section>
 
       <section className="mt-6 rounded-surface border border-border-subtle bg-surface-raised p-5 shadow-card">
@@ -243,7 +252,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
       </section>
 
       {confirmPurchase.error ? <p className="mt-4 text-sm font-bold text-status-negative">{apiErrorMessage(confirmPurchase.error)}</p> : null}
-    </main>
+    </PageLayout>
   );
 }
 

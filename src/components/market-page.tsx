@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleHelp, Heart, Store } from "lucide-react";
+import { CircleHelp, Heart, Package, Store } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/api";
@@ -9,9 +9,12 @@ import { apiErrorMessage } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import { formatFollowerCount } from "@/lib/utils";
+import { PageLayout } from "./page-layout";
 import { ProductCard } from "./product-card";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { BackButton } from "./ui/back-button";
+import { EmptyState, InlineLoadingState, LoadingState } from "./ui/feedback";
 
 export function MarketPage({ marketId }: { marketId: number }) {
   const router = useRouter();
@@ -54,11 +57,12 @@ export function MarketPage({ marketId }: { marketId: number }) {
 
   const market = marketQuery.data;
   const products = productsQuery.data?.items ?? [];
-  if (marketQuery.isLoading) return <main className="mx-auto max-w-6xl px-4 py-8 text-sm text-content-secondary">마켓을 불러오는 중입니다.</main>;
-  if (marketQuery.error || !market) return <main className="mx-auto max-w-6xl px-4 py-16"><div className="rounded-surface border border-status-negative-border bg-status-negative-subtle p-8 text-center shadow-card" role="alert"><h1 className="text-xl font-bold text-status-negative">마켓을 불러오지 못했습니다.</h1><Button className="mt-4" size="sm" variant="secondary" onClick={() => void marketQuery.refetch()}>마켓 다시 불러오기</Button></div></main>;
+  if (marketQuery.isLoading) return <PageLayout><BackButton fallbackHref="/markets" /><LoadingState className="mt-4" label="마켓을 불러오는 중입니다." /></PageLayout>;
+  if (marketQuery.error || !market) return <PageLayout><BackButton fallbackHref="/markets" /><div className="mt-4 rounded-surface border border-status-negative-border bg-status-negative-subtle p-8 text-center shadow-card" role="alert"><h1 className="text-xl font-bold text-status-negative">마켓을 불러오지 못했습니다.</h1><Button className="mt-4" size="sm" variant="secondary" onClick={() => void marketQuery.refetch()}>마켓 다시 불러오기</Button></div></PageLayout>;
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-24">
+    <PageLayout className="pt-0">
+      <BackButton fallbackHref="/markets" className="my-3" />
       <section className="overflow-hidden rounded-feature border border-border-subtle bg-surface-raised shadow-card">
         <div className="relative h-56 bg-surface-subtle md:h-72"><SafeImage src={market.cover_image_url} alt={market.name} fill sizes="100vw" className="object-cover" /></div>
         <div className="flex flex-col gap-4 p-5 md:flex-row md:items-end md:justify-between">
@@ -102,11 +106,18 @@ export function MarketPage({ marketId }: { marketId: number }) {
       </section>
       <section className="py-8">
         <h2 className="text-xl font-bold">마켓 상품</h2>
-        {productsQuery.isLoading ? <p className="mt-5 text-sm text-content-secondary">상품을 불러오는 중입니다.</p> : null}
+        {productsQuery.isLoading ? <InlineLoadingState className="mt-5" label="상품을 불러오는 중입니다." /> : null}
         {productsQuery.error ? <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-control border border-status-negative-border bg-status-negative-subtle p-4 text-sm font-bold text-status-negative" role="alert"><p>마켓 상품을 불러오지 못했습니다. {apiErrorMessage(productsQuery.error)}</p><Button size="sm" variant="secondary" onClick={() => void productsQuery.refetch()}>상품 다시 불러오기</Button></div> : null}
         {productsQuery.isSuccess && products.length ? <div className="mt-5 grid grid-cols-2 gap-x-3 gap-y-7 md:grid-cols-4 md:gap-x-5">{products.map((product) => <ProductCard key={product.id} product={product} />)}</div> : null}
-        {productsQuery.isSuccess && !products.length ? <p className="mt-5 rounded-surface border border-border-subtle bg-surface-raised p-8 text-center text-sm text-content-secondary">등록된 상품이 없습니다.</p> : null}
+        {productsQuery.isSuccess && !products.length ? (
+          <EmptyState
+            className="mt-5"
+            icon={<Package className="size-7" />}
+            title="등록된 상품이 없습니다"
+            description="이 마켓에 새 상품이 등록되면 이곳에서 확인할 수 있어요."
+          />
+        ) : null}
       </section>
-    </main>
+    </PageLayout>
   );
 }

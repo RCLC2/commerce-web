@@ -5,7 +5,7 @@ import { ClipboardList as PageIcon } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button-link";
 
-import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -29,19 +29,28 @@ import {
   submitServerAuthoritativeCheckout,
 } from "@/lib/queries/checkout";
 import { useSessionStore } from "@/lib/session-store";
-import type { CartItem, OrderResponse, PaymentRequest } from "@/lib/types";
+import type { Address, CartItem, OrderResponse, PaymentRequest } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
+import { PageLayout } from "./page-layout";
 import { TossPaymentWidget } from "./toss-payment-widget";
 import { Button } from "./ui/button";
+import { BackButton } from "./ui/back-button";
 import { BottomActionBar } from "./ui/bottom-action-bar";
 import { Field } from "./ui/field";
 import { Input, Select } from "./ui/input";
 import { Notice } from "./ui/notice";
 import { OrderSummary } from "./ui/order-summary";
 import { Surface } from "./ui/surface";
+import { EmptyState } from "./ui/feedback";
+import { CheckoutAddressForm, type CheckoutAddressInput } from "./checkout-address-form";
+
+function formatDeduction(amount: number) {
+  return amount > 0 ? `-${formatPrice(amount)}` : formatPrice(0);
+}
 
 export function CheckoutPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const token = useSessionStore((state) => state.accessToken);
   const memberID = useSessionStore((state) => state.memberID);
@@ -58,6 +67,8 @@ export function CheckoutPage() {
   const [paymentRequest, setPaymentRequest] = useState<PaymentRequest>();
   const [pendingAttemptBlocked, setPendingAttemptBlocked] = useState(false);
   const [restoreNonce, setRestoreNonce] = useState(0);
+  const [selectedAddressID, setSelectedAddressID] = useState<number>();
+  const [editingAddress, setEditingAddress] = useState(false);
 
   const cart = useQuery({
     queryKey: queryKeys.cart(memberID),
@@ -78,6 +89,15 @@ export function CheckoutPage() {
     queryKey: queryKeys.addresses(memberID),
     queryFn: () => api.listAddresses(effectiveToken),
     enabled: Boolean(effectiveToken),
+  });
+  const createAddress = useMutation({
+    mutationFn: (address: CheckoutAddressInput) => api.createAddress(effectiveToken, address),
+    onSuccess: (address) => {
+      queryClient.setQueryData<Address[]>(queryKeys.addresses(memberID), (current) => [...(current ?? []), address]);
+      setSelectedAddressID(address.id);
+      setEditingAddress(false);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.addresses(memberID) });
+    },
   });
   const confirmedLineItems = confirmedOrder?.market_orders?.flatMap((marketOrder) =>
     marketOrder.line_items) ?? [];
@@ -120,6 +140,14 @@ export function CheckoutPage() {
   const couponID = cartBoundCouponID(couponSelection, cart.data);
   const selectedCoupon = ownedCoupons.find((coupon) => coupon.id === couponID);
   const defaultAddress = (addresses.data ?? []).find((address) => address.is_default) ?? addresses.data?.[0];
+  const selectedAddress = (addresses.data ?? []).find((address) => address.id === selectedAddressID) ?? defaultAddress;
+  const deliveryLabels = [...new Set(displayItems.map((item) => item.product?.delivery_label?.trim()).filter((label): label is string => Boolean(label)))];
+  const arrivalDates = displayItems.map((item) => item.product?.delivery?.expected_arrival_date).filter((date): date is string => Boolean(date && /^\d{4}-\d{2}-\d{2}$/.test(date))).sort();
+  const arrivalRange = displayItems.length > 0 && arrivalDates.length === displayItems.length
+    ? arrivalDates[0] === arrivalDates[arrivalDates.length - 1]
+      ? formatArrivalDate(arrivalDates[0])
+      : `${formatArrivalDate(arrivalDates[0])} ~ ${formatArrivalDate(arrivalDates[arrivalDates.length - 1])}`
+    : undefined;
   const productTotal = items.reduce((sum, item) => sum + item.price_at_added * item.quantity, 0);
   const availablePoint = profile.data?.point_balance ?? 0;
   const eligibleSelectedCoupon = selectedCoupon
@@ -130,9 +158,39 @@ export function CheckoutPage() {
   const pointLimit = maxApplicablePoints(productTotal, selectedCouponDiscount, availablePoint);
   const appliedPoint = Math.min(normalizeRequestedPoints(usedPoint), pointLimit);
   const expectedAmount = productTotal - selectedCouponDiscount - appliedPoint;
+  const quote = useQuery({
+    queryKey: ["checkout-quote", memberID,
+      items.map((item) => `${item.id}:${item.quantity}:${item.price_at_added}`).join(","),
+      eligibleSelectedCoupon?.id, appliedPoint, selectedAddress?.id,
+      selectedAddress?.receiver, selectedAddress?.phone, selectedAddress?.zip_code,
+      selectedAddress?.line1, selectedAddress?.line2],
+    queryFn: () => api.quoteOrder(effectiveToken, {
+      cart_item_ids: items.map((item) => item.id),
+      used_coupon_id: eligibleSelectedCoupon?.id,
+      used_point: appliedPoint,
+      shipping_address: {
+        receiver: selectedAddress!.receiver,
+        phone: selectedAddress!.phone,
+        zip_code: selectedAddress!.zip_code,
+        line1: selectedAddress!.line1,
+        line2: selectedAddress!.line2,
+      },
+    }),
+    enabled: Boolean(effectiveToken && !createdOrderCode && cart.isSuccess && addresses.isSuccess && selectedAddress && items.length),
+    retry: false,
+  });
+  const quoteLineTotals = new Map(quote.data?.line_items.map((line) => [line.cart_item_id, line.line_total]));
+  const confirmedShippingFee = confirmedOrder?.market_orders?.reduce((sum, marketOrder) => sum + marketOrder.shipping_fee, 0);
   const serverAmount = confirmedOrder
-    ? Math.max(0, confirmedOrder.total_order_price - confirmedOrder.total_discount_price - confirmedOrder.used_point)
+    ? Math.max(0, confirmedOrder.total_order_price - confirmedOrder.total_discount_price - confirmedOrder.used_point + (confirmedShippingFee ?? 0))
     : undefined;
+  const displayedAmount = serverAmount !== undefined
+    ? formatPrice(serverAmount)
+    : createdOrderCode
+      ? "확정 금액 확인 중"
+      : quote.data && !quote.isFetching
+        ? formatPrice(quote.data.payment_amount)
+        : selectedAddress ? "금액 확인 중" : "—";
 
   useEffect(() => {
     if (!effectiveToken || memberID === null) {
@@ -242,12 +300,12 @@ export function CheckoutPage() {
           cart_item_ids: items.map((item) => item.id),
           used_coupon_id: eligibleSelectedCoupon?.id,
           used_point: appliedPoint,
-          shipping_address: defaultAddress ? {
-            receiver: defaultAddress.receiver,
-            phone: defaultAddress.phone,
-            zip_code: defaultAddress.zip_code,
-            line1: defaultAddress.line1,
-            line2: defaultAddress.line2,
+          shipping_address: selectedAddress ? {
+            receiver: selectedAddress.receiver,
+            phone: selectedAddress.phone,
+            zip_code: selectedAddress.zip_code,
+            line1: selectedAddress.line1,
+            line2: selectedAddress.line2,
           } : undefined,
         },
         placeOrder: (input) => api.placeOrder(effectiveToken, input),
@@ -314,7 +372,16 @@ export function CheckoutPage() {
   });
 
   if (!token) {
-    return <main className="mx-auto max-w-3xl px-4 py-16"><h1 className="text-2xl font-bold">로그인이 필요합니다</h1><ButtonLink href="/login" className="mt-5">로그인하기</ButtonLink></main>;
+    const checkoutQuery = searchParams.toString();
+    const checkoutPath = `/checkout${checkoutQuery ? `?${checkoutQuery}` : ""}`;
+    return (
+      <PageLayout>
+        <BackButton fallbackHref="/cart" className="mb-4" />
+        <h1 className="text-2xl font-bold">주문서를 작성하려면 로그인이 필요합니다</h1>
+        <p className="mt-2 text-sm text-content-secondary">로그인 후 장바구니 상품의 주문과 결제를 진행할 수 있습니다.</p>
+        <ButtonLink href={`/login?next=${encodeURIComponent(checkoutPath)}`} className="mt-5">로그인하기</ButtonLink>
+      </PageLayout>
+    );
   }
 
   const blockingError = cart.error ?? (!createdOrderCode ? addresses.error : null);
@@ -323,9 +390,10 @@ export function CheckoutPage() {
     !retryStateReady
     || (!createdOrderCode && (
       !items.length
-      || !defaultAddress
+      || !selectedAddress
       || !Number.isSafeInteger(expectedAmount)
-      || expectedAmount <= 0
+      || !quote.data
+      || quote.isFetching
       || pendingAttemptBlocked
     ))
     || Boolean(blockingError && !createdOrderCode)
@@ -345,7 +413,8 @@ export function CheckoutPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 pb-28 pt-8">
+    <PageLayout>
+      {!createdOrderCode ? <BackButton fallbackHref="/cart" className="mb-4" /> : null}
       <PageHeading icon={<PageIcon />} title="주문서" />
       {!createdOrderCode && requestedCartItemIDs !== null && cart.isSuccess && !items.length ? (
         <Notice className="mt-5" tone="warning" title="선택한 장바구니 상품을 찾을 수 없습니다."><Link href="/cart" className="font-bold underline">장바구니에서 다시 선택해주세요.</Link></Notice>
@@ -368,33 +437,71 @@ export function CheckoutPage() {
       <div className="mt-6 grid gap-6 md:grid-cols-[1fr_340px]">
         <section className="space-y-5">
           <Surface padding="sm">
-            <h2 className="font-bold">기본 배송지</h2>
+            <h2 className="font-bold">배송지</h2>
+            {!createdOrderCode && (addresses.data?.length ?? 0) > 1 ? (
+              <Field className="mt-3" label="배송받을 주소 선택" htmlFor="checkout-address">
+                <Select id="checkout-address" value={selectedAddress?.id ?? ""} onChange={(event) => setSelectedAddressID(Number(event.target.value))}>
+                  {addresses.data?.map((address) => <option key={address.id} value={address.id}>{address.receiver} · {address.line1}{address.is_default ? " (기본 배송지)" : ""}</option>)}
+                </Select>
+              </Field>
+            ) : null}
             {addresses.isPending ? (
               <div className="mt-3 grid gap-2" role="status" aria-label="배송지 불러오는 중">
                 <span className="h-4 w-40 animate-pulse rounded-control bg-surface-subtle" />
                 <span className="h-4 w-64 animate-pulse rounded-control bg-surface-subtle" />
               </div>
-            ) : defaultAddress ? (
+            ) : createdOrderCode && confirmedOrder?.delivery?.address ? (
               <div className="mt-3 text-sm leading-6">
-                <p className="font-bold">{defaultAddress.receiver} / {defaultAddress.phone}</p>
-                <p className="text-content-secondary">({defaultAddress.zip_code}) {defaultAddress.line1} {defaultAddress.line2}</p>
+                {confirmedOrder.delivery.receiver_name ? <p className="font-bold">{confirmedOrder.delivery.receiver_name}{confirmedOrder.delivery.receiver_phone ? ` / ${confirmedOrder.delivery.receiver_phone}` : ""}</p> : null}
+                <p className="text-content-secondary">{confirmedOrder.delivery.address}</p>
               </div>
-            ) : addresses.isSuccess ? <p className="mt-3 text-sm text-content-secondary">등록된 기본 배송지가 없습니다.</p> : null}
-            {defaultAddress ? <p className="mt-3 text-xs font-bold text-status-positive">이 주소로 배송됩니다. 받는 분과 연락처를 확인해주세요.</p> : null}
+            ) : createdOrderCode ? (
+              <p className="mt-3 text-sm text-content-secondary">기존 주문의 배송지는 주문 내역에서 확인해주세요.</p>
+            ) : selectedAddress ? (
+              <div className="mt-3 text-sm leading-6">
+                <p className="font-bold">{selectedAddress.receiver} / {selectedAddress.phone}</p>
+                <p className="text-content-secondary">({selectedAddress.zip_code}) {selectedAddress.line1} {selectedAddress.line2}</p>
+              </div>
+            ) : addresses.isSuccess ? <EmptyState className="mt-3 px-4 py-5" icon={<PageIcon className="size-7" />} title="등록된 배송지가 없습니다" description="배송지를 등록한 뒤 주문을 진행해주세요." /> : null}
+            {!createdOrderCode && addresses.isSuccess && (editingAddress || !addresses.data?.length) ? (
+              <CheckoutAddressForm
+                firstAddress={!addresses.data?.length}
+                pending={createAddress.isPending}
+                error={createAddress.error ? apiErrorMessage(createAddress.error) : undefined}
+                onSave={(address) => createAddress.mutate(address)}
+                onCancel={addresses.data?.length ? () => { createAddress.reset(); setEditingAddress(false); } : undefined}
+              />
+            ) : null}
+            {!createdOrderCode && addresses.isSuccess && Boolean(addresses.data?.length) && !editingAddress ? (
+              <Button className="mt-3" size="sm" variant="secondary" onClick={() => { createAddress.reset(); setEditingAddress(true); }}>새 배송지 추가</Button>
+            ) : null}
+            {!createdOrderCode && selectedAddress ? <p className="mt-3 text-xs font-bold text-status-positive">이 주소로 배송됩니다. 받는 분과 연락처를 확인해주세요.</p> : null}
+            {!createdOrderCode && (arrivalRange || deliveryLabels.length) ? (
+              <div className="mt-3 border-t border-border-subtle pt-3 text-xs text-content-secondary">
+                {arrivalRange ? <p><span className="font-bold text-content-primary">예상 도착일</span> {arrivalRange}</p> : null}
+                {deliveryLabels.length ? <p className="mt-1">{deliveryLabels.join(" · ")}</p> : null}
+                {arrivalRange ? <p className="mt-1">상품 정보 기준 예상일이며 배송 상황에 따라 달라질 수 있습니다.</p> : null}
+              </div>
+            ) : null}
           </Surface>
 
           <Surface padding="sm">
             <h2 className="font-bold">주문 상품</h2>
+            {!createdOrderCode && quote.data && quote.data.product_total !== productTotal ? <Notice className="mt-3" tone="warning">상품 가격이 변경되어 서버가 확인한 현재 가격을 표시합니다.</Notice> : null}
             {createdOrderCode ? (
               <Notice className="mt-3" tone="warning" title="복구한 주문은 현재 장바구니와 별개입니다">아래에는 서버에서 확인한 기존 주문 상품만 표시합니다. 현재 장바구니 변경사항은 이 결제에 포함되지 않습니다.</Notice>
             ) : null}
             <div className="mt-4 space-y-3">
               {displayItems.map((item) => {
                 const option = item.product?.options?.find((candidate) => candidate.id === item.option_id);
+                const group = !createdOrderCode ? checkoutDisplayGroups.find((candidate) => candidate.key === item.id) : undefined;
+                const quotedTotal = group && quote.data && group.cartItemIDs.every((id) => quoteLineTotals.has(id))
+                  ? group.cartItemIDs.reduce((sum, id) => sum + (quoteLineTotals.get(id) ?? 0), 0)
+                  : undefined;
                 return (
                   <div key={item.id} className="flex justify-between gap-4 text-sm">
                     <div><p className="font-bold">{item.product?.name ?? `상품 #${item.product_id}`}</p><p className="mt-1 text-content-secondary">{option ? `${option.option_name} · ${option.option_value}` : `옵션 #${item.option_id}`} · {item.quantity}개</p></div>
-                    <p className="shrink-0 whitespace-nowrap font-bold tabular-nums">{formatPrice(item.totalPrice)}</p>
+                    <p className="shrink-0 whitespace-nowrap font-bold tabular-nums">{formatPrice(quotedTotal ?? item.totalPrice)}</p>
                   </div>
                 );
               })}
@@ -435,15 +542,18 @@ export function CheckoutPage() {
 
         <aside className="h-fit md:sticky md:top-24">
           <OrderSummary
-            title={confirmedOrder ? "서버 확정 결제 금액" : "주문 전 예상 금액"}
+            title={confirmedOrder ? "서버 확정 결제 금액" : "결제 전 금액 확인"}
             items={[
-              { label: "상품 금액", value: formatPrice(confirmedOrder?.total_order_price ?? productTotal) },
-              { label: "서버 할인", value: confirmedOrder ? `-${formatPrice(confirmedOrder.total_discount_price)}` : "주문 후 확정", emphasis: confirmedOrder ? "negative" : "default" },
-              { label: "포인트", value: `-${formatPrice(confirmedOrder?.used_point ?? appliedPoint)}`, emphasis: "negative" },
+              { label: "상품 금액", value: formatPrice(confirmedOrder?.total_order_price ?? quote.data?.product_total ?? productTotal) },
+              { label: "쿠폰 할인", value: formatDeduction(confirmedOrder?.total_discount_price ?? quote.data?.discount_total ?? selectedCouponDiscount), emphasis: (confirmedOrder?.total_discount_price ?? quote.data?.discount_total ?? selectedCouponDiscount) > 0 ? "negative" : "default" },
+              { label: "포인트", value: formatDeduction(confirmedOrder?.used_point ?? quote.data?.used_point ?? appliedPoint), emphasis: (confirmedOrder?.used_point ?? quote.data?.used_point ?? appliedPoint) > 0 ? "negative" : "default" },
+              { label: "배송비", value: confirmedOrder ? formatPrice(confirmedShippingFee ?? 0) : quote.data && !quote.isFetching ? formatPrice(quote.data.shipping_fee) : selectedAddress ? "확인 중" : "배송지 등록 후 확인" },
             ]}
-            totalLabel="결제 금액"
-            total={serverAmount === undefined ? "주문 후 확정" : formatPrice(serverAmount)}
+            totalLabel="결제 예정 금액"
+            total={displayedAmount}
             footer={<>
+              {!createdOrderCode && quote.data && !quote.isFetching ? <p className="mb-3 text-xs leading-5 text-content-secondary">서버가 현재 상품·할인·배송비를 확인한 금액입니다. 주문 생성 시 다시 확인합니다.</p> : null}
+              {!createdOrderCode && quote.error ? <Notice className="mb-3" tone="error" title="결제 금액을 확인하지 못했습니다"><span>{apiErrorMessage(quote.error)}</span><Button className="mt-2" size="sm" variant="secondary" onClick={() => void quote.refetch()}>금액 다시 확인</Button></Notice> : null}
               {!paymentRequest ? (
                 <div className="hidden md:block">{renderCheckoutButton()}</div>
               ) : (
@@ -459,7 +569,7 @@ export function CheckoutPage() {
               {!createdOrderCode && items.length > 0 && expectedAmount <= 0 ? (
                 <p className="mt-3 text-xs font-bold text-action-primary">최소 결제 금액은 1원입니다. 쿠폰 또는 포인트 사용액을 조정해주세요.</p>
               ) : null}
-              {!createdOrderCode && addresses.isSuccess && !defaultAddress ? (
+              {!createdOrderCode && addresses.isSuccess && !selectedAddress ? (
                 <p className="mt-3 text-xs font-bold text-action-primary">등록된 배송지가 없어 주문을 진행할 수 없습니다.</p>
               ) : null}
               {restoreError ? <p className="mt-3 text-xs font-bold text-status-warning">{restoreError}</p> : null}
@@ -477,12 +587,17 @@ export function CheckoutPage() {
       {!paymentRequest ? (
         <BottomActionBar className="-mx-4 md:hidden">
           <div className="min-w-0 flex-1 self-center">
-            <p className="text-xs font-bold text-content-secondary">결제 금액</p>
-            <p className="truncate text-lg font-bold">{serverAmount === undefined ? "주문 후 확정" : formatPrice(serverAmount)}</p>
+            <p className="text-xs font-bold text-content-secondary">{confirmedOrder ? "결제 금액" : "예상 결제 금액"}</p>
+            <p className="truncate text-lg font-bold">{displayedAmount}</p>
           </div>
           <div className="w-1/2 shrink-0">{renderCheckoutButton()}</div>
         </BottomActionBar>
       ) : null}
-    </main>
+    </PageLayout>
   );
+}
+
+function formatArrivalDate(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  return `${year}년 ${month}월 ${day}일`;
 }

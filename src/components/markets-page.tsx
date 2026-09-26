@@ -10,10 +10,12 @@ import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import type { Market, MarketFeedItem } from "@/lib/types";
 import { formatFollowerCount } from "@/lib/utils";
+import { PageLayout } from "./page-layout";
 import { ProductCard } from "./product-card";
 import { SafeImage } from "./safe-image";
 import { ButtonLink } from "./ui/button-link";
 import { Button } from "./ui/button";
+import { EmptyState } from "./ui/feedback";
 
 const discoveryLimit = 12;
 const followingLimit = 8;
@@ -38,7 +40,7 @@ export function MarketsPage() {
   });
 
   return (
-    <main className="mx-auto min-h-[70vh] max-w-6xl px-4 pb-28 pt-8">
+    <PageLayout className="min-h-[70vh] pb-28 md:pb-28">
       <header className="overflow-hidden rounded-feature border border-border-subtle bg-gradient-to-br from-action-secondary via-surface-raised to-surface-raised px-6 py-8 text-content-primary md:px-10 md:py-11">
         <div className="flex items-center gap-3 text-action-primary">
           <Store size={19} aria-hidden="true" />
@@ -68,7 +70,7 @@ export function MarketsPage() {
         markets={trendingQuery.data ?? []}
         isLoading={trendingQuery.isLoading}
         error={trendingQuery.error}
-        emptyMessage="아직 이번 주 상승세를 보여 줄 마켓이 없습니다."
+        emptyMessage="아직 이번 주 상승세를 보여 줄 마켓이 없습니다"
         metric="followers"
         onRetry={() => void trendingQuery.refetch()}
       />
@@ -82,12 +84,12 @@ export function MarketsPage() {
         markets={newProductsQuery.data ?? []}
         isLoading={newProductsQuery.isLoading}
         error={newProductsQuery.error}
-        emptyMessage="최근 7일 신상품이 등록된 마켓이 없습니다."
+        emptyMessage="최근 7일 신상품이 등록된 마켓이 없습니다"
         metric="products"
         onRetry={() => void newProductsQuery.refetch()}
       />
 
-    </main>
+    </PageLayout>
   );
 }
 
@@ -136,7 +138,12 @@ function MarketDiscoverySection({
         </div>
       ) : null}
       {!isLoading && !error && markets.length === 0 ? (
-        <p className="mt-6 rounded-surface border border-dashed border-border-subtle bg-surface-raised px-5 py-8 text-center text-sm text-content-secondary">{emptyMessage}</p>
+        <EmptyState
+          className="mt-6"
+          icon={<Store className="size-7" />}
+          title={emptyMessage}
+          description="새로운 마켓을 준비하고 있으니 잠시 후 다시 확인해주세요."
+        />
       ) : null}
       {markets.length ? (
         <div className="no-scrollbar mt-6 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3 md:gap-5">
@@ -232,7 +239,12 @@ function FollowingSection({
         </div>
       ) : null}
       {!isLoading && !error && items.length === 0 ? (
-        <p className="mt-5 rounded-surface border border-dashed border-border-subtle bg-surface-raised px-5 py-6 text-sm text-content-secondary">아직 도착한 새 상품이 없습니다. 위에서 관심 있는 마켓을 발견해 보세요.</p>
+        <EmptyState
+          className="mt-5"
+          icon={<Heart className="size-7" />}
+          title="아직 도착한 새 상품이 없습니다"
+          description="위에서 관심 있는 마켓을 발견하고 팔로우해보세요."
+        />
       ) : null}
       {items.length ? (
         <div className="no-scrollbar mt-5 flex snap-x gap-4 overflow-x-auto pb-3">

@@ -5,7 +5,8 @@ import { Input } from "./ui/input";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Menu, X } from "lucide-react";
+import { useEffect, useId, useState } from "react";
 import { apiErrorMessage } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { displayLabel } from "@/lib/display-labels";
@@ -13,6 +14,8 @@ import { orderStatusLabel } from "@/lib/order-utils";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Notice } from "./ui/notice";
+import { EmptyState, LoadingState } from "./ui/feedback";
+import { PageLayout } from "./page-layout";
 
 type ConsoleLink = {
   href: string;
@@ -37,6 +40,8 @@ export function ConsoleLayout({
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const [mutationError, setMutationError] = useState<unknown>();
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  const navigationID = useId();
   useEffect(() => {
     const clearTimer = window.setTimeout(() => setMutationError(undefined), 0);
     const unsubscribe = queryClient.getMutationCache().subscribe((event) => {
@@ -56,14 +61,27 @@ export function ConsoleLayout({
   );
   const activeQueryErrors = activeQueries.filter((query) => query.state.status === "error");
   return (
-    <main className="mx-auto grid max-w-7xl gap-5 px-4 pb-24 pt-5 md:grid-cols-[208px_minmax(0,1fr)]">
-      <aside className="h-fit min-w-0 rounded-surface border border-border-subtle bg-surface-raised p-3 md:sticky md:top-24">
-        <div className="px-3 py-2">
-          <h1 className="text-lg font-bold">{title}</h1>
-          {subtitle ? <p className="mt-1 text-xs font-bold leading-5 text-content-secondary">{subtitle}</p> : null}
+    <PageLayout variant="console" className="gap-5 md:grid-cols-[208px_minmax(0,1fr)]">
+      <aside className="h-fit min-w-0 border-b border-border-subtle bg-transparent pb-3 md:sticky md:top-24 md:rounded-surface md:border md:bg-surface-raised md:p-3">
+        <div className="flex items-center justify-between gap-3 py-2 md:px-3 md:py-2">
+          <div>
+            <h1 className="text-lg font-bold">{title}</h1>
+            {subtitle ? <p className="mt-1 text-xs font-bold leading-5 text-content-secondary">{subtitle}</p> : null}
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden focus-visible:ring-2 focus-visible:ring-action-primary"
+            aria-label={navigationOpen ? "탐색 닫기" : "탐색 열기"}
+            aria-controls={navigationID}
+            aria-expanded={navigationOpen}
+            onClick={() => setNavigationOpen((open) => !open)}
+          >
+            {navigationOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
+          </Button>
         </div>
-        {sidebarHeader ? <div className="mb-3 px-1">{sidebarHeader}</div> : null}
-        <nav className="mt-2 grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-1">
+        {sidebarHeader ? <div className={cn("mb-3 px-1", navigationOpen ? "block" : "hidden md:block")}>{sidebarHeader}</div> : null}
+        <nav id={navigationID} className={cn("mt-2 grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-1", navigationOpen ? "grid md:grid" : "hidden md:grid")}>
           {links.map((link) => {
             const active = pathname === link.href || (!["/admin", "/seller"].includes(link.href) && pathname.startsWith(`${link.href}/`));
             return (
@@ -71,6 +89,7 @@ export function ConsoleLayout({
                 key={link.href}
                 href={link.href}
                 aria-current={active ? "page" : undefined}
+                onClick={() => setNavigationOpen(false)}
                 className={cn(
                   "rounded-md border border-transparent px-3 py-2.5 text-sm font-bold text-content-secondary transition hover:bg-surface-subtle",
                   active && "border-action-primary bg-action-secondary text-action-primary shadow-card hover:bg-action-secondary",
@@ -81,7 +100,7 @@ export function ConsoleLayout({
             );
           })}
         </nav>
-        {sidebarFooter ? <div className="mt-4 border-t border-border-subtle pt-4">{sidebarFooter}</div> : null}
+        {sidebarFooter ? <div className={cn("mt-4 border-t border-border-subtle pt-4", navigationOpen ? "block" : "hidden md:block")}>{sidebarFooter}</div> : null}
       </aside>
       <section className="min-w-0 overflow-hidden">
         {activeQueryErrors.length ? (
@@ -95,12 +114,12 @@ export function ConsoleLayout({
         ) : null}
         {children}
       </section>
-    </main>
+    </PageLayout>
   );
 }
 
-export function FilterPanel({ children }: { children: React.ReactNode }) {
-  return <div className="grid gap-2 rounded-md border border-border-subtle bg-surface-raised p-3 md:grid-cols-3 xl:grid-cols-4">{children}</div>;
+export function FilterPanel({ children, layout = "default" }: { children: React.ReactNode; layout?: "default" | "two-columns-at-lg" }) {
+  return <div className={cn("grid gap-2 rounded-md border border-border-subtle bg-surface-raised p-3", layout === "two-columns-at-lg" ? "lg:grid-cols-2" : "md:grid-cols-3 xl:grid-cols-4")}>{children}</div>;
 }
 
 export function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
@@ -110,6 +129,10 @@ export function FilterField({ label, children }: { label: string; children: Reac
       {children}
     </label>
   );
+}
+
+export function ConsoleActionField({ children }: { children: React.ReactNode }) {
+  return <div className="grid gap-1"><p className="text-xs font-bold text-content-secondary">작업</p>{children}</div>;
 }
 
 export function ConsoleHeader({
@@ -179,29 +202,48 @@ export function DataTable({
   columns,
   rows,
   emptyText = "표시할 데이터가 없습니다.",
+  emptyDescription,
+  isLoading = false,
+  cardBreakpoint = "md",
 }: {
   columns: string[];
   rows: Array<Array<React.ReactNode>>;
   emptyText?: string;
+  emptyDescription?: string;
+  isLoading?: boolean;
+  cardBreakpoint?: "md" | "xl";
 }) {
+  if (isLoading) return <LoadingState label="불러오는 중입니다." />;
+  if (!rows.length) return <EmptyState title={emptyText} description={emptyDescription} />;
+
   return (
-    <div className="rounded-surface border border-border-subtle bg-surface-raised">
-      {rows.length ? (
-        <div className="grid divide-y divide-border-subtle">
-          {rows.map((row, rowIndex) => (
-            <div key={rowIndex} className="grid gap-3 p-3 hover:bg-surface-subtle/70" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
-              {row.map((cell, cellIndex) => (
-                <div key={cellIndex} className="min-w-0">
-                  <p className="mb-1 text-xs font-bold text-content-secondary">{columns[cellIndex]}</p>
-                  <div className="min-w-0 break-words text-sm">{cell}</div>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="px-4 py-8 text-center text-sm font-bold text-content-secondary">{emptyText}</div>
-      )}
+    <div className="min-w-0 rounded-surface border border-border-subtle bg-surface-raised">
+      <div className={cn("overflow-x-auto overscroll-x-contain", cardBreakpoint === "xl" ? "hidden xl:block" : "hidden md:block")}>
+        <table className="min-w-max w-full text-left text-sm">
+          <thead className="border-b border-border-subtle bg-surface-subtle text-xs text-content-secondary">
+            <tr>{columns.map((column, index) => <th key={`${column}-${index}`} scope="col" className="px-4 py-3 font-bold">{column}</th>)}</tr>
+          </thead>
+          <tbody className="divide-y divide-border-subtle">
+            {rows.map((row, rowIndex) => (
+              <tr key={rowIndex} className="hover:bg-surface-subtle/70">
+                {columns.map((column, cellIndex) => <td key={`${column}-${cellIndex}`} className="min-w-0 px-4 py-3 align-top"><div className="max-w-lg break-words">{row[cellIndex]}</div></td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className={cn("divide-y divide-border-subtle", cardBreakpoint === "xl" ? "xl:hidden" : "md:hidden")}>
+        {rows.map((row, rowIndex) => (
+          <div key={rowIndex} className="grid gap-3 p-3">
+            {columns.map((column, cellIndex) => (
+              <div key={`${column}-${cellIndex}`} className="min-w-0">
+                <p className="mb-1 text-xs font-bold text-content-secondary">{column}</p>
+                <div className="min-w-0 break-words text-sm">{row[cellIndex]}</div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

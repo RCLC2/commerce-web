@@ -4,24 +4,25 @@ import { PageHeading } from "./ui/page-heading";
 import { Heart as PageIcon } from "lucide-react";
 
 import { useQuery } from "@tanstack/react-query";
-import { Bookmark, ChevronLeft, ChevronRight, Heart } from "lucide-react";
-import Link from "next/link";
+import { Bookmark, Heart } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
 import { getEffectiveToken } from "@/lib/auth-token";
-import { validCollectionPage } from "@/lib/product-engagement";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import { ProductCard } from "./product-card";
+import { PageLayout } from "./page-layout";
 import { Button } from "./ui/button";
+import { EmptyState, InlineLoadingState, LoginRequiredState } from "./ui/feedback";
+import { InfiniteScrollTrigger } from "./ui/infinite-scroll-trigger";
 
 const PAGE_SIZE = 20;
 type CollectionView = "liked" | "wishlist";
 
 export function LikesPage() {
   const [view, setView] = useState<CollectionView>("liked");
-  const [page, setPage] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const token = useSessionStore((state) => state.accessToken);
   const memberID = useSessionStore((state) => state.memberID);
   const effectiveToken = getEffectiveToken(token);
@@ -37,24 +38,24 @@ export function LikesPage() {
   });
   const selectedQuery = view === "liked" ? likedProducts : wishlistedProducts;
   const products = selectedQuery.data ?? [];
-  const currentPage = validCollectionPage(page, products.length, PAGE_SIZE);
-  const totalPages = Math.max(1, Math.ceil(products.length / PAGE_SIZE));
-  const pageProducts = products.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const visibleProducts = products.slice(0, visibleCount);
 
   function selectView(next: CollectionView) {
     setView(next);
-    setPage(1);
+    setVisibleCount(PAGE_SIZE);
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-24 pt-8">
+    <PageLayout>
       <PageHeading icon={<PageIcon />} title="좋아요" description="좋아요한 상품과 나중에 구매하려고 찜한 상품을 확인하세요." />
 
       {!effectiveToken ? (
-        <section className="mt-6 rounded-surface border border-border-subtle bg-surface-raised p-6 text-sm text-content-secondary shadow-card">
-          내 상품 목록을 보려면 로그인해 주세요.
-          <Link href="/login?next=/likes" className="ml-2 font-bold text-content-primary">로그인</Link>
-        </section>
+        <LoginRequiredState
+          className="mt-6"
+          icon={<Heart className="size-7" />}
+          description="좋아요한 상품과 찜한 상품을 확인하려면 로그인해주세요."
+          loginHref="/login?next=/likes"
+        />
       ) : (
         <section className="mt-8">
           <div className="flex gap-2" role="tablist" aria-label="좋아요 상품 목록">
@@ -64,34 +65,38 @@ export function LikesPage() {
 
           <div className="mt-6 flex items-center justify-between">
             <h2 className="text-lg font-bold">{view === "liked" ? "좋아요 상품" : "찜한 상품"}</h2>
-            {selectedQuery.isSuccess ? <span className="text-sm font-bold text-content-secondary">{products.length}개 · {currentPage}/{totalPages}</span> : null}
+            {selectedQuery.isSuccess ? <span className="text-sm font-bold text-content-secondary">{products.length}개</span> : null}
           </div>
 
-          {selectedQuery.isLoading ? <p className="mt-4 rounded-surface border border-border-subtle bg-surface-raised p-5 text-sm text-content-secondary">상품 목록을 불러오는 중입니다.</p> : null}
+          {selectedQuery.isLoading ? <InlineLoadingState className="mt-4" label="상품 목록을 불러오는 중입니다." /> : null}
           {selectedQuery.isError ? (
             <div className="mt-4 rounded-control border border-status-negative-border bg-status-negative-subtle p-5 text-sm" role="alert">
               <p className="font-bold text-status-negative">{apiErrorMessage(selectedQuery.error)}</p>
               <Button className="mt-3" size="sm" variant="secondary" onClick={() => void selectedQuery.refetch()}>다시 시도</Button>
             </div>
           ) : null}
-          {selectedQuery.isSuccess && pageProducts.length ? (
+          {selectedQuery.isSuccess && visibleProducts.length ? (
             <div className="mt-6 grid grid-cols-3 gap-x-2 gap-y-6 md:grid-cols-5 md:gap-x-4">
-              {pageProducts.map((product) => <ProductCard key={product.id} product={product} />)}
+              {visibleProducts.map((product) => <ProductCard key={product.id} product={product} />)}
             </div>
           ) : null}
-          {selectedQuery.isSuccess && !pageProducts.length ? <p className="mt-4 rounded-surface border border-border-subtle bg-surface-raised p-5 text-sm text-content-secondary">{view === "liked" ? "좋아요한 상품이 없습니다." : "찜한 상품이 없습니다."}</p> : null}
-          {selectedQuery.isSuccess && products.length > PAGE_SIZE ? (
-            <div className="mt-8 flex items-center justify-center gap-2">
-              <Button variant="secondary" size="sm" disabled={currentPage === 1} onClick={() => setPage(Math.max(1, currentPage - 1))}><ChevronLeft size={16} /> 이전</Button>
-              {Array.from({ length: totalPages }).map((_, index) => (
-                <Button variant="ghost" key={index} className={`h-9 w-9 rounded-md text-sm font-bold ${currentPage === index + 1 ? "bg-foreground text-content-inverse" : "bg-surface-raised"}`} onClick={() => setPage(index + 1)}>{index + 1}</Button>
-              ))}
-              <Button variant="secondary" size="sm" disabled={currentPage === totalPages} onClick={() => setPage(Math.min(totalPages, currentPage + 1))}>다음 <ChevronRight size={16} /></Button>
-            </div>
+          {selectedQuery.isSuccess && !products.length ? (
+            <EmptyState
+              className="mt-4"
+              icon={view === "liked" ? <Heart className="size-7" /> : <Bookmark className="size-7" />}
+              title={view === "liked" ? "좋아요한 상품이 없습니다" : "찜한 상품이 없습니다"}
+              description={view === "liked" ? "마음에 드는 상품의 하트를 눌러 모아보세요." : "나중에 보고 싶은 상품을 찜으로 저장해보세요."}
+            />
           ) : null}
+          {selectedQuery.isSuccess ? <InfiniteScrollTrigger
+            hasMore={visibleCount < products.length}
+            loading={false}
+            label="저장한 상품"
+            onLoadMore={() => setVisibleCount((count) => count + PAGE_SIZE)}
+          /> : null}
         </section>
       )}
-    </main>
+    </PageLayout>
   );
 }
 

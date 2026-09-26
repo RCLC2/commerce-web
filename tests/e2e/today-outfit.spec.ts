@@ -41,10 +41,9 @@ const slotLabels = {
 const outfitFixture = {
   weather_profile: "WARM",
   generated_at: "2026-09-05T02:30:00Z",
-  looks: Array.from({ length: 10 }, (_, lookIndex) => ({
+  refresh_pending: false,
+  looks: Array.from({ length: 5 }, (_, lookIndex) => ({
     id: lookIndex + 1,
-    title: `실제 상품 코디 ${lookIndex + 1}`,
-    reason: "가벼운 레이어드와 포인트 컬러를 조합했어요.",
     image_url: "/images/fashion-placeholder.svg",
     image_disclosure: "AI 연출 이미지 · 실제 상품과 차이가 있을 수 있습니다",
     items: Object.entries(slotLabels).map(([slot, slotLabel], slotIndex) => ({
@@ -103,14 +102,14 @@ test.describe("today outfit", () => {
     await page.goto("/today-outfit");
 
     await expect(page.getByRole("heading", { name: "오늘의 코디", exact: true })).toBeVisible();
-    await expect(page.getByRole("region", { name: "오늘의 코디 10개" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "오늘의 코디 5개" })).toBeVisible();
     await expect(page.getByText("주간 평균", { exact: false })).toContainText("23°");
-    await expect(page.getByText("01 / 10", { exact: true })).toBeVisible();
+    await expect(page.getByText("01 / 05", { exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "다음 코디", exact: true }).click();
-    await expect(page.getByText("02 / 10", { exact: true })).toBeVisible();
+    await expect(page.getByText("02 / 05", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "5번째 코디 보기", exact: true }).click();
-    await expect(page.getByText("05 / 10", { exact: true })).toBeVisible();
+    await expect(page.getByText("05 / 05", { exact: true })).toBeVisible();
 
     await expect(page.getByRole("heading", { name: "이 코디의 실제 상품" })).toBeVisible();
     await expect(page.getByRole("button", { name: /신발 실제 상품 5, 상품 목록에서 보기/ })).toBeVisible();
@@ -118,18 +117,18 @@ test.describe("today outfit", () => {
     await expect(page.locator('[data-selected="true"]')).toContainText("신발 실제 상품 5");
     await expect(page.getByRole("button", { name: /남성 코디|여성 코디|다른 코디/ })).toHaveCount(0);
 
-    const slider = page.getByRole("region", { name: "오늘의 코디 10개" });
+    const slider = page.getByRole("region", { name: "오늘의 코디 5개" });
     await slider.dispatchEvent("pointerdown", { clientX: 300 });
     await slider.dispatchEvent("pointerup", { clientX: 100 });
-    await expect(page.getByText("06 / 10", { exact: true })).toBeVisible();
+    await expect(page.getByText("01 / 05", { exact: true })).toBeVisible();
   });
 
-  test("keeps the seven-item bottom navigation visible on desktop", async ({ page }) => {
+  test("keeps the five-item bottom navigation visible on desktop", async ({ page }) => {
     await page.goto("/today-outfit");
 
     const navigation = page.getByRole("navigation", { name: "하단 주요 메뉴" });
     await expect(navigation).toBeVisible();
-    for (const label of ["카테고리", "마켓", "오늘의 코디", "홈", "좋아요", "장바구니", "마이페이지"]) {
+    for (const label of ["카테고리", "오늘의 코디", "홈", "좋아요", "마이페이지"]) {
       await expect(navigation.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
   });

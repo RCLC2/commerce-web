@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { ProductDetailContent } from "./product-detail-content";
 import { Button } from "./ui/button";
+import { LoadingSpinner } from "./ui/feedback";
 import { cn } from "@/lib/utils";
 
 const MOBILE_COLLAPSED_HEIGHT = 1100;
@@ -20,6 +21,7 @@ export function CollapsibleProductDetail({ html, className }: { html: string; cl
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
+  const [isMediaLoading, setIsMediaLoading] = useState(false);
 
   useEffect(() => {
     const content = contentRef.current;
@@ -40,12 +42,21 @@ export function CollapsibleProductDetail({ html, className }: { html: string; cl
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(measure);
     };
-    const handleContentLoad = (event: Event) => {
-      if (event.target instanceof HTMLImageElement) scheduleMeasure();
+    const updateMediaLoading = () => {
+      const images = Array.from(content.querySelectorAll("img"));
+      setIsMediaLoading(images.some((image) => !image.complete));
+    };
+    const handleContentMediaEvent = (event: Event) => {
+      if (event.target instanceof HTMLImageElement) {
+        scheduleMeasure();
+        updateMediaLoading();
+      }
     };
 
     measure();
-    content.addEventListener("load", handleContentLoad, true);
+    updateMediaLoading();
+    content.addEventListener("load", handleContentMediaEvent, true);
+    content.addEventListener("error", handleContentMediaEvent, true);
     window.addEventListener("resize", scheduleMeasure, { passive: true });
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleMeasure);
     observer?.observe(content);
@@ -53,7 +64,8 @@ export function CollapsibleProductDetail({ html, className }: { html: string; cl
 
     return () => {
       disposed = true;
-      content.removeEventListener("load", handleContentLoad, true);
+      content.removeEventListener("load", handleContentMediaEvent, true);
+      content.removeEventListener("error", handleContentMediaEvent, true);
       window.removeEventListener("resize", scheduleMeasure);
       observer?.disconnect();
       if (typeof window.cancelAnimationFrame === "function") window.cancelAnimationFrame(frame);
@@ -91,6 +103,12 @@ export function CollapsibleProductDetail({ html, className }: { html: string; cl
           )}
           html={html}
         />
+        {isMediaLoading ? (
+          <div className="absolute inset-0 z-10 grid place-items-center bg-surface-raised" role="status">
+            <LoadingSpinner className="size-12" aria-hidden="true" />
+            <span className="sr-only">상품 상세 이미지를 불러오는 중입니다.</span>
+          </div>
+        ) : null}
         {isOverflowing && !isExpanded ? (
           <div
             aria-hidden="true"

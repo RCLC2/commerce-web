@@ -9,7 +9,7 @@ import { CartPage } from "./cart-page";
 const push = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("./safe-image", () => ({ SafeImage: () => null }));
-vi.mock("@/lib/api", () => ({ api: { listCart: vi.fn(), getProduct: vi.fn(), updateCartItems: vi.fn() } }));
+vi.mock("@/lib/api", () => ({ api: { listCart: vi.fn(), getProduct: vi.fn(), updateCartItems: vi.fn(), removeCartItems: vi.fn() } }));
 const product: Product = { id: 1, market_id: 1, category_id: 1, name: "셔츠", description: "", shipping_type: "NORMAL", popularity_score: 0, base_price: 10000, discount_price: 0, status: "SELLING", options: [
   { id: 10, product_id: 1, option_name: "색상", option_value: "화이트", quantity: 10, additional_price: 0, is_active: true },
   { id: 20, product_id: 1, option_name: "색상", option_value: "블랙", quantity: 3, additional_price: 2000, is_active: true },
@@ -27,6 +27,9 @@ beforeEach(() => {
     rows = [{ ...rows[0], option_id: payload.option_id, quantity: payload.quantity, price_at_added: payload.option_id === 20 ? 12000 : 10000 }];
     return rows[0];
   });
+  vi.mocked(api.removeCartItems).mockImplementation(async (_, ids) => {
+    rows = rows.filter((item) => !ids.includes(item.id));
+  });
 });
 afterEach(cleanup);
 function mountCart() {
@@ -35,6 +38,41 @@ function mountCart() {
 }
 
 describe("cart editing", () => {
+  it("deletes every persisted row in the visible product group", async () => {
+    mountCart();
+    fireEvent.click(await screen.findByRole("button", { name: "셔츠 삭제" }));
+
+    await waitFor(() => expect(api.removeCartItems).toHaveBeenCalledWith("token", [1, 2]));
+    expect(await screen.findByText("장바구니가 비어 있습니다")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "셔츠 삭제" })).not.toBeInTheDocument();
+  });
+
+  it("explains stock shortages and stops checkout until the selected item is fixed", async () => {
+    rows = [{ ...rows[0], quantity: 4 }];
+    vi.mocked(api.getProduct).mockResolvedValue({ ...product, options: product.options?.map((option) => option.id === 10 ? { ...option, quantity: 3 } : option) });
+    mountCart();
+
+    expect(await screen.findByText(/현재 주문 가능한 수량은 3개입니다/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "선택 상품 주문하기" })).toBeDisabled();
+    expect(screen.getByText("상품 금액 합계")).toBeVisible();
+    expect(screen.queryByText("배송비")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "셔츠 수량 줄이기" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "선택 상품 주문하기" })).toBeEnabled());
+  });
+
+  it("uses the shared guest login state without requesting cart data", () => {
+    useSessionStore.setState({ accessToken: null, memberID: null, role: null, hydrated: true });
+    mountCart();
+
+    expect(screen.getByText("로그인이 필요합니다")).toBeInTheDocument();
+    expect(screen.getByText("장바구니에 담은 상품을 확인하려면 로그인해주세요.")).toBeInTheDocument();
+    const login = screen.getByRole("link", { name: "로그인하기" });
+    expect(login).toHaveAttribute("href", "/login?next=/cart");
+    expect(login.querySelector("button")).toBeNull();
+    expect(api.listCart).not.toHaveBeenCalled();
+    expect(api.getProduct).not.toHaveBeenCalled();
+  });
+
   it("updates grouped quantities atomically and uses the persisted ID for checkout", async () => {
     mountCart();
     const increase = await screen.findByRole("button", { name: "셔츠 수량 늘리기" });
@@ -42,7 +80,8 @@ describe("cart editing", () => {
     fireEvent.click(increase);
     await screen.findByText("장바구니를 변경했습니다.");
     expect(api.updateCartItems).toHaveBeenCalledWith("token", { cart_item_ids: [1,2], option_id: 10, quantity: 3 });
-    expect(screen.getByText("선택 수량 3개")).toBeInTheDocument();
+    expect(screen.getByText("선택 수량")).toBeInTheDocument();
+    expect(screen.getByText("3개")).toBeInTheDocument();
     const checkout = screen.getByRole("button", { name: "선택 상품 주문하기" });
     await waitFor(() => expect(checkout).toBeEnabled());
     fireEvent.click(checkout);
@@ -71,7 +110,8 @@ describe("cart editing", () => {
     await waitFor(() => expect(increase).toBeEnabled());
     fireEvent.click(increase);
     await screen.findByRole("alert");
-    expect(screen.getByText("선택 수량 2개")).toBeInTheDocument();
+    expect(screen.getByText("선택 수량")).toBeInTheDocument();
+    expect(screen.getByText("2개")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "목록 새로고침" })).toBeEnabled();
     expect(screen.queryByText("장바구니를 변경했습니다.")).not.toBeInTheDocument();
   });

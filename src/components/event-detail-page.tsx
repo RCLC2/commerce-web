@@ -3,7 +3,7 @@
 import { Select } from "./ui/input";
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Gift, Store, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Gift, Package, Store, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -19,10 +19,13 @@ import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import { formatFollowerCount } from "@/lib/utils";
 import { EventBenefitTicket } from "./event-benefit-ticket";
+import { PageLayout } from "./page-layout";
 import { ProductCard } from "./product-card";
 import { ApiErrorState } from "./api-error-state";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { BackButton } from "./ui/back-button";
+import { EmptyState, InlineLoadingState, LoadingState } from "./ui/feedback";
 
 const EVENT_PRODUCT_PAGE_SIZE = 12;
 
@@ -140,10 +143,10 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
   });
 
   if (eventQuery.isError) {
-    return <main className="mx-auto max-w-6xl px-4 py-8 text-sm"><ApiErrorState error={eventQuery.error} onRetry={() => void eventQuery.refetch()} /></main>;
+    return <PageLayout className="text-sm"><BackButton fallbackHref="/" /><ApiErrorState className="mt-4" error={eventQuery.error} onRetry={() => void eventQuery.refetch()} /></PageLayout>;
   }
   if (eventQuery.isLoading || !event) {
-    return <main className="mx-auto max-w-6xl px-4 py-8 text-sm text-content-secondary">이벤트를 불러오는 중입니다.</main>;
+    return <PageLayout><BackButton fallbackHref="/" /><LoadingState className="mt-4" label="이벤트를 불러오는 중입니다." /></PageLayout>;
   }
 
   const schedule = event.starts_at && event.ends_at
@@ -160,8 +163,9 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
       : "from-black/75 via-black/20";
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-24">
-      <section className="pt-5">
+    <PageLayout className="pt-0">
+      <BackButton fallbackHref="/" className="my-3" />
+      <section>
         <div className="relative h-[320px] overflow-hidden rounded-md bg-surface-subtle md:h-[420px]">
           <SafeImage src={event.image_url} alt={event.title} fill sizes="100vw" className="object-cover" priority />
           <div className={`absolute inset-0 bg-gradient-to-t ${heroTone} to-transparent`} />
@@ -223,7 +227,11 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
           </div>
 
           {productsQuery.isError ? <ApiErrorState error={productsQuery.error} onRetry={() => void productsQuery.refetch()} retryLabel="이벤트 상품 다시 시도" /> : productsQuery.isLoading ? <ProductSkeleton /> : products.length === 0 ? (
-            <p className="rounded-md border border-border-subtle bg-surface-raised p-8 text-center text-sm text-content-secondary">표시할 이벤트 상품이 없습니다.</p>
+            <EmptyState
+              icon={<Package className="size-7" />}
+              title="표시할 이벤트 상품이 없습니다"
+              description="다른 이벤트 상품을 준비하고 있으니 잠시 후 다시 확인해주세요."
+            />
           ) : event.product_display.mode === "MARKET_CAROUSELS" ? (
             <MarketCarousels products={products} />
           ) : (
@@ -232,10 +240,10 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
             </div>
           )}
           <div ref={loadMoreRef} className="h-10" />
-          {productsQuery.isFetchingNextPage ? <p className="text-center text-xs font-bold text-content-secondary">이벤트 상품을 더 불러오는 중입니다.</p> : null}
+          {productsQuery.isFetchingNextPage ? <InlineLoadingState className="mt-3" label="이벤트 상품을 더 불러오는 중입니다." /> : null}
         </section>
       ) : null}
-    </main>
+    </PageLayout>
   );
 }
 
