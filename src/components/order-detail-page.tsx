@@ -21,6 +21,7 @@ import { PageLayout } from "./page-layout";
 import { ReviewWritePanel } from "./review-write-panel";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { BackButton } from "./ui/back-button";
 import { EmptyState, InlineLoadingState, LoadingState, LoginRequiredState } from "./ui/feedback";
 
 const statusSteps = ["PAYMENT_PENDING", "PAID", "PLACED", "SHIPPED", "DELIVERED", "COMPLETED"];
@@ -78,6 +79,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   if (!token) {
     return (
       <PageLayout>
+        <BackButton fallbackHref="/mypage" className="mb-4" />
         <PageHeading icon={<PageIcon />} title="주문 상세" />
         <LoginRequiredState className="mt-6" icon={<PageIcon className="size-7" />} description="주문 상세를 확인하려면 로그인해주세요." loginHref={`/login?next=${encodeURIComponent(`/orders/${orderCode}`)}`} />
       </PageLayout>
@@ -85,11 +87,11 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   }
 
   if (isLoading) {
-    return <PageLayout><LoadingState label="주문 정보를 불러오는 중입니다." /></PageLayout>;
+    return <PageLayout><BackButton fallbackHref="/mypage" /><LoadingState className="mt-4" label="주문 정보를 불러오는 중입니다." /></PageLayout>;
   }
 
   if (error || !order) {
-    return <PageLayout className="text-sm text-action-primary"><ApiErrorState error={error ?? new Error("주문 정보를 찾을 수 없습니다.")} onRetry={() => void refetch()} /></PageLayout>;
+    return <PageLayout className="text-sm text-action-primary"><BackButton fallbackHref="/mypage" /><ApiErrorState className="mt-4" error={error ?? new Error("주문 정보를 찾을 수 없습니다.")} onRetry={() => void refetch()} /></PageLayout>;
   }
 
   const amount = order.total_order_price - order.total_discount_price - order.used_point;
@@ -98,6 +100,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
 
   return (
     <PageLayout>
+      <BackButton fallbackHref="/mypage" className="mb-4" />
       <div className="rounded-surface border border-border-subtle bg-surface-raised p-5 shadow-card">
         <PageHeading icon={<PageIcon />} title="주문 상세" description={`주문 번호 ${order.order_code}`} />
         <p className="mt-1 text-sm text-content-secondary">{order.ordered_at ? new Date(order.ordered_at).toLocaleString("ko-KR") : "-"}</p>
