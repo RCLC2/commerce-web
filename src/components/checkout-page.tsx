@@ -407,7 +407,7 @@ export function CheckoutPage() {
         disabled={checkoutDisabled}
         onClick={() => checkout.mutate()}
       >
-        {checkout.isPending ? "처리 중" : createdOrderCode ? "결제 정보 다시 준비" : "주문 생성 후 결제"}
+        {checkout.isPending ? "처리 중" : createdOrderCode ? "결제 정보 다시 준비" : "결제 진행하기"}
       </Button>
     );
   }
@@ -487,9 +487,9 @@ export function CheckoutPage() {
 
           <Surface padding="sm">
             <h2 className="font-bold">주문 상품</h2>
-            {!createdOrderCode && quote.data && quote.data.product_total !== productTotal ? <Notice className="mt-3" tone="warning">상품 가격이 변경되어 서버가 확인한 현재 가격을 표시합니다.</Notice> : null}
+            {!createdOrderCode && quote.data && quote.data.product_total !== productTotal ? <Notice className="mt-3" tone="warning">상품 가격이 변경되어 현재 판매가를 반영했습니다.</Notice> : null}
             {createdOrderCode ? (
-              <Notice className="mt-3" tone="warning" title="복구한 주문은 현재 장바구니와 별개입니다">아래에는 서버에서 확인한 기존 주문 상품만 표시합니다. 현재 장바구니 변경사항은 이 결제에 포함되지 않습니다.</Notice>
+              <Notice className="mt-3" tone="warning" title="복구한 주문은 현재 장바구니와 별개입니다">아래에는 기존 주문 상품을 표시합니다. 현재 장바구니 변경사항은 이 결제에 포함되지 않습니다.</Notice>
             ) : null}
             <div className="mt-4 space-y-3">
               {displayItems.map((item) => {
@@ -506,13 +506,13 @@ export function CheckoutPage() {
                 );
               })}
               {createdOrderCode && confirmedOrder && displayItems.length === 0 ? (
-                <p className="text-sm text-content-secondary">서버 주문에 표시할 상품 상세가 없습니다. 결제 금액은 서버 확정값을 사용합니다.</p>
+                <p className="text-sm text-content-secondary">상품 상세를 불러오지 못했습니다. 기존 주문의 결제 금액으로 진행합니다.</p>
               ) : null}
             </div>
           </Surface>
 
           <Surface padding="sm">
-            <h2 className="font-bold">할인 요청</h2>
+            <h2 className="font-bold">쿠폰·포인트</h2>
             <Field className="mt-4" label="보유 쿠폰" htmlFor="checkout-coupon" hint="주문 금액과 사용 조건에 맞는 쿠폰을 선택해주세요.">
               <Select
                 id="checkout-coupon"
@@ -534,7 +534,7 @@ export function CheckoutPage() {
                 })}
               </Select>
             </Field>
-            <Field className="mt-4" label="포인트 사용" htmlFor="checkout-point" hint={`요청 ${formatPrice(appliedPoint)} · 최대 사용 ${formatPrice(pointLimit)} · 보유 ${formatPrice(availablePoint)}`}>
+            <Field className="mt-4" label="포인트 사용" htmlFor="checkout-point" hint={`사용 ${formatPrice(appliedPoint)} · 최대 사용 ${formatPrice(pointLimit)} · 보유 ${formatPrice(availablePoint)}`}>
               <Input id="checkout-point" type="number" min={0} max={pointLimit} step={1} disabled={Boolean(createdOrderCode)} value={usedPoint} onChange={(event) => setUsedPoint(normalizeRequestedPoints(Number(event.target.value)))} />
             </Field>
           </Surface>
@@ -542,7 +542,7 @@ export function CheckoutPage() {
 
         <aside className="h-fit md:sticky md:top-24">
           <OrderSummary
-            title={confirmedOrder ? "서버 확정 결제 금액" : "결제 전 금액 확인"}
+            title={confirmedOrder ? "결제 금액" : "결제 금액"}
             items={[
               { label: "상품 금액", value: formatPrice(confirmedOrder?.total_order_price ?? quote.data?.product_total ?? productTotal) },
               { label: "쿠폰 할인", value: formatDeduction(confirmedOrder?.total_discount_price ?? quote.data?.discount_total ?? selectedCouponDiscount), emphasis: (confirmedOrder?.total_discount_price ?? quote.data?.discount_total ?? selectedCouponDiscount) > 0 ? "negative" : "default" },
@@ -552,7 +552,7 @@ export function CheckoutPage() {
             totalLabel="결제 예정 금액"
             total={displayedAmount}
             footer={<>
-              {!createdOrderCode && quote.data && !quote.isFetching ? <p className="mb-3 text-xs leading-5 text-content-secondary">서버가 현재 상품·할인·배송비를 확인한 금액입니다. 주문 생성 시 다시 확인합니다.</p> : null}
+              {!createdOrderCode && quote.data && !quote.isFetching ? <p className="mb-3 text-xs leading-5 text-content-secondary">쿠폰·포인트와 배송비가 반영된 금액입니다.</p> : null}
               {!createdOrderCode && quote.error ? <Notice className="mb-3" tone="error" title="결제 금액을 확인하지 못했습니다"><span>{apiErrorMessage(quote.error)}</span><Button className="mt-2" size="sm" variant="secondary" onClick={() => void quote.refetch()}>금액 다시 확인</Button></Notice> : null}
               {!paymentRequest ? (
                 <div className="hidden md:block">{renderCheckoutButton()}</div>
@@ -565,7 +565,7 @@ export function CheckoutPage() {
                   customerEmail={profile.data?.email}
                 />
               )}
-              {createdOrderCode ? <p className="mt-3 text-xs text-content-secondary">생성된 주문: {createdOrderCode}. 재시도해도 주문은 다시 생성하지 않습니다.</p> : null}
+              {createdOrderCode ? <p className="mt-3 text-xs text-content-secondary">주문번호: {createdOrderCode}. 결제를 다시 시도할 수 있습니다.</p> : null}
               {!createdOrderCode && items.length > 0 && expectedAmount <= 0 ? (
                 <p className="mt-3 text-xs font-bold text-action-primary">최소 결제 금액은 1원입니다. 쿠폰 또는 포인트 사용액을 조정해주세요.</p>
               ) : null}

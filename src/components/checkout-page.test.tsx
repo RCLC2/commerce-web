@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import { useSessionStore } from "@/lib/session-store";
@@ -16,6 +16,7 @@ vi.mock("@/lib/api", () => ({ api: {
   getProduct: vi.fn(), placeOrder: vi.fn(), getOrder: vi.fn(),
   createPaymentRequest: vi.fn(), listAllOrders: vi.fn(),
 } }));
+vi.mock("next/script", () => ({ default: ({ onReady }: { onReady: () => void }) => <button type="button" onClick={onReady}>주소 검색 준비</button> }));
 vi.mock("./toss-payment-widget", () => ({ TossPaymentWidget: () => null }));
 
 const baseProduct: Product = {
@@ -46,7 +47,7 @@ beforeEach(() => {
   vi.mocked(api.quoteOrder).mockResolvedValue({ product_total: 30_000, discount_total: 0, used_point: 0, shipping_fee: 0, payment_amount: 30_000, line_items: [{ cart_item_id: 10, unit_price: 10_000, line_total: 10_000 }, { cart_item_id: 11, unit_price: 20_000, line_total: 20_000 }] });
   vi.mocked(api.getOrder).mockResolvedValue({ id: 1, order_code: "ORDER-1", ordered_at: undefined, total_order_price: 30_000, total_discount_price: 0, used_point: 0, status: "PLACED" });
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 it("shows the product arrival range and submits the chosen shipping address", async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -59,7 +60,7 @@ it("shows the product arrival range and submits the chosen shipping address", as
     shipping_address: { receiver: "다른 주소", phone: "010-2222-2222", zip_code: "22222", line1: "둘째 주소", line2: "2호" },
   })));
   expect(screen.getByText("배송비")).toBeVisible();
-  const submit = screen.getAllByRole("button", { name: "주문 생성 후 결제" })[0];
+  const submit = screen.getAllByRole("button", { name: "결제 진행하기" })[0];
   await waitFor(() => expect(submit).toBeEnabled());
   fireEvent.click(submit);
   await waitFor(() => expect(api.placeOrder).toHaveBeenCalledWith("token", expect.objectContaining({
@@ -67,7 +68,12 @@ it("shows the product arrival range and submits the chosen shipping address", as
   })));
 });
 
-it("lets a customer without an address create one and then shows the server quote", async () => {
+it("searches and registers the first default address, selects it and enables checkout after a server quote", async () => {
+  let selectResult: ((result: { zonecode: string; address: string }) => void) | undefined;
+  vi.stubGlobal("kakao", { Postcode: class {
+    constructor(options: { oncomplete: typeof selectResult }) { selectResult = options.oncomplete; }
+    embed() {}
+  } });
   const address = { id: 3, receiver: "새 고객", phone: "010-3333-3333", zip_code: "33333", line1: "새 주소", line2: "3호", is_default: true };
   let saved = false;
   vi.mocked(api.listAddresses).mockImplementation(async () => saved ? [address] : []);
@@ -78,8 +84,13 @@ it("lets a customer without an address create one and then shows the server quot
   expect(await screen.findByRole("form", { name: "배송지 등록" })).toBeVisible();
   fireEvent.change(screen.getByLabelText(/^받는 분/), { target: { value: "새 고객" } });
   fireEvent.change(screen.getByLabelText(/^연락처/), { target: { value: "010-3333-3333" } });
-  fireEvent.change(screen.getByLabelText(/^우편번호/), { target: { value: "33333" } });
-  fireEvent.change(screen.getByLabelText(/^기본 주소/), { target: { value: "새 주소" } });
+  expect(screen.getAllByRole("button", { name: "결제 진행하기" })[0]).toBeDisabled();
+  expect(api.quoteOrder).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "주소 검색" }));
+  fireEvent.click(screen.getByRole("button", { name: "주소 검색 준비" }));
+  act(() => selectResult?.({ zonecode: "33333", address: "새 주소" }));
+  expect(screen.getByLabelText(/^우편번호/)).toHaveValue("33333");
+  expect(screen.getByLabelText(/^기본 주소/)).toHaveValue("새 주소");
   fireEvent.change(screen.getByLabelText("상세 주소"), { target: { value: "3호" } });
   fireEvent.click(screen.getByRole("button", { name: "배송지 저장하고 사용" }));
 
@@ -87,6 +98,7 @@ it("lets a customer without an address create one and then shows the server quot
   await waitFor(() => expect(api.quoteOrder).toHaveBeenCalledWith("token", expect.objectContaining({ shipping_address: expect.objectContaining({ line1: "새 주소" }) })));
   expect(await screen.findByText("(33333) 새 주소 3호")).toBeVisible();
   expect(screen.getByText("결제 예정 금액")).toBeVisible();
+  await waitFor(() => expect(screen.getAllByRole("button", { name: "결제 진행하기" })[0]).toBeEnabled());
 });
 
 it("shows current server prices when cart prices have changed", async () => {
@@ -94,7 +106,7 @@ it("shows current server prices when cart prices have changed", async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(<QueryClientProvider client={client}><CheckoutPage /></QueryClientProvider>);
 
-  expect(await screen.findByText("상품 가격이 변경되어 서버가 확인한 현재 가격을 표시합니다.")).toBeVisible();
+  expect(await screen.findByText("상품 가격이 변경되어 현재 판매가를 반영했습니다.")).toBeVisible();
   expect(screen.getByText("25,000원")).toBeVisible();
   expect(screen.getAllByText("35,000원").length).toBeGreaterThan(0);
 });
