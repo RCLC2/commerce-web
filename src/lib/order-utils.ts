@@ -30,3 +30,19 @@ export function orderStatusLabel(status: string) {
 export function firstOrderItem(order: OrderResponse) {
   return order.market_orders?.flatMap((marketOrder) => marketOrder.line_items)[0];
 }
+
+
+type OrderPaymentTotals = {
+  total_order_price: number;
+  total_discount_price: number;
+  used_point: number;
+  market_orders?: { shipping_fee?: number }[];
+};
+
+export function orderShippingFee(order: Pick<OrderPaymentTotals, "market_orders">) {
+  return order.market_orders?.reduce((total, marketOrder) => total + (marketOrder.shipping_fee ?? 0), 0) ?? 0;
+}
+
+export function orderPaymentAmount(order: OrderPaymentTotals) {
+  return order.total_order_price - order.total_discount_price - order.used_point + orderShippingFee(order);
+}

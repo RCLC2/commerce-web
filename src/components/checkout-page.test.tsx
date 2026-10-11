@@ -110,3 +110,34 @@ it("shows current server prices when cart prices have changed", async () => {
   expect(screen.getByText("25,000원")).toBeVisible();
   expect(screen.getAllByText("35,000원").length).toBeGreaterThan(0);
 });
+
+function pendingOrderWithAddress() {
+  return {
+    id: 1, order_code: "ORDER-1", ordered_at: undefined, total_order_price: 30_000, total_discount_price: 0, used_point: 0,
+    status: "PAYMENT_PENDING" as const,
+    deliveries: [{id:1,order_id:1,market_id:1,market_order_id:1,status:"PENDING",receiver_name:"주문 수령인",receiver_phone:"01012345678",address:"주문에 저장된 주소"}],
+  };
+}
+
+it("keeps the saved address after a new order is created without showing recovery warnings", async () => {
+  vi.mocked(api.getOrder).mockResolvedValue(pendingOrderWithAddress());
+  vi.mocked(api.createPaymentRequest).mockResolvedValue({client_key:"test",order_id:"ORDER-1",order_name:"주문",amount:30_000});
+  const client = new QueryClient({defaultOptions:{queries:{retry:false}}});
+  render(<QueryClientProvider client={client}><CheckoutPage /></QueryClientProvider>);
+  const submit = (await screen.findAllByRole("button",{name:"결제 진행하기"}))[0];
+  await waitFor(()=>expect(submit).toBeEnabled());
+  fireEvent.click(submit);
+  expect(await screen.findByText("주문에 저장된 주소")).toBeVisible();
+  await waitFor(()=>expect(api.createPaymentRequest).toHaveBeenCalledWith("token","ORDER-1"));
+  expect(screen.queryByText("복구한 주문은 현재 장바구니와 별개입니다")).not.toBeInTheDocument();
+});
+
+it("shows the recovery warning only when restoring a saved order and uses its saved address", async () => {
+  window.sessionStorage.setItem("commerce.checkout.retry",JSON.stringify({memberID:1,orderCode:"ORDER-1"}));
+  vi.mocked(api.getOrder).mockResolvedValue(pendingOrderWithAddress());
+  const client = new QueryClient({defaultOptions:{queries:{retry:false}}});
+  render(<QueryClientProvider client={client}><CheckoutPage /></QueryClientProvider>);
+  expect(await screen.findByText("복구한 주문은 현재 장바구니와 별개입니다")).toBeVisible();
+  expect(await screen.findByText("주문에 저장된 주소")).toBeVisible();
+  expect(api.placeOrder).not.toHaveBeenCalled();
+});

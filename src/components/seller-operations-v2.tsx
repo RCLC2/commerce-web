@@ -1,5 +1,6 @@
 "use client";
 
+import { Notice } from "./ui/notice";
 import { Input, Select } from "./ui/input";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,7 +10,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
 import { sellerConsoleApi } from "@/lib/seller-console-api";
-import { paymentMethodLabel } from "@/lib/display-labels";
+import { paymentMethodLabel, orderPaymentMethodLabel } from "@/lib/display-labels";
 import { formatPrice } from "@/lib/utils";
 import {
   ConsoleHeader,
@@ -212,7 +213,7 @@ export function SellerOrdersPageV2() {
         </FilterPanel>
         <div className="mt-4">
           <ConsoleTable
-            columns={["주문번호", "구매자", "대표 상품", "결제 금액", "정산 예정", "상태", "주문일"]}
+            columns={["주문번호", "구매자", "대표 상품", "최초 결제액", "정산 예정", "상태", "주문일"]}
             loading={ordersQuery.isLoading}
             emptyText={query || status !== "ALL" || from || to ? "검색 조건에 맞는 주문이 없습니다." : "처리할 주문이 없습니다."}
             rows={orders.map((item) => [
@@ -262,22 +263,23 @@ export function SellerOrdersPageV2() {
       >
         {order ? (
           <div className="grid gap-6">
-            {registerInvoice.error || completeDelivery.error ? <p className="rounded-md border border-status-negative/30 bg-status-negative-subtle px-3 py-2 text-sm font-bold text-status-negative" role="alert">{apiErrorMessage(registerInvoice.error ?? completeDelivery.error)}</p> : null}
-            {operationResolution ? <p className="rounded-md bg-status-positive-subtle px-3 py-2 text-sm font-bold text-status-positive" role="status">{operationResolution}</p> : null}
+            {registerInvoice.error || completeDelivery.error ? <Notice tone="error">{apiErrorMessage(registerInvoice.error ?? completeDelivery.error)}</Notice> : null}
+            {operationResolution ? <Notice tone="success">{operationResolution}</Notice> : null}
             <DetailGrid>
               <DetailItem label="구매자">{order.buyer_email}</DetailItem>
               <DetailItem label="주문 상태"><StatusBadge value={order.status} /></DetailItem>
-              <DetailItem label="마켓 결제 금액">{formatPrice(order.market_total_amount)}</DetailItem>
+              <DetailItem label="마켓 최초 결제액">{formatPrice(order.market_total_amount)}</DetailItem>
               <DetailItem label="배송비">{formatPrice(order.shipping_fee)}</DetailItem>
               <DetailItem label="예상 정산">{formatPrice(order.expected_settlement_amount)}</DetailItem>
-              <DetailItem label="결제 수단">{paymentMethodLabel(order.payment_method)}</DetailItem>
+              <DetailItem label="결제 수단">{orderPaymentMethodLabel(order.payment_method, order.payment_details)}</DetailItem>
+              {order.payment_details ? <DetailItem label="결제 대행">{paymentMethodLabel(order.payment_method)}</DetailItem> : null}
               <DetailItem label="주문일">{dateTime(order.created_at)}</DetailItem>
               <DetailItem label="수정일">{dateTime(order.updated_at)}</DetailItem>
             </DetailGrid>
             <section>
               <h3 className="mb-3 font-bold">배송 정보</h3>
-              <div className="grid gap-3 rounded-xl bg-surface-subtle p-4 sm:grid-cols-2">
-                {!shipmentFieldsEditable ? <p className="sm:col-span-2 rounded-md border border-border-subtle bg-surface-raised px-3 py-2 text-xs font-bold text-content-secondary">배송이 시작된 주문은 택배사와 송장번호를 조회만 할 수 있습니다.</p> : null}
+              <div className="grid gap-3 rounded-surface bg-surface-subtle p-4 sm:grid-cols-2">
+                {!shipmentFieldsEditable ? <Notice className="sm:col-span-2">배송이 시작된 주문은 택배사와 송장번호를 조회만 할 수 있습니다.</Notice> : null}
                 <FilterField label="택배사">
                   <Select className={consoleInputClass} value={carrier} onChange={(event) => { setShipmentEditing(true); setOperationResolution(undefined); if (!shippingPending) registerInvoice.reset(); setCarrier(event.target.value); }} disabled={!shipmentFieldsEditable || shippingPending}>
                     <option value="">택배사 선택</option>

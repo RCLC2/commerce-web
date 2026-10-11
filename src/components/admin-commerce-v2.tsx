@@ -7,8 +7,8 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { apiErrorMessage } from "@/lib/api-client";
 import { adminConsoleApi } from "@/lib/admin-console-api";
-import { orderStatusLabel } from "@/lib/order-utils";
-import { paymentMethodLabel, shippingTypeLabel } from "@/lib/display-labels";
+import { orderStatusLabel, orderPaymentAmount, orderShippingFee } from "@/lib/order-utils";
+import { paymentMethodLabel, orderPaymentMethodLabel, shippingTypeLabel } from "@/lib/display-labels";
 import { formatPrice } from "@/lib/utils";
 import { AdminAuthRequired, adminLinks, useAdminToken } from "./admin-console";
 import {
@@ -34,6 +34,10 @@ import {
 } from "./console-ui";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { Notice } from "./ui/notice";
+import { OrderSummary } from "./ui/order-summary";
+import { OrderRefundSummary } from "./order-refund-summary";
+import { OrderRefundControls } from "./order-refund-controls";
 
 function filterValue(value: string) {
   return value === "ALL" ? undefined : value;
@@ -341,13 +345,13 @@ export function AdminOrdersPageV2() {
         </FilterPanel>
         <div className="mt-4">
           <ConsoleTable
-            columns={["주문번호", "구매자", "결제 금액", "마켓 / 상품", "상태", "주문일"]}
+            columns={["주문번호", "구매자", "최초 결제액", "마켓 / 상품", "상태", "주문일"]}
             loading={ordersQuery.isLoading}
             emptyText={query || status !== "ALL" || marketID || from || to ? "검색 조건에 맞는 주문이 없습니다." : "등록된 주문이 없습니다."}
             rows={orders.map((order) => [
               <span key="code" className="font-bold">{order.order_code}</span>,
               <span key="buyer" className="break-all">{order.buyer_email}</span>,
-              formatPrice(order.total_order_price - order.discount_amount),
+              formatPrice(order.payment_amount ?? order.total_order_price - order.discount_amount),
               `${order.market_count}개 마켓 / ${order.item_count}개 상품`,
               <StatusBadge key="status" value={order.status} />,
               dateTime(order.created_at),
@@ -373,7 +377,7 @@ export function AdminOrdersPageV2() {
           setSelectedCode(undefined);
         }}
         footer={
-          orderQuery.data && !["CANCELLED", "COMPLETED"].includes(orderQuery.data.status) ? (
+          orderQuery.data && ["PAYMENT_PENDING", "PAID", "PLACED"].includes(orderQuery.data.status) ? (
             <Button type="button" variant="danger" disabled={cancelMutation.isPending} onClick={() => confirmation.ask({ title: "주문 취소", message: `주문 ${selectedCode}을 취소하면 되돌릴 수 없습니다. 계속할까요?`, confirmLabel: "주문 취소", danger: true }, () => cancelMutation.mutate())}>
               주문 취소
             </Button>
@@ -382,18 +386,29 @@ export function AdminOrdersPageV2() {
       >
         {orderQuery.data ? (
           <div className="grid gap-6">
-            {cancelMutation.error ? <p className="rounded-md border border-status-negative/30 bg-status-negative-subtle px-3 py-2 text-sm font-bold text-status-negative" role="alert">{apiErrorMessage(cancelMutation.error)}</p> : null}
-            {cancelResolution ? <p className="rounded-md bg-status-positive-subtle px-3 py-2 text-sm font-bold text-status-positive" role="status">{cancelResolution}</p> : null}
+            {cancelMutation.error ? <Notice tone="error">{apiErrorMessage(cancelMutation.error)}</Notice> : null}
+            {cancelResolution ? <Notice tone="success">{cancelResolution}</Notice> : null}
+            {["SHIPPED", "DELIVERED", "COMPLETED", "RETURN_REQUESTED", "RETURN_APPROVED", "RETURN_REJECTED"].includes(orderQuery.data.status) ? <OrderRefundControls key={orderQuery.data.order_code} token={token} orderCode={orderQuery.data.order_code} /> : null}
+            {orderQuery.data.refund ? <OrderRefundSummary refund={orderQuery.data.refund} revealOnMount /> : null}
             <DetailGrid>
               <DetailItem label="구매자">{orderQuery.data.buyer.email}</DetailItem>
               <DetailItem label="주문 상태"><StatusBadge value={orderQuery.data.status} /></DetailItem>
-              <DetailItem label="주문 금액">{formatPrice(orderQuery.data.total_order_price)}</DetailItem>
-              <DetailItem label="총 할인">{formatPrice(orderQuery.data.total_discount_price)}</DetailItem>
-              <DetailItem label="사용 포인트">{formatPrice(orderQuery.data.used_point)}</DetailItem>
-              <DetailItem label="결제 수단">{paymentMethodLabel(orderQuery.data.payment_method)}</DetailItem>
+              <DetailItem label="결제 수단">{orderPaymentMethodLabel(orderQuery.data.payment_method, orderQuery.data.payment_details)}</DetailItem>
+              {orderQuery.data.payment_details ? <DetailItem label="결제 대행">{paymentMethodLabel(orderQuery.data.payment_method)}</DetailItem> : null}
               <DetailItem label="주문일">{dateTime(orderQuery.data.created_at)}</DetailItem>
               <DetailItem label="수정일">{dateTime(orderQuery.data.updated_at)}</DetailItem>
             </DetailGrid>
+            <OrderSummary
+              title="최초 결제 내역"
+              items={[
+                { label: "상품 금액", value: formatPrice(orderQuery.data.total_order_price) },
+                { label: "쿠폰 할인", value: formatPrice(-orderQuery.data.total_discount_price) },
+                { label: "사용 포인트", value: `${(-orderQuery.data.used_point).toLocaleString()}P` },
+                { label: "배송비", value: formatPrice(orderShippingFee(orderQuery.data)) },
+              ]}
+              totalLabel="최초 결제액"
+              total={formatPrice(orderPaymentAmount(orderQuery.data))}
+            />
             {orderQuery.data.delivery ? (
               <section>
                 <h3 className="mb-3 font-bold">배송 정보</h3>
@@ -408,7 +423,7 @@ export function AdminOrdersPageV2() {
               </section>
             ) : null}
             {orderQuery.data.market_orders.map((marketOrder) => (
-              <section key={marketOrder.id} className="rounded-xl border border-border-subtle p-4">
+              <section key={marketOrder.id} className="rounded-surface border border-border-subtle bg-surface-raised p-4">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="font-bold">{marketOrder.market_name}</h3>

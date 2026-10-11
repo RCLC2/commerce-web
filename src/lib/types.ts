@@ -142,6 +142,7 @@ export type Product = {
   delivery_type?: string;
   delivery_label?: string;
   delivery?: {
+    shipping_fee?: number;
     expected_ship_date: string;
     expected_arrival_date: string;
     expected_arrival_label: string;
@@ -427,11 +428,14 @@ export type OrderResponse = {
   used_point: number;
   used_coupon_id?: number;
   payment_method?: string;
+  payment_details?: {method: string; easy_pay_provider?: string};
   payment_key?: string;
-  status: "PAYMENT_PENDING" | "PAID" | "PLACED" | "SHIPPED" | "DELIVERED" | "COMPLETED" | "CANCELLED";
+  status: "PAYMENT_PENDING" | "PAID" | "PLACED" | "SHIPPED" | "DELIVERED" | "COMPLETED" | "CANCELLED" | "RETURN_REQUESTED" | "RETURN_APPROVED" | "RETURN_REJECTED" | "RETURN_COMPLETED";
   ordered_at?: string;
   market_orders?: MarketOrderResponse[];
   delivery?: Delivery;
+  deliveries?: (Delivery & {market_id: number; market_order_id: number})[];
+  refund?: {reason: "CHANGE_OF_MIND" | "SELLER_FAULT"; cash_refund_amount: number; retained_shipping_fee: number; restored_point: number; coupon_status: "NOT_USED" | "RESTORED" | "EXPIRED"; completed_at: string};
 };
 
 export type PaymentRequest = {

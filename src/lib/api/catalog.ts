@@ -25,6 +25,7 @@ const productDetailSchema = z.object({
   delivery_type: z.string().optional(),
   delivery_label: z.string().optional(),
   delivery: z.object({
+    shipping_fee: z.number().int().nonnegative().optional(),
     expected_ship_date: z.string(),
     expected_arrival_date: z.string(),
     expected_arrival_label: z.string(),

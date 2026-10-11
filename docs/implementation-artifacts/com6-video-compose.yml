@@ -1,0 +1,48 @@
+services:
+  api:
+    image: commerce-com6-backend:local
+    container_name: commerce-com6-api
+    ports: ["127.0.0.1:18083:8080"]
+    environment: &backend-environment
+      APP_ENV: development
+      DATABASE_URL: commerce:commerce@tcp(commerce-com6-mysql:3306)/commerce?charset=utf8mb4&parseTime=true&loc=UTC&multiStatements=true
+      TEMPORAL_HOST_PORT: commerce-com6-temporal:7233
+      HTTP_ADDR: :8080
+      JWT_SECRET: com6-local-integration-test-secret
+      CORS_ALLOWED_ORIGINS: http://127.0.0.1:13000
+      TOSS_PAYMENTS_SECRET_KEY: test_gsk_com6local
+      TOSS_PAYMENTS_CLIENT_KEY: test_gck_com6local
+      AWS_EC2_METADATA_DISABLED: "true"
+      S3_BUCKET: com6-e2e
+      IMGPROXY_BASE_URL: http://127.0.0.1:18082
+      IMGPROXY_KEY: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+      IMGPROXY_SALT: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  worker:
+    image: commerce-com6-backend:local
+    container_name: commerce-com6-worker
+    command: ["/app/worker"]
+    environment:
+      <<: *backend-environment
+      WORKER_ROLE: transaction
+  web:
+    image: commerce-com6-web:local
+    container_name: commerce-com6-web
+    ports: ["127.0.0.1:13000:3000"]
+    environment:
+      BACKEND_API_BASE_URL: http://commerce-com6-api:8080
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+networks:
+  default:
+    external: true
+    name: commerce-com6-video

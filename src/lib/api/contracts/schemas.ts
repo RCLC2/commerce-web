@@ -259,6 +259,10 @@ export const orderStatusSchema = z.enum([
   "DELIVERED",
   "COMPLETED",
   "CANCELLED",
+  "RETURN_REQUESTED",
+  "RETURN_APPROVED",
+  "RETURN_REJECTED",
+  "RETURN_COMPLETED",
 ]);
 
 export const orderLineSchema = z.object({
@@ -283,6 +287,9 @@ export const marketOrderSchema = z.object({
   line_items: z.array(orderLineSchema).default([]),
 });
 
+export const orderPaymentDetailsSchema = z.object({method: z.string(), easy_pay_provider: z.string().optional()});
+export const orderRefundSchema = z.object({reason: z.enum(["CHANGE_OF_MIND", "SELLER_FAULT"]), cash_refund_amount: nonNegativeIntSchema, retained_shipping_fee: nonNegativeIntSchema, restored_point: nonNegativeIntSchema, coupon_status: z.enum(["NOT_USED", "RESTORED", "EXPIRED"]), completed_at: dateStringSchema});
+
 export const orderSchema = z.object({
   id: identifierSchema,
   order_code: z.string().min(1),
@@ -292,12 +299,15 @@ export const orderSchema = z.object({
   used_point: nonNegativeIntSchema,
   used_coupon_id: identifierSchema.optional(),
   payment_method: z.string().optional(),
+  payment_details: orderPaymentDetailsSchema.optional(),
   payment_key: z.string().optional(),
   status: orderStatusSchema,
   ordered_at: dateStringSchema.optional(),
   CreatedAt: dateStringSchema.optional(),
   market_orders: z.array(marketOrderSchema).optional(),
   delivery: deliverySchema.optional(),
+  deliveries: z.array(deliverySchema.extend({market_id: z.number().int().nonnegative(), market_order_id: z.number().int().nonnegative()})).optional(),
+  refund: orderRefundSchema.optional(),
 }).transform(({ CreatedAt, ...order }) => ({ ...order, ordered_at: order.ordered_at ?? CreatedAt }));
 
 export const couponDefinitionSchema = z.object({

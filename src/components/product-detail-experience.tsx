@@ -440,7 +440,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
               <dl className="space-y-2">
                 <div className="flex gap-4">
                   <dt className="w-14 shrink-0 font-bold text-content-secondary">배송비</dt>
-                  <dd className="font-bold">{product.shipping_type === "FREE" ? "무료배송" : "주문서에서 확인"}</dd>
+                  <dd className="font-bold">{product.delivery?.shipping_fee !== undefined ? product.delivery.shipping_fee === 0 ? "무료배송" : formatPrice(product.delivery.shipping_fee) : "주문서에서 확인"}</dd>
                 </div>
                 {product.delivery_label ? (
                   <div className="flex gap-4">

@@ -90,3 +90,14 @@ it("uses the authenticated cart, address, and order quote routes", async () => {
   expect(address.id).toBe(7);
   expect(quote).toMatchObject({ shipping_fee: 0, payment_amount: 64000 });
 });
+
+
+it("keeps full-return orders and their persisted shipping fees readable", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+    id: 1, order_code: "RETURN-1", total_order_price: 5000, total_discount_price: 1000, used_point: 1000, status: "RETURN_COMPLETED",
+    market_orders: [{ id: 1, market_id: 7, shipping_fee: 3000, status: "RETURN_COMPLETED", expected_settlement_amount: 0, line_items: [] }],
+  }), { status: 200 })));
+  const order = await customerApi.getOrder("token", "RETURN-1");
+  expect(order.status).toBe("RETURN_COMPLETED");
+  expect(order.market_orders?.[0].shipping_fee).toBe(3000);
+});

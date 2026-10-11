@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { orderPaymentDetailsSchema } from "./api/contracts/schemas";
 import { requestParsed, requestVoid } from "./api-client";
 import { pageSchema, withQuery } from "./console-contracts";
 
@@ -112,6 +113,7 @@ const sellerOrderLineSchema = z.object({
   status: z.string(),
 });
 export const sellerOrderDetailSchema = z.object({
+  payment_details: orderPaymentDetailsSchema.optional(),
   market_order_id: z.number().int().positive(),
   order_id: z.number().int().positive(),
   order_code: z.string(),
