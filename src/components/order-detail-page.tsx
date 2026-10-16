@@ -24,6 +24,7 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Notice } from "./ui/notice";
 import { OrderStatus } from "./ui/order-status";
+import { OrderCashReceipts } from "./order-cash-receipts";
 import { OrderRefundSummary } from "./order-refund-summary";
 import { OrderSummary } from "./ui/order-summary";
 import { Surface } from "./ui/surface";
@@ -123,6 +124,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
           <InfoBox label="최초 결제액" value={formatPrice(amount)} />
         </div>
         {order.payment_details && order.payment_method ? <p className="mt-3 text-xs text-content-secondary">결제 대행: {paymentMethodLabel(order.payment_method)}</p> : null}
+        <OrderCashReceipts memberID={memberID ?? undefined} token={effectiveToken} orderCode={orderCode} method={order.payment_details?.method} />
         <OrderProgress status={order.status} />
       </Surface>
 

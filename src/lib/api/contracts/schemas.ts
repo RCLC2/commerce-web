@@ -288,7 +288,7 @@ export const marketOrderSchema = z.object({
 });
 
 export const orderPaymentDetailsSchema = z.object({method: z.string(), easy_pay_provider: z.string().optional()});
-export const orderRefundSchema = z.object({reason: z.enum(["CHANGE_OF_MIND", "SELLER_FAULT"]), cash_refund_amount: nonNegativeIntSchema, retained_shipping_fee: nonNegativeIntSchema, restored_point: nonNegativeIntSchema, coupon_status: z.enum(["NOT_USED", "RESTORED", "EXPIRED"]), completed_at: dateStringSchema});
+export const orderRefundSchema = z.object({bank_refund: z.boolean().optional(), reason: z.enum(["CHANGE_OF_MIND", "SELLER_FAULT"]), cash_refund_amount: nonNegativeIntSchema, retained_shipping_fee: nonNegativeIntSchema, restored_point: nonNegativeIntSchema, coupon_status: z.enum(["NOT_USED", "RESTORED", "EXPIRED"]), completed_at: dateStringSchema});
 
 export const orderSchema = z.object({
   id: identifierSchema,

@@ -435,7 +435,7 @@ export type OrderResponse = {
   market_orders?: MarketOrderResponse[];
   delivery?: Delivery;
   deliveries?: (Delivery & {market_id: number; market_order_id: number})[];
-  refund?: {reason: "CHANGE_OF_MIND" | "SELLER_FAULT"; cash_refund_amount: number; retained_shipping_fee: number; restored_point: number; coupon_status: "NOT_USED" | "RESTORED" | "EXPIRED"; completed_at: string};
+  refund?: {bank_refund?: boolean; reason: "CHANGE_OF_MIND" | "SELLER_FAULT"; cash_refund_amount: number; retained_shipping_fee: number; restored_point: number; coupon_status: "NOT_USED" | "RESTORED" | "EXPIRED"; completed_at: string};
 };
 
 export type PaymentRequest = {
@@ -610,6 +610,9 @@ export type InventorySyncLog = {
 };
 
 export type Settlement = {
+  refund_deduction_amount?: number;
+  payable_amount?: number;
+  outstanding_refund_amount?: number;
   id: number;
   market_id: number;
   market_name: string;

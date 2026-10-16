@@ -203,6 +203,9 @@ export const adminOrderDetailSchema = z.object({
 });
 
 export const adminSettlementListItemSchema = z.object({
+  refund_deduction_amount: z.number().int().nonnegative().optional(),
+  payable_amount: z.number().int().nonnegative().optional(),
+  outstanding_refund_amount: z.number().int().nonnegative().optional(),
   id: z.number().int().positive(),
   market_id: z.number().int().positive(),
   market_name: z.string(),
@@ -232,6 +235,9 @@ const settlementLineSchema = z.object({
   purchase_confirmed_at: dateSchema,
 });
 export const adminSettlementDetailSchema = z.object({
+  refund_deduction_amount: z.number().int().nonnegative().optional(),
+  payable_amount: z.number().int().nonnegative().optional(),
+  outstanding_refund_amount: z.number().int().nonnegative().optional(),
   id: z.number().int().positive(),
   market_id: z.number().int().positive(),
   market_name: z.string(),

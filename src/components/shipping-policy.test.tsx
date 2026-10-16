@@ -5,7 +5,7 @@ import { shippingPolicyApi } from "@/lib/shipping-policy-api";
 import { MarketShippingSettings } from "./market-shipping-settings";
 import { OrderRefundSummary } from "./order-refund-summary";
 import { OrderRefundControls } from "./order-refund-controls";
-vi.mock("@/lib/shipping-policy-api", () => ({shippingPolicyApi:{settings:vi.fn(),update:vi.fn(),refundQuote:vi.fn(),refund:vi.fn(),withdrawRefund:vi.fn()}}));
+vi.mock("@/lib/shipping-policy-api", async (importOriginal) => ({...await importOriginal<typeof import("@/lib/shipping-policy-api")>(),shippingPolicyApi:{settings:vi.fn(),update:vi.fn(),refundQuote:vi.fn(),refund:vi.fn(),withdrawRefund:vi.fn()}}));
 function wrapper({children}:{children:React.ReactNode}) { return <QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}>{children}</QueryClientProvider>; }
 beforeEach(()=>{cleanup();vi.clearAllMocks();});
 describe("shipping policy screens",()=>{
@@ -106,9 +106,56 @@ it("polls an ambiguous refund until local completion and refreshes the parent or
  await waitFor(()=>{
   expect(invalidate).toHaveBeenCalledWith({queryKey:["admin-orders-v2"]});
   expect(invalidate).toHaveBeenCalledWith({queryKey:["admin-order-v2","ORD-poll"]});
+  expect(invalidate).toHaveBeenCalledWith({queryKey:["admin-settlements-v2"]});
+  expect(invalidate).toHaveBeenCalledWith({queryKey:["admin-settlement-v2"]});
  });
  expect(screen.getByRole("button",{name:"전체 환불 확정"})).toBeDisabled();
  await new Promise(resolve=>setTimeout(resolve,2200));
  expect(shippingPolicyApi.refundQuote).toHaveBeenCalledTimes(3);
  view.unmount();client.clear();
 },10000);
+
+it("requires a virtual-account refund destination and sends it after confirmation", async () => {
+ vi.mocked(shippingPolicyApi.refundQuote).mockResolvedValue({cash_refund_amount:7000,retained_shipping_fee:0,restored_point:0,reason:"CHANGE_OF_MIND",requires_refund_account:true});
+ vi.mocked(shippingPolicyApi.refund).mockResolvedValue({cash_refund_amount:7000,retained_shipping_fee:0,restored_point:0,reason:"CHANGE_OF_MIND",completed:true,bank_refund:true});
+ render(<OrderRefundControls token="admin" orderCode="ORD-virtual"/>,{wrapper});
+ await screen.findByLabelText("은행");
+ fireEvent.click(screen.getByRole("checkbox"));
+ expect(screen.getByRole("button",{name:"전체 환불 확정"})).toBeDisabled();
+ fireEvent.change(screen.getByLabelText("은행"),{target:{value:"90"}});
+ fireEvent.change(screen.getByLabelText("계좌번호"),{target:{value:"123-456-7890"}});
+ fireEvent.change(screen.getByLabelText("예금주"),{target:{value:"테스트"}});
+ fireEvent.click(screen.getByRole("button",{name:"전체 환불 확정"}));
+ const dialog=screen.getByRole("dialog",{name:"전체 상품 환불"});
+ expect(within(dialog).getByText(/끝자리 7890/)).toBeInTheDocument();
+ fireEvent.click(within(dialog).getByRole("button",{name:"환불 확정"}));
+ await waitFor(()=>expect(shippingPolicyApi.refund).toHaveBeenCalledWith("admin","ORD-virtual","CHANGE_OF_MIND",{bank:"90",accountNumber:"1234567890",holderName:"테스트"}));
+ expect(await screen.findByText(/전체 상품의 결제 취소가 접수되었습니다/)).toBeInTheDocument();
+});
+
+it("allows updating the virtual-account destination and retrying after a provider rejection", async () => {
+ const { ApiHttpError } = await import("@/lib/api-client");
+ vi.mocked(shippingPolicyApi.refundQuote)
+  .mockResolvedValueOnce({cash_refund_amount:7000,retained_shipping_fee:0,restored_point:0,reason:"CHANGE_OF_MIND",requires_refund_account:true})
+  .mockResolvedValue({cash_refund_amount:7000,retained_shipping_fee:0,restored_point:0,reason:"CHANGE_OF_MIND",requires_refund_account:true,operation_status:"FAILED"});
+ vi.mocked(shippingPolicyApi.refund)
+  .mockRejectedValueOnce(new ApiHttpError("결제사가 환불 요청을 거절했습니다.",409,undefined,"ORDER_REFUND_REJECTED"))
+  .mockResolvedValueOnce({cash_refund_amount:7000,retained_shipping_fee:0,restored_point:0,reason:"CHANGE_OF_MIND",completed:true,bank_refund:true});
+ render(<OrderRefundControls token="admin" orderCode="ORD-virtual-retry"/>,{wrapper});
+ await screen.findByLabelText("은행");
+ fireEvent.click(screen.getByRole("checkbox"));
+ fireEvent.change(screen.getByLabelText("은행"),{target:{value:"90"}});
+ fireEvent.change(screen.getByLabelText("계좌번호"),{target:{value:"1234567890"}});
+ fireEvent.change(screen.getByLabelText("예금주"),{target:{value:"테스트"}});
+ fireEvent.click(screen.getByRole("button",{name:"전체 환불 확정"}));
+ fireEvent.click(within(screen.getByRole("dialog",{name:"전체 상품 환불"})).getByRole("button",{name:"환불 확정"}));
+ expect(await screen.findByText("환불 요청 확인이 필요합니다")).toBeInTheDocument();
+ expect(screen.queryByText("환불을 처리하지 못했습니다")).not.toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText("계좌번호"),{target:{value:"9876543210"}});
+ fireEvent.click(screen.getByRole("button",{name:"전체 환불 확정"}));
+ const retryDialog = screen.getByRole("dialog",{name:"전체 상품 환불"});
+ expect(within(retryDialog).getByText(/끝자리 3210/)).toBeInTheDocument();
+ fireEvent.click(within(retryDialog).getByRole("button",{name:"환불 확정"}));
+ await waitFor(()=>expect(shippingPolicyApi.refund).toHaveBeenLastCalledWith("admin","ORD-virtual-retry","CHANGE_OF_MIND",{bank:"90",accountNumber:"9876543210",holderName:"테스트"}));
+ expect(await screen.findByText(/전체 상품의 결제 취소가 접수되었습니다/)).toBeInTheDocument();
+});

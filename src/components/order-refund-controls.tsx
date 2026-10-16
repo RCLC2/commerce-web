@@ -2,12 +2,12 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { shippingPolicyApi, type RefundReason } from "@/lib/shipping-policy-api";
+import { shippingPolicyApi, refundReceiveAccountSchema, type RefundReason } from "@/lib/shipping-policy-api";
 import { ApiError, apiErrorMessage } from "@/lib/api-client";
 import { formatPrice } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { Field } from "./ui/field";
-import { Select } from "./ui/input";
+import { Input, Select } from "./ui/input";
 import { Notice } from "./ui/notice";
 import { OrderSummary } from "./ui/order-summary";
 import { Surface } from "./ui/surface";
@@ -16,6 +16,10 @@ import { Dialog } from "./ui/overlay";
 
 export function OrderRefundControls({ token, orderCode }: { token: string; orderCode: string }) {
   const reasonID = useId();
+ const bankID = useId();
+ const accountID = useId();
+ const holderID = useId();
+ const [refundAccount, setRefundAccount] = useState({ bank: "", accountNumber: "", holderName: "" });
   const [reason, setReason] = useState<RefundReason>("CHANGE_OF_MIND");
   const [received, setReceived] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -37,10 +41,12 @@ export function OrderRefundControls({ token, orderCode }: { token: string; order
     void Promise.all([
       queryClient.invalidateQueries({ queryKey: ["admin-orders-v2"] }),
       queryClient.invalidateQueries({ queryKey: ["admin-order-v2", orderCode] }),
+      queryClient.invalidateQueries({ queryKey: ["admin-settlements-v2"] }),
+      queryClient.invalidateQueries({ queryKey: ["admin-settlement-v2"] }),
     ]);
   }, [completed, orderCode, queryClient]);
   const refund = useMutation({
-    mutationFn: () => shippingPolicyApi.refund(token, orderCode, reason),
+    mutationFn: () => quote.data?.requires_refund_account ? shippingPolicyApi.refund(token, orderCode, reason, refundAccount) : shippingPolicyApi.refund(token, orderCode, reason),
     onError: async () => {
       await quote.refetch();
     },
@@ -48,6 +54,8 @@ export function OrderRefundControls({ token, orderCode }: { token: string; order
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-orders-v2"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-order-v2", orderCode] }),
+      queryClient.invalidateQueries({ queryKey: ["admin-settlements-v2"] }),
+      queryClient.invalidateQueries({ queryKey: ["admin-settlement-v2"] }),
       ]);
     },
   });
@@ -60,12 +68,13 @@ export function OrderRefundControls({ token, orderCode }: { token: string; order
   const withdrawn = withdraw.isSuccess || quote.data?.withdrawn === true;
   const rejected = quote.data?.operation_status === "FAILED" || (refund.error instanceof ApiError && refund.error.code === "ORDER_REFUND_REJECTED");
   const processing = !completed && !withdrawn && Boolean(quote.data?.operation_status && ["PENDING", "RUNNING", "UNKNOWN", "SUCCEEDED"].includes(quote.data.operation_status));
-  const refundReady = received && quote.data && !quote.isFetching && !quote.isError && !refund.isPending && !refund.isSuccess && !withdraw.isPending && !withdrawn && !completed && !processing;
+  const accountValid = !quote.data?.requires_refund_account || refundReceiveAccountSchema.safeParse(refundAccount).success;
+  const refundReady = accountValid && received && quote.data && !quote.isFetching && !quote.isError && !refund.isPending && !refund.isSuccess && !withdraw.isPending && !withdrawn && !completed && !processing;
 
   return (
     <section aria-label="전체 상품 환불" className="grid gap-5">
       <h3 className="text-lg font-bold text-content-primary">전체 상품 환불</h3>
-      <Notice tone="warning" title="환불 가능 주문을 확인해주세요">정산 확정 전 주문만 환불할 수 있습니다. 확정·지급된 정산이 포함된 주문은 처리할 수 없습니다.</Notice>
+      <Notice tone="info" title="환불 후 정산 처리">확정·지급된 정산이 있어도 전체 상품을 환불할 수 있습니다. 셀러 회수액은 지급 예정 정산에서 차감하고, 부족한 금액은 다음 정산으로 이월합니다.</Notice>
       <Field label="환불 사유" htmlFor={reasonID}>
         <Select
           id={reasonID}
@@ -93,13 +102,27 @@ export function OrderRefundControls({ token, orderCode }: { token: string; order
           footer={<p className="text-xs leading-5 text-content-secondary">쿠폰은 기존 복원·만료 정책을 적용합니다. 별도 회수비는 청구하지 않습니다.</p>}
         />
       ) : quote.isError ? null : <InlineLoadingState label="환불 금액을 확인하는 중입니다." />}
+      {quote.data?.requires_refund_account ? (
+        <fieldset disabled={processing || completed || refund.isPending} className="grid gap-3 rounded-xl border border-border-subtle p-4">
+          <legend className="px-1 text-sm font-bold">구매자 환불 계좌</legend>
+          <Field label="은행" htmlFor={bankID}>
+            <Select id={bankID} value={refundAccount.bank} onChange={(event) => { refund.reset(); setRefundAccount({ ...refundAccount, bank: event.target.value }); }}>
+              <option value="">은행 선택</option>
+              {[ ["02","산업"],["03","기업"],["04","국민"],["07","수협"],["11","농협"],["12","지역농축협"],["20","우리"],["23","SC제일"],["27","씨티"],["31","대구(iM)"],["32","부산"],["34","광주"],["35","제주"],["37","전북"],["39","경남"],["45","새마을"],["48","신협"],["50","저축은행"],["64","산림조합"],["71","우체국"],["81","하나"],["88","신한"],["89","케이뱅크"],["90","카카오뱅크"],["92","토스뱅크"] ].map(([code,name]) => <option key={code} value={code}>{name}</option>)}
+            </Select>
+          </Field>
+          <Field label="계좌번호" htmlFor={accountID}><Input id={accountID} inputMode="numeric" autoComplete="off" maxLength={20} value={refundAccount.accountNumber} onChange={(event) => { refund.reset(); setRefundAccount({ ...refundAccount, accountNumber: event.target.value.replace(/[^0-9]/g, "") }); }} /></Field>
+          <Field label="예금주" htmlFor={holderID}><Input id={holderID} autoComplete="off" maxLength={60} value={refundAccount.holderName} onChange={(event) => { refund.reset(); setRefundAccount({ ...refundAccount, holderName: event.target.value }); }} /></Field>
+          <p className="text-xs leading-5 text-content-secondary">구매자가 제공한 환불 계좌를 입력해주세요. 계좌 환불은 결제 취소 접수 후 약 2일이 걸릴 수 있습니다.</p>
+        </fieldset>
+      ) : null}
       <Surface tone="subtle" padding="sm">
         <label className="flex cursor-pointer items-start gap-3 text-sm leading-6 text-content-primary">
         <input className="mt-1 size-4 shrink-0 accent-action-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action-primary" type="checkbox" checked={received} disabled={refund.isPending || refund.isSuccess || withdraw.isPending || withdrawn || completed || processing} onChange={(event) => setReceived(event.target.checked)} />
         전체 반품 상품의 회수를 확인했습니다.
         </label>
       </Surface>
-      {!withdrawn && !completed && !processing && (quote.isError || refund.isError) ? <Notice tone="error" title="환불을 처리하지 못했습니다">{apiErrorMessage(refund.error ?? quote.error)}{quote.isError ? <Button className="mt-3" size="sm" variant="secondary" onClick={() => void quote.refetch()}>환불 금액 다시 확인</Button> : null}</Notice> : null}
+      {!withdrawn && !completed && !processing && (quote.isError || (refund.isError && !rejected)) ? <Notice tone="error" title="환불을 처리하지 못했습니다">{apiErrorMessage(refund.error ?? quote.error)}{quote.isError ? <Button className="mt-3" size="sm" variant="secondary" onClick={() => void quote.refetch()}>환불 금액 다시 확인</Button> : null}</Notice> : null}
       {processing ? <Notice tone="info" title="환불 처리 상태를 확인하고 있습니다">결제사 처리와 내부 기록이 모두 완료될 때까지 확인합니다. 이 화면에서 완료 결과를 자동으로 갱신합니다.</Notice> : null}
       {rejected && !withdrawn && !completed ? (
         <Notice tone="warning" title="환불 요청 확인이 필요합니다">
@@ -109,7 +132,7 @@ export function OrderRefundControls({ token, orderCode }: { token: string; order
       ) : null}
       {withdraw.isError ? <Notice tone="error" title="환불 요청을 철회하지 못했습니다">{apiErrorMessage(withdraw.error)}</Notice> : null}
       {withdrawn ? <Notice tone="success">환불 요청을 철회했습니다. 정산 차단이 해제되며, 환불이나 혜택 복원은 실행하지 않습니다.</Notice> : null}
-      {refund.isSuccess || completed ? <Notice tone="success">전체 상품 환불을 완료했습니다.</Notice> : null}
+      {refund.isSuccess || completed ? <Notice tone="success">{(quote.data?.bank_refund || quote.data?.requires_refund_account) ? "전체 상품의 결제 취소가 접수되었습니다. 가상계좌의 실제 환불 입금까지 약 2일이 걸릴 수 있습니다." : "전체 상품 환불을 완료했습니다."}</Notice> : null}
       <Button
         type="button"
         className="w-full sm:w-auto sm:justify-self-end"
@@ -138,6 +161,7 @@ export function OrderRefundControls({ token, orderCode }: { token: string; order
           <div className="flex justify-between gap-4"><dt className="text-content-secondary">복원 포인트</dt><dd className="shrink-0 font-bold tabular-nums">{(quote.data?.restored_point ?? 0).toLocaleString()}P</dd></div>
           <div className="flex items-center justify-between gap-4 border-t border-border-subtle pt-3"><dt className="font-bold">현금 환불액</dt><dd className="shrink-0 text-xl font-bold tabular-nums">{formatPrice(quote.data?.cash_refund_amount ?? 0)}</dd></div>
         </dl>
+        {quote.data?.requires_refund_account ? <p className="mt-4 text-sm">환불 계좌: {refundAccount.holderName} · 끝자리 {refundAccount.accountNumber.slice(-4)}</p> : null}
         <p className="mt-4 text-xs leading-5 text-content-secondary">전체 상품의 회수가 확인된 주문입니다. 쿠폰은 기존 복원·만료 정책을 적용하며, 별도 회수비는 청구하지 않습니다.</p>
         <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button type="button" variant="secondary" onClick={() => setConfirmOpen(false)}>취소</Button>

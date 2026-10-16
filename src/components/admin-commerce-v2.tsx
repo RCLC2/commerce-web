@@ -541,7 +541,7 @@ export function AdminSettlementsPageV2() {
         </FilterPanel>
         <div className="mt-4">
           <ConsoleTable
-            columns={["마켓", "정산월", "매출", "수수료", "최종 정산", "상태"]}
+            columns={["마켓", "정산월", "매출", "수수료", "지급액", "상태"]}
             loading={settlementsQuery.isLoading}
             emptyText={query || status !== "ALL" || targetMonth || marketID ? "검색 조건에 맞는 정산이 없습니다." : "등록된 정산이 없습니다."}
             rows={settlements.map((settlement) => [
@@ -552,7 +552,10 @@ export function AdminSettlementsPageV2() {
               settlement.target_month,
               formatPrice(settlement.total_sales_amount),
               formatPrice(settlement.commission_amount),
-              <span key="amount" className="font-bold">{formatPrice(settlement.final_settlement_amount)}</span>,
+              <div key="amount">
+                <p className="font-bold">{formatPrice(settlement.payable_amount ?? settlement.final_settlement_amount)}</p>
+                <p className="text-xs text-content-secondary">{settlement.status === "PAID" ? "실제 지급액" : "지급 예정액"}</p>
+              </div>,
               <StatusBadge context="settlement" key="status" value={settlement.status} />,
             ])}
             rowKeys={settlements.map((settlement) => settlement.id)}
@@ -578,8 +581,29 @@ export function AdminSettlementsPageV2() {
           setSelectedID(undefined);
         }}
         footer={
-          settlementQuery.data && settlementQuery.data.status !== "PAID" ? (
-            <Button type="button" disabled={paidMutation.isPending} onClick={() => confirmation.ask({ title: "정산 지급 완료", message: "이 정산을 지급 완료 상태로 변경할까요?", confirmLabel: "지급 완료 처리" }, () => { if (selectedID) paidMutation.mutate(selectedID); })}>지급 완료 처리</Button>
+          settlementQuery.data && settlementQuery.data.status === "CONFIRMED" ? (
+            <Button
+              type="button"
+              disabled={paidMutation.isPending}
+              onClick={() => {
+                const settlement = settlementQuery.data;
+                if (!settlement || settlement.status !== "CONFIRMED") return;
+                confirmation.ask({
+                  title: "정산 지급 완료",
+                  message: (
+                    <span className="grid gap-4">
+                      <span className="grid gap-2 rounded-xl border border-border-subtle bg-surface-raised p-4">
+                        <span className="flex justify-between gap-4"><span>원래 정산액</span><span>{formatPrice(settlement.final_settlement_amount)}</span></span>
+                        <span className="flex justify-between gap-4"><span>환불 차감액</span><span>{formatPrice(settlement.refund_deduction_amount ?? 0)}</span></span>
+                        <span className="flex justify-between gap-4 border-t border-border-subtle pt-2 font-bold text-content-primary"><span>실제 지급액</span><span>{formatPrice(settlement.payable_amount ?? settlement.final_settlement_amount)}</span></span>
+                      </span>
+                      <span>은행 송금은 실행되지 않습니다. 위 금액으로 정산 지급 완료 기록을 저장할까요?</span>
+                    </span>
+                  ),
+                  confirmLabel: "지급 완료 처리",
+                }, () => { paidMutation.mutate(settlement.id); });
+              }}
+            >지급 완료 처리</Button>
           ) : undefined
         }
       >
@@ -592,7 +616,10 @@ export function AdminSettlementsPageV2() {
               <DetailItem label="총 매출">{formatPrice(settlementQuery.data.total_sales_amount)}</DetailItem>
               <DetailItem label="반품 배송비">{formatPrice(settlementQuery.data.total_return_shipping_fee)}</DetailItem>
               <DetailItem label="수수료">{formatPrice(settlementQuery.data.commission_amount)}</DetailItem>
-              <DetailItem label="최종 정산">{formatPrice(settlementQuery.data.final_settlement_amount)}</DetailItem>
+              <DetailItem label="원래 정산액">{formatPrice(settlementQuery.data.final_settlement_amount)}</DetailItem>
+              <DetailItem label={settlementQuery.data.status === "PAID" ? "차감 완료액" : "차감 예정액"}>{formatPrice(settlementQuery.data.refund_deduction_amount ?? 0)}</DetailItem>
+              <DetailItem label={settlementQuery.data.status === "PAID" ? "실제 지급액" : "지급 예정액"}>{formatPrice(settlementQuery.data.payable_amount ?? settlementQuery.data.final_settlement_amount)}</DetailItem>
+              <DetailItem label="마켓 미회수 환불액">{formatPrice(settlementQuery.data.outstanding_refund_amount ?? 0)}</DetailItem>
               <DetailItem label="지급 예정일">{dateTime(settlementQuery.data.payment_due_date)}</DetailItem>
               <DetailItem label="지급일">{dateTime(settlementQuery.data.paid_at)}</DetailItem>
               <DetailItem label="수정일">{dateTime(settlementQuery.data.updated_at)}</DetailItem>

@@ -118,6 +118,18 @@ describe("contract normalizers", () => {
     expect(normalizeSettlement(settlement)).toMatchObject({ id: 2, market_id: 3, status: "CONFIRMED" });
   });
 
+  it("preserves zero payable amounts after refund deductions", () => {
+    const raw = parseContract(rawSettlementSchema, {
+      ID: 2, MarketID: 3, TargetMonth: "2026-10", TotalSalesAmount: 6000,
+      CommissionAmount: 0, FinalSettlementAmount: 6000, Status: "CONFIRMED",
+      refund_deduction_amount: 6000, payable_amount: 0, outstanding_refund_amount: 10000,
+    }, "/admin/settlements");
+    expect(normalizeSettlement(raw)).toMatchObject({
+      final_settlement_amount: 6000, refund_deduction_amount: 6000,
+      payable_amount: 0, outstanding_refund_amount: 10000,
+    });
+  });
+
   it("retains order audit targets and treats zero settlement IDs as absent", () => {
     const log = parseContract(rawAuditLogSchema, {
       ID: 3,

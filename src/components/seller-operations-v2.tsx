@@ -376,14 +376,17 @@ export function SellerSettlementsPageV2() {
         </FilterPanel>
         <div className="mt-4">
           <ConsoleTable
-            columns={["정산월", "매출", "수수료", "최종 정산", "지급 예정일", "상태"]}
+            columns={["정산월", "매출", "수수료", "지급액", "지급 예정일", "상태"]}
             loading={settlementsQuery.isLoading}
             emptyText={status !== "ALL" || targetMonth ? "검색 조건에 맞는 정산이 없습니다." : "등록된 정산이 없습니다."}
             rows={settlements.map((item) => [
               <span key="month" className="font-bold">{item.target_month}</span>,
               formatPrice(item.total_sales_amount),
               formatPrice(item.commission_amount),
-              <span key="amount" className="font-bold">{formatPrice(item.final_settlement_amount)}</span>,
+              <div key="amount">
+                <p className="font-bold">{formatPrice(item.payable_amount ?? item.final_settlement_amount)}</p>
+                <p className="text-xs text-content-secondary">{item.status === "PAID" ? "실제 지급액" : "지급 예정액"}</p>
+              </div>,
               dateTime(item.payment_due_date),
               <StatusBadge context="settlement" key="status" value={item.status} />,
             ])}
@@ -407,7 +410,10 @@ export function SellerSettlementsPageV2() {
               <DetailItem label="총 매출">{formatPrice(settlementQuery.data.total_sales_amount)}</DetailItem>
               <DetailItem label="반품 배송비">{formatPrice(settlementQuery.data.total_return_shipping_fee)}</DetailItem>
               <DetailItem label="수수료">{formatPrice(settlementQuery.data.commission_amount)}</DetailItem>
-              <DetailItem label="최종 정산">{formatPrice(settlementQuery.data.final_settlement_amount)}</DetailItem>
+              <DetailItem label="원래 정산액">{formatPrice(settlementQuery.data.final_settlement_amount)}</DetailItem>
+              <DetailItem label={settlementQuery.data.status === "PAID" ? "차감 완료액" : "차감 예정액"}>{formatPrice(settlementQuery.data.refund_deduction_amount ?? 0)}</DetailItem>
+              <DetailItem label={settlementQuery.data.status === "PAID" ? "실제 지급액" : "지급 예정액"}>{formatPrice(settlementQuery.data.payable_amount ?? settlementQuery.data.final_settlement_amount)}</DetailItem>
+              <DetailItem label="마켓 미회수 환불액">{formatPrice(settlementQuery.data.outstanding_refund_amount ?? 0)}</DetailItem>
               <DetailItem label="지급 예정일">{dateTime(settlementQuery.data.payment_due_date)}</DetailItem>
               <DetailItem label="지급일">{dateTime(settlementQuery.data.paid_at)}</DetailItem>
               <DetailItem label="수정일">{dateTime(settlementQuery.data.updated_at)}</DetailItem>
@@ -415,7 +421,7 @@ export function SellerSettlementsPageV2() {
             <section>
               <h3 className="mb-3 font-bold">주문별 정산</h3>
               <ConsoleTable
-                columns={["주문", "상품 / 옵션", "수량", "매출", "수수료", "최종 정산", "상태"]}
+                columns={["주문", "상품 / 옵션", "수량", "매출", "수수료", "지급액", "상태"]}
                 rows={settlementQuery.data.lines.items.map((line) => [
                   line.order_code,
                   <div key="product"><p className="font-bold">{line.product_name}</p><p className="text-xs text-content-secondary">{line.option_name}: {line.option_value}</p></div>,
