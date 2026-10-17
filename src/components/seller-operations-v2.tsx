@@ -39,6 +39,7 @@ import {
   useSellerConsoleContext,
 } from "./seller-shell";
 import { Button } from "./ui/button";
+import { OrderReturnManagement } from "./order-return-management";
 
 function dateTime(value?: string) {
   return value ? new Date(value).toLocaleString("ko-KR") : "-";
@@ -276,6 +277,27 @@ export function SellerOrdersPageV2() {
               <DetailItem label="주문일">{dateTime(order.created_at)}</DetailItem>
               <DetailItem label="수정일">{dateTime(order.updated_at)}</DetailItem>
             </DetailGrid>
+            {marketID ? (
+              <OrderReturnManagement
+                key={order.order_code}
+                token={token}
+                orderCode={order.order_code}
+                role="SELLER"
+                markets={[{
+                  id: marketID,
+                  name: marketName ?? `마켓 ${marketID}`,
+                  items: order.items.map((item) => ({
+                    id: item.id, name: item.product_name, quantity: item.quantity,
+                    price: item.price, status: item.status,
+                  })),
+                }]}
+                pickupDefault={order.delivery ? {
+                  recipient_name: order.delivery.receiver_name,
+                  phone: order.delivery.receiver_phone,
+                  address: order.delivery.address,
+                } : undefined}
+              />
+            ) : null}
             <section>
               <h3 className="mb-3 font-bold">배송 정보</h3>
               <div className="grid gap-3 rounded-surface bg-surface-subtle p-4 sm:grid-cols-2">

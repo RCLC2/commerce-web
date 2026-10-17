@@ -26,6 +26,9 @@ import { Notice } from "./ui/notice";
 import { OrderStatus } from "./ui/order-status";
 import { OrderCashReceipts } from "./order-cash-receipts";
 import { OrderRefundSummary } from "./order-refund-summary";
+import { CustomerOrderReturns } from "./customer-order-returns";
+import { returnsApi } from "@/lib/returns-api";
+import { returnKeys } from "./order-return-shared";
 import { OrderSummary } from "./ui/order-summary";
 import { Surface } from "./ui/surface";
 import { BackButton } from "./ui/back-button";
@@ -45,6 +48,11 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   const { data: order, isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.order(orderCode, memberID),
     queryFn: () => api.getOrder(effectiveToken, orderCode),
+    enabled: Boolean(effectiveToken),
+  });
+  const returnRequests = useQuery({
+    queryKey: returnKeys.requests(effectiveToken, orderCode),
+    queryFn: () => returnsApi.requests(effectiveToken, orderCode),
     enabled: Boolean(effectiveToken),
   });
   const myReviews = useQuery({
@@ -206,7 +214,10 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
                           </p>
                           <OrderItemActions
                             item={item}
-                            busy={confirmPurchase.isPending}
+                            busy={confirmPurchase.isPending || !returnRequests.isSuccess || returnRequests.data.some((request) =>
+                              !["COMPLETED", "WITHDRAWN"].includes(request.status) &&
+                              request.items.some((returned) => returned.order_line_item_id === item.id)
+                            )}
                             completed={completed}
                             reviewSubmitted={serverReviewed || submittedLineItemIDs.has(item.id)}
                             canWriteReview={canToggleReview}
@@ -237,7 +248,22 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
             </div>
           )) : <EmptyState icon={<PageIcon className="size-7" />} title="표시할 주문 상품이 없습니다" description="주문 정보는 계속 확인할 수 있어요." />}
         </section>
-
+        <CustomerOrderReturns
+          token={effectiveToken}
+          orderCode={orderCode}
+          markets={(order.market_orders ?? []).map((market) => ({
+            id: market.market_id,
+            name: marketByID.get(market.market_id)?.name ?? `마켓 ${market.market_id}`,
+            items: market.line_items.map((item) => ({
+              id: item.id,
+              name: productByID.get(item.product_id)?.name ?? item.product?.name ?? `상품 ${item.product_id}`,
+              quantity: item.quantity,
+              price: item.price,
+              status: item.status,
+              purchaseConfirmedAt: item.purchase_confirmed_at,
+            })),
+          }))}
+        />
       </div>
       <aside className="min-w-0 space-y-6 lg:sticky lg:top-24">
         {order.refund ? <OrderRefundSummary refund={order.refund} /> : null}
