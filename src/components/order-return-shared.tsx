@@ -30,6 +30,8 @@ export function useReturnRefresh() {
         "seller-orders-v2",
         "seller-order-v2",
         "seller-inventory-v2",
+        "seller-inventory-options",
+        "seller-products-v2",
       ].map((key) => client.invalidateQueries({ queryKey: [key] })),
     );
   };

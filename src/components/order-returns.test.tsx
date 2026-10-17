@@ -7,7 +7,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { returnsApi } from "@/lib/returns-api";
 import { refundQuoteSchema } from "@/lib/shipping-policy-api";
 import { returnedRequest } from "@/test/returns-fixture";
@@ -52,9 +52,9 @@ function wrapper({ children }: { children: React.ReactNode }) {
   );
 }
 beforeEach(() => {
-  cleanup();
   vi.resetAllMocks();
 });
+afterEach(cleanup);
 it("never offers a receipt-checkbox bypass before inspection", () => {
   render(
     <OrderRefundControls
