@@ -12,8 +12,8 @@ export function AlsoViewedSection({ products }: { products: Product[] }) {
   return (
     <ProductShelf
       eyebrow="추천 상품"
-      title="함께 본 상품"
-      description="이 상품과 함께 둘러본 고객들이 관심을 보인 상품입니다."
+      title="비슷한 상품"
+      description="이 상품과 함께 살펴볼 만한 상품을 모았어요."
       products={products}
     />
   );
