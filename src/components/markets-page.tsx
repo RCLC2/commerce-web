@@ -16,6 +16,7 @@ import { SafeImage } from "./safe-image";
 import { ButtonLink } from "./ui/button-link";
 import { Button } from "./ui/button";
 import { EmptyState } from "./ui/feedback";
+import { PageHeading } from "./ui/page-heading";
 
 const discoveryLimit = 12;
 const followingLimit = 8;
@@ -41,15 +42,14 @@ export function MarketsPage() {
 
   return (
     <PageLayout className="min-h-[70vh] pb-28 md:pb-28">
-      <header className="overflow-hidden rounded-feature border border-border-subtle bg-gradient-to-br from-action-secondary via-surface-raised to-surface-raised px-6 py-8 text-content-primary md:px-10 md:py-11">
-        <div className="flex items-center gap-3 text-action-primary">
-          <Store size={19} aria-hidden="true" />
-          <p className="text-xs font-bold tracking-normal">마켓 둘러보기</p>
-        </div>
-        <h1 className="mt-5 text-3xl font-bold tracking-tight md:text-4xl">마켓</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-content-secondary md:text-base">
-          지금 새롭게 주목받는 마켓부터 신상품 소식이 활발한 마켓까지 한곳에서 발견해 보세요.
-        </p>
+      <header>
+        <PageHeading
+          className="[&_p:last-child]:max-w-2xl [&_p:last-child]:md:text-base"
+          icon={<Store />}
+          eyebrow="마켓 둘러보기"
+          title="마켓"
+          description="지금 새롭게 주목받는 마켓부터 신상품 소식이 활발한 마켓까지 한곳에서 발견해 보세요."
+        />
       </header>
 
       <FollowingSection

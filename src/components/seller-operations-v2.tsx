@@ -1,5 +1,6 @@
 "use client";
 
+import { Notice } from "./ui/notice";
 import { Input, Select } from "./ui/input";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,7 +10,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
 import { sellerConsoleApi } from "@/lib/seller-console-api";
-import { paymentMethodLabel } from "@/lib/display-labels";
+import { paymentMethodLabel, orderPaymentMethodLabel } from "@/lib/display-labels";
 import { formatPrice } from "@/lib/utils";
 import {
   ConsoleHeader,
@@ -38,6 +39,7 @@ import {
   useSellerConsoleContext,
 } from "./seller-shell";
 import { Button } from "./ui/button";
+import { OrderReturnManagement } from "./order-return-management";
 
 function dateTime(value?: string) {
   return value ? new Date(value).toLocaleString("ko-KR") : "-";
@@ -212,7 +214,7 @@ export function SellerOrdersPageV2() {
         </FilterPanel>
         <div className="mt-4">
           <ConsoleTable
-            columns={["주문번호", "구매자", "대표 상품", "결제 금액", "정산 예정", "상태", "주문일"]}
+            columns={["주문번호", "구매자", "대표 상품", "최초 결제액", "정산 예정", "상태", "주문일"]}
             loading={ordersQuery.isLoading}
             emptyText={query || status !== "ALL" || from || to ? "검색 조건에 맞는 주문이 없습니다." : "처리할 주문이 없습니다."}
             rows={orders.map((item) => [
@@ -262,22 +264,44 @@ export function SellerOrdersPageV2() {
       >
         {order ? (
           <div className="grid gap-6">
-            {registerInvoice.error || completeDelivery.error ? <p className="rounded-md border border-status-negative/30 bg-status-negative-subtle px-3 py-2 text-sm font-bold text-status-negative" role="alert">{apiErrorMessage(registerInvoice.error ?? completeDelivery.error)}</p> : null}
-            {operationResolution ? <p className="rounded-md bg-status-positive-subtle px-3 py-2 text-sm font-bold text-status-positive" role="status">{operationResolution}</p> : null}
+            {registerInvoice.error || completeDelivery.error ? <Notice tone="error">{apiErrorMessage(registerInvoice.error ?? completeDelivery.error)}</Notice> : null}
+            {operationResolution ? <Notice tone="success">{operationResolution}</Notice> : null}
             <DetailGrid>
               <DetailItem label="구매자">{order.buyer_email}</DetailItem>
               <DetailItem label="주문 상태"><StatusBadge value={order.status} /></DetailItem>
-              <DetailItem label="마켓 결제 금액">{formatPrice(order.market_total_amount)}</DetailItem>
+              <DetailItem label="마켓 최초 결제액">{formatPrice(order.market_total_amount)}</DetailItem>
               <DetailItem label="배송비">{formatPrice(order.shipping_fee)}</DetailItem>
               <DetailItem label="예상 정산">{formatPrice(order.expected_settlement_amount)}</DetailItem>
-              <DetailItem label="결제 수단">{paymentMethodLabel(order.payment_method)}</DetailItem>
+              <DetailItem label="결제 수단">{orderPaymentMethodLabel(order.payment_method, order.payment_details)}</DetailItem>
+              {order.payment_details ? <DetailItem label="결제 대행">{paymentMethodLabel(order.payment_method)}</DetailItem> : null}
               <DetailItem label="주문일">{dateTime(order.created_at)}</DetailItem>
               <DetailItem label="수정일">{dateTime(order.updated_at)}</DetailItem>
             </DetailGrid>
+            {marketID ? (
+              <OrderReturnManagement
+                key={order.order_code}
+                token={token}
+                orderCode={order.order_code}
+                role="SELLER"
+                markets={[{
+                  id: marketID,
+                  name: marketName ?? `마켓 ${marketID}`,
+                  items: order.items.map((item) => ({
+                    id: item.id, name: item.product_name, quantity: item.quantity,
+                    price: item.price, status: item.status,
+                  })),
+                }]}
+                pickupDefault={order.delivery ? {
+                  recipient_name: order.delivery.receiver_name,
+                  phone: order.delivery.receiver_phone,
+                  address: order.delivery.address,
+                } : undefined}
+              />
+            ) : null}
             <section>
               <h3 className="mb-3 font-bold">배송 정보</h3>
-              <div className="grid gap-3 rounded-xl bg-surface-subtle p-4 sm:grid-cols-2">
-                {!shipmentFieldsEditable ? <p className="sm:col-span-2 rounded-md border border-border-subtle bg-surface-raised px-3 py-2 text-xs font-bold text-content-secondary">배송이 시작된 주문은 택배사와 송장번호를 조회만 할 수 있습니다.</p> : null}
+              <div className="grid gap-3 rounded-surface bg-surface-subtle p-4 sm:grid-cols-2">
+                {!shipmentFieldsEditable ? <Notice className="sm:col-span-2">배송이 시작된 주문은 택배사와 송장번호를 조회만 할 수 있습니다.</Notice> : null}
                 <FilterField label="택배사">
                   <Select className={consoleInputClass} value={carrier} onChange={(event) => { setShipmentEditing(true); setOperationResolution(undefined); if (!shippingPending) registerInvoice.reset(); setCarrier(event.target.value); }} disabled={!shipmentFieldsEditable || shippingPending}>
                     <option value="">택배사 선택</option>
@@ -374,14 +398,17 @@ export function SellerSettlementsPageV2() {
         </FilterPanel>
         <div className="mt-4">
           <ConsoleTable
-            columns={["정산월", "매출", "수수료", "최종 정산", "지급 예정일", "상태"]}
+            columns={["정산월", "매출", "수수료", "지급액", "지급 예정일", "상태"]}
             loading={settlementsQuery.isLoading}
             emptyText={status !== "ALL" || targetMonth ? "검색 조건에 맞는 정산이 없습니다." : "등록된 정산이 없습니다."}
             rows={settlements.map((item) => [
               <span key="month" className="font-bold">{item.target_month}</span>,
               formatPrice(item.total_sales_amount),
               formatPrice(item.commission_amount),
-              <span key="amount" className="font-bold">{formatPrice(item.final_settlement_amount)}</span>,
+              <div key="amount">
+                <p className="font-bold">{formatPrice(item.payable_amount ?? item.final_settlement_amount)}</p>
+                <p className="text-xs text-content-secondary">{item.status === "PAID" ? "실제 지급액" : "지급 예정액"}</p>
+              </div>,
               dateTime(item.payment_due_date),
               <StatusBadge context="settlement" key="status" value={item.status} />,
             ])}
@@ -405,7 +432,10 @@ export function SellerSettlementsPageV2() {
               <DetailItem label="총 매출">{formatPrice(settlementQuery.data.total_sales_amount)}</DetailItem>
               <DetailItem label="반품 배송비">{formatPrice(settlementQuery.data.total_return_shipping_fee)}</DetailItem>
               <DetailItem label="수수료">{formatPrice(settlementQuery.data.commission_amount)}</DetailItem>
-              <DetailItem label="최종 정산">{formatPrice(settlementQuery.data.final_settlement_amount)}</DetailItem>
+              <DetailItem label="원래 정산액">{formatPrice(settlementQuery.data.final_settlement_amount)}</DetailItem>
+              <DetailItem label={settlementQuery.data.status === "PAID" ? "차감 완료액" : "차감 예정액"}>{formatPrice(settlementQuery.data.refund_deduction_amount ?? 0)}</DetailItem>
+              <DetailItem label={settlementQuery.data.status === "PAID" ? "실제 지급액" : "지급 예정액"}>{formatPrice(settlementQuery.data.payable_amount ?? settlementQuery.data.final_settlement_amount)}</DetailItem>
+              <DetailItem label="마켓 미회수 환불액">{formatPrice(settlementQuery.data.outstanding_refund_amount ?? 0)}</DetailItem>
               <DetailItem label="지급 예정일">{dateTime(settlementQuery.data.payment_due_date)}</DetailItem>
               <DetailItem label="지급일">{dateTime(settlementQuery.data.paid_at)}</DetailItem>
               <DetailItem label="수정일">{dateTime(settlementQuery.data.updated_at)}</DetailItem>
@@ -413,7 +443,7 @@ export function SellerSettlementsPageV2() {
             <section>
               <h3 className="mb-3 font-bold">주문별 정산</h3>
               <ConsoleTable
-                columns={["주문", "상품 / 옵션", "수량", "매출", "수수료", "최종 정산", "상태"]}
+                columns={["주문", "상품 / 옵션", "수량", "매출", "수수료", "지급액", "상태"]}
                 rows={settlementQuery.data.lines.items.map((line) => [
                   line.order_code,
                   <div key="product"><p className="font-bold">{line.product_name}</p><p className="text-xs text-content-secondary">{line.option_name}: {line.option_value}</p></div>,

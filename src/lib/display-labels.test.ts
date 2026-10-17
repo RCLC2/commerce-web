@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { displayLabel, paymentMethodLabel, shippingTypeLabel } from "./display-labels";
+import { displayLabel, paymentMethodLabel, orderPaymentMethodLabel, shippingTypeLabel } from "./display-labels";
 import { orderStatusLabel } from "./order-utils";
 
 describe("display labels", () => {
+  it("shows approved payment details and preserves the legacy provider fallback", () => {
+    expect(orderPaymentMethodLabel("toss", {method:"간편결제",easy_pay_provider:"카카오페이"})).toBe("카카오페이");
+    expect(orderPaymentMethodLabel("toss", {method:"카드"})).toBe("카드");
+    expect(orderPaymentMethodLabel("toss")).toBe("토스페이먼츠");
+  });
   it("keeps unknown operator-defined codes intact", () => {
     expect(displayLabel("experiment_custom_a")).toBe("experiment_custom_a");
     expect(paymentMethodLabel(undefined)).toBe("결제 수단 미확인");

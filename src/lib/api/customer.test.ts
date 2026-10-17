@@ -71,3 +71,33 @@ it("persists a cart group edit with authenticated PATCH and parses the saved row
   expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get("Authorization")).toBe("Bearer token");
   expect(saved).toMatchObject({ id: 1, option_id: 5, quantity: 3, price_at_added: 42000 });
 });
+
+it("uses the authenticated cart, address, and order quote routes", async () => {
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ ID: 7, ReceiverName: "김하늘", ReceiverPhone: "010-1234-5678", PostalCode: "06234", BaseAddress: "서울", DetailAddress: "5층", IsDefault: true }), { status: 201 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ product_total: 64000, discount_total: 0, used_point: 0, shipping_fee: 0, payment_amount: 64000, line_items: [{ cart_item_id: 3, unit_price: 32000, line_total: 64000 }] }), { status: 200 }));
+  vi.stubGlobal("fetch", fetchMock);
+
+  await customerApi.removeCartItems("token", [1, 2]);
+  const address = await customerApi.createAddress("token", { receiver: "김하늘", phone: "010-1234-5678", zip_code: "06234", line1: "서울", line2: "5층", is_default: true });
+  const quote = await customerApi.quoteOrder("token", { cart_item_ids: [3], used_point: 0, shipping_address: { receiver: address.receiver, phone: address.phone, zip_code: address.zip_code, line1: address.line1, line2: address.line2 } });
+
+  expect(fetchMock.mock.calls.map((call) => [new URL(String(call[0])).pathname, call[1].method])).toEqual([
+    ["/api/v1/cart/items", "DELETE"], ["/api/v1/me/addresses", "POST"], ["/api/v1/orders/quote", "POST"],
+  ]);
+  expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ cart_item_ids: [1, 2] });
+  expect(address.id).toBe(7);
+  expect(quote).toMatchObject({ shipping_fee: 0, payment_amount: 64000 });
+});
+
+
+it("keeps full-return orders and their persisted shipping fees readable", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+    id: 1, order_code: "RETURN-1", total_order_price: 5000, total_discount_price: 1000, used_point: 1000, status: "RETURN_COMPLETED",
+    market_orders: [{ id: 1, market_id: 7, shipping_fee: 3000, status: "RETURN_COMPLETED", expected_settlement_amount: 0, line_items: [] }],
+  }), { status: 200 })));
+  const order = await customerApi.getOrder("token", "RETURN-1");
+  expect(order.status).toBe("RETURN_COMPLETED");
+  expect(order.market_orders?.[0].shipping_fee).toBe(3000);
+});

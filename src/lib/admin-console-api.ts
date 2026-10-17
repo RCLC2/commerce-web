@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { orderPaymentDetailsSchema, orderRefundSchema } from "./api/contracts/schemas";
 import { requestParsed, requestVoid } from "./api-client";
 import { pageSchema, withQuery } from "./console-contracts";
 
@@ -21,6 +22,7 @@ export const adminMemberDetailSchema = adminMemberListItemSchema.extend({
   social_providers: z.array(z.string()),
 });
 export const memberOrderListItemSchema = z.object({
+  payment_amount: z.number().int().nonnegative().optional(),
   order_code: z.string(),
   representative_product: z.string(),
   item_count: z.number().int().nonnegative(),
@@ -133,6 +135,7 @@ export const adminProductDetailSchema = z.object({
 });
 
 export const adminOrderListItemSchema = z.object({
+  payment_amount: z.number().int().nonnegative().optional(),
   id: z.number().int().positive(),
   order_code: z.string(),
   member_id: z.number().int().positive(),
@@ -157,6 +160,8 @@ const adminOrderLineSchema = z.object({
   status: z.string(),
 });
 export const adminOrderDetailSchema = z.object({
+  refund: orderRefundSchema.optional(),
+  payment_details: orderPaymentDetailsSchema.optional(),
   id: z.number().int().positive(),
   order_code: z.string(),
   buyer: z.object({
@@ -198,6 +203,9 @@ export const adminOrderDetailSchema = z.object({
 });
 
 export const adminSettlementListItemSchema = z.object({
+  refund_deduction_amount: z.number().int().nonnegative().optional(),
+  payable_amount: z.number().int().nonnegative().optional(),
+  outstanding_refund_amount: z.number().int().nonnegative().optional(),
   id: z.number().int().positive(),
   market_id: z.number().int().positive(),
   market_name: z.string(),
@@ -227,6 +235,9 @@ const settlementLineSchema = z.object({
   purchase_confirmed_at: dateSchema,
 });
 export const adminSettlementDetailSchema = z.object({
+  refund_deduction_amount: z.number().int().nonnegative().optional(),
+  payable_amount: z.number().int().nonnegative().optional(),
+  outstanding_refund_amount: z.number().int().nonnegative().optional(),
   id: z.number().int().positive(),
   market_id: z.number().int().positive(),
   market_name: z.string(),

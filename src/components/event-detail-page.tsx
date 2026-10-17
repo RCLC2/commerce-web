@@ -3,7 +3,7 @@
 import { Select } from "./ui/input";
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Gift, Package, Store, Users } from "lucide-react";
+import { ArrowDownUp, ChevronLeft, ChevronRight, Gift, Package, Store, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -24,7 +24,9 @@ import { ProductCard } from "./product-card";
 import { ApiErrorState } from "./api-error-state";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
+import { BackButton } from "./ui/back-button";
 import { EmptyState, InlineLoadingState, LoadingState } from "./ui/feedback";
+import { FilterChip } from "./ui/filter-chip";
 
 const EVENT_PRODUCT_PAGE_SIZE = 12;
 
@@ -142,10 +144,10 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
   });
 
   if (eventQuery.isError) {
-    return <PageLayout className="text-sm"><ApiErrorState error={eventQuery.error} onRetry={() => void eventQuery.refetch()} /></PageLayout>;
+    return <PageLayout className="text-sm"><BackButton fallbackHref="/" /><ApiErrorState className="mt-4" error={eventQuery.error} onRetry={() => void eventQuery.refetch()} /></PageLayout>;
   }
   if (eventQuery.isLoading || !event) {
-    return <PageLayout><LoadingState label="이벤트를 불러오는 중입니다." /></PageLayout>;
+    return <PageLayout><BackButton fallbackHref="/" /><LoadingState className="mt-4" label="이벤트를 불러오는 중입니다." /></PageLayout>;
   }
 
   const schedule = event.starts_at && event.ends_at
@@ -163,7 +165,8 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
 
   return (
     <PageLayout className="pt-0">
-      <section className="pt-5">
+      <BackButton fallbackHref="/" className="my-3" />
+      <section>
         <div className="relative h-[320px] overflow-hidden rounded-md bg-surface-subtle md:h-[420px]">
           <SafeImage src={event.image_url} alt={event.title} fill sizes="100vw" className="object-cover" priority />
           <div className={`absolute inset-0 bg-gradient-to-t ${heroTone} to-transparent`} />
@@ -209,19 +212,30 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
 
       {event.product_display.enabled ? (
         <section className="py-8">
-          <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <h2 className="text-xl font-bold">{event.product_display.section_title}</h2>
-            <div className="flex flex-wrap gap-2">
-              {event.product_display.markets.length > 1 ? (
-                <FilterSelect label="전체 마켓" value={marketID} options={event.product_display.markets} onChange={setMarketID} />
-              ) : null}
-              {event.product_display.categories.length > 1 ? (
-                <FilterSelect label="전체 카테고리" value={categoryID} options={event.product_display.categories} onChange={setCategoryID} />
-              ) : null}
-              <Select aria-label="이벤트 상품 정렬" className="h-11 rounded-control border border-border-interactive bg-surface-raised px-3 text-sm font-bold" value={activeSort} onChange={(e) => setSort(e.target.value as EventSort)}>
-                {event.product_display.sort_options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </Select>
+          <div className="mb-6 border-b border-border-subtle pb-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-bold">{event.product_display.section_title}</h2>
+                <p className="mt-1 text-sm text-content-secondary">원하는 마켓과 카테고리로 이벤트 상품을 찾아보세요.</p>
+              </div>
+              <EventSortSelect options={event.product_display.sort_options} value={activeSort} onChange={setSort} />
             </div>
+            {event.product_display.markets.length > 1 || event.product_display.categories.length > 1 ? (
+              <div className="mt-4 space-y-3 rounded-surface border border-border-subtle bg-surface-raised p-3 shadow-card">
+                {event.product_display.markets.length > 1 ? (
+                  <EventFilterRow label="마켓" ariaLabel="이벤트 마켓 필터">
+                    <FilterChip selected={!marketID} onClick={() => setMarketID(undefined)}>전체</FilterChip>
+                    {event.product_display.markets.map((market) => <FilterChip key={market.id} selected={marketID === market.id} onClick={() => setMarketID(market.id)}>{market.name}</FilterChip>)}
+                  </EventFilterRow>
+                ) : null}
+                {event.product_display.categories.length > 1 ? (
+                  <EventFilterRow label="카테고리" ariaLabel="이벤트 카테고리 필터">
+                    <FilterChip selected={!categoryID} onClick={() => setCategoryID(undefined)}>전체</FilterChip>
+                    {event.product_display.categories.map((category) => <FilterChip key={category.id} selected={categoryID === category.id} onClick={() => setCategoryID(category.id)}>{category.name}</FilterChip>)}
+                  </EventFilterRow>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           {productsQuery.isError ? <ApiErrorState error={productsQuery.error} onRetry={() => void productsQuery.refetch()} retryLabel="이벤트 상품 다시 시도" /> : productsQuery.isLoading ? <ProductSkeleton /> : products.length === 0 ? (
@@ -245,12 +259,24 @@ export function EventDetailPage({ eventId }: { eventId: number }) {
   );
 }
 
-function FilterSelect({ label, value, options, onChange }: { label: string; value?: number; options: Array<{ id: number; name: string }>; onChange: (value?: number) => void }) {
+function EventFilterRow({ label, ariaLabel, children }: { label: string; ariaLabel: string; children: React.ReactNode }) {
   return (
-    <Select className="h-11 rounded-control border border-border-interactive bg-surface-raised px-3 text-sm font-bold" value={value ?? ""} onChange={(event) => onChange(event.target.value ? Number(event.target.value) : undefined)}>
-      <option value="">{label}</option>
-      {options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
-    </Select>
+    <div className="grid gap-2 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:items-center">
+      <p className="text-xs font-bold text-content-secondary">{label}</p>
+      <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label={ariaLabel}>{children}</div>
+    </div>
+  );
+}
+
+function EventSortSelect({ options, value, onChange }: { options: Array<{ value: EventSort; label: string }>; value: EventSort; onChange: (value: EventSort) => void }) {
+  return (
+    <label className="relative shrink-0">
+      <span className="sr-only">이벤트 상품 정렬</span>
+      <ArrowDownUp className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-action-primary" aria-hidden="true" />
+      <Select aria-label="이벤트 상품 정렬" className="h-10 appearance-none rounded-full border border-border-interactive bg-surface-raised pl-9 pr-9 text-sm font-bold outline-none transition-colors hover:border-action-primary hover:bg-action-secondary focus:border-action-primary focus:ring-4 focus:ring-action-primary/10" value={value} onChange={(event) => onChange(event.target.value as EventSort)}>
+        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </Select>
+    </label>
   );
 }
 
