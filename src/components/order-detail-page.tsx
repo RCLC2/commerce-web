@@ -1,7 +1,7 @@
 "use client";
 
 import { PageHeading } from "./ui/page-heading";
-import { Check, ReceiptText as PageIcon } from "lucide-react";
+import { ReceiptText as PageIcon } from "lucide-react";
 
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -306,19 +306,12 @@ function OrderProgress({ status }: { status: string }) {
             <li
               key={step}
               aria-current={current ? "step" : undefined}
-              className={`flex min-h-11 min-w-0 items-center gap-2 rounded-control px-3 py-2 text-xs font-bold ${
-                current
+              className={`flex min-h-11 min-w-0 items-center rounded-control px-3 py-2 text-xs font-bold ${
+                index <= activeIndex
                   ? "bg-action-primary text-content-on-brand"
-                  : completed
-                    ? "bg-action-secondary text-action-primary-pressed"
-                    : "bg-surface-subtle text-content-secondary"
+                  : "bg-surface-subtle text-content-secondary"
               }`}
             >
-              {completed ? (
-                <Check aria-hidden="true" className="size-4 shrink-0" />
-              ) : (
-                <span aria-hidden="true" className="flex size-4 shrink-0 items-center justify-center">{index + 1}</span>
-              )}
               <span>{statusLabel(step)}<span className="sr-only"> · {current ? "현재 단계" : completed ? "완료" : "예정"}</span></span>
             </li>
           );

@@ -127,7 +127,7 @@ node tests/support/returns-browser-check.mjs /tmp/commerce-returns-ui.json
 
 ## 영상 UI/UX 검토 (2026-10-18)
 
-주문 상세의 진행 단계는 현재 단계를 진한 primary, 이전 단계를 연한 primary와 체크 표시, 다음 단계를 회색으로 구분하도록 수정했다. 현재 단계 문구와 `aria-current="step"`를 추가했다. 실제 주문 화면의 데스크톱1440px·모바일390px 캡처, 현재 단계 일치·단일 표시·가로 넘침 없음, 변경 파일 ESLint 및 프로덕션 빌드로 확인했다.
+주문 상세의 진행 단계는 이전 단계부터 현재 단계까지 primary 색상으로 채우고, 다음 단계를 회색으로 구분한다. 단계 이름으로 표시하며 현재 단계 문구와 `aria-current="step"`를 제공한다. 기존 2/3/6열 반응형 배치는 유지하며, 색상 표시 수정 후 변경 파일 ESLint와 TypeScript 검사를 확인했다.
 
 다음은 영상에서 확인한 **미적용 개선 제안**이다.
 
