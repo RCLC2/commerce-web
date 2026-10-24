@@ -51,7 +51,7 @@ export const refundQuoteSchema = z.object({
 export const shippingPolicyApi = {
   settings: (token: string, marketID: number) =>
     requestParsed(
-      shippingSettingsSchema,
+      shippingSettingsSchema.nullable(),
       `/api/v1/seller/markets/${marketID}/shipping-settings`,
       { token },
     ),

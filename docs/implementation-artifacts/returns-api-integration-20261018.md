@@ -35,9 +35,13 @@
 | `POST /refunds/{refundID}/execute` | 관리자 환불 실행, 필요 시 가상계좌 환불 계좌 전달 |
 | `POST /refunds/{refundID}/withdraw` | 실행 전 또는 PG 효과 없는 확정 실패 요청 철회 |
 | `GET/PUT /markets/{marketID}/return-address` | 마켓의 현재 반품 도착지 설정 |
-| `GET/PUT /seller/markets/{marketID}/shipping-settings` | 기존 배송 설정에 편도 회수비 포함 |
+| `GET/PUT /seller/markets/{marketID}/shipping-settings` | 배송비·편도 회수비 조회, 미등록 마켓 첫 저장 및 변경 |
 
 응답은 Zod로 검증한다. 요청·견적·검수 캐시에는 로그인 토큰을 포함해 역할을 전환해도 다른 계정의 캐시를 재사용하지 않는다. 주문/요청/수거/검수/견적/재고 캐시를 처리 후 갱신한다.
+
+2026-10-25 배송 설정 보완: 소유한 마켓에 설정 행이 없으면 GET은 `200` 성공 응답의 `data: null`을 반환한다. `/seller`의 배송비 설정 화면은 이 경우에만 첫 등록 폼을 보여준다. 기본 배송비는 빈 선택으로 시작하며 판매자가 무료배송 `0` 또는 유료배송 `3000`을 직접 선택해야 저장할 수 있다. 기존에 저장한 `0`은 미등록으로 취급하지 않는다. 조회 중·인증/권한 오류·서버 오류를 미등록으로 바꾸지 않고, 조회 실패에는 재시도 버튼을 제공한다. PUT은 기존 upsert이며 저장한 설정 DTO를 반환한다. 저장 실패 시 선택값은 유지한다. 설정 전 주문 견적의 `409` 차단은 유지한다.
+
+이 보완은 `src/components/shipping-policy.test.tsx`와 `src/lib/shipping-policy-api.test.ts`의 19개 테스트, TypeScript 및 변경 파일 ESLint로 확인했다. 이 테스트 수는 배송 설정 보완과 기존 환불 요약 테스트의 합계이며 전체 반품 흐름의 통합 테스트 결과가 아니다.
 
 신청 요청의 `pickup`은 서버 계약상 선택 사항이며 현재 프론트는 필수로 수집한다. 생성·목록 응답은 신청 주소 또는 `null`을 반환한다. 검수 POST·목록 응답의 `restocked_quantity`·`restocked_at`은 실제 재고 이력의 처리량·시각이고 미처리는 0/null이다. 이 계약이 제공되는 API를 먼저 배포해야 한다.
 

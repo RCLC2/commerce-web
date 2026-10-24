@@ -8,6 +8,8 @@ import {
 } from "@/lib/shipping-policy-api";
 import { apiErrorMessage } from "@/lib/api-client";
 import { Button } from "./ui/button";
+import { Select } from "./ui/input";
+import { Notice } from "./ui/notice";
 
 export function MarketShippingSettings({
   token,
@@ -23,7 +25,16 @@ export function MarketShippingSettings({
     queryFn: () => shippingPolicyApi.settings(token, marketID),
   });
   const [draft, setDraft] = useState<ShippingSettings>();
-  const settings = draft ?? query.data;
+  const unconfigured = query.isSuccess && query.data === null;
+  const settings = draft ?? query.data ?? (unconfigured
+    ? {
+        market_id: marketID,
+        shipping_fee: Number.NaN,
+        return_shipping_fee: 3000,
+        additional_shipping_fee: 0,
+        additional_shipping_fee_reason: "NONE" as const,
+      }
+    : undefined);
   const save = useMutation({
     mutationFn: (value: ShippingSettings) =>
       shippingPolicyApi.update(token, value),
@@ -33,13 +44,25 @@ export function MarketShippingSettings({
     },
   });
 
+  if (query.isError) {
+    return (
+      <Notice tone="error" title="배송 설정을 불러오지 못했습니다.">
+        <p>{apiErrorMessage(query.error)}</p>
+        <Button
+          type="button"
+          variant="secondary"
+          className="mt-3"
+          onClick={() => void query.refetch()}
+        >
+          배송 설정 다시 불러오기
+        </Button>
+      </Notice>
+    );
+  }
+
   if (!settings) {
     return (
-      <p role={query.isError ? "alert" : "status"}>
-        {query.isError
-          ? apiErrorMessage(query.error)
-          : "배송 설정을 불러오는 중입니다."}
-      </p>
+      <p role="status">배송 설정을 불러오는 중입니다.</p>
     );
   }
 
@@ -59,29 +82,41 @@ export function MarketShippingSettings({
 
   return (
     <form
+      aria-label="마켓 배송비 설정"
       className="grid gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         if (valid && !save.isPending) save.mutate(settings);
       }}
     >
+      {unconfigured ? (
+        <Notice title="배송비가 아직 설정되지 않았습니다.">
+          기본 배송비를 직접 선택해 저장해주세요. 저장 전에는 주문을 받을 수
+          없습니다.
+        </Notice>
+      ) : null}
       <label className="grid gap-1 text-sm">
         기본 배송비 (원)
-        <input
-          className="rounded-md border border-border-subtle p-2"
-          type="number"
-          min="0"
-          max="3000"
-          step="3000"
+        <Select
           required
           disabled={save.isPending}
           value={
             Number.isNaN(settings.shipping_fee) ? "" : settings.shipping_fee
           }
           onChange={(event) =>
-            updateDraft({ shipping_fee: event.target.valueAsNumber })
+            updateDraft({
+              shipping_fee: event.target.value === ""
+                ? Number.NaN
+                : Number(event.target.value),
+            })
           }
-        />
+        >
+          <option value="" disabled>
+            선택해주세요
+          </option>
+          <option value="0">무료배송 · 0원</option>
+          <option value="3000">유료배송 · 3,000원</option>
+        </Select>
       </label>
       <p className="text-xs text-content-secondary">
         무료배송(0원) 또는 유료배송(3,000원)으로 설정해주세요. 배송비에는 쿠폰과
