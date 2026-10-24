@@ -27,7 +27,9 @@ Docker MySQL 8.4와 실제 #201 API, #57 production build를 사용했습니다.
 ## 자동 회귀
 
 - 배송 설정 API·컴포넌트 Vitest19건, TypeScript, 변경 파일 ESLint, production build 통과.
-- #198·#201 실제 MySQL 배송 설정 테스트4건: 첫 등록/upsert, 기존 무료 반품비 보존, 명시적 무료 반품비 저장. SKIP없음.
+- #198·#201 실제 MySQL 배송 설정 테스트6건: 첫 등록/upsert, 기존 무료 반품비 보존, 명시적 무료 반품비 저장. SKIP없음.
 - #200은 실제 main 커밋의 SQL79개로 만든 DB 업그레이드·데이터 보존, 빈 DB, 수거지 마이그레이션을 독립 DB3개에서 검증했습니다.
 
 화면 캡처와 브라우저 실행 자료는 로컬 ignored `output/playwright/shipping-first-registration-20261025/`에 보관합니다. 미디어를 저장소에 커밋하지 않습니다.
+
+최종 #201 코드에서 CI와 같은 필수 실행기를 별도 빈 DB들로 실행했습니다: 마이그레이션3건 + 배송설정4건 + 반품18건 = 총25건 PASS, SKIP0. CI 도구 테스트는40건 통과했습니다.
