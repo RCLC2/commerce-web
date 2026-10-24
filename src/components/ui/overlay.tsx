@@ -26,7 +26,7 @@ export function Drawer({ open, onClose, title, children, className, id }: Overla
   );
 }
 
-export function Dialog({ open, onClose, title, description, children, className }: OverlayProps) {
+export function Dialog({ open, onClose, title, description, children, className, fixedHeader = false }: OverlayProps & { fixedHeader?: boolean }) {
   const dialogRef = useRef<HTMLElement>(null);
   const titleID = useId();
   const descriptionID = useId();
@@ -35,9 +35,9 @@ export function Dialog({ open, onClose, title, description, children, className 
   return (
     <div className="fixed inset-0 z-[var(--commerce-z-modal)] grid place-items-center p-4" role="presentation">
       <button type="button" className="absolute inset-0 bg-black/40" aria-label="대화상자 닫기" onClick={onClose} />
-      <section ref={dialogRef} tabIndex={-1} className={cn("relative z-10 max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-feature bg-surface-raised p-5 shadow-float", className)} role="dialog" aria-modal="true" aria-labelledby={titleID} aria-describedby={description ? descriptionID : undefined}>
-        <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><h2 id={titleID} className="text-lg font-bold text-content-primary">{title}</h2>{description ? <p id={descriptionID} className="mt-1 text-sm leading-6 text-content-secondary">{description}</p> : null}</div><Button size="icon" variant="ghost" aria-label="대화상자 닫기" onClick={onClose}><X className="size-5" /></Button></div>
-        <div className="mt-5">{children}</div>
+      <section ref={dialogRef} tabIndex={-1} className={cn("relative z-10 max-h-[calc(100dvh-2rem)] w-full max-w-md rounded-feature bg-surface-raised shadow-float", fixedHeader ? "flex flex-col overflow-hidden" : "overflow-y-auto p-5", className)} role="dialog" aria-modal="true" aria-labelledby={titleID} aria-describedby={description ? descriptionID : undefined}>
+        <div className={cn("flex items-start gap-3", fixedHeader && "shrink-0 border-b border-border-subtle p-5")}><div className="min-w-0 flex-1"><h2 id={titleID} className="text-lg font-bold text-content-primary">{title}</h2>{description ? <p id={descriptionID} className="mt-1 text-sm leading-6 text-content-secondary">{description}</p> : null}</div><Button size="icon" variant="ghost" aria-label="대화상자 닫기" onClick={onClose}><X className="size-5" /></Button></div>
+        <div className={fixedHeader ? "flex min-h-0 flex-col" : "mt-5"}>{children}</div>
       </section>
     </div>
   );

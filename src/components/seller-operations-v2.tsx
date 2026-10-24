@@ -286,8 +286,10 @@ export function SellerOrdersPageV2() {
                 markets={[{
                   id: marketID,
                   name: marketName ?? `마켓 ${marketID}`,
+                  shippingFee: order.shipping_fee,
                   items: order.items.map((item) => ({
                     id: item.id, name: item.product_name, quantity: item.quantity,
+                    optionLabel: [item.option_name, item.option_value].filter(Boolean).join(": "),
                     price: item.price, status: item.status,
                   })),
                 }]}

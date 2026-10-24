@@ -11,10 +11,36 @@ const cli =
   process.env.PLAYWRIGHT_CLI_PATH ??
   path.join(os.homedir(), ".codex/skills/playwright/scripts/playwright_cli.sh");
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "returns-browser-"));
-const output = path.resolve("output/playwright/returns-integration");
+const output = path.resolve(process.env.E2E_OUTPUT_DIR ?? "output/playwright/returns-integration");
 fs.mkdirSync(output, { recursive: true });
+for (const file of ["failure.txt", "result.json"]) fs.rmSync(path.join(output, file), { force: true });
 const result = [];
+let openFormRefreshVerified = false;
 let step = 0;
+const buyerAddress = { receiver: "구매자 수거 담당", phone: "01087654321", zip_code: "04524", line1: "서울특별시 중구 수거 주소", line2: "201호", is_default: false };
+const sellerAddress = { receiver: "판매자 반품 담당", phone: "01022222222", zip_code: "04790", line1: "서울특별시 성동구 반품센터", line2: "2층 검수실", is_default: false };
+let buyerAddressID;
+let sellerAddressID;
+function asReturnAddress(address) {
+  return { recipient_name: address.receiver, phone: address.phone, postal_code: address.zip_code, address: address.line1, address_detail: address.line2 };
+}
+function assertAddress(actual, expected, label) {
+  for (const [field, value] of Object.entries(expected)) {
+    if (actual?.[field] !== value) throw new Error(`${label}: ${field} snapshot mismatch`);
+  }
+}
+async function prepareAddressBooks() {
+  for (const [role, selected] of [["buyer", buyerAddress], ["seller", sellerAddress]]) {
+    const existing = await data(role, "/api/v1/me/addresses");
+    const home = { ...selected, receiver: `${role} 기본 주소`, line1: "서울특별시 강남구 기본 주소", is_default: true };
+    if (!existing?.length) await data(role, "/api/v1/me/addresses", { method: "POST", body: JSON.stringify(home) });
+    const saved = await data(role, "/api/v1/me/addresses", { method: "POST", body: JSON.stringify(selected) });
+    const id = saved.id ?? saved.ID;
+    if (!id) throw new Error(`${role} address ID missing`);
+    if (role === "buyer") buyerAddressID = id;
+    else sellerAddressID = id;
+  }
+}
 const sessions = Object.fromEntries(
   ["buyer", "seller", "admin"].map((role) => [
     role,
@@ -83,7 +109,41 @@ function openOrder(role, code) {
   );
   snapshot(role);
 }
+function verifyOpenFormRefresh(scenario) {
+  return `
+    const dialog=page.getByRole('dialog',{name:/반품 신청/});
+    const submit=dialog.getByRole('button',{name:'선택 상품 반품 신청',exact:true});
+    await submit.waitFor();
+    await page.waitForFunction(()=>!Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='선택 상품 반품 신청')?.disabled);
+    const routePattern=${JSON.stringify(`**/api/v1/orders/${scenario.orderCode}/refunds`)};
+    await page.route(routePattern,route=>route.request().method()==='GET'?route.abort('failed'):route.continue());
+    await page.evaluate(()=>window.dispatchEvent(new Event('visibilitychange')));
+    const retry=dialog.getByRole('button',{name:'신청 가능 수량 다시 확인',exact:true});
+    await retry.waitFor();
+    if(!await submit.isDisabled())throw new Error('stale form remains submittable');
+    await page.screenshot({path:${JSON.stringify(path.join(output, "open-form-refresh-failed.png"))},fullPage:true});
+    const viewport=page.viewportSize();
+    await page.setViewportSize({width:390,height:600});
+    for(const locator of [dialog.getByRole('heading',{level:2}),retry,submit]) {
+      const box=await locator.boundingBox();
+      if(!box||box.y<0||box.y+box.height>600)throw new Error('mobile form action clipped');
+    }
+    const body=await dialog.getByRole('region',{name:'반품 신청 내용',exact:true}).boundingBox();
+    if(!body||body.height<60)throw new Error('mobile form body has no usable space');
+    if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw new Error('mobile form horizontal overflow');
+    await page.screenshot({path:${JSON.stringify(path.join(output, "open-form-refresh-failed-mobile.png"))}});
+    await page.setViewportSize(viewport);
+
+    await page.unroute(routePattern);
+    await retry.click();
+    await page.waitForFunction(()=>!Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='선택 상품 반품 신청')?.disabled);
+    if(await dialog.getByRole('combobox',{name:'주소록에서 선택',exact:true}).inputValue()!=='${buyerAddressID}')throw new Error('pickup selection lost on retry');
+    if(await dialog.getByRole('spinbutton',{name:/반품 수량$/}).inputValue()!=='1')throw new Error('quantity lost on retry');
+    if(await dialog.getByRole('combobox',{name:/반품 사유$/}).inputValue()!=='ITEM_DEFECTIVE')throw new Error('reason lost on retry');
+  `;
+}
 async function request(scenario, count, reason) {
+  console.log(`Request ${scenario.orderCode}: ${count}, ${reason}`);
   openOrder("buyer", scenario.orderCode);
   browser(
     "buyer",
@@ -92,8 +152,9 @@ async function request(scenario, count, reason) {
   snapshot("buyer");
   browser(
     "buyer",
-    `await page.getByRole('checkbox',{name:${JSON.stringify(scenario.productName)},exact:true}).check();await page.getByRole('spinbutton',{name:${JSON.stringify(scenario.productName + " 반품 수량")},exact:true}).fill(${JSON.stringify(String(count))});await page.getByRole('combobox',{name:${JSON.stringify(scenario.productName + " 반품 사유")},exact:true}).selectOption(${JSON.stringify(reason)});await page.getByRole('button',{name:'선택 상품 반품 신청',exact:true}).click();await page.getByRole('dialog',{name:/반품 신청/}).waitFor({state:'hidden'});`,
+    `await page.getByRole('checkbox',{name:${JSON.stringify(scenario.productName)},exact:false}).check();await page.getByRole('spinbutton',{name:/반품 수량$/}).fill(${JSON.stringify(String(count))});await page.getByRole('combobox',{name:/반품 사유$/}).selectOption(${JSON.stringify(reason)});await page.getByRole('combobox',{name:'주소록에서 선택',exact:true}).selectOption('${buyerAddressID}');${scenario === fixture.scenarios.partial && count === 1 ? verifyOpenFormRefresh(scenario) : ''}await page.getByRole('button',{name:'선택 상품 반품 신청',exact:true}).click();await page.getByRole('dialog',{name:/반품 신청/}).waitFor({state:'hidden'});`,
   );
+  if (scenario === fixture.scenarios.partial && count === 1) openFormRefreshVerified = true;
   const rows = await list(scenario.orderCode);
   const latest = rows.at(-1);
   if (
@@ -102,9 +163,11 @@ async function request(scenario, count, reason) {
     latest.items[0].reason !== reason
   )
     throw new Error("selected request did not persist");
+  assertAddress(latest.pickup, asReturnAddress(buyerAddress), "buyer request");
   return latest;
 }
 async function receive(scenario, request, responsibility, restock) {
+  console.log(`Collection / inspection ${request.id}`);
   if (request.status === "COMPLETED") return;
   openOrder("seller", scenario.orderCode);
   browser(
@@ -136,13 +199,13 @@ async function receive(scenario, request, responsibility, restock) {
       snapshot("seller");
       browser(
         "seller",
-        `const group=page.getByRole('group',{name:'기본 반품 도착지',exact:true});for(const [name,value] of [['수령인','검증 마켓 반품팀'],['연락처','01011111111'],['우편번호','12345'],['주소','서울시 반품로 10'],['상세 주소','검수실']])await group.getByRole('textbox',{name,exact:true}).fill(value);await page.getByRole('button',{name:'기본 반품 도착지 저장',exact:true}).click();await page.getByRole('button',{name:'수거 묶음 저장',exact:true}).waitFor();`,
+        `await page.getByRole('combobox',{name:'내 주소록에서 선택',exact:true}).selectOption('${sellerAddressID}');await page.getByRole('button',{name:'기본 반품 도착지 저장',exact:true}).click();await page.getByRole('button',{name:'수거 정보 저장',exact:true}).waitFor();`,
       );
       snapshot("seller");
     }
     browser(
       "seller",
-      `await page.getByRole('group',{name:'고객 수거지',exact:true}).getByRole('textbox',{name:'우편번호',exact:true}).fill('54321');await page.getByRole('button',{name:'수거 묶음 저장',exact:true}).click();await page.getByRole('textbox',{name:'수거 택배사',exact:true}).waitFor();`,
+      `await page.getByRole('button',{name:'수거 정보 저장',exact:true}).click();await page.getByRole('textbox',{name:'수거 택배사',exact:true}).waitFor();`,
     );
     collections = await data(
       "seller",
@@ -152,6 +215,8 @@ async function receive(scenario, request, responsibility, restock) {
       c.items.some((i) => request.items.some((r) => r.id === i.refund_item_id)),
     );
   }
+  assertAddress(collection.pickup, asReturnAddress(buyerAddress), "collection pickup");
+  assertAddress(collection.destination, asReturnAddress(sellerAddress), "collection destination");
   if (collection.status === "DRAFT") {
     snapshot("seller");
     browser(
@@ -184,18 +249,25 @@ async function receive(scenario, request, responsibility, restock) {
   if (!inspections.length) {
     browser(
       "seller",
-      `await page.getByRole('spinbutton',{name:'재판매 가능 수량',exact:true}).fill('${restock ? 1 : 0}');await page.getByRole('combobox',{name:'확정 귀책',exact:true}).selectOption('${responsibility}');await page.getByRole('button',{name:'검수 저장',exact:true}).click();await page.getByRole('button',{name:'검수 정정 저장',exact:true}).waitFor();`,
+      `await page.getByRole('spinbutton',{name:'재판매 가능 수량',exact:true}).fill('${restock ? 1 : 0}');await page.getByRole('combobox',{name:'반품 비용 부담',exact:true}).selectOption('${responsibility}');await page.getByRole('button',{name:'검수 저장',exact:true}).click();await page.locator('summary').filter({hasText:'검수 완료 · 수령'}).waitFor();`,
     );
   }
   if (restock) {
+    const savedInspections = await data(
+      "seller",
+      `/api/v1/return-collections/${collection.id}/inspections`,
+    );
+    if (savedInspections.some((record) => record.restocked_quantity > 0))
+      return;
     snapshot("seller");
     browser(
       "seller",
-      `await page.getByRole('spinbutton',{name:'재입고 수량',exact:true}).fill('1');await page.getByRole('button',{name:'선택 수량 재입고',exact:true}).click();await page.getByRole('button',{name:'재입고 확정',exact:true}).click();await page.getByText('선택한 1개의 재입고 처리가 확인되었습니다.',{exact:true}).waitFor();`,
+      `await page.getByRole('spinbutton',{name:'재입고 수량',exact:true}).fill('1');await page.getByRole('button',{name:'선택 수량 재입고',exact:true}).click();await page.getByRole('button',{name:'재입고 확정',exact:true}).click();await page.getByText('이번 재입고 1개 · 누적 재입고 1개',{exact:true}).waitFor();`,
     );
   }
 }
 async function refund(scenario, request, expected, bank = false) {
+  console.log(`Refund ${request.id}: ${expected}`);
   const current = (await list(scenario.orderCode)).find(
     (r) => r.id === request.id,
   );
@@ -231,7 +303,7 @@ async function refund(scenario, request, expected, bank = false) {
   }
   browser(
     "admin",
-    `const section=page.getByRole('region',{name:'검수 기반 환불',exact:true});await section.locator('strong').filter({hasText:'${expected.toLocaleString("ko-KR")}원'}).waitFor();await section.getByRole('button',{name:'검수한 수량 환불',exact:true}).click();`,
+    `const section=page.getByRole('region',{name:'환불 금액 안내',exact:true});await section.locator('strong').filter({hasText:'${expected.toLocaleString("ko-KR")}원'}).waitFor();await section.getByRole('button',{name:'검수한 수량 환불',exact:true}).click();`,
   );
   snapshot("admin");
   browser(
@@ -259,6 +331,7 @@ async function refund(scenario, request, expected, bank = false) {
   });
 }
 try {
+  await prepareAddressBooks();
   for (const role of ["buyer", "seller", "admin"]) login(role);
   const partial = fixture.scenarios.partial;
   const initial =
@@ -270,7 +343,7 @@ try {
     openOrder("buyer", partial.orderCode);
     browser(
       "buyer",
-      `await page.getByRole('button',{name:${JSON.stringify(fixture.marketName + " 반품 신청")},exact:true}).click();await page.getByText('신청 가능한 수량 2개 · 원 주문 3개',{exact:true}).waitFor();await page.getByRole('dialog',{name:/반품 신청/}).getByRole('button',{name:'대화상자 닫기',exact:true}).click();`,
+      `await page.getByRole('button',{name:${JSON.stringify(fixture.marketName + " 반품 신청")},exact:true}).click();await page.getByText('신청 가능한 수량 2개 · 주문 수량 3개',{exact:true}).waitFor();await page.getByRole('dialog',{name:/반품 신청/}).getByRole('button',{name:'대화상자 닫기',exact:true}).click();`,
     );
   }
   const remaining =
@@ -362,6 +435,8 @@ try {
         results: result,
         pgRequests: gateway.requests.length,
         selectedStock: 101,
+        addressBooks: { buyer: true, seller: true, snapshotsVerified: true },
+        openFormRefreshFailure: { verified: openFormRefreshVerified },
       },
       null,
       2,
@@ -376,4 +451,9 @@ try {
     String(error.stack ?? error),
   );
   throw error;
+} finally {
+  for (const role of ["buyer", "seller", "admin"]) {
+    try { command(role, "close"); } catch {}
+  }
+  fs.rmSync(temporary, { recursive: true, force: true });
 }

@@ -108,7 +108,7 @@ export function ReturnInspectionForm({
             ))}
           </Select>
         </Field>
-        <Field label="확정 귀책" htmlFor={`${prefix}-responsibility`}>
+        <Field label="반품 비용 부담" htmlFor={`${prefix}-responsibility`}>
           <Select
             id={`${prefix}-responsibility`}
             required
@@ -118,14 +118,14 @@ export function ReturnInspectionForm({
             }
           >
             <option value="">직접 확인 후 선택</option>
-            <option value="BUYER">구매자 귀책</option>
-            <option value="SELLER">판매자 귀책</option>
+            <option value="BUYER">구매자 부담</option>
+            <option value="SELLER">판매자 부담</option>
           </Select>
         </Field>
       </fieldset>
       {locked ? (
         <p className="text-xs text-content-secondary">
-          환불 계산이 확정되어 이 수거의 검수 기록을 변경할 수 없습니다.
+          환불 금액이 확정되어 검수 내용을 수정할 수 없습니다.
         </p>
       ) : (
         <p className="text-xs leading-5 text-content-secondary">
@@ -151,7 +151,7 @@ export function ReturnInspectionForm({
       ) : null}
       {latest ? (
         <p className="text-xs text-content-secondary">
-          검수 버전 {latest.version} ·{" "}
+          검수 기록 {latest.version}차 ·{" "}
           {new Date(latest.inspected_at).toLocaleString("ko-KR")}
         </p>
       ) : null}
@@ -161,18 +161,50 @@ export function ReturnInspectionForm({
 export function ReturnRestock({
   token,
   inspection,
+  totalRestockedQuantity,
+  productName,
+  optionLabel,
 }: {
   token: string;
   inspection: ReturnInspection;
+  totalRestockedQuantity: number;
+  productName: string;
+  optionLabel?: string;
 }) {
   const refresh = useReturnRefresh();
   const prefix = useId();
-  const [quantity, setQuantity] = useState(inspection.restockable_quantity);
+  const remaining = Math.max(
+    0,
+    inspection.restockable_quantity - totalRestockedQuantity,
+  );
+  const [quantity, setQuantity] = useState(remaining);
   const [confirming, setConfirming] = useState(false);
   const restock = useMutation({
     mutationFn: () => returnsApi.restock(token, inspection.id, quantity),
     onSuccess: refresh,
   });
+  if (inspection.restocked_quantity > 0 || restock.isSuccess) {
+    const restored = inspection.restocked_quantity || quantity;
+    const cumulativeRestocked = totalRestockedQuantity + (inspection.restocked_quantity > 0 ? 0 : restored);
+    return (
+      <Notice tone="success" title="재입고 완료">
+        <p className="font-medium">이번 재입고 {restored}개 · 누적 재입고 {cumulativeRestocked}개</p>
+        {inspection.restocked_at ? (
+          <p>
+            {new Date(inspection.restocked_at).toLocaleString("ko-KR")} 처리
+          </p>
+        ) : null}
+        <p>판매 가능한 재고에 반영되었습니다.</p>
+      </Notice>
+    );
+  }
+  if (remaining === 0) {
+    return (
+      <p className="text-xs text-content-secondary">
+        추가로 재입고할 수량이 없습니다. 누적 재입고 {totalRestockedQuantity}개
+      </p>
+    );
+  }
   return (
     <section
       className="mt-4 grid gap-3 rounded-control bg-surface-subtle p-4"
@@ -180,15 +212,15 @@ export function ReturnRestock({
     >
       <h5 className="text-sm font-bold">선택 수량 재입고</h5>
       <p className="text-xs leading-5 text-content-secondary">
-        재판매 가능 {inspection.restockable_quantity}개 이내에서 선택합니다.
-        같은 검수·같은 수량을 다시 요청해도 중복 입고하지 않습니다.
+        재판매 가능 {inspection.restockable_quantity}개 중 누적 재입고{" "}
+        {totalRestockedQuantity}개, 남은 {remaining}개 이내에서 선택합니다.
       </p>
       <Field htmlFor={prefix} label="재입고 수량">
         <Input
           id={prefix}
           type="number"
           min={1}
-          max={inspection.restockable_quantity}
+          max={remaining}
           value={Number.isNaN(quantity) ? "" : quantity}
           disabled={restock.isPending || restock.isSuccess}
           onChange={(event) => {
@@ -203,12 +235,14 @@ export function ReturnRestock({
           재판매 가능 수량 초과 여부를 확인해주세요.
         </Notice>
       ) : null}
-      {restock.isSuccess ? (
-        <Notice tone="success">
-          선택한 {quantity}개의 재입고 처리가 확인되었습니다.
-        </Notice>
-      ) : confirming ? (
+      {confirming ? (
         <div className="grid gap-3">
+          <div className="text-sm font-medium">
+            {productName}
+            <p className="mt-1 text-xs font-normal text-content-secondary">
+              {optionLabel || "선택 옵션 정보 없음"}
+            </p>
+          </div>
           <p className="text-sm font-bold">
             판매 가능한 재고에 {quantity}개를 반영할까요?
           </p>
@@ -233,9 +267,7 @@ export function ReturnRestock({
           className="justify-self-start"
           variant="secondary"
           disabled={
-            !Number.isInteger(quantity) ||
-            quantity <= 0 ||
-            quantity > inspection.restockable_quantity
+            !Number.isInteger(quantity) || quantity <= 0 || quantity > remaining
           }
           onClick={() => setConfirming(true)}
         >

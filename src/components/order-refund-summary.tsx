@@ -3,7 +3,68 @@
 import { useEffect, useRef } from "react";
 import type { OrderResponse } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
-import { OrderSummary } from "./ui/order-summary";
+import { OrderSummary, type OrderSummaryItem } from "./ui/order-summary";
+
+export function refundShippingItems(
+  refund: Pick<
+    NonNullable<OrderResponse["refund"]>,
+    | "retained_shipping_fee"
+    | "outbound_shipping_fee_deduction"
+    | "return_shipping_fee"
+    | "shipping_fee_waived_amount"
+    | "shipping_refund_amount"
+  >,
+  originalShippingFeeRetained?: number,
+): OrderSummaryItem[] {
+  const {
+    outbound_shipping_fee_deduction: outbound,
+    return_shipping_fee: pickup,
+    shipping_fee_waived_amount: waived,
+    shipping_refund_amount: refunded,
+  } = refund;
+  if (
+    outbound === undefined ||
+    pickup === undefined ||
+    waived === undefined ||
+    refunded === undefined ||
+    waived > outbound + pickup ||
+    refund.retained_shipping_fee < outbound + pickup - waived
+  ) {
+    return [
+      {
+        label: "유지·차감된 배송비 합계",
+        value: formatPrice(refund.retained_shipping_fee),
+      },
+    ];
+  }
+  // Request quotes only include new deductions in retained_shipping_fee.
+  // Order summaries already include the original paid shipping in that total.
+  const originalRetained = originalShippingFeeRetained ??
+    (refund.retained_shipping_fee - (outbound + pickup - waived));
+  const rows: OrderSummaryItem[] = [];
+  if (originalRetained > 0)
+    rows.push({
+      label: "최초 배송비 환불 제외",
+      value: formatPrice(originalRetained),
+    });
+  if (outbound > 0)
+    rows.push({ label: "무료배송 발송비 차감", value: formatPrice(outbound) });
+  if (pickup > 0)
+    rows.push({ label: "반품 회수비 차감", value: formatPrice(pickup) });
+  if (waived > 0)
+    rows.push({
+      label: "반품비 초과액 면제",
+      value: `-${formatPrice(waived)}`,
+      emphasis: "positive",
+    });
+  if (refunded > 0)
+    rows.push({
+      label: "최초 배송비 환불",
+      value: formatPrice(refunded),
+      emphasis: "positive",
+    });
+  return rows.length ? rows : [{ label: "배송비 부담", value: "없음" }];
+}
 
 export function OrderRefundSummary({
   refund,
@@ -36,10 +97,7 @@ export function OrderRefundSummary({
         className="min-w-0"
         title={refund.bank_refund ? "결제 취소 접수 합계" : "환불 완료 합계"}
         items={[
-          {
-            label: "유지·차감된 배송비 합계",
-            value: formatPrice(refund.retained_shipping_fee),
-          },
+          ...refundShippingItems(refund),
           {
             label: "복원 포인트",
             value: `${refund.restored_point.toLocaleString()}P`,
@@ -57,7 +115,7 @@ export function OrderRefundSummary({
                     : "사용하지 않음",
           },
         ]}
-        totalLabel={refund.bank_refund ? "PG 취소액" : "실제 환불액"}
+        totalLabel={refund.bank_refund ? "결제 취소 금액" : "결제수단 환불액 합계"}
         total={formatPrice(refund.cash_refund_amount)}
         footer={
           <p className="text-xs text-content-secondary">

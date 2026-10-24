@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type Ref } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { returnsApi, type ReturnRequest } from "@/lib/returns-api";
+import {
+  returnsApi,
+  type ReturnMarket,
+  type ReturnRequest,
+} from "@/lib/returns-api";
 import { refundReceiveAccountSchema } from "@/lib/shipping-policy-api";
 import { apiErrorMessage } from "@/lib/api-client";
 import { formatPrice } from "@/lib/utils";
@@ -13,17 +17,31 @@ import { Input, Select } from "./ui/input";
 import { Notice } from "./ui/notice";
 import { OrderSummary } from "./ui/order-summary";
 import { Dialog } from "./ui/overlay";
+import { refundShippingItems } from "./order-refund-summary";
 
 export function OrderRefundControls({
   token,
   request,
+  markets,
   canExecute,
+  sectionRef,
+  inspectionReady = true,
+  previousShippingRefundAmount = 0,
 }: {
   token: string;
   request: ReturnRequest;
+  markets: ReturnMarket[];
   canExecute: boolean;
+  sectionRef?: Ref<HTMLElement>;
+  inspectionReady?: boolean;
+  previousShippingRefundAmount?: number;
 }) {
   const refresh = useReturnRefresh();
+  const orderLines = new Map(
+    markets.flatMap((market) =>
+      market.items.map((item) => [item.id, item] as const),
+    ),
+  );
   const prefix = useId();
   const [account, setAccount] = useState({
     bank: "",
@@ -32,9 +50,9 @@ export function OrderRefundControls({
   });
   const [confirmation, setConfirmation] = useState<"refund" | "withdraw">();
   const observedCompletion = useRef(false);
-  const eligible = ["INSPECTED", "PROCESSING", "COMPLETED"].includes(
-    request.status,
-  );
+  const eligible =
+    ["PROCESSING", "COMPLETED"].includes(request.status) ||
+    (request.status === "INSPECTED" && inspectionReady);
   const quote = useQuery({
     queryKey: ["return-quote", token, request.id],
     queryFn: () => returnsApi.quote(token, request.id),
@@ -77,19 +95,24 @@ export function OrderRefundControls({
     mutationFn: () => returnsApi.withdraw(token, request.id),
     onSuccess: refresh,
   });
-  const data = quote.data;
+  const data = eligible ? quote.data : undefined;
+  const originalShippingFee = markets.find((market) => market.id === request.market_id)?.shippingFee;
+  const originalShippingFeeRetained = originalShippingFee === undefined || !data
+    ? undefined
+    : Math.max(0, originalShippingFee - previousShippingRefundAmount - data.shipping_refund_amount);
   const processing =
     !completed &&
     Boolean(
       data?.operation_status &&
-        ["PENDING", "RUNNING", "UNKNOWN", "SUCCEEDED"].includes(
-          data.operation_status,
-        ),
+      ["PENDING", "RUNNING", "UNKNOWN", "SUCCEEDED"].includes(
+        data.operation_status,
+      ),
     );
   const withdrawn =
     request.status === "WITHDRAWN" || data?.withdrawn || withdraw.isSuccess;
   const rejected = data?.operation_status === "FAILED";
   const ready =
+    eligible &&
     canExecute &&
     data &&
     !quote.isFetching &&
@@ -110,12 +133,16 @@ export function OrderRefundControls({
       request.status === "INSPECTED" ||
       rejected);
   return (
-    <section className="grid gap-4" aria-label="검수 기반 환불">
-      <h4 className="font-bold">검수 기반 환불</h4>
+    <section
+      ref={sectionRef}
+      tabIndex={-1}
+      className="scroll-mt-4 grid gap-4"
+      aria-label="환불 금액 안내"
+    >
+      <h4 className="font-bold">환불 금액 안내</h4>
       {!eligible && !withdrawn ? (
         <Notice tone="info">
-          반품 상품이 입고되고 같은 수거 건의 모든 상품 검수가 기록되면 환불
-          금액을 확인할 수 있습니다.
+          반품 상품이 도착하고 모든 상품의 검수가 끝나면 환불 금액을 확인할 수 있습니다.
         </Notice>
       ) : null}
       {eligible && quote.isPending ? (
@@ -137,22 +164,22 @@ export function OrderRefundControls({
       ) : null}
       {data ? (
         <OrderSummary
-          title="환불 금액"
+          title="차감·복원 내역"
           items={[
             {
               label: "최초 배송비 환불",
               value: formatPrice(data.shipping_refund_amount),
             },
             {
-              label: "최초 발송비 차감 기준액",
+              label: "최초 발송비",
               value: formatPrice(data.outbound_shipping_fee_deduction),
             },
             {
-              label: "회수비 차감 기준액",
+              label: "반품 수거비",
               value: formatPrice(data.return_shipping_fee),
             },
             {
-              label: "환불액 초과 비용 면제",
+              label: "초과 반품비 면제",
               value: formatPrice(data.shipping_fee_waived_amount),
               emphasis: "positive",
             },
@@ -162,13 +189,11 @@ export function OrderRefundControls({
               emphasis: "positive",
             },
           ]}
-          totalLabel="현금 환불액"
+          totalLabel="결제수단 환불액"
           total={formatPrice(data.cash_refund_amount)}
           footer={
             <p className="text-xs leading-5 text-content-secondary">
-              발송비·회수비는 면제 전 기준액입니다. 포인트는 배송비와 상계하지
-              않으며, 쿠폰은 원 주문 전체 환불이 끝날 때 기존 만료 정책으로
-              복원합니다.
+              발송비·수거비 합계에서 면제액을 뺀 금액만 차감합니다. 배송비에는 포인트를 사용할 수 없습니다. 쿠폰은 주문 전체가 환불되면 유효기간에 따라 돌려드립니다.
             </p>
           }
         />
@@ -251,15 +276,13 @@ export function OrderRefundControls({
             />
           </Field>
           <p className="text-xs text-content-secondary">
-            구매자가 제공한 계좌를 입력해주세요. 계좌 정보는 조회 응답에
-            표시하지 않습니다.
+            구매자가 제공한 계좌를 입력해주세요. 계좌 정보는 저장 후 화면에 다시 표시되지 않습니다.
           </p>
         </fieldset>
       ) : null}
       {processing ? (
         <Notice tone="info" title="환불 처리 상태를 확인하고 있습니다">
-          결제사 처리와 내부 기록이 모두 완료될 때까지 자동으로 확인합니다. 다시
-          환불을 요청하지 않아도 됩니다.
+          환불이 완료되면 자동으로 알려드립니다. 다시 요청하지 않아도 됩니다.
         </Notice>
       ) : null}
       {execute.isError && !processing && !completed ? (
@@ -282,7 +305,7 @@ export function OrderRefundControls({
       ) : null}
       {withdrawn ? (
         <Notice tone="info">
-          철회된 반품 요청입니다. 환불·혜택 복원을 실행하지 않습니다.
+          반품 신청을 철회했습니다. 환불은 진행되지 않습니다.
         </Notice>
       ) : null}
       {canExecute ? (
@@ -320,7 +343,7 @@ export function OrderRefundControls({
         description={
           confirmation === "refund"
             ? "선택한 반품 요청의 확정 금액을 확인해주세요."
-            : "결제사에 환불이 실행되지 않았는지 서버에서 확인합니다."
+            : "환불 진행 여부를 확인한 뒤 반품 신청을 철회합니다."
         }
       >
         {confirmation === "refund" && data ? (
@@ -333,21 +356,73 @@ export function OrderRefundControls({
               )}
               개
             </p>
-            <p className="mt-4 text-2xl font-bold tabular-nums text-action-primary">
+            <dl
+              aria-label="상품별 환불 승인 수량"
+              className="mt-3 divide-y divide-border-subtle rounded-control border border-border-subtle px-3"
+            >
+              {request.items.map((item) => (
+                <div key={item.id} className="grid min-w-0 gap-1 py-3 text-sm">
+                  <dt className="break-words font-medium">
+                    {orderLines.get(item.order_line_item_id)?.name ??
+                      `주문 상품 #${item.order_line_item_id}`}
+                    <span className="mt-1 block text-xs font-normal text-content-secondary">
+                      {orderLines.get(item.order_line_item_id)?.optionLabel ||
+                        "선택 옵션 정보 없음"}
+                    </span>
+                  </dt>
+                  <dd className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                    <span className="text-content-secondary">
+                      신청 {item.quantity}개
+                    </span>
+                    <span className="font-bold">
+                      환불 승인 {item.approved_quantity}개
+                    </span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <div className="mt-4 rounded-control bg-surface-subtle p-3">
+              <p className="text-sm font-bold">배송비 반영 내역</p>
+              <dl
+                aria-label="배송비 반영 내역"
+                className="mt-2 grid gap-2 text-sm"
+              >
+                {refundShippingItems(data, originalShippingFeeRetained).map((item, index) => (
+                  <div
+                    key={index}
+                    className="flex items-start justify-between gap-3"
+                  >
+                    <dt className="min-w-0 text-content-secondary">
+                      {item.label}
+                    </dt>
+                    <dd className="shrink-0 font-medium tabular-nums">
+                      {item.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              {data.shipping_fee_waived_amount > 0 ? (
+                <p className="mt-2 text-xs leading-5 text-content-secondary">
+                  발송비·수거비 합계에서 면제액을 뺀 금액만 차감합니다.
+                </p>
+              ) : null}
+            </div>
+            <p className="mt-4 text-xs font-bold text-content-secondary">
+              결제수단 환불액
+            </p>
+            <p className="mt-1 text-2xl font-bold tabular-nums text-action-primary">
               {formatPrice(data.cash_refund_amount)}
             </p>
             <p className="mt-2 text-sm">
               복원 포인트 {data.restored_point.toLocaleString()}P
             </p>
             <p className="mt-3 text-xs text-content-secondary">
-              다른 반품 요청이나 구매를 유지한 상품에는 이 환불을 적용하지
-              않습니다.
+              이 요청에서 승인한 상품만 환불됩니다.
             </p>
           </>
         ) : (
           <p className="text-sm leading-6">
-            철회하면 이 요청으로 환불하거나 혜택을 복원하지 않습니다. 결제사
-            결과가 불명확하거나 이미 환불된 요청은 철회할 수 없습니다.
+            철회하면 이 반품의 환불은 진행되지 않습니다. 환불 처리 중이거나 완료된 요청은 철회할 수 없습니다.
           </p>
         )}
         <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

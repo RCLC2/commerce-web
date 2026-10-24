@@ -5,7 +5,7 @@ import { ReceiptText as PageIcon } from "lucide-react";
 
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { canWriteOrderLineReview, reviewedOrderLineItemIDs } from "@/lib/product-engagement";
@@ -27,7 +27,7 @@ import { OrderStatus } from "./ui/order-status";
 import { OrderCashReceipts } from "./order-cash-receipts";
 import { OrderRefundSummary } from "./order-refund-summary";
 import { CustomerOrderReturns } from "./customer-order-returns";
-import { returnsApi } from "@/lib/returns-api";
+import { returnsApi, hasActiveReturnForLine } from "@/lib/returns-api";
 import { returnKeys } from "./order-return-shared";
 import { OrderSummary } from "./ui/order-summary";
 import { Surface } from "./ui/surface";
@@ -41,11 +41,12 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   const memberID = useSessionStore((state) => state.memberID);
   const effectiveToken = getEffectiveToken(token) ?? "";
   const queryClient = useQueryClient();
+  const refundDetails = useRef<HTMLDivElement>(null);
   const [trackingInfo, setTrackingInfo] = useState<TrackingInfo | null>(null);
   const [reviewingLineItemID, setReviewingLineItemID] = useState<number | null>(null);
   const [submittedLineItemIDs, setSubmittedLineItemIDs] = useState<Set<number>>(() => new Set());
 
-  const { data: order, isLoading, error, refetch } = useQuery({
+  const { data: order, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: queryKeys.order(orderCode, memberID),
     queryFn: () => api.getOrder(effectiveToken, orderCode),
     enabled: Boolean(effectiveToken),
@@ -111,7 +112,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
     return <PageLayout><BackButton fallbackHref="/mypage" /><LoadingState className="mt-4" label="주문 정보를 불러오는 중입니다." /></PageLayout>;
   }
 
-  if (error || !order) {
+  if (!order) {
     return <PageLayout className="text-sm text-action-primary"><BackButton fallbackHref="/mypage" /><ApiErrorState className="mt-4" error={error ?? new Error("주문 정보를 찾을 수 없습니다.")} onRetry={() => void refetch()} /></PageLayout>;
   }
 
@@ -123,6 +124,14 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   return (
     <PageLayout className="pb-[calc(8rem+env(safe-area-inset-bottom))]">
       <BackButton fallbackHref="/mypage" className="mb-4" />
+      {error ? (
+        <Notice tone="warning" className="mb-4">
+          <p>주문 정보를 갱신하지 못했습니다. 마지막으로 확인한 내역을 표시합니다.</p>
+          <Button className="mt-3" size="sm" variant="secondary" disabled={isFetching} onClick={() => void refetch()}>
+            {isFetching ? "주문 정보 확인 중" : "주문 정보 다시 확인"}
+          </Button>
+        </Notice>
+      ) : null}
       <Surface>
         <PageHeading icon={<PageIcon />} title="주문 상세" description={`주문 번호 ${order.order_code}`} />
         <p className="mt-1 text-sm text-content-secondary">{order.ordered_at ? new Date(order.ordered_at).toLocaleString("ko-KR") : "-"}</p>
@@ -195,6 +204,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
                   });
                   const isReviewing = reviewingLineItemID === item.id;
                   const canToggleReview = reviewEligible && (!myReviews.isFetching || isReviewing);
+                  const returnInProgress = hasActiveReturnForLine(item.id, returnRequests.data ?? []);
 
                   return (
                     <div key={item.id} className="border-t border-border-subtle pt-4 first:border-t-0 first:pt-0">
@@ -214,10 +224,8 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
                           </p>
                           <OrderItemActions
                             item={item}
-                            busy={confirmPurchase.isPending || !returnRequests.isSuccess || returnRequests.data.some((request) =>
-                              !["COMPLETED", "WITHDRAWN"].includes(request.status) &&
-                              request.items.some((returned) => returned.order_line_item_id === item.id)
-                            )}
+                            busy={confirmPurchase.isPending || !returnRequests.isSuccess || returnInProgress}
+                            returnInProgress={returnInProgress}
                             completed={completed}
                             reviewSubmitted={serverReviewed || submittedLineItemIDs.has(item.id)}
                             canWriteReview={canToggleReview}
@@ -251,12 +259,25 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
         <CustomerOrderReturns
           token={effectiveToken}
           orderCode={orderCode}
+          onShowRefundDetails={order.refund ? () => {
+            const section = refundDetails.current;
+            if (!section) return;
+            section.focus({ preventScroll: true });
+            section.scrollIntoView({
+              block: "start",
+              behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+            });
+          } : undefined}
           markets={(order.market_orders ?? []).map((market) => ({
             id: market.market_id,
             name: marketByID.get(market.market_id)?.name ?? `마켓 ${market.market_id}`,
             items: market.line_items.map((item) => ({
               id: item.id,
               name: productByID.get(item.product_id)?.name ?? item.product?.name ?? `상품 ${item.product_id}`,
+              optionLabel: (() => {
+                const option = (item.product ?? productByID.get(item.product_id))?.options?.find((candidate) => candidate.id === item.option_id);
+                return option ? [option.option_name, option.option_value].filter(Boolean).join(": ") : undefined;
+              })(),
               quantity: item.quantity,
               price: item.price,
               status: item.status,
@@ -264,16 +285,20 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
             })),
           }))}
         />
+        {order.refund ? (
+          <div ref={refundDetails} tabIndex={-1} aria-label="환불 상세" className="mt-6 scroll-mt-24">
+            <OrderRefundSummary refund={order.refund} />
+          </div>
+        ) : null}
       </div>
       <aside className="min-w-0 space-y-6 lg:sticky lg:top-24">
-        {order.refund ? <OrderRefundSummary refund={order.refund} /> : null}
         <OrderSummary
           className="min-w-0"
           title="최초 결제 내역"
           items={[
             { label: "상품 금액", value: formatPrice(order.total_order_price) },
-            { label: "쿠폰 할인", value: formatPrice(-order.total_discount_price) },
-            { label: "사용 포인트", value: `${(-order.used_point).toLocaleString()}P` },
+            { label: "쿠폰 할인", value: formatPrice(-order.total_discount_price || 0) },
+            { label: "사용 포인트", value: `${(-order.used_point || 0).toLocaleString()}P` },
             { label: "배송비", value: formatPrice(orderShippingFee(order)) },
           ]}
           totalLabel="최초 결제액"
@@ -324,6 +349,7 @@ function OrderProgress({ status }: { status: string }) {
 function OrderItemActions({
   item,
   busy,
+  returnInProgress,
   completed,
   reviewSubmitted,
   canWriteReview,
@@ -333,6 +359,7 @@ function OrderItemActions({
 }: {
   item: OrderLineItemResponse;
   busy: boolean;
+  returnInProgress: boolean;
   completed: boolean;
   reviewSubmitted: boolean;
   canWriteReview: boolean;
@@ -345,7 +372,7 @@ function OrderItemActions({
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2">
       {delivered ? (
-        <Button size="sm" disabled={busy} onClick={onConfirm}>
+        <Button size="sm" disabled={busy} aria-describedby={returnInProgress ? `purchase-return-${item.id}` : undefined} onClick={onConfirm}>
           구매 확정
         </Button>
       ) : null}
@@ -356,6 +383,11 @@ function OrderItemActions({
         </Button>
       ) : null}
       {completed ? <OrderStatus status="COMPLETED" /> : null}
+      {delivered && returnInProgress ? (
+        <p id={`purchase-return-${item.id}`} className="w-full text-xs leading-5 text-content-secondary">
+          반품 처리 중인 상품은 구매확정할 수 없습니다.
+        </p>
+      ) : null}
     </div>
   );
 }

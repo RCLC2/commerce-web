@@ -49,9 +49,9 @@ export function ReturnCollectionWorkspace({
       returnsApi.updateCollection(token, collection.id, body),
     onSuccess: refresh,
   });
-  const names = new Map(
+  const orderLines = new Map(
     markets.flatMap((market) =>
-      market.items.map((item) => [item.id, item.name] as const),
+      market.items.map((item) => [item.id, item] as const),
     ),
   );
   const refundItems = new Map(
@@ -75,39 +75,56 @@ export function ReturnCollectionWorkspace({
         : "반품 입고 확인";
   return (
     <section
-      className="grid min-w-0 gap-4 rounded-control border border-border-subtle p-4"
+      data-return-collection={collection.id}
+      tabIndex={-1}
+      className="scroll-mt-4 grid min-w-0 gap-4 rounded-control border border-border-subtle p-4"
       aria-label={`수거 건 ${collection.id}`}
     >
       <h4 className="font-bold">
         수거 #{collection.id} · {collectionStatusLabels[collection.status]}
       </h4>
-      <div className="grid gap-3 text-sm sm:grid-cols-2">
-        <div>
-          <p className="font-bold">고객 수거지</p>
-          <p className="mt-1 break-words">
-            {collection.pickup.address} {collection.pickup.address_detail}
-          </p>
-          <p className="text-xs text-content-secondary">
-            {collection.pickup.recipient_name} · {collection.pickup.phone}
-          </p>
+      <details
+        open={collection.status !== "RECEIVED"}
+        className="rounded-control bg-surface-subtle p-3"
+      >
+        <summary className="cursor-pointer text-sm font-bold">
+          수거·입고 내역 · {collectionStatusLabels[collection.status]}
+        </summary>
+        <div className="mt-3 grid gap-3">
+          <div className="grid gap-3 text-sm sm:grid-cols-2">
+            <div>
+              <p className="font-bold">고객 수거지</p>
+              <p className="mt-1 break-words">
+                {collection.pickup.address} {collection.pickup.address_detail}
+              </p>
+              <p className="text-xs text-content-secondary">
+                {collection.pickup.recipient_name} · {collection.pickup.phone}
+              </p>
+            </div>
+            <div>
+              <p className="font-bold">반품 도착지</p>
+              <p className="mt-1 break-words">
+                {collection.destination.address}{" "}
+                {collection.destination.address_detail}
+              </p>
+              <p className="text-xs text-content-secondary">
+                {collection.destination.recipient_name} ·{" "}
+                {collection.destination.phone}
+              </p>
+            </div>
+          </div>
+          {collection.tracking_number ? (
+            <p className="break-all text-sm">
+              택배사 {collection.carrier} · 송장 {collection.tracking_number}
+            </p>
+          ) : null}
+          {collection.collected_at ? (
+            <p className="text-xs text-content-secondary">
+              수거가 완료되어 주소를 변경할 수 없습니다.
+            </p>
+          ) : null}
         </div>
-        <div>
-          <p className="font-bold">반품 도착지</p>
-          <p className="mt-1 break-words">
-            {collection.destination.address}{" "}
-            {collection.destination.address_detail}
-          </p>
-          <p className="text-xs text-content-secondary">
-            {collection.destination.recipient_name} ·{" "}
-            {collection.destination.phone}
-          </p>
-        </div>
-      </div>
-      {collection.tracking_number ? (
-        <p className="break-all text-sm">
-          택배사 {collection.carrier} · 송장 {collection.tracking_number}
-        </p>
-      ) : null}
+      </details>
       {update.isError ? (
         <Notice tone="error">{apiErrorMessage(update.error)}</Notice>
       ) : null}
@@ -184,8 +201,11 @@ export function ReturnCollectionWorkspace({
             </Button>
           )}
           <p className="text-xs text-content-secondary">
-            택배사에 실제로 접수·수거·입고된 결과를 기록해주세요. 이 버튼이
-            택배를 자동 접수하지는 않습니다.
+            {collection.status === "DRAFT"
+              ? "택배사에 수거를 접수한 뒤 택배사와 송장번호를 입력해주세요."
+              : collection.status === "REQUESTED"
+                ? "택배기사가 상품을 가져간 뒤 수거 완료를 확인해주세요."
+                : "반품 상품이 도착한 뒤 입고를 확인해주세요."}
           </p>
         </form>
       ) : null}
@@ -229,11 +249,7 @@ export function ReturnCollectionWorkspace({
             </Button>
           </form>
         </details>
-      ) : (
-        <p className="text-xs text-content-secondary">
-          수거가 완료되어 주소를 변경할 수 없습니다.
-        </p>
-      )}
+      ) : null}
       {collection.status === "RECEIVED" ? (
         <div className="grid gap-5">
           <h4 className="font-bold">상품 검수·재입고</h4>
@@ -252,6 +268,14 @@ export function ReturnCollectionWorkspace({
           ) : (
             collection.items.map((item) => {
               const refunded = refundItems.get(item.refund_item_id);
+              const orderLine = refunded
+                ? orderLines.get(refunded.order_line_item_id)
+                : undefined;
+              const productName =
+                orderLine?.name ??
+                (refunded
+                  ? `주문 상품 #${refunded.order_line_item_id}`
+                  : `수거 상품 #${item.id}`);
               const versions = history.data.filter(
                 (record) => record.return_collection_item_id === item.id,
               );
@@ -262,61 +286,90 @@ export function ReturnCollectionWorkspace({
                   !old || current.version > old.version ? current : old,
                 undefined,
               );
+              const inspectionForm = (
+                <ReturnInspectionForm
+                  key={`${item.id}:${latest?.id ?? 0}`}
+                  token={token}
+                  itemID={item.id}
+                  quantity={item.quantity}
+                  latest={latest}
+                  locked={
+                    Boolean(collection.fee_refund_id) ||
+                    requests.some(
+                      (request) =>
+                        request.items.some(
+                          (line) => line.id === item.refund_item_id,
+                        ) &&
+                        (request.quoted_at !== null ||
+                          request.status === "WITHDRAWN"),
+                    )
+                  }
+                />
+              );
               return (
                 <article
                   key={item.id}
-                  className="grid gap-3 border-t border-border-subtle pt-4"
+                  data-return-inspection-item={item.id}
+                  tabIndex={-1}
+                  className="scroll-mt-4 grid gap-3 border-t border-border-subtle pt-4"
                 >
                   <h5 className="text-sm font-bold">
-                    {refunded
-                      ? names.get(refunded.order_line_item_id)
-                      : undefined}{" "}
-                    · 수거 예정 {item.quantity}개
+                    {productName}
+                    <span className="mt-1 block text-xs font-normal text-content-secondary">
+                      {orderLine?.optionLabel || "선택 옵션 정보 없음"}
+                    </span>
                   </h5>
-                  <ReturnInspectionForm
-                    key={`${item.id}:${latest?.id ?? 0}`}
-                    token={token}
-                    itemID={item.id}
-                    quantity={item.quantity}
-                    latest={latest}
-                    locked={
-                      Boolean(collection.fee_refund_id) ||
-                      requests.some(
-                        (request) =>
-                          request.items.some(
-                            (line) => line.id === item.refund_item_id,
-                          ) &&
-                          (request.quoted_at !== null ||
-                            request.status === "WITHDRAWN"),
-                      )
-                    }
-                  />
+                  <p className="text-xs text-content-secondary">
+                    수거 요청 {item.quantity}개
+                    {latest ? ` · 수령 ${latest.received_quantity}개` : ""}
+                  </p>
+                  {latest ? (
+                    <details
+                      key={`inspection-summary-${latest.id}`}
+                      className="rounded-control bg-surface-subtle p-3"
+                    >
+                      <summary className="cursor-pointer text-sm font-bold">
+                        검수 완료 · 수령 {latest.received_quantity}개 / 환불
+                        승인 {latest.refundable_quantity}개 / 재판매 가능{" "}
+                        {latest.restockable_quantity}개
+                      </summary>
+                      <div className="mt-4 grid gap-4">
+                        {inspectionForm}
+                        <details>
+                          <summary className="cursor-pointer text-xs font-bold">
+                            검수 이력 {versions.length}건
+                          </summary>
+                          <ul className="mt-2 grid gap-2 text-xs text-content-secondary">
+                            {versions.map((v) => (
+                              <li key={v.id}>
+                                {v.version}차 검수 · 수령 {v.received_quantity} /
+                                환불 승인 {v.refundable_quantity} / 재판매 가능{" "}
+                                {v.restockable_quantity} ·{" "}
+                                {v.responsibility === "SELLER"
+                                  ? "판매자"
+                                  : "구매자"}{" "}
+                                부담 · 재입고 {v.restocked_quantity}개
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      </div>
+                    </details>
+                  ) : (
+                    inspectionForm
+                  )}
                   {latest ? (
                     <ReturnRestock
                       key={latest.id}
                       token={token}
                       inspection={latest}
+                      productName={productName}
+                      optionLabel={orderLine?.optionLabel}
+                      totalRestockedQuantity={versions.reduce(
+                        (sum, record) => sum + record.restocked_quantity,
+                        0,
+                      )}
                     />
-                  ) : null}
-                  {versions.length > 0 ? (
-                    <details>
-                      <summary className="cursor-pointer text-xs font-bold">
-                        검수 이력 {versions.length}건
-                      </summary>
-                      <ul className="mt-2 grid gap-2 text-xs text-content-secondary">
-                        {versions.map((v) => (
-                          <li key={v.id}>
-                            버전 {v.version} · 수령 {v.received_quantity} / 환불
-                            승인 {v.refundable_quantity} / 재판매 가능{" "}
-                            {v.restockable_quantity} ·{" "}
-                            {v.responsibility === "SELLER"
-                              ? "판매자"
-                              : "구매자"}{" "}
-                            귀책
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
                   ) : null}
                 </article>
               );

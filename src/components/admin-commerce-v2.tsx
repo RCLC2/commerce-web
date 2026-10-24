@@ -396,8 +396,10 @@ export function AdminOrdersPageV2() {
               markets={orderQuery.data.market_orders.map((market) => ({
                 id: market.market_id,
                 name: market.market_name,
+                shippingFee: market.shipping_fee,
                 items: market.items.map((item) => ({
                   id: item.id, name: item.product_name, quantity: item.quantity,
+                  optionLabel: [item.option_name, item.option_value].filter(Boolean).join(": "),
                   price: item.price, status: item.status,
                 })),
               }))}
@@ -420,8 +422,8 @@ export function AdminOrdersPageV2() {
               title="최초 결제 내역"
               items={[
                 { label: "상품 금액", value: formatPrice(orderQuery.data.total_order_price) },
-                { label: "쿠폰 할인", value: formatPrice(-orderQuery.data.total_discount_price) },
-                { label: "사용 포인트", value: `${(-orderQuery.data.used_point).toLocaleString()}P` },
+                { label: "쿠폰 할인", value: formatPrice(-orderQuery.data.total_discount_price || 0) },
+                { label: "사용 포인트", value: `${(-orderQuery.data.used_point || 0).toLocaleString()}P` },
                 { label: "배송비", value: formatPrice(orderShippingFee(orderQuery.data)) },
               ]}
               totalLabel="최초 결제액"

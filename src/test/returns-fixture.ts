@@ -1,4 +1,19 @@
-import { returnRequestSchema } from "@/lib/returns-api";
+import { inspectionSchema, returnRequestSchema } from "@/lib/returns-api";
+export const returnedInspection = () =>
+  inspectionSchema.parse({
+    id: 21,
+    return_collection_item_id: 1,
+    version: 1,
+    received_quantity: 2,
+    refundable_quantity: 2,
+    restockable_quantity: 2,
+    result_code: "NORMAL",
+    responsibility: "BUYER",
+    inspected_by: 5,
+    inspected_at: "2026-10-18T00:00:00Z",
+    restocked_quantity: 0,
+    restocked_at: null,
+  });
 export const returnedRequest = () =>
   returnRequestSchema.parse({
     id: 12,

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { requestParsed } from "./api-client";
+import { ApiError, requestParsed } from "./api-client";
 import {
   refundQuoteSchema,
   refundReceiveAccountSchema,
@@ -31,11 +31,11 @@ export const returnReasonSchema = z.enum(
 export type ReturnReason = z.infer<typeof returnReasonSchema>;
 export const responsibilitySchema = z.enum(["BUYER", "SELLER"]);
 export const returnAddressSchema = z.object({
-  recipient_name: z.string().trim().min(1).max(100),
-  phone: z.string().trim().min(1).max(20),
-  postal_code: z.string().regex(/^[0-9]{5}$/),
-  address: z.string().trim().min(1).max(255),
-  address_detail: z.string().max(255),
+  recipient_name: z.string().trim().min(1, "수령인을 입력해주세요.").max(100, "수령인은 100자 이내로 입력해주세요."),
+  phone: z.string().trim().min(1, "연락처를 입력해주세요.").max(20, "연락처는 20자 이내로 입력해주세요."),
+  postal_code: z.string().regex(/^[0-9]{5}$/, "우편번호는 숫자 5자리로 입력해주세요."),
+  address: z.string().trim().min(1, "주소를 입력해주세요.").max(255, "주소는 255자 이내로 입력해주세요."),
+  address_detail: z.string().max(255, "상세 주소는 255자 이내로 입력해주세요."),
 });
 export type ReturnAddress = z.infer<typeof returnAddressSchema>;
 export const emptyReturnAddress = (): ReturnAddress => ({
@@ -58,6 +58,7 @@ const itemSchema = z.object({
 });
 export const returnRequestSchema = z.object({
   id,
+  pickup: returnAddressSchema.nullish(),
   order_id: id,
   market_id: quantity,
   market_order_id: quantity,
@@ -134,10 +135,13 @@ export const inspectionSchema = inspectionRequestSchema.safeExtend({
   version: id,
   inspected_by: id,
   inspected_at: z.string(),
+  restocked_quantity: quantity,
+  restocked_at: z.string().nullable(),
 });
 export type ReturnInspection = z.infer<typeof inspectionSchema>;
 export const returnRequestInputSchema = z.object({
   market_id: id,
+  pickup: returnAddressSchema.optional(),
   items: z
     .array(
       z.object({
@@ -239,12 +243,20 @@ export const returnsApi = {
       `/api/v1/return-inspections/${inspectionID}/restock`,
       json(token, "POST", { quantity: quantity.positive().parse(count) }),
     ),
-  address: (token: string, marketID: number) =>
-    requestParsed(
-      returnAddressSchema,
-      `/api/v1/markets/${marketID}/return-address`,
-      { token },
-    ),
+  address: async (token: string, marketID: number): Promise<ReturnAddress | null> => {
+    try {
+      return await requestParsed(
+        returnAddressSchema,
+        `/api/v1/markets/${marketID}/return-address`,
+        { token },
+      );
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404 && error.code === "RESOURCE_NOT_FOUND") {
+        return null;
+      }
+      throw error;
+    }
+  },
   saveAddress: (token: string, marketID: number, address: ReturnAddress) =>
     requestParsed(
       z.object({ saved: z.literal(true) }),
@@ -278,7 +290,7 @@ export const returnsApi = {
 };
 export const returnStatusLabels: Record<ReturnRequest["status"], string> = {
   REQUESTED: "반품 접수",
-  INSPECTED: "검수 기록 완료",
+  INSPECTED: "검수 완료",
   PROCESSING: "환불 처리 중",
   COMPLETED: "환불 완료",
   WITHDRAWN: "요청 철회",
@@ -296,12 +308,54 @@ export const collectionStatusLabels: Record<
 export type ReturnLine = {
   id: number;
   name: string;
+  optionLabel?: string;
   quantity: number;
   price: number;
   status: string;
   purchaseConfirmedAt?: string | null;
 };
-export type ReturnMarket = { id: number; name: string; items: ReturnLine[] };
+export type ReturnMarket = { id: number; name: string; shippingFee?: number; items: ReturnLine[] };
+export function returnInspectionProgress(
+  requests: ReturnRequest[],
+  collections: ReturnCollection[],
+) {
+  const withdrawn = new Set(
+    requests
+      .filter((r) => r.status === "WITHDRAWN")
+      .flatMap((r) => r.items.map((i) => i.id)),
+  );
+  const items = new Map(
+    requests.flatMap((r) => r.items.map((i) => [i.id, i] as const)),
+  );
+  const ids = new Set(
+    collections
+      .flatMap((c) => c.items.map((i) => i.refund_item_id))
+      .filter((id) => !withdrawn.has(id)),
+  );
+  const completed = [...ids].filter((id) => {
+    const item = items.get(id);
+    return item && item.responsibility !== "UNDETERMINED";
+  }).length;
+  return {
+    completed,
+    total: ids.size,
+    ready:
+      ids.size > 0 &&
+      completed === ids.size &&
+      collections.every((c) => c.status === "RECEIVED"),
+  };
+}
+
+export function hasActiveReturnForLine(
+  lineID: number,
+  requests: ReturnRequest[],
+) {
+  return requests.some(
+    (request) =>
+      !["COMPLETED", "WITHDRAWN", "LEGACY"].includes(request.status) &&
+      request.items.some((item) => item.order_line_item_id === lineID),
+  );
+}
 export function returnableQuantity(
   line: ReturnLine,
   requests: ReturnRequest[],
