@@ -1,0 +1,12 @@
+{
+  "browser": {
+    "browserName": "chromium",
+    "launchOptions": {
+      "channel": "chrome",
+      "args": ["--window-size=1440,900"]
+    },
+    "contextOptions": {
+      "viewport": null
+    }
+  }
+}

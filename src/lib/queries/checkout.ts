@@ -1,5 +1,6 @@
 import type { CouponDefinition, OrderResponse } from "../types";
 import { ApiHttpError } from "../api-client";
+import { orderPaymentAmount } from "../order-utils";
 
 export type CheckoutOrderInput = {
   cart_item_ids: number[];
@@ -236,7 +237,7 @@ export async function submitServerAuthoritativeCheckout({
     throw new CheckoutOrderStateError("조회한 주문과 결제 대상 주문이 일치하지 않습니다.");
   }
   onOrderConfirmed(order);
-  const amount = order.total_order_price - order.total_discount_price - order.used_point;
+  const amount = orderPaymentAmount(order);
 
   if (order.status !== "PAYMENT_PENDING") {
     if (order.status === "CANCELLED") {
@@ -251,7 +252,17 @@ export async function submitServerAuthoritativeCheckout({
   if (!Number.isSafeInteger(amount) || amount <= 0) {
     throw new Error("0원 이하 주문의 토스 테스트 결제는 지원되지 않습니다.");
   }
-  const paymentRequest = await createPaymentRequest(orderCode);
+  let paymentRequest: TossPaymentRequest | undefined;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      paymentRequest = await createPaymentRequest(orderCode);
+      break;
+    } catch (error) {
+      if (!(error instanceof ApiHttpError) || error.code !== "ORDER_PAYMENT_PREPARING" || attempt === 4) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+    }
+  }
+  if (!paymentRequest) throw new Error("결제 정보를 준비하지 못했습니다. 다시 시도해주세요.");
   if (paymentRequest.order_id !== orderCode) {
     throw new CheckoutOrderStateError("결제 요청의 주문 ID가 조회한 주문과 일치하지 않습니다.");
   }

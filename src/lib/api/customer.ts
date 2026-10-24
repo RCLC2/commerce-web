@@ -1,3 +1,4 @@
+import { orderQuoteSchema, type UpdateCartItemGroupRequest, type CreateShippingAddressRequest, type OrderQuoteRequest } from "./checkout-contracts";
 import { z } from "zod";
 import { requestParsed, requestVoid } from "../api-client";
 import {
@@ -118,12 +119,14 @@ export const customerApi = {
     }),
   listCart: async (token: string) =>
     (await requestParsed(z.array(rawCartSchema), "/api/v1/cart", { token })).map(normalizeCartItem),
-  updateCartItems: async (token: string, payload: { cart_item_ids: number[]; option_id: number; quantity: number }) =>
+  updateCartItems: async (token: string, payload: UpdateCartItemGroupRequest) =>
     normalizeCartItem(await requestParsed(rawCartSchema, "/api/v1/cart/items", {
       method: "PATCH",
       token,
       body: JSON.stringify(payload),
     })),
+  removeCartItems: (token: string, cartItemIDs: number[]) =>
+    requestVoid("/api/v1/cart/items", { method: "DELETE", token, body: JSON.stringify({ cart_item_ids: cartItemIDs }) }),
   listCoupons: async (token: string) =>
     (await requestParsed(z.array(rawOwnedCouponSchema), "/api/v1/coupons", { token }))
       .map((coupon) => normalizeOwnedCoupon(coupon)),
@@ -142,6 +145,8 @@ export const customerApi = {
     requestVoid(`/api/v1/coupons/${couponID}/issue`, { method: "POST", token }),
   listAddresses: async (token: string) =>
     (await requestParsed(z.array(rawAddressSchema), "/api/v1/me/addresses", { token })).map(normalizeAddress),
+  createAddress: async (token: string, payload: CreateShippingAddressRequest) =>
+    normalizeAddress(await requestParsed(rawAddressSchema, "/api/v1/me/addresses", { method: "POST", token, body: JSON.stringify(payload) })),
   updateAddress: (token: string, addressID: number, payload: { address_name?: string; receiver: string; phone: string; zip_code: string; line1: string; line2: string; is_default: boolean }) =>
     requestVoid(`/api/v1/me/addresses/${addressID}`, { method: "PATCH", token, body: JSON.stringify(payload) }),
   listMyReviews: async (token: string) =>
@@ -202,6 +207,8 @@ export const customerApi = {
       token,
       body: JSON.stringify(payload),
     }),
+  quoteOrder: (token: string, payload: OrderQuoteRequest) =>
+    requestParsed(orderQuoteSchema, "/api/v1/orders/quote", { method: "POST", token, body: JSON.stringify(payload) }),
   listOrders: (token: string, params?: { status?: CustomerOrderListStatus; limit?: number; offset?: number }) => {
     const query = new URLSearchParams();
     if (params?.status) query.set("status", params.status);

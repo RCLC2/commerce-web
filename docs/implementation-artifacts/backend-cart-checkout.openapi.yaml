@@ -1,0 +1,413 @@
+openapi: 3.1.0
+info:
+  title: Commerce 장바구니·주문서 백엔드 API 작업 계약
+  version: 0.1.0
+  description: >-
+    commerce 백엔드 origin/main 88add6ab0b6d7846e6b049dbdfc6c6d9be32b279 기준
+    아직 없는 네 API의 구현 계약이다. 요청 필드와 성공 응답 필드는 현재
+    commerce-web의 customerApi 파서에 맞춘다. 기존 API처럼 성공 응답은
+    별도 data 래퍼가 없는 JSON 객체이며, 삭제 성공은 빈 본문이다.
+servers:
+  - url: /api/v1
+security:
+  - BearerAuth: []
+tags:
+  - name: Cart
+    description: 회원 장바구니
+  - name: ShippingAddresses
+    description: 회원 배송지
+  - name: Checkout
+    description: 주문 전 금액 확인
+paths:
+  /cart/items:
+    patch:
+      tags: [Cart]
+      operationId: updateCartItemGroup
+      summary: 장바구니 상품의 옵션과 총수량 변경
+      description: >-
+        화면에서 하나로 묶인 장바구니 행들을 변경한다. 모든 행은 같은 회원·상품·기존 옵션에
+        속해야 한다. quantity는 행별 수량이 아니라 변경 후 그룹 전체 수량이다.
+        새 옵션의 판매 상태와 가용 재고를 확인하고 현재 가격으로 응답한다.
+        검증·변경·중복 행 정리·변경 이력 기록은 한 트랜잭션에서 완료한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartItemGroupRequest'
+            examples:
+              changeOptionAndQuantity:
+                summary: 한 상품으로 표시된 두 행을 새 옵션 3개로 변경
+                value:
+                  cart_item_ids: [101, 102]
+                  option_id: 22
+                  quantity: 3
+      responses:
+        '200':
+          description: 변경 후 장바구니 행 한 개. 기존 GET /cart 원소와 같은 필드 형식.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartItemResponse'
+              examples:
+                updated:
+                  value:
+                    ID: 101
+                    MemberID: 7
+                    ProductID: 15
+                    OptionID: 22
+                    Quantity: 3
+                    PriceAtAdded: 32000
+        '400':
+          description: 빈·중복 ID, 서로 다른 상품 그룹, 유효하지 않은 옵션이나 수량.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/CartItemsNotFound'
+        '409':
+          description: 재고 부족 또는 주문 생성과의 장바구니 변경 경합.
+    delete:
+      tags: [Cart]
+      operationId: deleteCartItemGroup
+      summary: 선택한 장바구니 상품 삭제
+      description: >-
+        요청한 모든 행이 로그인 회원의 것인지 확인한 후 한 번에 삭제한다.
+        다른 회원의 행이나 없는 행이 섞여 있으면 아무것도 삭제하지 않는다.
+        기존 장바구니 REMOVE 변경 이력을 함께 기록한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteCartItemGroupRequest'
+            examples:
+              deleteGroupedItem:
+                value:
+                  cart_item_ids: [101, 102]
+      responses:
+        '204':
+          description: 삭제 완료. 응답 본문 없음.
+        '400':
+          description: 빈 목록, 중복 ID 또는 잘못된 ID.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/CartItemsNotFound'
+        '409':
+          description: 주문 생성이 같은 장바구니 행을 선점한 경우.
+  /me/addresses:
+    post:
+      tags: [ShippingAddresses]
+      operationId: createShippingAddress
+      summary: 새 배송지 등록
+      description: >-
+        회원 ID는 Bearer 토큰에서 가져온다. 첫 배송지는 기본 배송지로 저장한다.
+        이후 is_default가 true이면 해당 회원의 기존 기본 배송지 해제와 생성을
+        한 트랜잭션에서 처리한다. 프론트엔드는 address_name을 보내지 않으므로
+        서버가 기존 저장 모델의 필수 주소명을 채워야 한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateShippingAddressRequest'
+            examples:
+              firstAddress:
+                value:
+                  receiver: 홍길동
+                  phone: '01012345678'
+                  zip_code: '06236'
+                  line1: 서울 강남구 테헤란로 123
+                  line2: 101호
+                  is_default: true
+      responses:
+        '201':
+          description: 생성된 배송지. 기존 GET /me/addresses 원소와 같은 필드 형식.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShippingAddressResponse'
+              examples:
+                created:
+                  value:
+                    ID: 42
+                    ReceiverName: 홍길동
+                    ReceiverPhone: '01012345678'
+                    PostalCode: '06236'
+                    BaseAddress: 서울 강남구 테헤란로 123
+                    DetailAddress: 101호
+                    IsDefault: true
+        '400':
+          description: 필수 주소 정보 누락 또는 저장 길이 제한 초과.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+  /orders/quote:
+    post:
+      tags: [Checkout]
+      operationId: quoteOrder
+      summary: 주문 전 현재 결제 금액 견적
+      description: >-
+        POST /orders와 같은 현재 상품 가격, 쿠폰 적용 범위, 포인트 잔액 및 0원 주문
+        금지 규칙으로 계산한다. 이 호출은 주문·재고 예약·쿠폰 사용·포인트 차감·
+        장바구니 삭제를 하지 않는다. 견적은 가격을 보장하거나 잠그지 않으며
+        POST /orders에서 다시 검증한다. 현재 origin/main의 배송비 정책은 0원이다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderQuoteRequest'
+            examples:
+              couponAndPoints:
+                value:
+                  cart_item_ids: [101, 102]
+                  used_coupon_id: 35
+                  used_point: 3000
+                  shipping_address:
+                    receiver: 홍길동
+                    phone: '01012345678'
+                    zip_code: '06236'
+                    line1: 서울 강남구 테헤란로 123
+                    line2: 101호
+      responses:
+        '200':
+          description: 현재 서버 기준 주문 금액. 동일 상태의 결제 요청 금액과 일치해야 함.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderQuoteResponse'
+              examples:
+                quoted:
+                  value:
+                    product_total: 53000
+                    discount_total: 5000
+                    used_point: 3000
+                    shipping_fee: 0
+                    payment_amount: 45000
+                    line_items:
+                      - cart_item_id: 101
+                        unit_price: 32000
+                        line_total: 32000
+                      - cart_item_id: 102
+                        unit_price: 21000
+                        line_total: 21000
+        '400':
+          description: 잘못된 배송지·쿠폰·포인트, 0원 주문 또는 요청 형식 오류.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/CartItemsNotFound'
+        '409':
+          description: 주문 가능한 상품 상태·재고가 변경된 경우.
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    Unauthenticated:
+      description: 로그인 토큰이 없거나 유효하지 않음.
+    CartItemsNotFound:
+      description: 없는 장바구니 행 또는 다른 회원 소유의 행. 두 경우를 동일하게 처리.
+  schemas:
+    CartItemIds:
+      type: array
+      description: 요청 대상 장바구니 행 ID 목록.
+      minItems: 1
+      uniqueItems: true
+      items:
+        type: integer
+        format: int64
+        minimum: 1
+    UpdateCartItemGroupRequest:
+      type: object
+      description: 장바구니 상품 그룹의 변경 후 옵션과 총수량.
+      required: [cart_item_ids, option_id, quantity]
+      properties:
+        cart_item_ids:
+          $ref: '#/components/schemas/CartItemIds'
+        option_id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 변경할 상품에 속한 새 옵션 ID.
+        quantity:
+          type: integer
+          minimum: 1
+          description: 그룹 전체의 변경 후 수량. 행마다 적용할 수량이 아님.
+    DeleteCartItemGroupRequest:
+      type: object
+      required: [cart_item_ids]
+      properties:
+        cart_item_ids:
+          $ref: '#/components/schemas/CartItemIds'
+    CartItemResponse:
+      type: object
+      description: 현재 GET /cart 응답 원소의 PascalCase JSON 필드를 유지한다.
+      required: [ID, MemberID, ProductID, OptionID, Quantity, PriceAtAdded]
+      properties:
+        ID:
+          type: integer
+          format: int64
+          minimum: 1
+        MemberID:
+          type: integer
+          format: int64
+          minimum: 1
+        ProductID:
+          type: integer
+          format: int64
+          minimum: 1
+        OptionID:
+          type: integer
+          format: int64
+          minimum: 1
+        Quantity:
+          type: integer
+          minimum: 1
+        PriceAtAdded:
+          type: integer
+          minimum: 0
+          description: 변경 시 확인한 상품의 현재 단가.
+    CreateShippingAddressRequest:
+      type: object
+      required: [receiver, phone, zip_code, line1, line2, is_default]
+      properties:
+        receiver:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: 받는 분.
+        phone:
+          type: string
+          minLength: 1
+          maxLength: 20
+          description: 연락처.
+        zip_code:
+          type: string
+          minLength: 1
+          maxLength: 10
+          description: 우편번호. 앞의 0을 보존하므로 문자열.
+        line1:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: 기본 주소.
+        line2:
+          type: string
+          maxLength: 255
+          description: 상세 주소. 없으면 빈 문자열.
+        is_default:
+          type: boolean
+          description: 기본 배송지 지정 요청. 첫 배송지는 이 값과 무관하게 기본값.
+    ShippingAddressResponse:
+      type: object
+      description: 현재 GET /me/addresses 응답 원소의 PascalCase 필드를 유지한다.
+      required: [ID, ReceiverName, ReceiverPhone, PostalCode, BaseAddress, DetailAddress, IsDefault]
+      properties:
+        ID:
+          type: integer
+          format: int64
+          minimum: 1
+        ReceiverName:
+          type: string
+        ReceiverPhone:
+          type: string
+        PostalCode:
+          type: string
+        BaseAddress:
+          type: string
+        DetailAddress:
+          type: string
+        IsDefault:
+          type: boolean
+    OrderShippingAddressInput:
+      type: object
+      description: 기존 POST /orders의 shipping_address와 동일한 구조.
+      required: [receiver, phone, zip_code, line1, line2]
+      properties:
+        receiver:
+          type: string
+          minLength: 1
+          maxLength: 100
+        phone:
+          type: string
+          minLength: 1
+          maxLength: 20
+        zip_code:
+          type: string
+          minLength: 1
+        line1:
+          type: string
+          minLength: 1
+          description: 기존 주문처럼 우편번호·기본·상세 주소를 합친 결과는 255자 이하여야 함.
+        line2:
+          type: string
+          description: 상세 주소. 없으면 빈 문자열.
+    OrderQuoteRequest:
+      type: object
+      description: 기존 POST /orders의 주문 대상·혜택·배송지 입력과 동일한 구조.
+      required: [cart_item_ids, used_point, shipping_address]
+      properties:
+        cart_item_ids:
+          $ref: '#/components/schemas/CartItemIds'
+        used_coupon_id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 적용할 쿠폰이 없으면 생략.
+        used_point:
+          type: integer
+          minimum: 0
+          description: 사용할 포인트. 없으면 0.
+        shipping_address:
+          $ref: '#/components/schemas/OrderShippingAddressInput'
+    OrderQuoteResponse:
+      type: object
+      description: >-
+        payment_amount = product_total - discount_total - used_point + shipping_fee.
+        같은 상태에서 생성한 주문의 결제 요청 금액과 같아야 한다.
+      required: [product_total, discount_total, used_point, shipping_fee, payment_amount, line_items]
+      properties:
+        product_total:
+          type: integer
+          minimum: 0
+          description: 선택한 상품들의 현재 가격 합계.
+        discount_total:
+          type: integer
+          minimum: 0
+          description: 적용 가능한 쿠폰 할인 합계.
+        used_point:
+          type: integer
+          minimum: 0
+          description: 적용이 검증된 포인트.
+        shipping_fee:
+          type: integer
+          minimum: 0
+          description: 현재 정책에서 0원.
+        payment_amount:
+          type: integer
+          minimum: 1
+          description: 주문 전 최종 결제 예정액.
+        line_items:
+          type: array
+          description: 요청한 장바구니 행마다 정확히 하나의 금액 항목.
+          items:
+            $ref: '#/components/schemas/OrderQuoteLineResponse'
+    OrderQuoteLineResponse:
+      type: object
+      required: [cart_item_id, unit_price, line_total]
+      properties:
+        cart_item_id:
+          type: integer
+          format: int64
+          minimum: 1
+        unit_price:
+          type: integer
+          minimum: 0
+          description: 현재 상품 옵션 단가.
+        line_total:
+          type: integer
+          minimum: 0
+          description: unit_price와 해당 장바구니 행 수량을 곱한 값.

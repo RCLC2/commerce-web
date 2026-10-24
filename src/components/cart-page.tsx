@@ -6,7 +6,7 @@ import { ShoppingBag as PageIcon } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button-link";
 
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronRight, ShoppingBag } from "lucide-react";
+import { Check, ChevronRight, ShoppingBag, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -61,6 +61,26 @@ export function CartPage() {
   const selectedGroups = displayGroups.filter((group) => selectedGroupKeys.has(group.key));
   const selectedQuantity = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
   const total = selectedItems.reduce((sum, item) => sum + item.price_at_added * item.quantity, 0);
+  const stockIssues = new Map<string, string>();
+  for (const group of displayGroups) {
+    const product = group.items[0].product;
+    if (!product) continue;
+    if (product.status !== "SELLING" || product.in_stock === false) {
+      stockIssues.set(group.key, "현재 판매하지 않는 상품입니다. 선택을 해제해주세요.");
+      continue;
+    }
+    if (!product.options) continue;
+    const option = product.options.find((candidate) => candidate.id === group.option_id);
+    if (!option?.is_active) {
+      stockIssues.set(group.key, "선택한 옵션을 주문할 수 없습니다. 옵션을 변경하거나 선택을 해제해주세요.");
+      continue;
+    }
+    const available = availableCartQuantity(product, group.option_id);
+    if (available === 0) stockIssues.set(group.key, "선택한 옵션이 품절되었습니다. 옵션을 변경하거나 선택을 해제해주세요.");
+    else if (group.quantity > available) stockIssues.set(group.key, `현재 주문 가능한 수량은 ${available}개입니다. 수량을 줄이거나 옵션을 변경해주세요.`);
+  }
+  const selectedStockIssueCount = selectedGroups.filter((group) => stockIssues.has(group.key)).length;
+  const stockCheckPending = selectedGroups.some((group) => !group.items[0].product && products[productIDs.indexOf(group.product_id)]?.isPending);
   const productError = products.some((query) => query.isError);
   const allSelected = displayGroups.length > 0 && selectedGroups.length === displayGroups.length;
 
@@ -91,6 +111,17 @@ export function CartPage() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.cart(memberID) });
     },
     onError: () => { void queryClient.invalidateQueries({ queryKey: queryKeys.cart(memberID) }); },
+  });
+  const removeCart = useMutation({
+    mutationFn: (cartItemIDs: number[]) => api.removeCartItems(effectiveToken, cartItemIDs),
+    onSuccess: (_, cartItemIDs) => {
+      queryClient.setQueryData<CartItem[]>(queryKeys.cart(memberID), (current) =>
+        (current ?? []).filter((item) => !cartItemIDs.includes(item.id)));
+      setSelectedIDs((current) => new Set([...current].filter((id) => !cartItemIDs.includes(id))));
+      setEditingKey(null);
+      setSaved(true);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cart(memberID) });
+    },
   });
   const editingGroup = displayGroups.find((group) => group.key === editingKey);
   const editingProduct = editingGroup ? productByID.get(editingGroup.product_id) : undefined;
@@ -142,6 +173,7 @@ export function CartPage() {
       </div>
       {saved ? <Notice className="mt-4" tone="success">장바구니를 변경했습니다.</Notice> : null}
       {updateCart.error && !editingGroup ? <Notice className="mt-4" tone="error" title="장바구니를 변경하지 못했습니다">{apiErrorMessage(updateCart.error)}<Button variant="secondary" size="sm" className="ml-2" onClick={() => { updateCart.reset(); void cart.refetch(); }}>목록 새로고침</Button></Notice> : null}
+      {removeCart.error ? <Notice className="mt-4" tone="error" title="상품을 삭제하지 못했습니다">{apiErrorMessage(removeCart.error)}<Button variant="secondary" size="sm" className="ml-2" onClick={() => { removeCart.reset(); void cart.refetch(); }}>다시 확인</Button></Notice> : null}
       {editingGroup && editingProduct ? <CartOptionEditor key={editingGroup.key} group={editingGroup} product={editingProduct} groups={displayGroups} pending={updateCart.isPending} error={updateCart.error ? apiErrorMessage(updateCart.error) : undefined} onClose={() => { setEditingKey(null); updateCart.reset(); }} onSave={(optionID, quantity) => saveGroup(editingGroup, optionID, quantity)} /> : null}
       <div className="mt-7 grid gap-6 md:grid-cols-[minmax(0,1fr)_320px]">
         <section>
@@ -159,7 +191,9 @@ export function CartPage() {
             const item = group.items[0];
             const option = item.product?.options?.find((candidate) => candidate.id === group.option_id);
             const selected = selectedGroupKeys.has(group.key);
-            return <article key={group.key} className={`rounded-surface border bg-surface-raised p-4 transition ${selected ? "border-action-primary/40 shadow-card" : "border-border-subtle"}`}>
+            const stockIssue = stockIssues.get(group.key);
+            const availableQuantity = availableCartQuantity(item.product, group.option_id);
+            return <article key={group.key} className={`rounded-surface border bg-surface-raised p-4 transition ${stockIssue ? "border-status-negative-border" : selected ? "border-action-primary/40 shadow-card" : "border-border-subtle"}`}>
               <div className="grid grid-cols-[24px_88px_minmax(0,1fr)] gap-3">
                 <label className="pt-1" aria-label={`${item.product?.name ?? `상품 ${group.product_id}`} 선택`}><input type="checkbox" className="h-5 w-5 cursor-pointer accent-action-primary" checked={selected} onChange={() => toggleGroup(group.cartItemIDs)} /></label>
                 <Link href={`/products/${group.product_id}`} className="relative aspect-square overflow-hidden rounded-control bg-surface-subtle"><SafeImage src={item.product?.image_url} alt="" fill sizes="88px" className="object-cover" /></Link>
@@ -169,9 +203,13 @@ export function CartPage() {
                   <p className="mt-3 text-right font-bold tabular-nums text-content-primary">{formatPrice(group.totalPrice)}</p>
                 </div>
               </div>
+              {stockIssue ? <p className="mt-3 rounded-control bg-status-negative-subtle px-3 py-2 text-sm font-bold text-status-negative" role="status">{stockIssue}</p> : null}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-3">
-                <QuantityStepper value={group.quantity} max={availableCartQuantity(item.product, group.option_id)} disabled={updateCart.isPending || !item.product || cart.isFetching} label={`${item.product?.name ?? "상품"} 수량`} onValueChange={(quantity) => saveGroup(group, group.option_id, quantity)} />
-                <Button size="sm" variant="secondary" disabled={updateCart.isPending || !item.product?.options?.length || cart.isFetching} onClick={() => { updateCart.reset(); setSaved(false); setEditingKey(group.key); }}>옵션 변경</Button>
+                <QuantityStepper value={group.quantity} max={availableQuantity} disabled={updateCart.isPending || removeCart.isPending || !item.product || cart.isFetching || availableQuantity === 0 || item.product.status !== "SELLING" || item.product.in_stock === false} label={`${item.product?.name ?? "상품"} 수량`} onValueChange={(quantity) => saveGroup(group, group.option_id, quantity)} />
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="secondary" disabled={updateCart.isPending || removeCart.isPending || !item.product?.options?.length || cart.isFetching} onClick={() => { updateCart.reset(); setSaved(false); setEditingKey(group.key); }}>옵션 변경</Button>
+                  <Button size="sm" variant="ghost" className="text-status-negative" aria-label={`${item.product?.name ?? "상품"} 삭제`} disabled={updateCart.isPending || removeCart.isPending || cart.isFetching} onClick={() => { setSaved(false); removeCart.reset(); removeCart.mutate(group.cartItemIDs); }}><Trash2 size={16} /> 삭제</Button>
+                </div>
               </div>
             </article>;
           })}
@@ -179,10 +217,11 @@ export function CartPage() {
         </section>
         <aside className="md:sticky md:top-24">
           <OrderSummary
-            title="주문 예상 금액"
-            items={[{ label: `선택 수량 ${selectedQuantity}개`, value: formatPrice(total) }]}
+            title="선택 상품"
+            items={[{ label: "선택 수량", value: `${selectedQuantity}개` }]}
+            totalLabel="상품 금액 합계"
             total={formatPrice(total)}
-            footer={<><Button className="w-full" size="lg" disabled={!selectedItems.length || cart.isError || cart.isFetching || updateCart.isPending} onClick={goToCheckout}><Check size={18} /> 선택 상품 주문하기</Button>{displayGroups.length > 0 && !selectedItems.length ? <p className="mt-3 text-center text-xs font-bold text-action-primary">주문할 상품을 선택해주세요.</p> : null}</>}
+            footer={<><Button className="w-full" size="lg" disabled={!selectedItems.length || cart.isError || cart.isFetching || updateCart.isPending || removeCart.isPending || stockCheckPending || selectedStockIssueCount > 0} onClick={goToCheckout}><Check size={18} /> 선택 상품 주문하기</Button>{selectedStockIssueCount > 0 ? <p className="mt-3 text-sm font-bold text-status-negative" role="status">주문할 수 없는 상품 {selectedStockIssueCount}개가 선택되어 있습니다. 수량·옵션을 변경하거나 선택을 해제해주세요.</p> : stockCheckPending ? <p className="mt-3 text-center text-xs text-content-secondary" role="status">상품 재고를 확인하는 중입니다.</p> : displayGroups.length > 0 && !selectedItems.length ? <p className="mt-3 text-center text-xs font-bold text-action-primary">주문할 상품을 선택해주세요.</p> : null}</>}
           />
         </aside>
       </div>

@@ -11,17 +11,22 @@ export function ProductCard({
   product,
   imageAspect = "aspect-square",
   compact = false,
+  recentlyViewed = false,
+  onVisit,
 }: {
   product: Product;
   imageAspect?: string;
   compact?: boolean;
+  recentlyViewed?: boolean;
+  onVisit?: () => void;
 }) {
   const couponPrice = couponPriceForProduct(product);
 
   return (
     <article className="group min-w-0">
-      <Link href={`/products/${product.id}`} className="block">
-        <div className={`relative ${imageAspect} overflow-hidden rounded-control bg-surface-subtle`}>
+      <Link href={`/products/${product.id}`} className="block" onClick={onVisit}>
+        <div className={`relative ${imageAspect} overflow-hidden rounded-control bg-surface-subtle ${recentlyViewed ? "ring-2 ring-inset ring-action-primary" : ""}`}>
+          {recentlyViewed ? <span className="absolute left-2 top-2 z-10 rounded-full bg-action-primary px-2 py-1 text-xs font-bold text-content-inverse">최근 본 상품</span> : null}
           <SafeImage
             src={product.image_url}
             alt={product.name}
@@ -35,7 +40,7 @@ export function ProductCard({
         <Link href={`/markets/${product.market?.id ?? product.market_id}`} className="inline-flex max-w-full items-center gap-1 text-xs font-medium text-content-secondary underline-offset-2 hover:text-content-primary hover:underline">
           <Store size={13} className="shrink-0" aria-hidden="true" /><span className="truncate">{product.market?.name ?? product.market_name ?? `마켓 ${product.market_id}`}</span>
         </Link>
-        <Link href={`/products/${product.id}`} className="block">
+        <Link href={`/products/${product.id}`} className="block" onClick={onVisit}>
           <h3 className={`${compact ? "line-clamp-1" : "line-clamp-2"} text-sm font-bold leading-5 text-content-primary hover:underline`}>{product.name}</h3>
         </Link>
         <ProductCardPrice

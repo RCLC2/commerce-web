@@ -9,7 +9,7 @@ import { apiErrorMessage } from "@/lib/api-client";
 import { api } from "@/lib/api";
 import { clearCheckoutRetryState, readCheckoutRetryState } from "@/lib/queries/checkout";
 import { useSessionStore } from "@/lib/session-store";
-import { parseTossSuccessParams, type TossPaymentSuccessParams } from "@/lib/toss-payment";
+import { isPaymentConfirmedOrderStatus, parseTossSuccessParams, type TossPaymentSuccessParams } from "@/lib/toss-payment";
 import { formatPrice } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/feedback";
@@ -72,11 +72,11 @@ export function TossSuccessClient() {
         });
 
         let latest = await api.getOrder(token, requestedOrderId);
-        for (let attempt = 0; attempt < 5 && !["PAID", "PLACED"].includes(latest.status); attempt += 1) {
+        for (let attempt = 0; attempt < 5 && !isPaymentConfirmedOrderStatus(latest.status); attempt += 1) {
           await new Promise((resolve) => window.setTimeout(resolve, 400));
           latest = await api.getOrder(token, requestedOrderId);
         }
-        if (!["PAID", "PLACED"].includes(latest.status)) {
+        if (!isPaymentConfirmedOrderStatus(latest.status)) {
           throw new Error("결제 승인은 완료됐지만 주문 상태 반영이 지연되고 있습니다.");
         }
 

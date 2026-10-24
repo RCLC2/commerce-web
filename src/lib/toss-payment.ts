@@ -4,6 +4,13 @@ export type TossPaymentSuccessParams = {
   amount: number;
 };
 
+export function isPaymentConfirmedOrderStatus(status: string): boolean {
+  return [
+    "PAID", "PLACED", "SHIPPED", "DELIVERED", "COMPLETED",
+    "RETURN_REQUESTED", "RETURN_APPROVED", "RETURN_REJECTED",
+  ].includes(status);
+}
+
 type SearchParamReader = {
   get: (name: string) => string | null;
 };

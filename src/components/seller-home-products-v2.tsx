@@ -45,6 +45,7 @@ import {
   useSellerConsoleContext,
 } from "./seller-shell";
 import { Button } from "./ui/button";
+import { MarketShippingSettings } from "./market-shipping-settings";
 
 function dateTime(value?: string) {
   return value ? new Date(value).toLocaleString("ko-KR") : "-";
@@ -99,6 +100,8 @@ export function SellerHomePageV2() {
           </div>
         ))}
       </div>
+
+      {marketID ? <ConsoleSection className="mt-5" title="배송비 설정"><MarketShippingSettings key={marketID} token={token} marketID={marketID} /></ConsoleSection> : null}
 
       <ConsoleSection
         className="mt-5"

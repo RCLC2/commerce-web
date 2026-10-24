@@ -144,6 +144,9 @@ export const rawSellerProductSchema = z.looseObject({
 });
 
 export const rawSettlementSchema = z.looseObject({
+  refund_deduction_amount: nonNegativeIntSchema.optional(),
+  payable_amount: nonNegativeIntSchema.optional(),
+  outstanding_refund_amount: nonNegativeIntSchema.optional(),
   ID: identifierSchema,
   MarketID: identifierSchema,
   TargetMonth: z.string(),

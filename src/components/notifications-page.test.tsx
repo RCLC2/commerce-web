@@ -18,6 +18,8 @@ describe("notification guest state", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     render(<QueryClientProvider client={client}><NotificationsPage /></QueryClientProvider>);
 
+    expect(screen.getByRole("heading", { name: "알림함" })).toBeInTheDocument();
+    expect(screen.getByText("새로운 소식과 쇼핑 관련 알림을 한곳에서 확인하세요.")).toBeInTheDocument();
     expect(screen.getByText("로그인이 필요합니다")).toBeInTheDocument();
     expect(screen.getByText("새로운 알림을 확인하려면 로그인해주세요.")).toBeInTheDocument();
     const login = screen.getByRole("link", { name: "로그인하기" });
