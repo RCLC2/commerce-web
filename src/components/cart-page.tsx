@@ -22,7 +22,6 @@ import { Button } from "./ui/button";
 import { EmptyState, LoadingState, LoginRequiredState } from "./ui/feedback";
 import { Notice } from "./ui/notice";
 import { OrderSummary } from "./ui/order-summary";
-import { QuantityStepper } from "./ui/quantity-stepper";
 import { CartOptionEditor, availableCartQuantity } from "./cart-option-editor";
 import type { CartDisplayGroup } from "@/lib/cart-display";
 import type { CartItem } from "@/lib/types";
@@ -192,7 +191,6 @@ export function CartPage() {
             const option = item.product?.options?.find((candidate) => candidate.id === group.option_id);
             const selected = selectedGroupKeys.has(group.key);
             const stockIssue = stockIssues.get(group.key);
-            const availableQuantity = availableCartQuantity(item.product, group.option_id);
             return <article key={group.key} className={`rounded-surface border bg-surface-raised p-4 transition ${stockIssue ? "border-status-negative-border" : selected ? "border-action-primary/40 shadow-card" : "border-border-subtle"}`}>
               <div className="grid grid-cols-[24px_88px_minmax(0,1fr)] gap-3">
                 <label className="pt-1" aria-label={`${item.product?.name ?? `상품 ${group.product_id}`} 선택`}><input type="checkbox" className="h-5 w-5 cursor-pointer accent-action-primary" checked={selected} onChange={() => toggleGroup(group.cartItemIDs)} /></label>
@@ -205,9 +203,8 @@ export function CartPage() {
               </div>
               {stockIssue ? <p className="mt-3 rounded-control bg-status-negative-subtle px-3 py-2 text-sm font-bold text-status-negative" role="status">{stockIssue}</p> : null}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-3">
-                <QuantityStepper value={group.quantity} max={availableQuantity} disabled={updateCart.isPending || removeCart.isPending || !item.product || cart.isFetching || availableQuantity === 0 || item.product.status !== "SELLING" || item.product.in_stock === false} label={`${item.product?.name ?? "상품"} 수량`} onValueChange={(quantity) => saveGroup(group, group.option_id, quantity)} />
                 <div className="flex items-center gap-2">
-                  <Button size="sm" variant="secondary" disabled={updateCart.isPending || removeCart.isPending || !item.product?.options?.length || cart.isFetching} onClick={() => { updateCart.reset(); setSaved(false); setEditingKey(group.key); }}>옵션 변경</Button>
+                  <Button size="sm" variant="secondary" disabled={updateCart.isPending || removeCart.isPending || !item.product?.options?.length || cart.isFetching} onClick={() => { updateCart.reset(); setSaved(false); setEditingKey(group.key); }}>옵션·수량 변경</Button>
                   <Button size="sm" variant="ghost" className="text-status-negative" aria-label={`${item.product?.name ?? "상품"} 삭제`} disabled={updateCart.isPending || removeCart.isPending || cart.isFetching} onClick={() => { setSaved(false); removeCart.reset(); removeCart.mutate(group.cartItemIDs); }}><Trash2 size={16} /> 삭제</Button>
                 </div>
               </div>

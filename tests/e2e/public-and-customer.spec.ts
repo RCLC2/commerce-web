@@ -181,7 +181,8 @@ test.describe("public and customer journeys with live and controlled API boundar
     });
     await page.goto("/products/1");
 
-    await page.getByRole("button", { name: "장바구니 담기", exact: true }).first().click();
+    await page.getByRole("button", { name: "옵션·수량 선택", exact: true }).click();
+    await page.getByRole("dialog", { name: "구매 옵션", exact: true }).getByRole("button", { name: "장바구니 담기", exact: true }).click();
 
     await expect(page.getByText(/상품을 담았습니다/).first()).toBeVisible();
     expect(addAttempts).toBe(1);

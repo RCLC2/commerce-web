@@ -7,7 +7,7 @@ import { formatPrice } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { Field } from "./ui/field";
 import { Select } from "./ui/input";
-import { Dialog } from "./ui/overlay";
+import { BottomSheet } from "./ui/overlay";
 import { QuantityStepper } from "./ui/quantity-stepper";
 import { Notice } from "./ui/notice";
 
@@ -29,7 +29,7 @@ export function CartOptionEditor({ group, product, groups, pending, error, onClo
   const valid = selectedOption?.is_active && quantity >= 1 && quantity <= available;
 
   return (
-    <Dialog open title="옵션 변경" description={product.name} onClose={() => { if (!pending) onClose(); }}>
+    <BottomSheet open title="옵션·수량 변경" className="mx-auto max-w-xl" description={product.name} onClose={() => { if (!pending) onClose(); }}>
       <div className="space-y-5">
         <Field label="상품 옵션" htmlFor="cart-product-option">
           <Select id="cart-product-option" value={optionID} disabled={pending} onChange={(event) => {
@@ -52,6 +52,6 @@ export function CartOptionEditor({ group, product, groups, pending, error, onClo
         <p className="text-xs leading-5 text-content-secondary">변경한 옵션과 현재 판매가를 기준으로 주문 금액을 다시 계산합니다.</p>
         <div className="flex justify-end gap-2"><Button variant="secondary" disabled={pending} onClick={onClose}>취소</Button><Button disabled={pending || !valid} onClick={() => onSave(optionID, quantity)}>{pending ? "저장 중" : "변경 저장"}</Button></div>
       </div>
-    </Dialog>
+    </BottomSheet>
   );
 }
