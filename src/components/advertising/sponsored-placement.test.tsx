@@ -80,7 +80,7 @@ describe("SponsoredDecision", () => {
     render(<SponsoredDecision decision={bannerDecision()} />);
 
     expect(screen.getByRole("img", { name: "테스트 상품 스폰서드 배너" })).toHaveClass("object-cover");
-    expect(screen.getByRole("img", { name: "테스트 상품 스폰서드 배너" }).parentElement).toHaveClass("h-44", "md:h-56");
+    expect(screen.getByRole("img", { name: "테스트 상품 스폰서드 배너" }).closest("div")).toHaveClass("h-44", "md:h-56");
     expect(screen.getByRole("link", { name: "Jane Doe" })).toHaveAttribute("href", "https://www.pexels.com/@jane");
     expect(screen.getByRole("link", { name: "Pexels" })).toHaveAttribute("href", "https://www.pexels.com/photo/88");
   });
@@ -88,7 +88,7 @@ describe("SponsoredDecision", () => {
   it("uses a shorter banner on PDP", () => {
     render(<SponsoredDecision decision={pdpBannerDecision()} />);
 
-    expect(screen.getByRole("img", { name: "테스트 상품 스폰서드 배너" }).parentElement).toHaveClass("h-36", "md:h-44");
+    expect(screen.getByRole("img", { name: "테스트 상품 스폰서드 배너" }).closest("div")).toHaveClass("h-36", "md:h-44");
   });
 
   it("uses compact cards for home feed and PDP market placements", () => {

@@ -292,7 +292,7 @@ describe("coupon response regressions", () => {
 });
 
 describe("origin/main mixed contract regressions", () => {
-  it("normalizes timestamp-free review mutations and PascalCase notifications", async () => {
+  it("normalizes timestamp-free review mutations and reads current inbox notifications", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({
         id: 5,
@@ -308,14 +308,24 @@ describe("origin/main mixed contract regressions", () => {
         status: "ACTIVE",
         images: [],
       }), { status: 201 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify([{
-        ID: 9,
-        UserID: 3,
-        Title: "배송",
-        Message: "출고되었습니다",
-        IsRead: false,
-        CreatedAt: "2026-07-29T00:00:00Z",
-      }]), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        items: [{
+          id: 9,
+          member_id: 3,
+          message_id: 12,
+          created_at: "2026-07-29T00:00:00Z",
+          read_at: null,
+          message: {
+            id: 12,
+            kind: "INFORMATION",
+            title: "배송",
+            body: "출고되었습니다",
+            destination_path: "/orders/ORDER-1",
+            toast_enabled: true,
+          },
+        }],
+        read_through: "2026-07-29T00:00:00Z",
+      }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
     const review = await customerApi.createOrderLineReview("token", "ORDER-1", 6, {
@@ -329,12 +339,20 @@ describe("origin/main mixed contract regressions", () => {
     expect(review).not.toHaveProperty("created_at");
     await expect(customerApi.listNotifications("token")).resolves.toEqual([{
       id: 9,
-      user_id: 3,
-      title: "배송",
-      message: "출고되었습니다",
-      is_read: false,
+      member_id: 3,
+      message_id: 12,
       created_at: "2026-07-29T00:00:00Z",
+      read_at: null,
+      message: {
+        id: 12,
+        kind: "INFORMATION",
+        title: "배송",
+        body: "출고되었습니다",
+        destination_path: "/orders/ORDER-1",
+        toast_enabled: true,
+      },
     }]);
+    expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("/api/v1/me/notifications?limit=50"), expect.any(Object));
   });
 
   it("rejects a truncated review mutation response before reporting success", async () => {
