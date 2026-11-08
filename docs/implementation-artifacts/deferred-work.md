@@ -17,3 +17,10 @@
 - **D1 — 해결:** 열린 `ReturnRequestForm`에 최신 반품 목록의 조회 오류·조회 중 상태를 전달한다. 오류·재조회 중에는 제출을 차단하고 고정 하단에 재확인 버튼을 제공한다. 수량·사유·수거지는 유지하며, 재조회 성공 뒤에는 갱신된 신청 가능 수량으로 다시 판단한다.
 - **D2 — 해결:** 수량·사유 입력의 접근 가능한 이름에 상품명과 옵션명을 함께 사용한다. 네이비·블랙 옵션이 있는 동일 상품을 각각 선택하는 회귀 테스트로 구분을 확인한다.
 - **D3 — 해결:** 공통 `tests/support/returns-browser-check.mjs`에서 구매자·판매자 주소록 준비 → 각자 저장 주소 선택 → 요청/수거 주소 5개 필드 저장 검증을 수행한다. 최신 버튼·안내 문구, 조회 실패/재시도와 모바일 검증, 실행 후 해당 브라우저 세션 정리를 반영했다. 전용 API·DB·Temporal·PG 대역 및 새 fixture가 필요한 통합 스크립트이며 단독 실행형 테스트는 아니다.
+
+- source_spec: `docs/implementation-artifacts/spec-mypage-wallet-design.md`
+  summary: Refresh the pre-existing notification contract fixture in commands.test.ts.
+  evidence: The unchanged HEAD reproduces the same failing listNotifications test because its fixture is a legacy array while the current endpoint requires the inbox page object; unrelated to the wallet change.
+- source_spec: `docs/implementation-artifacts/spec-mypage-wallet-design.md`
+  summary: Refresh two pre-existing sponsored-placement image geometry assertions.
+  evidence: Both failures reproduce unchanged on HEAD; SafeImage now wraps images in its loading-state span, so immediate parent class checks no longer target the banner geometry.
