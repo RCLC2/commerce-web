@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import type { Product } from "@/lib/types";
@@ -59,7 +59,8 @@ describe("ProductDetailExperience quick purchase layer", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={client}><ProductDetailExperience productId={product.id} initialProduct={product} /></QueryClientProvider>);
 
-    fireEvent.click(screen.getAllByRole("button", { name: "로그인 후 담기" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "옵션·수량 선택" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "구매 옵션" })).getByRole("button", { name: "로그인 후 담기" }));
     expect(push).toHaveBeenCalledWith("/login?next=%2Fproducts%2F1");
   });
 
@@ -92,4 +93,28 @@ describe("ProductDetailExperience quick purchase layer", () => {
     );
     expect(quickPurchase).not.toHaveClass("z-[var(--commerce-z-dropdown)]");
   });
+  it("opens option and quantity selection in a shared bottom sheet and retains choices on dismissal", () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const withOptions = { ...product, options: [...product.options!, { id: 2, product_id: 1, option_name: "색상", option_value: "화이트", additional_price: 2000, quantity: 3, is_active: true }] };
+    vi.mocked(api.getProduct).mockResolvedValue(withOptions);
+    render(<QueryClientProvider client={client}><ProductDetailExperience productId={product.id} initialProduct={withOptions} /></QueryClientProvider>);
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "옵션·수량 선택" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    let sheet = screen.getByRole("dialog", { name: "구매 옵션" });
+    fireEvent.change(within(sheet).getByRole("combobox"), { target: { value: "2" } });
+    fireEvent.click(within(sheet).getByRole("button", { name: "수량 늘리기" }));
+    expect(within(sheet).getByText("63,800원")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    fireEvent.click(trigger);
+    sheet = screen.getByRole("dialog", { name: "구매 옵션" });
+    expect(within(sheet).getByRole("combobox")).toHaveValue("2");
+    expect(within(sheet).getByText("63,800원")).toBeInTheDocument();
+    fireEvent.click(within(sheet).getByRole("button", { name: "수량 늘리기" }));
+    expect(within(sheet).getByRole("button", { name: "수량 늘리기" })).toBeDisabled();
+  });
+
 });

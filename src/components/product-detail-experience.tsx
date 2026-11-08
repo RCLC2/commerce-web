@@ -3,7 +3,7 @@
 import { Select } from "./ui/input";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, Bookmark, Camera, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Heart, MessageSquareText, Minus, Plus, ShoppingBag, SlidersHorizontal, Star, X } from "lucide-react";
+import { BadgeCheck, Bookmark, Camera, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Heart, MessageSquareText, Minus, Plus, ShoppingBag, SlidersHorizontal, Star } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -32,7 +32,7 @@ import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 import { BackButton } from "./ui/back-button";
 import { EmptyState, InlineLoadingState, LoadingSpinner, LoadingState, Toast } from "./ui/feedback";
-import { useAccessibleOverlay } from "./ui/use-accessible-overlay";
+import { BottomSheet } from "./ui/overlay";
 
 class CartPreflightError extends Error {
   constructor(cause: unknown) {
@@ -59,8 +59,6 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
   const [isDraggingImage, setIsDraggingImage] = useState(false);
   const dragStartX = useRef<number | null>(null);
   const purchasePanelRef = useRef<HTMLElement | null>(null);
-  const purchaseDialogRef = useRef<HTMLDivElement | null>(null);
-  useAccessibleOverlay(purchaseOpen, () => setPurchaseOpen(false), purchaseDialogRef);
 
   const productQuery = useQuery({
     queryKey: queryKeys.product(productId),
@@ -461,12 +459,11 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
           </div>
           <div className="relative mb-4 border-b border-border-subtle pb-3">
             <p className="text-xs font-bold text-action-primary">구매 옵션</p>
-            <h2 className="mt-1 pr-16 text-base font-bold">원하는 옵션을 선택하세요</h2>
-            <span className="absolute right-0 top-0 shrink-0 text-right text-xs font-bold text-content-secondary">
-              {formatPrice((price + (selectedOption?.additional_price ?? 0)) * purchaseQuantity)}<br />{purchaseQuantity}개
-            </span>
+            <h2 className="mt-1 text-base font-bold">옵션과 수량을 확인하세요</h2>
           </div>
           <PurchaseControls
+              selectionInSheet
+              selectionOpen={purchaseOpen}
               product={product}
               selectedOption={selectedOption}
               quantity={purchaseQuantity}
@@ -491,7 +488,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
               onWishlist={() => handleProtectedEngagement("wishlist")}
               onRetryLike={retryLike}
               onRetryWishlist={retryWishlist}
-              onCart={handleCartAction}
+              onCart={() => { if (addCart.isSuccess || (addCart.isError && !(addCart.error instanceof CartPreflightError))) handleCartAction(); else setPurchaseOpen(true); }}
           />
         </aside>
       </div>
@@ -624,56 +621,43 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-2">
           <div className="hidden min-w-0 flex-1 sm:block"><p className="truncate text-xs font-bold text-content-secondary">{product.name}</p><p className="font-bold">{formatPrice(price + (selectedOption?.additional_price ?? 0))} · {purchaseQuantity}개</p></div>
           <Button className="shrink-0" variant="secondary" onClick={() => setPurchaseOpen(true)} tabIndex={showFloatingPurchase ? 0 : -1}><SlidersHorizontal size={18} /> 옵션·수량</Button>
-          <Button className="min-w-0 flex-1 sm:max-w-64" onClick={handleCartAction} disabled={addCart.isPending || !selectedOption} tabIndex={showFloatingPurchase ? 0 : -1}>
+          <Button className="min-w-0 flex-1 sm:max-w-64" onClick={() => { if (addCart.isSuccess || (addCart.isError && !(addCart.error instanceof CartPreflightError))) handleCartAction(); else setPurchaseOpen(true); }} aria-haspopup={addCart.isSuccess || (addCart.isError && !(addCart.error instanceof CartPreflightError)) ? undefined : "dialog"} aria-expanded={purchaseOpen} disabled={addCart.isPending || !selectedOption} tabIndex={showFloatingPurchase ? 0 : -1}>
             {addCart.isSuccess ? <CheckCircle2 size={19} /> : <ShoppingBag size={19} />}
-            {addCart.isPending ? "담는 중" : addCart.isSuccess || (addCart.isError && !(addCart.error instanceof CartPreflightError)) ? "장바구니 확인" : addCart.isError ? "다시 담기" : !effectiveToken ? "로그인 후 담기" : "장바구니 담기"}
+            {addCart.isPending ? "담는 중" : addCart.isSuccess || (addCart.isError && !(addCart.error instanceof CartPreflightError)) ? "장바구니 확인" : "구매 옵션 선택"}
           </Button>
           {addCart.isError ? <p className="basis-full text-right text-xs font-bold text-action-primary">{addCart.error instanceof CartPreflightError ? addCart.error.message : "담기 결과가 불명확합니다. 장바구니에서 확인해주세요."}</p> : null}
         </div>
       </div>
 
-      {purchaseOpen ? (
-        <div className="fixed inset-0 z-[var(--commerce-z-modal)] flex items-end justify-center bg-black/45 p-0 md:items-center md:p-6" onClick={(event) => { if (event.target === event.currentTarget) setPurchaseOpen(false); }}>
-          <div ref={purchaseDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="구매 옵션" className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-surface bg-surface-raised p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-float md:rounded-surface">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-bold text-content-secondary">{product.market_name}</p>
-                <h2 className="font-bold">{product.name}</h2>
-              </div>
-              <Button variant="secondary" size="icon" aria-label="구매 옵션 닫기" onClick={() => setPurchaseOpen(false)}><X size={18} /></Button>
-            </div>
-            <div className="mt-5">
-              <PurchaseControls
-                product={product}
-                selectedOption={selectedOption}
-                quantity={purchaseQuantity}
-                availableQuantity={availableQuantity}
-                liked={liked}
-                wishlisted={wishlisted}
-                cartPending={addCart.isPending}
-                likePending={likeMutation.isPending}
-                wishlistPending={wishlistMutation.isPending}
-                likeReady={!effectiveToken || (likedProductsQuery.isSuccess && !likedProductsQuery.isFetching)}
-                wishlistReady={!effectiveToken || (wishlistQuery.isSuccess && !wishlistQuery.isFetching)}
-                engagementLoading={engagementLoading}
-                likeError={likeError ? `좋아요 상태를 처리하지 못했습니다. ${apiErrorMessage(likeError)}` : undefined}
-                wishlistError={wishlistError ? `찜 상태를 처리하지 못했습니다. ${apiErrorMessage(wishlistError)}` : undefined}
-                added={addCart.isSuccess}
-                cartError={addCart.isError ? addCart.error instanceof CartPreflightError ? addCart.error.message : `장바구니 반영 여부를 확인하지 못했습니다. ${apiErrorMessage(addCart.error)}` : undefined}
-                cartRetrySafe={addCart.error instanceof CartPreflightError}
-                authenticated={Boolean(effectiveToken)}
-                onOption={handleOption}
-                onQuantity={handleQuantity}
-                onLike={() => handleProtectedEngagement("like")}
-                onWishlist={() => handleProtectedEngagement("wishlist")}
-                onRetryLike={retryLike}
-                onRetryWishlist={retryWishlist}
-                onCart={handleCartAction}
-              />
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <BottomSheet open={purchaseOpen} onClose={() => { if (!addCart.isPending) setPurchaseOpen(false); }} title="구매 옵션" description={product.name} className="mx-auto max-w-lg">
+        <PurchaseControls
+          product={product}
+          selectedOption={selectedOption}
+          quantity={purchaseQuantity}
+          availableQuantity={availableQuantity}
+          liked={liked}
+          wishlisted={wishlisted}
+          cartPending={addCart.isPending}
+          likePending={likeMutation.isPending}
+          wishlistPending={wishlistMutation.isPending}
+          likeReady={!effectiveToken || (likedProductsQuery.isSuccess && !likedProductsQuery.isFetching)}
+          wishlistReady={!effectiveToken || (wishlistQuery.isSuccess && !wishlistQuery.isFetching)}
+          engagementLoading={engagementLoading}
+          likeError={likeError ? `좋아요 상태를 처리하지 못했습니다. ${apiErrorMessage(likeError)}` : undefined}
+          wishlistError={wishlistError ? `찜 상태를 처리하지 못했습니다. ${apiErrorMessage(wishlistError)}` : undefined}
+          added={addCart.isSuccess}
+          cartError={addCart.isError ? addCart.error instanceof CartPreflightError ? addCart.error.message : `장바구니 반영 여부를 확인하지 못했습니다. ${apiErrorMessage(addCart.error)}` : undefined}
+          cartRetrySafe={addCart.error instanceof CartPreflightError}
+          authenticated={Boolean(effectiveToken)}
+          onOption={handleOption}
+          onQuantity={handleQuantity}
+          onLike={() => handleProtectedEngagement("like")}
+          onWishlist={() => handleProtectedEngagement("wishlist")}
+          onRetryLike={retryLike}
+          onRetryWishlist={retryWishlist}
+          onCart={handleCartAction}
+        />
+      </BottomSheet>
       {toast ? (
         <div className="pointer-events-none fixed inset-x-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[var(--commerce-z-modal)] flex justify-center">
           <Toast tone={toast.tone} className="pointer-events-auto max-w-md">{toast.message}</Toast>
@@ -698,6 +682,8 @@ function GalleryButton({ label, side, onClick, children }: { label: string; side
 }
 
 type PurchaseControlsProps = {
+  selectionInSheet?: boolean;
+  selectionOpen?: boolean;
   product: Product;
   selectedOption?: ProductOption;
   quantity: number;
@@ -726,37 +712,40 @@ type PurchaseControlsProps = {
 };
 
 function PurchaseControls(props: PurchaseControlsProps) {
+  const opensSelection = props.selectionInSheet && !props.added && !(props.cartError && !props.cartRetrySafe);
   return (
     <div className="space-y-4">
-      <label className="block text-sm font-bold">
-        옵션
-        <Select
-          className="mt-2 h-12 w-full rounded-control border border-border-interactive bg-surface-raised px-3 text-sm outline-none focus:border-foreground"
-          value={props.selectedOption?.id ?? ""}
-          onChange={(event) => props.onOption(Number(event.target.value))}
-          disabled={props.cartPending}
-        >
-          {!props.selectedOption ? <option value="">판매 가능한 옵션 없음</option> : null}
-          {props.product.options?.map((option) => (
-            <option key={option.id} value={option.id} disabled={availableOptionQuantity(option) <= 0}>
-              {option.option_value}{availableOptionQuantity(option) <= 0 ? " (품절)" : ""}
-            </option>
-          ))}
-        </Select>
-      </label>
-      {!props.selectedOption ? <p className="rounded-control border border-status-warning-border bg-status-warning-subtle px-3 py-2 text-sm font-bold text-status-warning" role="status">현재 구매 가능한 옵션이 없습니다.</p> : null}
-      <div className="flex items-center justify-between rounded-control border border-border-subtle p-3">
-        <span className="text-sm font-bold">수량</span>
-        <div className="flex items-center gap-3">
-          <Button variant="secondary" size="icon" disabled={props.cartPending || props.quantity <= 1} onClick={() => props.onQuantity(Math.max(1, props.quantity - 1))} aria-label="수량 줄이기"><Minus size={16} /></Button>
-          <span className="w-6 text-center font-bold">{props.quantity}</span>
-          <Button variant="secondary" size="icon" disabled={props.cartPending || props.quantity >= props.availableQuantity} onClick={() => props.onQuantity(Math.min(props.availableQuantity, props.quantity + 1))} aria-label="수량 늘리기"><Plus size={16} /></Button>
+      {props.selectionInSheet ? <div className="rounded-control bg-surface-subtle p-4 text-sm"><p className="font-bold">{props.selectedOption?.option_value ?? "판매 가능한 옵션 없음"}</p><div className="mt-2 flex items-center justify-between gap-3"><span className="text-content-secondary">수량 {props.quantity}개</span><strong>{formatPrice(((props.product.discount_price || props.product.base_price) + (props.selectedOption?.additional_price ?? 0)) * props.quantity)}</strong></div></div> : <>
+        <label className="block text-sm font-bold">
+          옵션
+          <Select
+            className="mt-2 h-12 w-full rounded-control border border-border-interactive bg-surface-raised px-3 text-sm outline-none focus:border-foreground"
+            value={props.selectedOption?.id ?? ""}
+            onChange={(event) => props.onOption(Number(event.target.value))}
+            disabled={props.cartPending}
+          >
+            {!props.selectedOption ? <option value="">판매 가능한 옵션 없음</option> : null}
+            {props.product.options?.map((option) => (
+              <option key={option.id} value={option.id} disabled={availableOptionQuantity(option) <= 0}>
+                {option.option_value}{availableOptionQuantity(option) <= 0 ? " (품절)" : ""}
+              </option>
+            ))}
+          </Select>
+        </label>
+        {!props.selectedOption ? <p className="rounded-control border border-status-warning-border bg-status-warning-subtle px-3 py-2 text-sm font-bold text-status-warning" role="status">현재 구매 가능한 옵션이 없습니다.</p> : null}
+        <div className="flex items-center justify-between rounded-control border border-border-subtle p-3">
+          <span className="text-sm font-bold">수량</span>
+          <div className="flex items-center gap-3">
+            <Button variant="secondary" size="icon" disabled={props.cartPending || props.quantity <= 1} onClick={() => props.onQuantity(Math.max(1, props.quantity - 1))} aria-label="수량 줄이기"><Minus size={16} /></Button>
+            <span className="w-6 text-center font-bold">{props.quantity}</span>
+            <Button variant="secondary" size="icon" disabled={props.cartPending || props.quantity >= props.availableQuantity} onClick={() => props.onQuantity(Math.min(props.availableQuantity, props.quantity + 1))} aria-label="수량 늘리기"><Plus size={16} /></Button>
+          </div>
         </div>
-      </div>
-      <div className="flex items-center justify-between px-1 text-sm">
-        <span className="text-content-secondary">결제 예정 금액</span>
-        <strong className="text-lg">{formatPrice(((props.product.discount_price || props.product.base_price) + (props.selectedOption?.additional_price ?? 0)) * props.quantity)}</strong>
-      </div>
+        <div className="flex items-center justify-between px-1 text-sm">
+          <span className="text-content-secondary">결제 예정 금액</span>
+          <strong className="text-lg">{formatPrice(((props.product.discount_price || props.product.base_price) + (props.selectedOption?.additional_price ?? 0)) * props.quantity)}</strong>
+        </div>
+      </>}
       <div className="grid grid-cols-[56px_56px_1fr] gap-2">
         <Button variant="secondary" size="lg" aria-label={props.liked ? "좋아요 취소" : "좋아요"} title={props.liked ? "좋아요 취소" : "좋아요"} onClick={props.onLike} disabled={props.likePending || props.wishlistPending || (props.authenticated && !props.likeReady)}>
           <Heart size={20} className={props.liked ? "fill-brand text-action-primary" : ""} />
@@ -764,9 +753,9 @@ function PurchaseControls(props: PurchaseControlsProps) {
         <Button variant="secondary" size="lg" aria-label={props.wishlisted ? "찜 해제" : "찜하기"} title={props.wishlisted ? "찜 해제" : "찜하기"} onClick={props.onWishlist} disabled={props.likePending || props.wishlistPending || (props.authenticated && !props.wishlistReady)}>
           <Bookmark size={20} className={props.wishlisted ? "fill-brand text-action-primary" : ""} />
         </Button>
-        <Button size="lg" onClick={props.onCart} disabled={props.cartPending || !props.selectedOption}>
+        <Button size="lg" onClick={props.onCart} disabled={props.cartPending || !props.selectedOption} aria-haspopup={opensSelection ? "dialog" : undefined} aria-expanded={opensSelection ? props.selectionOpen : undefined}>
           {props.added ? <CheckCircle2 size={19} /> : <ShoppingBag size={19} />}
-          {props.cartPending ? "담는 중" : !props.authenticated ? "로그인 후 담기" : props.added || (props.cartError && !props.cartRetrySafe) ? "장바구니 확인" : props.cartRetrySafe ? "다시 담기" : "장바구니 담기"}
+          {opensSelection ? "옵션·수량 선택" : props.cartPending ? "담는 중" : !props.authenticated ? "로그인 후 담기" : props.added || (props.cartError && !props.cartRetrySafe) ? "장바구니 확인" : props.cartRetrySafe ? "다시 담기" : "장바구니 담기"}
         </Button>
       </div>
       {props.engagementLoading ? <InlineLoadingState className="min-h-0 justify-start border-0 bg-transparent px-0 py-0 text-xs font-bold" label="좋아요와 찜 상태를 확인하는 중입니다." /> : null}

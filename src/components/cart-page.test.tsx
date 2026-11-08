@@ -56,7 +56,10 @@ describe("cart editing", () => {
     expect(screen.getByRole("button", { name: "선택 상품 주문하기" })).toBeDisabled();
     expect(screen.getByText("상품 금액 합계")).toBeVisible();
     expect(screen.queryByText("배송비")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "셔츠 수량 줄이기" }));
+    fireEvent.click(screen.getByRole("button", { name: "옵션·수량 변경" }));
+    const sheet = screen.getByRole("dialog", { name: "옵션·수량 변경" });
+    fireEvent.click(within(sheet).getByRole("button", { name: "수량 줄이기" }));
+    fireEvent.click(within(sheet).getByRole("button", { name: "변경 저장" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "선택 상품 주문하기" })).toBeEnabled());
   });
 
@@ -75,9 +78,12 @@ describe("cart editing", () => {
 
   it("updates grouped quantities atomically and uses the persisted ID for checkout", async () => {
     mountCart();
-    const increase = await screen.findByRole("button", { name: "셔츠 수량 늘리기" });
-    await waitFor(() => expect(increase).toBeEnabled());
-    fireEvent.click(increase);
+    const edit = await screen.findByRole("button", { name: "옵션·수량 변경" });
+    await waitFor(() => expect(edit).toBeEnabled());
+    fireEvent.click(edit);
+    const sheet = screen.getByRole("dialog", { name: "옵션·수량 변경" });
+    fireEvent.click(within(sheet).getByRole("button", { name: "수량 늘리기" }));
+    fireEvent.click(within(sheet).getByRole("button", { name: "변경 저장" }));
     await screen.findByText("장바구니를 변경했습니다.");
     expect(api.updateCartItems).toHaveBeenCalledWith("token", { cart_item_ids: [1,2], option_id: 10, quantity: 3 });
     expect(screen.getByText("선택 수량")).toBeInTheDocument();
@@ -90,10 +96,10 @@ describe("cart editing", () => {
 
   it("changes options, excludes sold-out options, and refreshes the server price", async () => {
     mountCart();
-    const edit = await screen.findByRole("button", { name: "옵션 변경" });
+    const edit = await screen.findByRole("button", { name: "옵션·수량 변경" });
     await waitFor(() => expect(edit).toBeEnabled());
     fireEvent.click(edit);
-    const dialog = screen.getByRole("dialog", { name: "옵션 변경" });
+    const dialog = screen.getByRole("dialog", { name: "옵션·수량 변경" });
     expect(within(dialog).getByRole("option", { name: /블루.*품절/ })).toBeDisabled();
     fireEvent.change(within(dialog).getByRole("combobox"), { target: { value: "20" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "변경 저장" }));
@@ -106,10 +112,10 @@ describe("cart editing", () => {
   it("caps quantity only when the new option has insufficient stock and explains the change", async () => {
     rows = [{ ...rows[0], quantity: 5 }];
     mountCart();
-    const edit = await screen.findByRole("button", { name: "옵션 변경" });
+    const edit = await screen.findByRole("button", { name: "옵션·수량 변경" });
     await waitFor(() => expect(edit).toBeEnabled());
     fireEvent.click(edit);
-    const dialog = screen.getByRole("dialog", { name: "옵션 변경" });
+    const dialog = screen.getByRole("dialog", { name: "옵션·수량 변경" });
     fireEvent.change(within(dialog).getByRole("combobox"), { target: { value: "20" } });
     expect(within(dialog).getByText("최대 주문 가능 수량 3개")).toBeVisible();
     expect(within(dialog).getByText(/수량을 5개에서 3개로 변경했습니다/)).toBeVisible();
@@ -118,15 +124,22 @@ describe("cart editing", () => {
   });
 
   it("keeps stored quantities on failure and shows a retry path", async () => {
-    vi.mocked(api.updateCartItems).mockRejectedValue(new Error("재고가 부족합니다."));
+    vi.mocked(api.updateCartItems).mockRejectedValueOnce(new Error("재고가 부족합니다."));
     mountCart();
-    const increase = await screen.findByRole("button", { name: "셔츠 수량 늘리기" });
-    await waitFor(() => expect(increase).toBeEnabled());
-    fireEvent.click(increase);
-    await screen.findByRole("alert");
+    const edit = await screen.findByRole("button", { name: "옵션·수량 변경" });
+    await waitFor(() => expect(edit).toBeEnabled());
+    fireEvent.click(edit);
+    const sheet = screen.getByRole("dialog", { name: "옵션·수량 변경" });
+    fireEvent.click(within(sheet).getByRole("button", { name: "수량 늘리기" }));
+    fireEvent.click(within(sheet).getByRole("button", { name: "변경 저장" }));
+    await within(sheet).findByRole("alert");
     expect(screen.getByText("선택 수량")).toBeInTheDocument();
     expect(screen.getByText("2개")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "목록 새로고침" })).toBeEnabled();
-    expect(screen.queryByText("장바구니를 변경했습니다.")).not.toBeInTheDocument();
+    expect(within(sheet).getByRole("group", { name: "수량" })).toHaveTextContent("3");
+    expect(within(sheet).getByRole("button", { name: "변경 저장" })).toBeEnabled();
+    fireEvent.click(within(sheet).getByRole("button", { name: "변경 저장" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(api.updateCartItems).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("장바구니를 변경했습니다.")).toBeInTheDocument();
   });
 });
