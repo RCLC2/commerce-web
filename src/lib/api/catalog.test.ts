@@ -4,6 +4,15 @@ import { catalogApi } from "./catalog";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("catalogApi backend contracts", () => {
+  it("keeps the backend estimated arrival date in the product detail", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      product: { id: 1, market_id: 2, category_id: 3, name: "상품", description: "", base_price: 10_000, status: "SELLING" },
+      delivery: { expected_ship_date: "2026-09-28", expected_arrival_date: "2026-09-29", expected_arrival_label: "09/29 도착 예정", type: "NORMAL", label: "일반배송", carrier: "택배", shipping_fee: 0 },
+    }), { status: 200 })));
+
+    await expect(catalogApi.getProduct(1)).resolves.toMatchObject({ delivery: { expected_arrival_date: "2026-09-29" } });
+  });
+
   it("rejects product badge tones outside the public five-tone contract", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([{
       id: 1,

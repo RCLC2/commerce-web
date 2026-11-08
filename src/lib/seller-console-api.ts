@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { orderPaymentDetailsSchema } from "./api/contracts/schemas";
 import { requestParsed, requestVoid } from "./api-client";
 import { pageSchema, withQuery } from "./console-contracts";
 
@@ -112,6 +113,7 @@ const sellerOrderLineSchema = z.object({
   status: z.string(),
 });
 export const sellerOrderDetailSchema = z.object({
+  payment_details: orderPaymentDetailsSchema.optional(),
   market_order_id: z.number().int().positive(),
   order_id: z.number().int().positive(),
   order_code: z.string(),
@@ -136,6 +138,9 @@ export const sellerOrderDetailSchema = z.object({
 });
 
 export const sellerSettlementListItemSchema = z.object({
+  refund_deduction_amount: z.number().int().nonnegative().optional(),
+  payable_amount: z.number().int().nonnegative().optional(),
+  outstanding_refund_amount: z.number().int().nonnegative().optional(),
   id: z.number().int().positive(),
   target_month: z.string(),
   total_sales_amount: z.number().int(),
@@ -162,6 +167,9 @@ const sellerSettlementLineSchema = z.object({
   purchase_confirmed_at: dateSchema,
 });
 export const sellerSettlementDetailSchema = z.object({
+  refund_deduction_amount: z.number().int().nonnegative().optional(),
+  payable_amount: z.number().int().nonnegative().optional(),
+  outstanding_refund_amount: z.number().int().nonnegative().optional(),
   id: z.number().int().positive(),
   target_month: z.string(),
   total_sales_amount: z.number().int(),

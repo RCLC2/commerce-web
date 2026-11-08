@@ -3,12 +3,11 @@
 import { PageHeading } from "./ui/page-heading";
 import { Grid2X2 as PageIcon } from "lucide-react";
 
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Clock3, Package, Store } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Pagination } from "./ui/pagination";
 import { FilterChip } from "./ui/filter-chip";
 import { api } from "@/lib/api";
 import { scrollCarouselByCard } from "@/lib/carousel";
@@ -19,6 +18,7 @@ import { ProductCard } from "./product-card";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 import { EmptyState, LoadingSpinner, LoadingState } from "./ui/feedback";
+import { InfiniteScrollTrigger } from "./ui/infinite-scroll-trigger";
 
 const PAGE_SIZE = 8;
 
@@ -26,21 +26,20 @@ export function CategoryInformationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedSlug = searchParams.get("category");
-  const requestedPage = Number(searchParams.get("page"));
-  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
-  function changePage(next: number, slug = selectedSlug) {
+  function selectCategory(slug: string) {
     const params = new URLSearchParams();
     if (slug) params.set("category", slug);
-    if (next > 1) params.set("page", String(next));
-    router.push(`/categories${params.size ? `?${params}` : ""}`, { scroll: false });
+    router.push(`/categories${params.size ? `?${params}` : ""}`);
   }
-  const informationQuery = useQuery({
-    queryKey: ["category-information", selectedSlug ?? "server-default", page, PAGE_SIZE],
-    queryFn: () => api.getCategoryInformation({ category: selectedSlug ?? undefined, page, pageSize: PAGE_SIZE }),
+  const informationQuery = useInfiniteQuery({
+    queryKey: ["category-information", selectedSlug ?? "server-default", PAGE_SIZE],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => api.getCategoryInformation({ category: selectedSlug ?? undefined, page: pageParam, pageSize: PAGE_SIZE }),
+    getNextPageParam: (lastPage) => lastPage.pagination.has_next ? lastPage.pagination.page + 1 : undefined,
     placeholderData: (previous) => previous,
   });
 
-  const information = informationQuery.data;
+  const information = informationQuery.data?.pages[0];
   const roots = useMemo(
     () => [...(information?.categories ?? [])].sort(compareCategoryOrder),
     [information?.categories],
@@ -48,18 +47,14 @@ export function CategoryInformationPage() {
   const selected = information?.selected_category;
   const selectedRoot = roots.find((category) => containsCategory(category, selected?.slug ?? selectedSlug ?? "")) ?? roots[0];
   const filters = selectedRoot ? [selectedRoot, ...flattenChildren(selectedRoot)] : [];
-  const products = information?.products ?? [];
+  const products = informationQuery.data?.pages.flatMap((page) => page.products) ?? [];
   const carousel = information?.realtime_popular_carousel;
-
-  function selectCategory(slug: string) {
-    changePage(1, slug);
-  }
 
   if (informationQuery.isLoading && !information) {
     return <CategoryLoading />;
   }
 
-  if (informationQuery.error || !information || !selected) {
+  if (!information || !selected) {
     return (
       <PageLayout>
         <div className="rounded-surface border border-status-negative-border bg-status-negative-subtle p-8 text-center shadow-card" role="alert">
@@ -140,7 +135,13 @@ export function CategoryInformationPage() {
             />
           )}
 
-          <Pagination page={information.pagination.page} totalPages={information.pagination.total_pages} hasNext={information.pagination.has_next} disabled={informationQuery.isFetching} onChange={changePage} />
+          <InfiniteScrollTrigger
+            hasMore={Boolean(informationQuery.hasNextPage)}
+            loading={informationQuery.isFetching}
+            error={informationQuery.isFetchNextPageError}
+            label="카테고리 상품"
+            onLoadMore={() => void informationQuery.fetchNextPage()}
+          />
         </section>
       </div>
     </PageLayout>

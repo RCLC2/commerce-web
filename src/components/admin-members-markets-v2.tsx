@@ -365,7 +365,7 @@ export function AdminMembersPageV2() {
               rows={(ordersQuery.data?.items ?? []).map((order) => [
                 order.order_code,
                 `${order.representative_product} 외 ${Math.max(0, order.item_count - 1)}건`,
-                formatPrice(order.total_amount - order.discount_amount),
+                formatPrice(order.payment_amount ?? order.total_amount - order.discount_amount),
                 <StatusBadge key="status" value={order.status} />,
                 formatDate(order.created_at),
               ])}

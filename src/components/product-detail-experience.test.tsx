@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import type { Product } from "@/lib/types";
@@ -55,6 +55,22 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("ProductDetailExperience quick purchase layer", () => {
+  it("returns guests to the same product after login for cart actions", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><ProductDetailExperience productId={product.id} initialProduct={product} /></QueryClientProvider>);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "로그인 후 담기" })[0]);
+    expect(push).toHaveBeenCalledWith("/login?next=%2Fproducts%2F1");
+  });
+
+  it("shows a back action above the product gallery", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><ProductDetailExperience productId={product.id} initialProduct={product} /></QueryClientProvider>);
+
+    const backButton = await screen.findByRole("button", { name: "뒤로가기" });
+    expect(screen.getByRole("main").firstElementChild).toBe(backButton);
+  });
+
   it("uses a spinner-only status while the review summary is loading", async () => {
     vi.mocked(api.getProductReviewSummary).mockReturnValue(new Promise(() => {}));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

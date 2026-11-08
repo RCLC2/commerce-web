@@ -44,7 +44,7 @@ it("shows the public review summary and every review entry", async () => {
     review_count: 1,
     average_rating: 4.5,
     photo_review_count: 0,
-    rating_distribution: { "5": 1 },
+    rating_distribution: { "4.5": 1 },
   };
   vi.spyOn(api, "getProductReviews").mockResolvedValue([review]);
   vi.spyOn(api, "getProductReviewSummary").mockResolvedValue(summary);
@@ -65,4 +65,24 @@ it("shows the public review summary and every review entry", async () => {
   expect(screen.getByRole("dialog", { name: "리뷰 첨부 사진" })).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "다음 리뷰 사진" }));
   expect(within(screen.getByRole("dialog", { name: "리뷰 첨부 사진" })).getAllByText("2 / 2")).toHaveLength(2);
+});
+
+it("filters reviews by the selected rating and restores the full list", async () => {
+  const product: Product = {
+    id: 1, market_id: 2, category_id: 3, name: "린넨 셔츠", description: "",
+    base_price: 39_000, discount_price: 0, shipping_type: "NORMAL", popularity_score: 0, status: "SELLING",
+  };
+  vi.spyOn(api, "getProductReviews").mockResolvedValue([
+    { id: 1, product_id: 1, rating: 5, content: "좋아요", images: [] },
+    { id: 2, product_id: 1, rating: 4, content: "보통이에요", images: [] },
+  ] as Review[]);
+  vi.spyOn(api, "getProductReviewSummary").mockResolvedValue({ product_id: 1, review_count: 2, average_rating: 4.5, rating_distribution: { "5": 1, "4": 1 } });
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ProductReviewsPage productId={1} initialProduct={product} /></QueryClientProvider>);
+
+  expect(await screen.findByText("보통이에요")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "5점 리뷰 1개 보기" }));
+  expect(screen.getByText("좋아요")).toBeVisible();
+  expect(screen.queryByText("보통이에요")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "전체 리뷰 보기" }));
+  expect(screen.getByText("보통이에요")).toBeVisible();
 });

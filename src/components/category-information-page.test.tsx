@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CategoryInformation, Product } from "@/lib/types";
 import { api } from "@/lib/api";
+import { ControlledIntersectionObserver } from "@/test/controlled-intersection-observer";
 import { CategoryInformationPage } from "./category-information-page";
 
 let currentSearchParams = "";
@@ -72,8 +73,10 @@ function mountCategoryPage() {
 beforeEach(() => {
   vi.clearAllMocks();
   currentSearchParams = "";
+  ControlledIntersectionObserver.instances = [];
+  vi.stubGlobal("IntersectionObserver", ControlledIntersectionObserver);
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("CategoryInformationPage loading feedback", () => {
   it("pairs the initial category skeleton with an actual spinner", async () => {
@@ -110,5 +113,25 @@ describe("CategoryInformationPage loading feedback", () => {
     expect(await screen.findByText("이 카테고리에 등록된 상품이 없습니다")).toBeVisible();
     expect(screen.getByText("다른 카테고리를 선택하거나 새 상품이 등록된 뒤 다시 확인해주세요.")).toBeVisible();
     expect(screen.getByText("이 카테고리에 등록된 상품이 없습니다").parentElement?.querySelector("svg")).toHaveClass("lucide-package");
+  });
+
+  it("appends the next category page when the product list reaches the viewport", async () => {
+    vi.mocked(api.getCategoryInformation)
+      .mockResolvedValueOnce({ ...categoryInformation, pagination: { page: 1, page_size: 8, has_next: true, total_pages: 2 } })
+      .mockResolvedValueOnce({
+        ...categoryInformation,
+        products: [{ ...categoryProduct, id: 100, name: "두 번째 묶음 상품" }],
+        pagination: { page: 2, page_size: 8, has_next: false, total_pages: 2 },
+      });
+
+    mountCategoryPage();
+    expect(await screen.findByText("전환 유지 상품")).toBeVisible();
+    await waitFor(() => expect(ControlledIntersectionObserver.forLabel("카테고리 상품")).toBeDefined());
+    ControlledIntersectionObserver.forLabel("카테고리 상품")?.intersect();
+
+    expect(await screen.findByText("두 번째 묶음 상품")).toBeVisible();
+    expect(screen.getByText("전환 유지 상품")).toBeVisible();
+    expect(api.getCategoryInformation).toHaveBeenLastCalledWith({ category: undefined, page: 2, pageSize: 8 });
+    expect(screen.queryByRole("navigation", { name: "상품 페이지" })).not.toBeInTheDocument();
   });
 });

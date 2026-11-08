@@ -151,6 +151,9 @@ export function normalizeSettlement(raw: z.infer<typeof rawSettlementSchema>): S
     total_sales_amount: raw.TotalSalesAmount,
     commission_amount: raw.CommissionAmount,
     final_settlement_amount: raw.FinalSettlementAmount,
+    refund_deduction_amount: raw.refund_deduction_amount ?? 0,
+    payable_amount: raw.payable_amount ?? raw.FinalSettlementAmount,
+    outstanding_refund_amount: raw.outstanding_refund_amount ?? 0,
     status: raw.Status,
   };
 }

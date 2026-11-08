@@ -24,7 +24,7 @@ export function FilterChip({ selected = false, variant = "filter", className, ch
       )}
       {...props}
     >
-      {!navigation ? <Check className={cn("size-3.5 shrink-0", !selected && "invisible")} aria-hidden="true" /> : null}{children}
+      {!navigation && selected ? <Check className="size-3.5 shrink-0" aria-hidden="true" /> : null}{children}
     </button>
   );
 }

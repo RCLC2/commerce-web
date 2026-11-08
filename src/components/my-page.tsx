@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-client";
-import { firstOrderItem, orderStatusLabel } from "@/lib/order-utils";
+import { firstOrderItem, orderPaymentAmount, orderStatusLabel } from "@/lib/order-utils";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionStore } from "@/lib/session-store";
 import type { Address } from "@/lib/types";
@@ -27,6 +27,7 @@ import { EmptyState, InlineLoadingState, LoadingSpinner, LoginRequiredState } fr
 const statuses = [
   ["ALL", "전체"], ["PAYMENT_PENDING", "결제 대기"], ["PAID", "결제 완료"], ["PLACED", "주문 접수"],
   ["SHIPPED", "배송 중"], ["DELIVERED", "배송 완료"], ["COMPLETED", "구매 확정"], ["CANCELLED", "취소"],
+  ["RETURN_REQUESTED", "반품 요청"], ["RETURN_APPROVED", "반품 승인"], ["RETURN_REJECTED", "반품 거절"], ["RETURN_COMPLETED", "반품 완료"],
 ] as const;
 
 export function MyPage() {
@@ -90,7 +91,7 @@ export function MyPage() {
         </div>
         {profile?.email ? <p className="mt-3 break-all text-sm text-content-secondary">{profile.email}</p> : null}
         <div className="mt-6 grid grid-cols-3 divide-x divide-border-subtle rounded-surface border border-action-primary/15 bg-action-secondary/45 px-2 py-4 text-center">
-          <SummaryMetric label="포인트" loadingLabel="포인트를 불러오는 중입니다." value={profileQuery.isSuccess ? formatPrice(profile?.point_balance ?? 0) : null} />
+          <SummaryMetric label="포인트" loadingLabel="포인트를 불러오는 중입니다." value={profileQuery.isSuccess ? `${(profile?.point_balance ?? 0).toLocaleString()}P` : null} />
           <SummaryMetric label="보유 쿠폰" loadingLabel="보유 쿠폰을 불러오는 중입니다." value={couponsQuery.isSuccess ? `${couponsQuery.data.length}장` : null} />
           <SummaryMetric label="전체 주문" loadingLabel="전체 주문을 불러오는 중입니다." value={ordersQuery.isSuccess ? `${orders.length}건` : null} />
         </div>
@@ -139,7 +140,7 @@ export function MyPage() {
           {filteredOrders.map((order) => {
             const item = firstOrderItem(order);
             const product = item ? item.product ?? productByID.get(item.product_id) : undefined;
-            return <Link key={order.id} href={`/orders/${order.order_code}`} className="block rounded-surface border border-border-subtle bg-surface-raised p-4 shadow-card transition hover:border-border-interactive"><div className="flex gap-3"><div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-control bg-surface-subtle"><SafeImage src={product?.image_url} alt="" fill sizes="80px" className="object-cover" /></div><div className="min-w-0 flex-1"><div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:gap-3"><div className="min-w-0 max-w-full"><p className="font-bold">{orderStatusLabel(order.status)}</p><p className="mt-1 truncate text-sm font-bold">{product?.name ?? `상품 #${item?.product_id ?? "-"}`}</p></div><p className="shrink-0 whitespace-nowrap font-bold tabular-nums">{formatPrice(order.total_order_price - order.total_discount_price - order.used_point)}</p></div><p className="mt-2 text-xs text-content-secondary">{order.ordered_at ? new Date(order.ordered_at).toLocaleDateString("ko-KR") : ""} · {order.order_code}</p></div></div></Link>;
+            return <Link key={order.id} href={`/orders/${order.order_code}`} className="block rounded-surface border border-border-subtle bg-surface-raised p-4 shadow-card transition hover:border-border-interactive"><div className="flex gap-3"><div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-control bg-surface-subtle"><SafeImage src={product?.image_url} alt="" fill sizes="80px" className="object-cover" /></div><div className="min-w-0 flex-1"><div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:gap-3"><div className="min-w-0 max-w-full"><p className="font-bold">{orderStatusLabel(order.status)}</p><p className="mt-1 truncate text-sm font-bold">{product?.name ?? `상품 #${item?.product_id ?? "-"}`}</p></div><div className="shrink-0 whitespace-nowrap sm:text-right"><p className="text-xs text-content-secondary">최초 결제액</p><p className="mt-1 font-bold tabular-nums">{formatPrice(orderPaymentAmount(order))}</p></div></div><p className="mt-2 text-xs text-content-secondary">{order.ordered_at ? new Date(order.ordered_at).toLocaleDateString("ko-KR") : ""} · {order.order_code}</p></div></div></Link>;
           })}
           {ordersQuery.isSuccess && !filteredOrders.length ? <EmptyState icon={<ShoppingBag className="size-7" />} title="조건에 맞는 주문이 없습니다" description="주문 상태를 바꾸거나 다른 상품명으로 검색해보세요." /> : null}
         </div>

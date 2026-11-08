@@ -44,6 +44,29 @@ describe("selectedCartItemIDs", () => {
 });
 
 describe("submitServerAuthoritativeCheckout", () => {
+  it("includes every market shipping fee in the server-confirmed payment amount", async () => {
+    const order: OrderResponse = {
+      ...serverOrder,
+      market_orders: [3000, 2000].map((shipping_fee, index) => ({
+        id: index + 1,
+        market_id: index + 1,
+        shipping_fee,
+        status: "PAYMENT_PENDING",
+        expected_settlement_amount: 0,
+        line_items: [],
+      })),
+    };
+    await expect(submitServerAuthoritativeCheckout({
+      existingOrderCode: order.order_code,
+      orderInput: { cart_item_ids: [11], used_point: 3000 },
+      placeOrder: vi.fn(),
+      getOrder: vi.fn().mockResolvedValue(order),
+      createPaymentRequest: vi.fn().mockResolvedValue(tossPaymentRequest("ORDER-1", 45000)),
+      onOrderCreated: vi.fn(),
+      onOrderConfirmed: vi.fn(),
+    })).resolves.toMatchObject({ amount: 45000, paymentSkipped: false });
+  });
+
   it("reuses the created order and requests payment for the server-confirmed amount", async () => {
     const placeOrder = vi.fn().mockResolvedValue({ orderCode: "ORDER-1" });
     const getOrder = vi.fn().mockResolvedValue(serverOrder);
@@ -352,4 +375,36 @@ describe("checkout retry storage", () => {
       }],
     }], [11, 12])).toBeUndefined();
   });
+});
+
+describe("payment preparation retry", () => {
+  it("retries preparation on the same order without creating another order", async () => {
+    const placeOrder = vi.fn().mockResolvedValue({orderCode: "ORDER-1"});
+    const createPaymentRequest = vi.fn()
+      .mockRejectedValueOnce(new ApiHttpError("preparing", 409, undefined, "ORDER_PAYMENT_PREPARING"))
+      .mockResolvedValue(tossPaymentRequest());
+    await submitServerAuthoritativeCheckout({orderInput:{cart_item_ids:[11],used_point:3000},placeOrder,getOrder:vi.fn().mockResolvedValue(serverOrder),createPaymentRequest,onOrderCreated:vi.fn(),onOrderConfirmed:vi.fn()});
+    expect(placeOrder).toHaveBeenCalledTimes(1);
+    expect(createPaymentRequest).toHaveBeenCalledTimes(2);
+    expect(createPaymentRequest.mock.calls).toEqual([["ORDER-1"],["ORDER-1"]]);
+  });
+  it("does not retry other payment failures", async () => {
+    const error = new ApiHttpError("invalid", 400);
+    const createPaymentRequest = vi.fn().mockRejectedValue(error);
+    await expect(submitServerAuthoritativeCheckout({existingOrderCode:"ORDER-1",orderInput:{cart_item_ids:[11],used_point:3000},placeOrder:vi.fn(),getOrder:vi.fn().mockResolvedValue(serverOrder),createPaymentRequest,onOrderCreated:vi.fn(),onOrderConfirmed:vi.fn()})).rejects.toBe(error);
+    expect(createPaymentRequest).toHaveBeenCalledTimes(1);
+  });
+});
+
+it("stops payment preparation after five attempts", async () => {
+  vi.useFakeTimers();
+  try {
+    const error = new ApiHttpError("preparing",409,undefined,"ORDER_PAYMENT_PREPARING");
+    const createPaymentRequest = vi.fn().mockRejectedValue(error);
+    const result = submitServerAuthoritativeCheckout({existingOrderCode:"ORDER-1",orderInput:{cart_item_ids:[11],used_point:3000},placeOrder:vi.fn(),getOrder:vi.fn().mockResolvedValue(serverOrder),createPaymentRequest,onOrderCreated:vi.fn(),onOrderConfirmed:vi.fn()});
+    const rejection = expect(result).rejects.toBe(error);
+    await vi.runAllTimersAsync();
+    await rejection;
+    expect(createPaymentRequest).toHaveBeenCalledTimes(5);
+  } finally { vi.useRealTimers(); }
 });

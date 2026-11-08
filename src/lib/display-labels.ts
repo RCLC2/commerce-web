@@ -22,9 +22,9 @@ export function paymentMethodLabel(value: string | null | undefined) {
   const methods: Record<string, string> = {
     CARD: "카드", BANK_TRANSFER: "계좌 이체", TRANSFER: "계좌 이체",
     VIRTUAL_ACCOUNT: "가상 계좌", EASY_PAY: "간편 결제", MOBILE_PHONE: "휴대폰 결제",
-    POINT: "포인트", TOSS: "토스페이", TOSS_PAY: "토스페이", TOSSPAY: "토스페이",
+    POINT: "포인트", TOSS: "토스페이먼츠", TOSS_PAY: "토스페이", TOSSPAY: "토스페이",
   };
-  return value ? methods[value] ?? value : "결제 수단 미확인";
+  return value ? methods[value.toUpperCase()] ?? value : "결제 수단 미확인";
 }
 
 export function shippingTypeLabel(value: string | null | undefined) {
@@ -33,4 +33,15 @@ export function shippingTypeLabel(value: string | null | undefined) {
     FREE: "무료 배송",
   };
   return value ? types[value] ?? value : "배송 유형 미확인";
+}
+
+/** Carrier codes follow the delivery API's supported carriers. */
+export function deliveryCarrierLabel(value: string | null | undefined) {
+  const carriers: Record<string, string> = {CJ: "CJ대한통운", HANJIN: "한진택배", LOTTE: "롯데택배", POST: "우체국"};
+  return value ? carriers[value.toUpperCase()] ?? "택배사 정보 없음" : "송장 등록 전";
+}
+
+/** Shows the actual approved method, falling back to the provider for older orders. */
+export function orderPaymentMethodLabel(provider: string | null | undefined, details?: {method: string; easy_pay_provider?: string}) {
+  return details?.easy_pay_provider || paymentMethodLabel(details?.method || provider);
 }
