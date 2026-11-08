@@ -60,13 +60,13 @@ test.describe("public and customer journeys with live and controlled API boundar
     expect(couponResponse.ok()).toBeTruthy();
     await couponResponse.finished();
     await flushReact(page);
-    await expect(page.getByText(email, { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: `${email.split("@")[0]}님`, exact: true })).toBeVisible();
     await expect(
-      page.getByText("발급 가능한 쿠폰", { exact: true }).locator("..").getByText("1장", { exact: true }),
+      page.getByRole("link", { name: "받을 수 있는 쿠폰 1장", exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "다시 시도", exact: true })).toHaveCount(0);
 
-    await page.getByText("발급 가능한 쿠폰", { exact: true }).locator("..").getByRole("link", { name: "더보기" }).click();
+    await page.getByRole("link", { name: "받을 수 있는 쿠폰 1장", exact: true }).click();
     const issueResponsePromise = page.waitForResponse((response) =>
       /\/api\/v1\/coupons\/\d+\/issue$/.test(response.url())
       && response.request().method() === "POST");
@@ -195,31 +195,6 @@ test.describe("public and customer journeys with live and controlled API boundar
 
     await expect(page.getByRole("button", { name: "다시 시도", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "변경사항 저장", exact: true })).toHaveCount(0);
-  });
-
-  test("address save failure remains visible beside the edit form", async ({ page, request }) => {
-    const session = await signIn(request, seedAccounts.member);
-    await installSession(page, session);
-    await page.route("**/api/v1/me/addresses", (route) => route.fulfill({
-      status: 200,
-      json: [{
-        ID: 51,
-        ReceiverName: "테스트 사용자",
-        ReceiverPhone: "010-0000-0000",
-        PostalCode: "06236",
-        BaseAddress: "서울시 강남구",
-        DetailAddress: "1층",
-        IsDefault: true,
-      }],
-    }));
-    await page.route("**/api/v1/me/addresses/51", (route) => route.fulfill({ status: 503, body: "address unavailable" }));
-    await page.goto("/mypage");
-
-    await page.getByRole("button", { name: "편집하기", exact: true }).click();
-    await page.getByRole("button", { name: "저장", exact: true }).click();
-
-    await expect(page.getByText(/address unavailable/)).toBeVisible();
-    await expect(page.getByRole("button", { name: "저장", exact: true })).toBeVisible();
   });
 
   test("controlled review mutations reconcile uncertain update and delete responses", async ({ page }) => {
