@@ -2,9 +2,10 @@
 
 - 제목: **feat: 마이페이지 지갑과 상품 옵션 바텀시트 개선**
 - head: `feat/mypage-wallet-design`
-- 권장 base: `feat/commerce-web-ux-integration` (#57이 열려 있는 동안)
-- 기준 커밋: `0c15c8e973121fa4c9c473c84f8ed57dc71e65d1`
-- 등록 구성: 기능별 코드 커밋 4개와 구현·검증·PR 문서 커밋 1개. 웹·모바일 MP4의 GitHub 첨부를 완료했습니다.
+- base: `main` (#57 squash 병합 후 전환)
+- 최초 작업 기준: `0c15c8e973121fa4c9c473c84f8ed57dc71e65d1`
+- 재배치 기준 main: `b0958d828e616ed52810fb3555feee75c53e4700`
+- 등록 구성: 기존 기능별 커밋 5개를 main 위에 재배치하고 순차 병합 검증 문서 커밋을 더했습니다. 웹·모바일 MP4의 GitHub 첨부는 유지합니다.
 - GitHub 본문: [pr-mypage-wallet-design-body.md](pr-mypage-wallet-design-body.md)
 
 ## 참고한 기존 PR
@@ -18,9 +19,9 @@
 ## 등록 기준
 
 1. 작업 소스·테스트·카드 이미지·구현 문서만 기능별로 선별해 커밋합니다. 사전 미추적 폴더와 `.env.local`, `output/`은 제외합니다.
-2. 게시 시점 #57 head가 위 기준과 일치함을 확인했습니다. main을 바로 base로 삼으면 #57의 선행 20개 커밋도 비교에 포함되므로 #57 브랜치를 base로 사용합니다.
+2. 최초 게시 시 #57 브랜치를 기준으로 했습니다. #57이 main에 squash 병합된 뒤에는 기능별 다섯 커밋만 main 위에 재배치해 선행 커밋이 중복되지 않도록 했습니다.
 3. 아래 MP4 두 개를 GitHub에 첨부하고 발급된 `user-attachments` URL을 본문에 반영했습니다. GitHub 미리보기에서 두 영상의 해상도·길이와 로딩 완료를 확인했습니다. 영상 파일은 Git 이력에 포함하지 않습니다.
-4. #57 병합 후 main 기준으로 바꿀 때 선행 변경이 diff에 중복되지 않는지 확인합니다. #58이 먼저 병합되면 추천 문구 2개의 중복도 확인합니다.
+4. #59 base는 main이며, 최초 다섯 커밋의 소스 트리가 500개 테스트를 통과한 예비 통합 결과와 동일함을 확인했습니다. #58이 먼저 병합되면 추천 문구 2개의 중복도 확인합니다.
 
 ## 영상 자료
 
@@ -36,6 +37,8 @@ WebM 원본은 `output/playwright/new-features-20261108/`에 보관합니다.
 모바일은 Chromium 터치 에뮬레이션입니다. 실행 중인 프로덕션 프론트와 localhost 메모리 API를 사용했으며, 실제 운영 서버·PG·실기기 Safari 촬영은 아닙니다. 원본과 MP4의 길이·해상도·프레임 수와 MP4 전체 디코딩을 확인했습니다.
 
 ## 준비 시점 검증
+
+- 순차 병합 검증: 전체 Vitest 93개 파일 / 500개, build·TypeScript·독립 tsc·관련 ESLint 통과. [통합 기록](pr57-pr59-sequential-merge-20261108.md)을 참고합니다.
 
 - 2026-11-08: 관련 Vitest 7개 파일 / 40개 테스트 통과.
 - 같은 시점: 변경·추가 TS/TSX 16개 파일 ESLint, `git diff --check` 통과.

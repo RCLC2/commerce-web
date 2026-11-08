@@ -19,8 +19,8 @@
 - **D3 — 해결:** 공통 `tests/support/returns-browser-check.mjs`에서 구매자·판매자 주소록 준비 → 각자 저장 주소 선택 → 요청/수거 주소 5개 필드 저장 검증을 수행한다. 최신 버튼·안내 문구, 조회 실패/재시도와 모바일 검증, 실행 후 해당 브라우저 세션 정리를 반영했다. 전용 API·DB·Temporal·PG 대역 및 새 fixture가 필요한 통합 스크립트이며 단독 실행형 테스트는 아니다.
 
 - source_spec: `docs/implementation-artifacts/spec-mypage-wallet-design.md`
-  summary: Refresh the pre-existing notification contract fixture in commands.test.ts.
+  summary: Resolved 2026-11-08 in PR57 be0a13d: refreshed the notification contract fixture in commands.test.ts.
   evidence: The unchanged HEAD reproduces the same failing listNotifications test because its fixture is a legacy array while the current endpoint requires the inbox page object; unrelated to the wallet change.
 - source_spec: `docs/implementation-artifacts/spec-mypage-wallet-design.md`
-  summary: Refresh two pre-existing sponsored-placement image geometry assertions.
+  summary: Resolved 2026-11-08 in PR57 be0a13d: refreshed both sponsored-placement image container assertions.
   evidence: Both failures reproduce unchanged on HEAD; SafeImage now wraps images in its loading-state span, so immediate parent class checks no longer target the banner geometry.
