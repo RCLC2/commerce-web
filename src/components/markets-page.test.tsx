@@ -34,7 +34,12 @@ describe("MarketsPage", () => {
 
     renderPage();
 
-    expect(await screen.findByRole("heading", { name: "마켓" })).toBeVisible();
+    const heading = await screen.findByRole("heading", { name: "마켓" });
+    const pageHeader = heading.closest("header");
+    expect(heading).toBeVisible();
+    expect(pageHeader).toContainElement(heading);
+    expect(pageHeader?.children).toHaveLength(1);
+    expect(screen.getByText("지금 새롭게 주목받는 마켓부터 신상품 소식이 활발한 마켓까지 한곳에서 발견해 보세요.")).toBeVisible();
     expect(screen.getByRole("heading", { name: "지금 뜨는 마켓" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "신상이 활발한 마켓" })).toBeVisible();
     expect(await screen.findByText("지금 뜨는 곳")).toBeVisible();
@@ -70,6 +75,7 @@ describe("MarketsPage", () => {
 
     renderPage();
 
+    expect((await screen.findByRole("heading", { name: "마켓" })).closest("header")).not.toBeNull();
     const trendingHeading = await screen.findByRole("heading", { name: "지금 뜨는 마켓" });
     expect(trendingHeading).toBeVisible();
     expect(screen.getByRole("heading", { name: "신상이 활발한 마켓" })).toBeVisible();
