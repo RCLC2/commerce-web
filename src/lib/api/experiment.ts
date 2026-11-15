@@ -3,12 +3,27 @@ const DEFAULT_EXPERIMENT_API_BASE_URL = "/experiment-api";
 export type ExperimentStatus = "DRAFT" | "SCHEDULED" | "RUNNING" | "PAUSED" | "ENDED";
 export type ExperimentSubjectType = "MEMBER" | "ANONYMOUS";
 export type ExperimentEventType = "impression" | "click" | "add_to_cart" | "purchase";
+export type ExperimentValueType = "BOOLEAN" | "STRING" | "NUMBER" | "JSON";
+export type ExperimentConclusion = "UNDECIDED" | "WINNER" | "INCONCLUSIVE";
+
+export type ExperimentTargetingRule = {
+  attribute: string;
+  operator: "EQ" | "NEQ" | "IN" | "NOT_IN" | "GT" | "GTE" | "LT" | "LTE";
+  value: unknown;
+};
+
+export type ExperimentOverride = {
+  subject_type: ExperimentSubjectType;
+  subject_key: string;
+  variant_key: string;
+};
 
 export type ExperimentVariant = {
   id?: number;
   key: string;
   name: string;
   traffic_weight: number;
+  value?: unknown;
 };
 
 export type Experiment = {
@@ -22,6 +37,15 @@ export type Experiment = {
   ended_at?: string;
   primary_metric: string;
   description: string;
+  value_type: ExperimentValueType;
+  default_value: unknown;
+  kill_switch: boolean;
+  targeting_rules: ExperimentTargetingRule[];
+  overrides: ExperimentOverride[];
+  conclusion: ExperimentConclusion;
+  winner_variant_key?: string;
+  decision_reason?: string;
+  revision: number;
   variants: ExperimentVariant[];
   created_at: string;
   updated_at: string;
@@ -37,7 +61,35 @@ export type CreateExperimentPayload = {
   ended_at?: string;
   primary_metric: string;
   description: string;
+  value_type?: ExperimentValueType;
+  default_value?: unknown;
   variants: ExperimentVariant[];
+};
+
+export type UpdateExperimentConfigPayload = {
+  expected_revision: number;
+  value_type: ExperimentValueType;
+  default_value: unknown;
+  kill_switch: boolean;
+  include_anonymous: boolean;
+  started_at?: string;
+  ended_at?: string;
+  variants: ExperimentVariant[];
+  targeting_rules: ExperimentTargetingRule[];
+  overrides: ExperimentOverride[];
+  conclusion: ExperimentConclusion;
+  winner_variant_key?: string;
+  decision_reason?: string;
+  change_reason: string;
+  actor: string;
+};
+
+export type ExperimentRevision = {
+  revision: number;
+  snapshot: UpdateExperimentConfigPayload;
+  change_reason: string;
+  created_by: string;
+  created_at: string;
 };
 
 export type AssignmentResolveResponse = {
@@ -45,6 +97,8 @@ export type AssignmentResolveResponse = {
     experiment_key: string;
     variant_key: string;
     eligible: boolean;
+    value?: unknown;
+    revision?: number;
     reason?: string;
     ttl_seconds?: number;
   }>;
@@ -132,6 +186,33 @@ export const experimentApi = {
       method: "PATCH",
       body: JSON.stringify({ status }),
     }),
+  updateConfig: (id: number, payload: UpdateExperimentConfigPayload, options: ExperimentApiOptions) =>
+    experimentRequest<Experiment>(`/v1/experiments/${id}/config`, {
+      ...options,
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  listRevisions: (id: number, options: ExperimentApiOptions) =>
+    experimentRequest<{ revisions: ExperimentRevision[] }>(`/v1/experiments/${id}/revisions`, options),
+  rollbackConfig: (
+    id: number,
+    revision: number,
+    payload: { expected_revision: number; change_reason: string; actor: string },
+    options: ExperimentApiOptions,
+  ) => experimentRequest<Experiment>(`/v1/experiments/${id}/revisions/${revision}/rollback`, {
+    ...options,
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
+  simulate: (
+    id: number,
+    payload: { subject: { type: ExperimentSubjectType; key: string }; context?: Record<string, unknown> },
+    options: ExperimentApiOptions,
+  ) => experimentRequest<AssignmentResolveResponse["assignments"][number]>(`/v1/experiments/${id}/simulate`, {
+    ...options,
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
   resolveAssignment: (
     payload: { experiment_keys: string[]; subject: { type: ExperimentSubjectType; key: string }; context?: Record<string, unknown> },
     options: ExperimentApiOptions,

@@ -4,10 +4,19 @@ import { apiErrorMessage } from "@/lib/api-client";
 
 import { Input, Select } from "./ui/input";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Beaker, Play, Pause, RotateCcw, Square, Send, RefreshCw } from "lucide-react";
-import { experimentApi, type CreateExperimentPayload, type ExperimentEventType, type ExperimentStatus, type ExperimentSubjectType } from "@/lib/api/experiment";
+import { Beaker, History, Pause, Play, RefreshCw, RotateCcw, Save, Send, ShieldAlert, Square } from "lucide-react";
+import {
+  experimentApi,
+  type CreateExperimentPayload,
+  type ExperimentConclusion,
+  type ExperimentEventType,
+  type ExperimentStatus,
+  type ExperimentSubjectType,
+  type ExperimentValueType,
+  type UpdateExperimentConfigPayload,
+} from "@/lib/api/experiment";
 import { displayLabel } from "@/lib/display-labels";
 import { cn } from "@/lib/utils";
 import { AdminAuthRequired, adminLinks, useAdminToken } from "./admin-console";
@@ -27,6 +36,13 @@ type ExperimentForm = {
   segmentCount: string;
 };
 
+type VariantConfigDraft = {
+  key: string;
+  name: string;
+  trafficWeight: string;
+  value: string;
+};
+
 const defaultBaseUrl = process.env.NEXT_PUBLIC_EXPERIMENT_API_BASE_URL || "/experiment-api";
 
 export function AdminExperimentsPage() {
@@ -41,6 +57,19 @@ export function AdminExperimentsPage() {
   const [eventVariantKey, setEventVariantKey] = useState("");
   const [eventRevenue, setEventRevenue] = useState("12900");
   const [lastResponse, setLastResponse] = useState<unknown>(null);
+  const [valueType, setValueType] = useState<ExperimentValueType>("STRING");
+  const [defaultValue, setDefaultValue] = useState('""');
+  const [killSwitch, setKillSwitch] = useState(false);
+  const [includeAnonymous, setIncludeAnonymous] = useState(false);
+  const [variantDrafts, setVariantDrafts] = useState<VariantConfigDraft[]>([]);
+  const [targetingRules, setTargetingRules] = useState("[]");
+  const [overrides, setOverrides] = useState("[]");
+  const [conclusion, setConclusion] = useState<ExperimentConclusion>("UNDECIDED");
+  const [winnerVariantKey, setWinnerVariantKey] = useState("");
+  const [decisionReason, setDecisionReason] = useState("");
+  const [changeReason, setChangeReason] = useState("운영 설정 변경");
+  const [actor, setActor] = useState("commerce-admin");
+  const [simulationContext, setSimulationContext] = useState('{"country":"KR","orders":3}');
   const options = useMemo(() => ({ baseUrl: experimentBaseUrl, adminToken: experimentAdminToken }), [experimentBaseUrl, experimentAdminToken]);
 
 
@@ -55,9 +84,36 @@ export function AdminExperimentsPage() {
   const selected = experiments.find((experiment) => experiment.id === selectedID) ?? experiments[0] ?? null;
   const selectedEventVariantKey = selected?.variants.some((variant) => variant.key === eventVariantKey) ? eventVariantKey : selected?.variants[0]?.key ?? "";
 
+  useEffect(() => {
+    if (!selected) {
+      return;
+    }
+    setValueType(selected.value_type ?? "STRING");
+    setDefaultValue(formatJSONValue(selected.default_value ?? ""));
+    setKillSwitch(Boolean(selected.kill_switch));
+    setIncludeAnonymous(selected.include_anonymous);
+    setVariantDrafts(selected.variants.map((variant) => ({
+      key: variant.key,
+      name: variant.name,
+      trafficWeight: String(variant.traffic_weight),
+      value: formatJSONValue(variant.value ?? selected.default_value ?? ""),
+    })));
+    setTargetingRules(JSON.stringify(selected.targeting_rules ?? [], null, 2));
+    setOverrides(JSON.stringify(selected.overrides ?? [], null, 2));
+    setConclusion(selected.conclusion ?? "UNDECIDED");
+    setWinnerVariantKey(selected.winner_variant_key ?? "");
+    setDecisionReason(selected.decision_reason ?? "");
+  }, [selected]);
+
   const resultQuery = useQuery({
     queryKey: ["experiment-admin", "results", selected?.id, experimentBaseUrl, experimentAdminToken],
     queryFn: () => experimentApi.getResult(selected?.id ?? 0, options),
+    enabled: Boolean(adminToken && experimentAdminToken && selected?.id),
+  });
+
+  const revisionsQuery = useQuery({
+    queryKey: ["experiment-admin", "revisions", selected?.id, experimentBaseUrl, experimentAdminToken],
+    queryFn: () => experimentApi.listRevisions(selected?.id ?? 0, options),
     enabled: Boolean(adminToken && experimentAdminToken && selected?.id),
   });
 
@@ -105,6 +161,71 @@ export function AdminExperimentsPage() {
     onSuccess: setLastResponse,
   });
 
+  const configMutation = useMutation({
+    mutationFn: () => {
+      if (!selected) {
+        throw new Error("실험을 선택해 주세요.");
+      }
+      const payload: UpdateExperimentConfigPayload = {
+        expected_revision: selected.revision,
+        value_type: valueType,
+        default_value: parseJSONValue(defaultValue, "기본값"),
+        kill_switch: killSwitch,
+        include_anonymous: includeAnonymous,
+        started_at: selected.started_at,
+        ended_at: selected.ended_at,
+        variants: variantDrafts.map((variant) => ({
+          key: variant.key,
+          name: variant.name.trim(),
+          traffic_weight: Number(variant.trafficWeight),
+          value: parseJSONValue(variant.value, `${variant.key} 값`),
+        })),
+        targeting_rules: parseJSONValue(targetingRules, "타게팅 규칙") as UpdateExperimentConfigPayload["targeting_rules"],
+        overrides: parseJSONValue(overrides, "오버라이드") as UpdateExperimentConfigPayload["overrides"],
+        conclusion,
+        winner_variant_key: conclusion === "WINNER" ? winnerVariantKey : undefined,
+        decision_reason: decisionReason.trim(),
+        change_reason: changeReason.trim(),
+        actor: actor.trim(),
+      };
+      return experimentApi.updateConfig(selected.id, payload, options);
+    },
+    onSuccess: (experiment) => {
+      setLastResponse(experiment);
+      void queryClient.invalidateQueries({ queryKey: ["experiment-admin"] });
+    },
+  });
+
+  const simulationMutation = useMutation({
+    mutationFn: () => {
+      if (!selected) {
+        throw new Error("실험을 선택해 주세요.");
+      }
+      return experimentApi.simulate(selected.id, {
+        subject: { type: subjectType, key: subjectKey.trim() },
+        context: parseJSONValue(simulationContext, "평가 context") as Record<string, unknown>,
+      }, options);
+    },
+    onSuccess: setLastResponse,
+  });
+
+  const rollbackMutation = useMutation({
+    mutationFn: (revision: number) => {
+      if (!selected) {
+        throw new Error("실험을 선택해 주세요.");
+      }
+      return experimentApi.rollbackConfig(selected.id, revision, {
+        expected_revision: selected.revision,
+        change_reason: `${revision}번 revision으로 롤백`,
+        actor: actor.trim(),
+      }, options);
+    },
+    onSuccess: (experiment) => {
+      setLastResponse(experiment);
+      void queryClient.invalidateQueries({ queryKey: ["experiment-admin"] });
+    },
+  });
+
   const eventMutation = useMutation({
     mutationFn: (eventType: ExperimentEventType) => {
       if (!selected) {
@@ -138,7 +259,7 @@ export function AdminExperimentsPage() {
   const totalImpressions = result?.variants.reduce((sum, variant) => sum + variant.impressions, 0) ?? 0;
   const totalPurchases = result?.variants.reduce((sum, variant) => sum + variant.purchases, 0) ?? 0;
   const totalRevenue = result?.variants.reduce((sum, variant) => sum + variant.revenue, 0) ?? 0;
-  const error = createExperiment.error ?? statusMutation.error ?? patchStatusMutation.error ?? resolveMutation.error ?? eventMutation.error ?? experimentsQuery.error ?? resultQuery.error;
+  const error = createExperiment.error ?? statusMutation.error ?? patchStatusMutation.error ?? configMutation.error ?? simulationMutation.error ?? rollbackMutation.error ?? resolveMutation.error ?? eventMutation.error ?? experimentsQuery.error ?? resultQuery.error ?? revisionsQuery.error;
 
   return (
     <ConsoleLayout title="관리자" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
@@ -285,6 +406,115 @@ export function AdminExperimentsPage() {
           )}
         </ConsoleSection>
 
+        <ConsoleSection
+          title="운영 제어"
+          description="저장된 설정은 다음 서버 평가 요청부터 즉시 적용됩니다. 호출자 폴링이나 판정 캐시는 사용하지 않습니다."
+          action={selected ? <StatusBadge value={killSwitch ? "PAUSED" : `REVISION ${selected.revision}`} /> : null}
+        >
+          {selected ? (
+            <div className="grid gap-5">
+              <div className={cn("flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4", killSwitch ? "border-status-negative-border bg-status-negative-subtle" : "border-status-positive-border bg-status-positive-subtle")}>
+                <div className="flex items-start gap-3">
+                  <ShieldAlert className={killSwitch ? "text-status-negative" : "text-status-positive"} size={22} />
+                  <div>
+                    <p className="font-bold text-content-primary">Kill Switch</p>
+                    <p className="mt-1 text-xs font-bold text-content-secondary">켜면 다음 평가부터 모든 사용자를 즉시 제외합니다.</p>
+                  </div>
+                </div>
+                <label className="flex cursor-pointer items-center gap-2 text-sm font-bold text-content-primary">
+                  <input className="h-5 w-5 accent-action-primary" type="checkbox" checked={killSwitch} onChange={(event) => setKillSwitch(event.target.checked)} />
+                  {killSwitch ? "중단됨" : "정상 평가"}
+                </label>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                <SelectField label="값 타입" value={valueType} onChange={(value) => setValueType(value as ExperimentValueType)} options={["BOOLEAN", "STRING", "NUMBER", "JSON"]} />
+                <TextField label="기본값 (JSON)" value={defaultValue} onChange={setDefaultValue} />
+                <SelectField label="비회원 평가" value={includeAnonymous ? "true" : "false"} onChange={(value) => setIncludeAnonymous(value === "true")} options={["true", "false"]} labels={{ true: "허용", false: "회원만" }} />
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-content-primary">Variant 값과 트래픽</p>
+                    <p className="mt-1 text-xs font-bold text-content-secondary">비율 합계는 100이어야 하며 0% 패배군도 설정할 수 있습니다.</p>
+                  </div>
+                  <span className={cn("rounded-full px-3 py-1 text-xs font-bold", variantDrafts.reduce((sum, variant) => sum + Number(variant.trafficWeight || 0), 0) === 100 ? "bg-status-positive-subtle text-status-positive" : "bg-status-negative-subtle text-status-negative")}>
+                    합계 {variantDrafts.reduce((sum, variant) => sum + Number(variant.trafficWeight || 0), 0)}%
+                  </span>
+                </div>
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {variantDrafts.map((variant, index) => (
+                    <div key={variant.key} className="rounded-lg border border-border-subtle bg-surface-subtle p-3">
+                      <div className="mb-3 flex items-center justify-between">
+                        <div><p className="font-bold text-content-primary">{variant.key}</p><p className="text-xs font-bold text-content-secondary">{variant.name}</p></div>
+                        {winnerVariantKey === variant.key && conclusion === "WINNER" ? <StatusBadge value="WINNER" /> : null}
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <TextField label="트래픽 (%)" type="number" value={variant.trafficWeight} onChange={(value) => setVariantDrafts((current) => updateVariantDraft(current, index, "trafficWeight", value))} />
+                        <TextField label="반환값 (JSON)" value={variant.value} onChange={(value) => setVariantDrafts((current) => updateVariantDraft(current, index, "value", value))} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <JSONField
+                  label="타게팅 규칙"
+                  description="모든 규칙을 AND로 평가합니다. EQ, NEQ, IN, NOT_IN, GT, GTE, LT, LTE를 지원합니다."
+                  value={targetingRules}
+                  onChange={setTargetingRules}
+                />
+                <JSONField
+                  label="사용자 오버라이드"
+                  description="subject_type, subject_key, variant_key로 QA 또는 특정 사용자를 고정합니다."
+                  value={overrides}
+                  onChange={setOverrides}
+                />
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                <SelectField label="실험 결론" value={conclusion} onChange={(value) => setConclusion(value as ExperimentConclusion)} options={["UNDECIDED", "WINNER", "INCONCLUSIVE"]} />
+                <SelectField label="승리군" value={winnerVariantKey} onChange={setWinnerVariantKey} options={["", ...variantDrafts.map((variant) => variant.key)]} labels={{ "": "선택 안 함" }} />
+                <TextField label="판정 사유" value={decisionReason} onChange={setDecisionReason} />
+                <TextField label="변경자" value={actor} onChange={setActor} />
+                <div className="md:col-span-2"><TextField label="변경 사유" value={changeReason} onChange={setChangeReason} /></div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button disabled={configMutation.isPending} onClick={() => configMutation.mutate()}><Save size={15} />{configMutation.isPending ? "저장 중" : "운영 설정 저장"}</Button>
+              </div>
+            </div>
+          ) : <p className="text-sm font-bold text-content-secondary">실험을 선택해 주세요.</p>}
+        </ConsoleSection>
+
+        <ConsoleSection title="중앙 판정 시뮬레이터와 변경 이력" description="실제 배정을 저장하지 않고 최신 설정으로 판정합니다. 과거 설정은 새 revision으로 롤백됩니다.">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+            <div className="grid gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <SelectField label="대상 유형" value={subjectType} onChange={(value) => setSubjectType(value as ExperimentSubjectType)} options={["ANONYMOUS", "MEMBER"]} />
+                <TextField label="대상 식별자" value={subjectKey} onChange={setSubjectKey} />
+              </div>
+              <JSONField label="평가 context" description="타게팅에 사용할 속성을 입력합니다." value={simulationContext} onChange={setSimulationContext} compact />
+              <Button variant="secondary" disabled={!selected || simulationMutation.isPending} onClick={() => simulationMutation.mutate()}><Beaker size={15} />판정 시뮬레이션</Button>
+              <pre className="max-h-64 overflow-auto rounded-md bg-content-primary p-3 text-xs leading-5 text-content-inverse">{JSON.stringify(lastResponse ?? {}, null, 2)}</pre>
+            </div>
+            <div>
+              <div className="mb-2 flex items-center gap-2 text-sm font-bold text-content-primary"><History size={16} />Revision 이력</div>
+              <DataTable
+                columns={["Revision", "변경", "변경자", "작업"]}
+                rows={(revisionsQuery.data?.revisions ?? []).map((revision) => [
+                  `#${revision.revision}`,
+                  <div key="reason"><p className="font-bold">{revision.change_reason}</p><p className="text-xs text-content-secondary">{new Date(revision.created_at).toLocaleString("ko-KR")}</p></div>,
+                  revision.created_by,
+                  <Button key="rollback" size="sm" variant="secondary" disabled={!selected || revision.revision === selected.revision || rollbackMutation.isPending} onClick={() => rollbackMutation.mutate(revision.revision)}>롤백</Button>,
+                ])}
+              />
+            </div>
+          </div>
+        </ConsoleSection>
+
         <ConsoleSection title="배정, 이벤트, 결과 검증">
           <div className="grid gap-3 md:grid-cols-4">
             <SelectField label="대상 유형" value={subjectType} onChange={(value) => setSubjectType(value as ExperimentSubjectType)} options={["ANONYMOUS", "MEMBER"]} />
@@ -327,6 +557,21 @@ function TextField({ label, value, onChange, type = "text" }: { label: string; v
   );
 }
 
+function JSONField({ label, description, value, onChange, compact = false }: { label: string; description: string; value: string; onChange: (value: string) => void; compact?: boolean }) {
+  return (
+    <label className="grid gap-1 text-xs font-bold text-content-secondary">
+      {label}
+      <span className="font-medium leading-5 text-content-tertiary">{description}</span>
+      <textarea
+        className={cn("w-full resize-y rounded-control border border-border-interactive bg-surface-raised px-3 py-2 font-mono text-xs leading-5 text-content-primary outline-none", compact ? "min-h-24" : "min-h-40")}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        spellCheck={false}
+      />
+    </label>
+  );
+}
+
 function SelectField({ label, value, options, labels, onChange }: { label: string; value: string; options: string[]; labels?: Record<string, string>; onChange: (value: string) => void }) {
   return (
     <label className="grid gap-1 text-xs font-bold text-content-secondary">
@@ -349,6 +594,22 @@ function storeValue(key: string, value: string) {
   if (typeof window !== "undefined") {
     localStorage.setItem(key, value);
   }
+}
+
+function updateVariantDraft(drafts: VariantConfigDraft[], index: number, field: "trafficWeight" | "value", value: string) {
+  return drafts.map((draft, draftIndex) => draftIndex === index ? { ...draft, [field]: value } : draft);
+}
+
+function parseJSONValue(value: string, label: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    throw new Error(`${label}은(는) 올바른 JSON이어야 합니다.`);
+  }
+}
+
+function formatJSONValue(value: unknown) {
+  return JSON.stringify(value, null, typeof value === "object" && value !== null ? 2 : undefined) ?? "null";
 }
 
 function demoForm(): ExperimentForm {
@@ -378,6 +639,8 @@ function formPayload(form: ExperimentForm): CreateExperimentPayload {
     ended_at: form.endedAt ? new Date(form.endedAt).toISOString() : undefined,
     primary_metric: form.primaryMetric,
     description: form.description.trim(),
+    value_type: "STRING",
+    default_value: "control",
     variants: segmentVariants(Number(form.segmentCount) || 2),
   };
 }
@@ -390,6 +653,6 @@ function segmentVariants(count: number): CreateExperimentPayload["variants"] {
     const key = String.fromCharCode(65 + index);
     const trafficWeight = base + (remainder > 0 ? 1 : 0);
     remainder -= remainder > 0 ? 1 : 0;
-    return { key, name: `${key}군`, traffic_weight: trafficWeight };
+    return { key, name: `${key}군`, traffic_weight: trafficWeight, value: key.toLowerCase() };
   });
 }
