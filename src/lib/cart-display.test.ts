@@ -24,7 +24,24 @@ describe("groupCartItemsForDisplay", () => {
       cartItemIDs: [1, 2, 3],
       quantity: 3,
       totalPrice: 45_000,
+      priceAtAddedTotal: 45_000,
+      currentPriceAvailable: false,
     })]);
+  });
+
+  it("uses current prices and aggregates the change across grouped rows", () => {
+    const groups = groupCartItemsForDisplay([
+      item({ id: 1, quantity: 2, current_price: 18_000 }),
+      item({ id: 2, price_at_added: 17_000, current_price: 18_000 }),
+    ]);
+
+    expect(groups[0]).toMatchObject({
+      quantity: 3,
+      priceAtAddedTotal: 47_000,
+      totalPrice: 54_000,
+      priceChangeAmount: 7_000,
+      currentPriceAvailable: true,
+    });
   });
 
   it("keeps different options separate and sums price snapshots exactly", () => {

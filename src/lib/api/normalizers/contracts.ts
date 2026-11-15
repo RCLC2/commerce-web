@@ -56,6 +56,9 @@ export function normalizeCartItem(raw: z.infer<typeof rawCartSchema>): CartItem 
     option_id: raw.OptionID,
     quantity: raw.Quantity,
     price_at_added: raw.PriceAtAdded,
+    current_price: raw.CurrentPrice,
+    price_change_amount: raw.PriceChangeAmount,
+    price_change_rate: raw.PriceChangeRate,
   };
 }
 

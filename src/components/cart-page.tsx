@@ -59,7 +59,10 @@ export function CartPage() {
     .map((group) => group.key));
   const selectedGroups = displayGroups.filter((group) => selectedGroupKeys.has(group.key));
   const selectedQuantity = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
-  const total = selectedItems.reduce((sum, item) => sum + item.price_at_added * item.quantity, 0);
+  const priceAtAddedTotal = selectedItems.reduce((sum, item) => sum + item.price_at_added * item.quantity, 0);
+  const total = selectedItems.reduce((sum, item) => sum + (item.current_price ?? item.price_at_added) * item.quantity, 0);
+  const selectedCurrentPricesAvailable = selectedItems.every((item) => item.current_price !== undefined);
+  const selectedPriceChange = selectedCurrentPricesAvailable ? total - priceAtAddedTotal : 0;
   const stockIssues = new Map<string, string>();
   for (const group of displayGroups) {
     const product = group.items[0].product;
@@ -191,6 +194,7 @@ export function CartPage() {
             const option = item.product?.options?.find((candidate) => candidate.id === group.option_id);
             const selected = selectedGroupKeys.has(group.key);
             const stockIssue = stockIssues.get(group.key);
+            const priceChanged = group.currentPriceAvailable && group.priceChangeAmount !== 0;
             return <article key={group.key} className={`rounded-surface border bg-surface-raised p-4 transition ${stockIssue ? "border-status-negative-border" : selected ? "border-action-primary/40 shadow-card" : "border-border-subtle"}`}>
               <div className="grid grid-cols-[24px_88px_minmax(0,1fr)] gap-3">
                 <label className="pt-1" aria-label={`${item.product?.name ?? `상품 ${group.product_id}`} 선택`}><input type="checkbox" className="h-5 w-5 cursor-pointer accent-action-primary" checked={selected} onChange={() => toggleGroup(group.cartItemIDs)} /></label>
@@ -198,7 +202,11 @@ export function CartPage() {
                 <div className="min-w-0">
                   <Link href={`/products/${group.product_id}`} className="group block"><p className="text-xs font-bold text-content-secondary">{item.product?.market_name ?? `마켓 #${item.product?.market_id ?? "-"}`}</p><div className="mt-1 flex items-start justify-between gap-2"><h2 className="line-clamp-2 text-sm font-bold leading-5 text-content-primary group-hover:underline">{item.product?.name ?? `상품 #${group.product_id}`}</h2><ChevronRight className="mt-0.5 shrink-0 text-content-tertiary" size={16} /></div></Link>
                   <p className="mt-2 text-xs text-content-secondary">{option ? `${option.option_name} · ${option.option_value}` : `옵션 #${group.option_id}`} · {group.quantity}개</p>
-                  <p className="mt-3 text-right font-bold tabular-nums text-content-primary">{formatPrice(group.totalPrice)}</p>
+                  <div className="mt-3 flex flex-wrap items-end justify-end gap-x-2 gap-y-1 text-right">
+                    {priceChanged ? <p className={`basis-full text-xs font-bold ${group.priceChangeAmount > 0 ? "text-status-negative" : "text-status-positive"}`}>담은 뒤 {formatPrice(Math.abs(group.priceChangeAmount))} {group.priceChangeAmount > 0 ? "올랐어요" : "내렸어요"}</p> : null}
+                    {priceChanged ? <p className="text-xs tabular-nums text-content-tertiary line-through">{formatPrice(group.priceAtAddedTotal)}</p> : null}
+                    <p className="font-bold tabular-nums text-content-primary">{formatPrice(group.totalPrice)}</p>
+                  </div>
                 </div>
               </div>
               {stockIssue ? <p className="mt-3 rounded-control bg-status-negative-subtle px-3 py-2 text-sm font-bold text-status-negative" role="status">{stockIssue}</p> : null}
@@ -215,7 +223,10 @@ export function CartPage() {
         <aside className="md:sticky md:top-24">
           <OrderSummary
             title="선택 상품"
-            items={[{ label: "선택 수량", value: `${selectedQuantity}개` }]}
+            items={[
+              { label: "선택 수량", value: `${selectedQuantity}개` },
+              ...(selectedPriceChange !== 0 ? [{ label: "담을 때보다", value: `${selectedPriceChange > 0 ? "+" : "-"}${formatPrice(Math.abs(selectedPriceChange))}`, emphasis: selectedPriceChange > 0 ? "negative" as const : "positive" as const }] : []),
+            ]}
             totalLabel="상품 금액 합계"
             total={formatPrice(total)}
             footer={<><Button className="w-full" size="lg" disabled={!selectedItems.length || cart.isError || cart.isFetching || updateCart.isPending || removeCart.isPending || stockCheckPending || selectedStockIssueCount > 0} onClick={goToCheckout}><Check size={18} /> 선택 상품 주문하기</Button>{selectedStockIssueCount > 0 ? <p className="mt-3 text-sm font-bold text-status-negative" role="status">주문할 수 없는 상품 {selectedStockIssueCount}개가 선택되어 있습니다. 수량·옵션을 변경하거나 선택을 해제해주세요.</p> : stockCheckPending ? <p className="mt-3 text-center text-xs text-content-secondary" role="status">상품 재고를 확인하는 중입니다.</p> : displayGroups.length > 0 && !selectedItems.length ? <p className="mt-3 text-center text-xs font-bold text-action-primary">주문할 상품을 선택해주세요.</p> : null}</>}

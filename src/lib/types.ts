@@ -416,6 +416,9 @@ export type CartItem = {
   option_id: number;
   quantity: number;
   price_at_added: number;
+  current_price?: number;
+  price_change_amount?: number;
+  price_change_rate?: number;
   product?: Product;
 };
 

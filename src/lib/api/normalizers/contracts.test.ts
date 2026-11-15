@@ -44,13 +44,17 @@ describe("contract normalizers", () => {
   it("normalizes PascalCase cart and address responses", () => {
     const cart = parseContract(rawCartSchema, {
       ID: 1, MemberID: 2, ProductID: 3, OptionID: 4, Quantity: 2, PriceAtAdded: 12000,
+      CurrentPrice: 15000, PriceChangeAmount: 3000, PriceChangeRate: 25,
     }, "/cart");
     const address = parseContract(rawAddressSchema, {
       ID: 5, ReceiverName: "홍길동", ReceiverPhone: "010", PostalCode: "01234",
       BaseAddress: "서울", DetailAddress: "101호", IsDefault: true,
     }, "/addresses");
 
-    expect(normalizeCartItem(cart)).toMatchObject({ id: 1, product_id: 3, price_at_added: 12000 });
+    expect(normalizeCartItem(cart)).toMatchObject({
+      id: 1, product_id: 3, price_at_added: 12000,
+      current_price: 15000, price_change_amount: 3000, price_change_rate: 25,
+    });
     expect(normalizeAddress(address)).toMatchObject({ id: 5, receiver: "홍길동", line1: "서울", is_default: true });
   });
 

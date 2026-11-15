@@ -109,6 +109,24 @@ describe("cart editing", () => {
     expect(screen.getAllByText("24,000원").length).toBeGreaterThan(0);
   });
 
+  it("shows the current total and how much the price changed since adding", async () => {
+    rows = [{
+      ...rows[0],
+      quantity: 2,
+      price_at_added: 10_000,
+      current_price: 12_500,
+      price_change_amount: 2_500,
+      price_change_rate: 25,
+    }];
+    mountCart();
+
+    expect(await screen.findByText("담은 뒤 5,000원 올랐어요")).toBeVisible();
+    expect(screen.getByText("20,000원")).toHaveClass("line-through");
+    expect(screen.getAllByText("25,000원").length).toBeGreaterThan(0);
+    expect(screen.getByText("담을 때보다")).toBeVisible();
+    expect(screen.getByText("+5,000원")).toHaveClass("text-status-negative");
+  });
+
   it("caps quantity only when the new option has insufficient stock and explains the change", async () => {
     rows = [{ ...rows[0], quantity: 5 }];
     mountCart();
