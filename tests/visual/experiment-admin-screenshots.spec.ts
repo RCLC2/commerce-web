@@ -143,6 +143,9 @@ test("captures the experiment admin control plane for the pull request", async (
   await expect(page.getByText("결제 추천 영역 고도화", { exact: true })).toBeVisible();
   await expect(page.getByText("합계 100%", { exact: true })).toBeVisible();
   await expect(page.getByText("승리군 treatment 확정 및 트래픽 확대", { exact: true }).first()).toBeVisible();
+  await page.addStyleTag({
+    content: 'nav[aria-label="하단 주요 메뉴"] { display: none !important; }',
+  });
 
   await page.screenshot({
     path: "output/pr-screenshots/experiment-admin-overview.png",
