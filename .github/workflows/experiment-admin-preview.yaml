@@ -1,0 +1,44 @@
+name: experiment-admin-preview
+
+on:
+  pull_request:
+    paths:
+      - "src/components/admin-experiments-page.tsx"
+      - "src/lib/api/experiment.ts"
+      - "tests/visual/experiment-admin-screenshots.spec.ts"
+      - ".github/workflows/experiment-admin-preview.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  screenshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@1e60f620b9541dca1515407f7e40b5221d3b1c8 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Capture experiment admin screenshots
+        run: npx playwright test tests/visual/experiment-admin-screenshots.spec.ts --project=chromium
+
+      - name: Upload pull request screenshots
+        if: always()
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4
+        with:
+          name: experiment-admin-screenshots
+          path: output/pr-screenshots/*.png
+          if-no-files-found: error
