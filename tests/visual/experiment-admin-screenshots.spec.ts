@@ -136,13 +136,13 @@ test("captures the experiment admin control plane for the pull request", async (
     await route.fulfill({ status: 404, body: "not mocked" });
   });
   await page.route("**/api/v1/categories**", (route) => route.fulfill({ status: 200, json: [] }));
-  await page.route("**/api/v1/notifications/unread-count", (route) => route.fulfill({ status: 200, json: { unread_count: 0 } }));
+  await page.route("**/api/v1/me/notifications/unread-count", (route) => route.fulfill({ status: 200, json: { unread_count: 0 } }));
 
   await page.goto("/admin/experiments");
   await expect(page.getByRole("heading", { name: "실험 관리", exact: true })).toBeVisible();
   await expect(page.getByText("결제 추천 영역 고도화", { exact: true })).toBeVisible();
   await expect(page.getByText("합계 100%", { exact: true })).toBeVisible();
-  await expect(page.getByText("승리군 treatment 확정 및 트래픽 확대", { exact: true })).toBeVisible();
+  await expect(page.getByText("승리군 treatment 확정 및 트래픽 확대", { exact: true }).first()).toBeVisible();
 
   await page.screenshot({
     path: "output/pr-screenshots/experiment-admin-overview.png",
