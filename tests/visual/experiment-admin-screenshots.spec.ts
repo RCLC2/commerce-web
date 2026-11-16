@@ -179,7 +179,7 @@ test("captures the experiment admin control plane for the pull request", async (
 
   await page.goto("/admin/experiments");
   await expect(page.getByRole("heading", { name: "실험 관리", exact: true })).toBeVisible();
-  await expect(page.getByText("결제 추천 영역 고도화", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "결제 추천 영역 고도화", exact: true })).toBeVisible();
   await expect(page.getByText("대조군 · 기존 추천", { exact: true })).toBeVisible();
   await expect(page.getByText("현재 운영 기능으로 비교 기준입니다. (Control)", { exact: true })).toBeVisible();
   await page.addStyleTag({
