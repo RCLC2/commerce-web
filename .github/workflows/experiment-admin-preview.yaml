@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "src/components/admin-experiments-page.tsx"
+      - "src/components/admin-experiments/**"
       - "src/lib/api/experiment.ts"
       - "tests/visual/experiment-admin-screenshots.spec.ts"
       - ".github/workflows/experiment-admin-preview.yaml"
