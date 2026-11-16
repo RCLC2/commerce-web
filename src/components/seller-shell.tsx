@@ -14,6 +14,7 @@ export const sellerLinks = [
   { href: "/seller/ads", label: "광고" },
   { href: "/seller/inventory", label: "재고 연동" },
   { href: "/seller/orders", label: "주문/배송" },
+  { href: "/seller/inquiries", label: "고객 문의" },
   { href: "/seller/settlements", label: "정산" },
   { href: "/seller/reviews", label: "리뷰" },
   { href: "/seller/audit-logs", label: "변경 이력" },

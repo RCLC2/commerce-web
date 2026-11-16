@@ -13,6 +13,7 @@ import { onboardingApi } from "./api/onboarding";
 import { outfitApi } from "./api/outfit";
 import { homePlacementApi } from "./api/home-placements";
 import { marketDisplayApi } from "./api/market-display";
+import { inquiryApi } from "./api/inquiries";
 
 export const api = {
   ...catalogApi,
@@ -30,4 +31,5 @@ export const api = {
   ...outfitApi,
   ...homePlacementApi,
   ...marketDisplayApi,
+  ...inquiryApi,
 };
