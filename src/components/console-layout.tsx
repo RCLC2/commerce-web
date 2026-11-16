@@ -45,6 +45,7 @@ export function ConsoleLayout({
   useEffect(() => {
     const clearTimer = window.setTimeout(() => setMutationError(undefined), 0);
     const unsubscribe = queryClient.getMutationCache().subscribe((event) => {
+      if (event.mutation?.options.meta?.suppressConsoleError) return;
       if (event.mutation?.state.status === "error") {
         setMutationError(event.mutation.state.error);
       } else if (event.mutation?.state.status === "pending" || event.mutation?.state.status === "success") {
