@@ -212,5 +212,5 @@ test("captures the experiment admin control plane for the pull request", async (
   await page.getByLabel("운영 이름").first().fill("기존 추천 수정안");
   await page.getByRole("button", { name: "변경 저장", exact: true }).click();
   await expect(page.getByTestId("revision-conflict")).toBeVisible();
-  await page.screenshot({ path: "output/pr-screenshots/experiment-admin-conflict.png", fullPage: true });
+  await page.screenshot({ path: "output/pr-screenshots/experiment-admin-conflict.png" });
 });
