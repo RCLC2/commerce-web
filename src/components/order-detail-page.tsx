@@ -233,6 +233,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
                             onConfirm={() => confirmPurchase.mutate(item.id)}
                             onToggleReview={() => setReviewingLineItemID(isReviewing ? null : item.id)}
                           />
+                          <Link href={`/mypage/inquiries/new?orderCode=${encodeURIComponent(order.order_code)}&lineItemID=${item.id}`} className="mt-2 inline-flex min-h-9 items-center rounded-control px-3 text-xs font-bold text-action-primary hover:bg-action-secondary">이 상품 문의하기</Link>
                         </div>
                       </div>
                       {reviewEligible && isReviewing ? (
@@ -305,6 +306,11 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
           total={formatPrice(amount)}
           footer={<p className="text-xs leading-5 text-content-secondary">주문 당시 결제한 금액입니다. 배송비에는 쿠폰·포인트 할인이 적용되지 않습니다.</p>}
         />
+        <Surface>
+          <h2 className="font-bold">주문에 도움이 필요하신가요?</h2>
+          <p className="mt-2 text-sm leading-6 text-content-secondary">이 주문번호를 자동으로 넣어 1:1 문의를 시작할 수 있어요.</p>
+          <Link href={`/mypage/inquiries/new?orderCode=${encodeURIComponent(order.order_code)}`} className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-control bg-button-primary px-4 text-sm font-bold text-button-primary-content shadow-button-primary">주문 문의하기</Link>
+        </Surface>
       </aside>
       </div>
 

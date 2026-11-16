@@ -32,7 +32,7 @@ export default defineConfig({
   ],
   webServer: shouldStartFrontend
     ? {
-        command: "npm run dev -- --hostname 127.0.0.1 --port 3000",
+        command: "npx next dev --hostname 127.0.0.1 --port 3000",
         url: frontendBaseURL,
         reuseExistingServer: false,
         timeout: 120_000,

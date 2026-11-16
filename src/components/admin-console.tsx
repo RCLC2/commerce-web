@@ -32,6 +32,7 @@ export const adminLinks = [
   { href: "/admin/markets", label: "마켓" },
   { href: "/admin/products", label: "상품" },
   { href: "/admin/orders", label: "주문" },
+  { href: "/admin/inquiries", label: "고객 문의" },
   { href: "/admin/settlements", label: "정산" },
   { href: "/admin/coupons", label: "쿠폰" },
   { href: "/admin/tokens", label: "토큰 조회" },
