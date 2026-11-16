@@ -57,7 +57,7 @@ function OperatorInquiryContent({ role, token, marketID }: { role: "admin" | "se
   const item = detail.data;
 
   return <>
-    <ConsoleHeader title={role === "admin" ? "고객 문의 통합 검색" : "고객 문의"} description={role === "admin" ? "질문 내용, 회원 이메일, 주문번호를 자연어로 검색하고 플랫폼 문의를 처리합니다." : "내 마켓의 주문·상품 문의를 확인하고 고객에게 답변합니다."} />
+    <ConsoleHeader title={role === "admin" ? "고객 문의 통합 검색" : "고객 문의"} description={role === "admin" ? "질문 내용, 회원 이메일, 주문번호를 키워드로 검색하고 플랫폼 문의를 처리합니다." : "내 마켓의 주문·상품 문의를 확인하고 고객에게 답변합니다."} />
     <form className="mt-5 grid gap-2 rounded-surface border border-border-subtle bg-surface-raised p-3 md:grid-cols-[minmax(240px,1fr)_160px_160px_auto]" onSubmit={(event) => { event.preventDefault(); setQuery(queryInput.trim()); }}>
       <label className="relative block"><span className="sr-only">문의 검색</span><Search className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-content-secondary" /><Input className="pl-9" value={queryInput} onChange={(event) => setQueryInput(event.target.value)} placeholder={role === "admin" ? "예: 배송이 멈춘 주문, member@example.com" : "제목, 주문번호, 회원 이메일"} /></label>
       <Select aria-label="문의 상태" value={status} onChange={(event) => setStatus(event.target.value as "" | InquiryStatus)}><option value="">전체 상태</option><option value="STARTED">접수</option><option value="IN_PROGRESS">처리 중</option><option value="COMPLETED">처리 완료</option><option value="CLOSED">종료</option></Select>
