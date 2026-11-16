@@ -11,6 +11,7 @@ const listItems = [
 ];
 
 test("COM-23 PR screenshots", async ({ page }) => {
+  test.setTimeout(90_000);
   await installApiMocks(page);
   await installSession(page, "MEMBER");
   await page.setViewportSize({ width: 390, height: 844 });
@@ -57,8 +58,48 @@ test("COM-23 PR screenshots", async ({ page }) => {
   await expect(page.getByText("문의 답변이 도착했습니다", { exact: true })).toBeVisible();
   await shot(page, "08-answer-notification.png");
 
-  await installSession(page, "SELLER");
   await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/mypage");
+  await expect(page.getByRole("heading", { name: "minji님" })).toBeVisible();
+  await shot(page, "11-pc-mypage-summary.png");
+
+  await page.goto("/orders/ORD-20261116-1001");
+  await expect(productInquiry).toBeVisible();
+  await productInquiry.scrollIntoViewIfNeeded();
+  await shot(page, "12-pc-order-inquiry-entry.png", false);
+
+  await page.goto("/mypage/inquiries/new?orderCode=ORD-20261116-1001&lineItemID=6");
+  await expect(page.getByRole("heading", { name: "새 문의 작성" })).toBeVisible();
+  await shot(page, "13-pc-create-order-inquiry.png");
+
+  await page.goto("/mypage/inquiries");
+  await expect(page.getByText("주말 전에 받을 수 있을까요?", { exact: true })).toBeVisible();
+  await shot(page, "14-pc-inquiry-list.png");
+
+  await page.goto("/mypage/inquiries/402");
+  await expect(page.getByText("담당자가 반품 수거 일정을 확인하고 있습니다.", { exact: true })).toBeVisible();
+  await shot(page, "15-pc-inquiry-thread.png");
+
+  await page.goto("/mypage/inquiries/403");
+  await page.getByRole("button", { name: "네, 해결됐어요" }).click();
+  await page.getByRole("button", { name: "5점" }).click();
+  await page.getByPlaceholder("좋았던 점을 남겨주세요.").fill("빠르고 이해하기 쉬운 답변이었어요.");
+  await page.getByTestId("satisfaction-survey").scrollIntoViewIfNeeded();
+  await shot(page, "16-pc-satisfaction-positive.png", false);
+
+  await page.reload();
+  await page.getByRole("button", { name: "아니요" }).click();
+  await page.getByRole("button", { name: "2점" }).click();
+  await page.getByRole("button", { name: "해결되지 않았어요" }).click();
+  await page.getByPlaceholder("어떤 점이 아쉬웠는지 알려주세요.").fill("쿠폰 적용 조건을 확인했지만 결제 화면에서는 여전히 보이지 않았어요.");
+  await page.getByTestId("satisfaction-survey").scrollIntoViewIfNeeded();
+  await shot(page, "17-pc-satisfaction-negative.png", false);
+
+  await page.goto("/notifications");
+  await expect(page.getByText("문의 답변이 도착했습니다", { exact: true })).toBeVisible();
+  await shot(page, "18-pc-answer-notification.png");
+
+  await installSession(page, "SELLER");
   await page.goto("/seller/inquiries");
   await page.getByRole("button", { name: /주말 전에 받을 수 있을까요/ }).click();
   await expect(page.getByText("문의 #401", { exact: true })).toBeVisible();
