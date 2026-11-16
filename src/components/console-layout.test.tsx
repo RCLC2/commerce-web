@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider, useMutation } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConsoleActionField, ConsoleLayout, DataTable, FilterField, FilterPanel } from "./console-layout";
 
@@ -114,6 +114,29 @@ describe("ConsoleLayout navigation", () => {
 
     expect(screen.getByRole("button", { name: "탐색 열기" })).toHaveAttribute("aria-expanded", "false");
     expect(navigation).toHaveClass("hidden", "md:grid");
+  });
+
+  it("allows locally handled mutations to suppress the global error banner", async () => {
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    function LocallyHandledMutation() {
+      const mutation = useMutation({
+        mutationFn: async () => { throw new Error("AI 검색 실패"); },
+        meta: { suppressConsoleError: true },
+      });
+      return <button type="button" onClick={() => mutation.mutate()}>AI 검색</button>;
+    }
+    render(
+      <QueryClientProvider client={client}>
+        <ConsoleLayout title="관리자" links={[{ href: "/admin", label: "홈" }]}>
+          <LocallyHandledMutation />
+        </ConsoleLayout>
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "AI 검색" }));
+    await waitFor(() => expect(client.getMutationCache().getAll()[0].state.status).toBe("error"));
+
+    expect(screen.queryByText("작업을 완료하지 못했습니다.")).not.toBeInTheDocument();
   });
 });
 

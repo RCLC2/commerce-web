@@ -107,11 +107,26 @@ test("COM-23 PR screenshots", async ({ page }) => {
 
   await installSession(page, "ADMIN");
   await page.goto("/admin/inquiries");
-  await page.getByPlaceholder("예: 배송이 멈춘 주문, member@example.com").fill("쿠폰 결제 화면");
-  await page.getByRole("button", { name: "검색", exact: true }).click();
+  await page.getByPlaceholder("예: 지난주 처리 중인 배송 지연 문의").fill("쿠폰 결제 화면");
+  await page.getByRole("button", { name: "AI 검색", exact: true }).click();
+  await expect(page.getByTestId("ai-search-explanation")).toBeVisible();
   await page.getByRole("button", { name: /쿠폰이 결제 화면에 보이지 않아요/ }).click();
   await expect(page.getByText("문의 #403", { exact: true })).toBeVisible();
   await shot(page, "10-admin-natural-language-search.png");
+
+  await page.getByPlaceholder("예: 지난주 처리 중인 배송 지연 문의").fill("지난달 없는 회원 문의");
+  await page.getByRole("button", { name: "AI 검색", exact: true }).click();
+  await expect(page.getByText("조건에 맞는 문의가 없습니다", { exact: true })).toBeVisible();
+  await shot(page, "19-pc-admin-ai-empty.png");
+
+  await page.getByPlaceholder("예: 지난주 처리 중인 배송 지연 문의").fill("쿠폰 오류 테스트");
+  await page.getByRole("button", { name: "AI 검색", exact: true }).click();
+  await expect(page.getByText("AI 검색을 완료하지 못했습니다", { exact: true })).toBeVisible();
+  await shot(page, "20-pc-admin-ai-unavailable.png");
+
+  await page.getByRole("button", { name: "기본 키워드 검색으로 전환" }).click();
+  await expect(page.getByRole("button", { name: /쿠폰이 결제 화면에 보이지 않아요/ })).toBeVisible();
+  await shot(page, "21-pc-admin-keyword-fallback.png");
 });
 
 async function installSession(page: Page, role: "MEMBER" | "SELLER" | "ADMIN") {
@@ -126,6 +141,7 @@ async function installSession(page: Page, role: "MEMBER" | "SELLER" | "ADMIN") {
 
 async function shot(page: Page, name: string, scrollTop = true) {
   if (scrollTop) await page.evaluate(() => window.scrollTo(0, 0));
+  await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
   await page.screenshot({ path: `docs/pr-assets/com-23/${name}`, animations: "disabled" });
 }
 
@@ -177,6 +193,20 @@ async function installApiMocks(page: Page) {
     if (path === "/api/v1/me/notifications") return json(route, { items: [{ id: 51, member_id: 3, message_id: 71, created_at: capturedAt, read_at: null, toast_shown_at: null, message: { id: 71, kind: "INFORMATION", title: "문의 답변이 도착했습니다", body: "반품 수거 일정을 확인했습니다. 금요일 오전 방문으로 변경해드렸어요.", destination_path: "/mypage/inquiries/402", toast_enabled: true, toast_expires_at: null } }], read_through: capturedAt });
     if (path === "/api/v1/notifications/read-all") return route.fulfill({ status: 204 });
     if (path === "/api/v1/seller/context") return json(route, { market_id: 1, market_name: "오브제 스튜디오", status: "OPEN", permissions: ["INQUIRY_READ", "INQUIRY_REPLY"] });
+    if (path === "/api/v1/admin/inquiries/search" && method === "POST") {
+      const request = route.request().postDataJSON() as { query?: string };
+      if (request.query === "쿠폰 오류 테스트") return jsonError(route, 503, "DEPENDENCY_UNAVAILABLE", "연결된 서비스를 일시적으로 사용할 수 없습니다");
+      if (request.query === "지난달 없는 회원 문의") return json(route, {
+        interpretation: { summary: "지난달 접수된 회원 문의를 찾습니다.", keywords: ["회원"], category: "MEMBER", created_from: "2026-10-01T00:00:00Z", created_to: "2026-11-01T00:00:00Z" },
+        summary: "해당 기간과 조건에 맞는 문의를 찾지 못했습니다.", items: [], limit: 30, offset: 0, total: 0,
+      });
+      return json(route, {
+        interpretation: { summary: "결제 화면에서 쿠폰이 보이지 않는 문의를 찾습니다.", keywords: ["쿠폰", "결제 화면"], category: "PROMOTION" },
+        summary: "쿠폰 노출과 결제 적용 문제를 직접 다룬 문의 1건입니다.",
+        items: [{ ...detail(403), match_reason: "고객이 결제 화면에서 발급 쿠폰을 찾을 수 없다고 문의했습니다.", highlights: ["20% 쿠폰", "결제 화면", "최소 주문금액"] }],
+        limit: 30, offset: 0, total: 1,
+      });
+    }
     if ((path === "/api/v1/seller/inquiries" || path === "/api/v1/admin/inquiries") && method === "GET") {
       const items = path.includes("admin") && url.searchParams.get("q") ? [detail(403)] : listItems.map((item) => ({ ...item, member_email: "minji@example.com", order_code: item.order_id ? "ORD-20261116-1001" : undefined, market_name: item.market_id ? "오브제 스튜디오" : undefined }));
       return json(route, { items, limit: 100, offset: 0, total: items.length });
@@ -197,4 +227,8 @@ function productFixture() {
 
 function json(route: Route, value: unknown) {
   return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(value) });
+}
+
+function jsonError(route: Route, status: number, code: string, message: string) {
+  return route.fulfill({ status, contentType: "application/json", body: JSON.stringify({ success: false, error: { code, message, request_id: "req-ai-search", details: { dependency: "inquiry_search_ai" } } }) });
 }

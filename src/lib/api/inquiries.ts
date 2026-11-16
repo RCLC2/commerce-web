@@ -75,11 +75,35 @@ const operatorInquiryPageSchema = z.object({
   total: z.number().int().nonnegative(),
 });
 
+export const inquirySearchInterpretationSchema = z.object({
+  summary: z.string().min(1),
+  keywords: z.array(z.string().min(1)).max(8),
+  status: inquiryStatusSchema.optional(),
+  category: inquiryCategorySchema.optional(),
+  created_from: z.string().optional(),
+  created_to: z.string().optional(),
+});
+
+export const naturalLanguageInquirySearchItemSchema = operatorInquirySchema.extend({
+  match_reason: z.string().min(1),
+  highlights: z.array(z.string().min(1)).max(3).optional(),
+});
+
+export const naturalLanguageInquirySearchResponseSchema = z.object({
+  interpretation: inquirySearchInterpretationSchema,
+  summary: z.string().min(1),
+  items: z.array(naturalLanguageInquirySearchItemSchema),
+  limit: z.number().int().positive(),
+  offset: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+});
+
 export type Inquiry = z.infer<typeof inquirySchema>;
 export type InquiryMessage = z.infer<typeof inquiryMessageSchema>;
 export type InquiryStatus = z.infer<typeof inquiryStatusSchema>;
 export type InquiryCategory = z.infer<typeof inquiryCategorySchema>;
 export type OperatorInquiry = z.infer<typeof operatorInquirySchema>;
+export type NaturalLanguageInquirySearchResponse = z.infer<typeof naturalLanguageInquirySearchResponseSchema>;
 
 type OperatorFilter = {
   query?: string;
@@ -133,6 +157,8 @@ export const inquiryApi = {
     requestParsed(satisfactionResponseSchema, `/api/v1/me/inquiries/${inquiryID}/satisfaction`, { method: "POST", token, body: JSON.stringify(payload) }),
   listOperatorInquiries: (token: string, role: "admin" | "seller", filter?: OperatorFilter) =>
     requestParsed(operatorInquiryPageSchema, operatorPath(role, filter), { token }),
+  searchAdminInquiries: (token: string, payload: { query: string; status?: InquiryStatus; category?: InquiryCategory; limit?: number; offset?: number }) =>
+    requestParsed(naturalLanguageInquirySearchResponseSchema, "/api/v1/admin/inquiries/search", { method: "POST", token, body: JSON.stringify(payload) }),
   getOperatorInquiry: (token: string, role: "admin" | "seller", inquiryID: number, marketID?: number) =>
     requestParsed(operatorInquirySchema, `/api/v1/${role}/inquiries/${inquiryID}${queryString({ market_id: role === "seller" ? marketID : undefined })}`, { token }),
   replyAsOperator: (token: string, role: "admin" | "seller", inquiryID: number, body: string, marketID?: number) =>
