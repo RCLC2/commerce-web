@@ -40,7 +40,7 @@ const products = {
       popularity_score: 92,
       status: "SELLING",
       market_name: "모먼트 스튜디오",
-      image_url: "https://images.example.test/mock-jacket",
+      image_url: "https://images.unsplash.com/mock-jacket",
       in_stock: true,
       options: [
         {
@@ -72,7 +72,7 @@ const products = {
       popularity_score: 78,
       status: "SELLING",
       market_name: "데일리 아카이브",
-      image_url: "https://images.example.test/mock-denim",
+      image_url: "https://images.unsplash.com/mock-denim",
       in_stock: true,
       options: [
         {
