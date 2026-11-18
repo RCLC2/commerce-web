@@ -54,7 +54,7 @@ describe("cart editing", () => {
 
     expect(await screen.findByText(/현재 주문 가능한 수량은 3개입니다/)).toBeVisible();
     expect(screen.getByRole("button", { name: "선택 상품 주문하기" })).toBeDisabled();
-    expect(screen.getByText("상품 금액 합계")).toBeVisible();
+    expect(screen.getByText("상품 금액 합계 (쿠폰 적용 전)")).toBeVisible();
     expect(screen.queryByText("배송비")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "옵션·수량 변경" }));
     const sheet = screen.getByRole("dialog", { name: "옵션·수량 변경" });

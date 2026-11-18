@@ -44,8 +44,8 @@ export function CartPage() {
   const productIDs = [...new Set((cart.data ?? []).map((item) => item.product_id))];
   const products = useQueries({
     queries: productIDs.map((id) => ({
-      queryKey: queryKeys.product(id),
-      queryFn: () => api.getProduct(id),
+      queryKey: [...queryKeys.product(id), memberID],
+      queryFn: () => api.getProduct(id, effectiveToken),
       staleTime: 5 * 60 * 1000,
     })),
   });
@@ -59,10 +59,11 @@ export function CartPage() {
     .map((group) => group.key));
   const selectedGroups = displayGroups.filter((group) => selectedGroupKeys.has(group.key));
   const selectedQuantity = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
-  const priceAtAddedTotal = selectedItems.reduce((sum, item) => sum + item.price_at_added * item.quantity, 0);
+  const displayPriceAtAddedTotal = selectedItems.reduce((sum, item) => sum + (item.coupon_price_at_added ?? item.price_at_added) * item.quantity, 0);
+  const displayPriceTotal = selectedItems.reduce((sum, item) => sum + (item.current_coupon_price ?? item.current_price ?? item.coupon_price_at_added ?? item.price_at_added) * item.quantity, 0);
   const total = selectedItems.reduce((sum, item) => sum + (item.current_price ?? item.price_at_added) * item.quantity, 0);
-  const selectedCurrentPricesAvailable = selectedItems.every((item) => item.current_price !== undefined);
-  const selectedPriceChange = selectedCurrentPricesAvailable ? total - priceAtAddedTotal : 0;
+  const selectedCurrentPricesAvailable = selectedItems.every((item) => item.current_coupon_price !== undefined || item.current_price !== undefined);
+  const selectedPriceChange = selectedCurrentPricesAvailable ? displayPriceTotal - displayPriceAtAddedTotal : 0;
   const stockIssues = new Map<string, string>();
   for (const group of displayGroups) {
     const product = group.items[0].product;
@@ -227,7 +228,7 @@ export function CartPage() {
               { label: "선택 수량", value: `${selectedQuantity}개` },
               ...(selectedPriceChange !== 0 ? [{ label: "담을 때보다", value: `${selectedPriceChange > 0 ? "+" : "-"}${formatPrice(Math.abs(selectedPriceChange))}`, emphasis: selectedPriceChange > 0 ? "negative" as const : "positive" as const }] : []),
             ]}
-            totalLabel="상품 금액 합계"
+            totalLabel="상품 금액 합계 (쿠폰 적용 전)"
             total={formatPrice(total)}
             footer={<><Button className="w-full" size="lg" disabled={!selectedItems.length || cart.isError || cart.isFetching || updateCart.isPending || removeCart.isPending || stockCheckPending || selectedStockIssueCount > 0} onClick={goToCheckout}><Check size={18} /> 선택 상품 주문하기</Button>{selectedStockIssueCount > 0 ? <p className="mt-3 text-sm font-bold text-status-negative" role="status">주문할 수 없는 상품 {selectedStockIssueCount}개가 선택되어 있습니다. 수량·옵션을 변경하거나 선택을 해제해주세요.</p> : stockCheckPending ? <p className="mt-3 text-center text-xs text-content-secondary" role="status">상품 재고를 확인하는 중입니다.</p> : displayGroups.length > 0 && !selectedItems.length ? <p className="mt-3 text-center text-xs font-bold text-action-primary">주문할 상품을 선택해주세요.</p> : null}</>}
           />

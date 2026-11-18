@@ -57,8 +57,8 @@ export const catalogApi = {
   listCategories: () => requestParsed(z.array(categorySchema), "/api/v1/categories"),
   getPLPInformation: (): Promise<PLPInformation> =>
     requestParsed(plpInformationSchema, "/api/v1/plp-information"),
-  listPLPProducts: async (params: PLPProductParams = {}): Promise<PLPProductPage> => {
-    const page = await requestParsed(plpProductPageSchema, plpProductsPath(params));
+  listPLPProducts: async (params: PLPProductParams = {}, token?: string): Promise<PLPProductPage> => {
+    const page = await requestParsed(plpProductPageSchema, plpProductsPath(params), { token });
     return { ...page, items: page.items.map(normalizePublicProduct) };
   },
   listCategoryTree: () => requestParsed(z.array(categorySchema), "/api/v1/categories/tree"),
@@ -110,8 +110,8 @@ export const catalogApi = {
   },
   listPromotionProducts: () => parseProducts("/api/v1/products/promotions"),
   listLatestProducts: () => parseProducts("/api/v1/products/latest"),
-  getProduct: (id: number) =>
-    requestParsed(productDetailSchema, `/api/v1/products/${id}`).then((detail) => normalizePublicProduct({
+  getProduct: (id: number, token?: string) =>
+    requestParsed(productDetailSchema, `/api/v1/products/${id}`, { token }).then((detail) => normalizePublicProduct({
       ...detail.product,
       discount_price: detail.product.discount_price
         || discountPriceFromLowest(detail.product.base_price, detail.lowest_price),

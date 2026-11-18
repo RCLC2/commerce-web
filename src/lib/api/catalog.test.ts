@@ -4,6 +4,31 @@ import { catalogApi } from "./catalog";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("catalogApi backend contracts", () => {
+  it("sends member auth for coupon-aware product surfaces", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        items: [], page: 1, page_size: 24, total: 0, total_pages: 0,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        product: {
+          id: 1, market_id: 2, category_id: 3, name: "상품", description: "", base_price: 10_000, status: "SELLING",
+          coupon_lowest_price: 8_000,
+          best_coupon_quote: { coupon_id: 9, user_coupon_id: 90, code: "OWNED", name: "보유 쿠폰", source: "OWNED", discount_amount: 2_000, discounted_amount: 8_000, issue_required: false },
+        },
+      }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await catalogApi.listPLPProducts({}, "member-token");
+    await expect(catalogApi.getProduct(1, "member-token")).resolves.toMatchObject({
+      coupon_lowest_price: 8_000,
+      best_coupon_quote: { source: "OWNED", user_coupon_id: 90 },
+    });
+
+    for (const call of fetchMock.mock.calls) {
+      expect((call[1]?.headers as Headers).get("Authorization")).toBe("Bearer member-token");
+    }
+  });
+
   it("keeps the backend estimated arrival date in the product detail", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
       product: { id: 1, market_id: 2, category_id: 3, name: "상품", description: "", base_price: 10_000, status: "SELLING" },

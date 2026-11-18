@@ -44,7 +44,10 @@ describe("contract normalizers", () => {
   it("normalizes PascalCase cart and address responses", () => {
     const cart = parseContract(rawCartSchema, {
       ID: 1, MemberID: 2, ProductID: 3, OptionID: 4, Quantity: 2, PriceAtAdded: 12000,
-      CurrentPrice: 15000, PriceChangeAmount: 3000, PriceChangeRate: 25,
+      CouponPriceAtAdded: 10000, CouponIDAtAdded: 8, CouponIssueRequiredAtAdded: true,
+      CurrentPrice: 15000, CurrentCouponPrice: 9000,
+      BestCouponQuote: { CouponID: 9, UserCouponID: 90, Source: "OWNED", DiscountAmount: 6000, DiscountedAmount: 9000, IssueRequired: false },
+      PriceChangeAmount: -1000, PriceChangeRate: -10,
     }, "/cart");
     const address = parseContract(rawAddressSchema, {
       ID: 5, ReceiverName: "홍길동", ReceiverPhone: "010", PostalCode: "01234",
@@ -53,7 +56,10 @@ describe("contract normalizers", () => {
 
     expect(normalizeCartItem(cart)).toMatchObject({
       id: 1, product_id: 3, price_at_added: 12000,
-      current_price: 15000, price_change_amount: 3000, price_change_rate: 25,
+      coupon_price_at_added: 10000, coupon_id_at_added: 8, coupon_issue_required_at_added: true,
+      current_price: 15000, current_coupon_price: 9000,
+      best_coupon_quote: { coupon_id: 9, user_coupon_id: 90, source: "OWNED" },
+      price_change_amount: -1000, price_change_rate: -10,
     });
     expect(normalizeAddress(address)).toMatchObject({ id: 5, receiver: "홍길동", line1: "서울", is_default: true });
   });

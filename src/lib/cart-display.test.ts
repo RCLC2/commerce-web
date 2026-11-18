@@ -44,6 +44,19 @@ describe("groupCartItemsForDisplay", () => {
     });
   });
 
+  it("uses coupon prices for item display without replacing the selling price contract", () => {
+    const groups = groupCartItemsForDisplay([
+      item({ id: 1, price_at_added: 20_000, coupon_price_at_added: 17_000, current_price: 21_000, current_coupon_price: 16_000 }),
+    ]);
+
+    expect(groups[0]).toMatchObject({
+      priceAtAddedTotal: 17_000,
+      totalPrice: 16_000,
+      priceChangeAmount: -1_000,
+      currentPriceAvailable: true,
+    });
+  });
+
   it("keeps different options separate and sums price snapshots exactly", () => {
     const groups = groupCartItemsForDisplay([
       item({ id: 1, price_at_added: 15_000 }),

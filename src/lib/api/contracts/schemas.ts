@@ -63,6 +63,18 @@ export const productCouponOfferSchema = z.object({
   requires_claim: z.boolean(),
 });
 
+export const bestCouponQuoteSchema = z.object({
+  coupon_id: identifierSchema,
+  user_coupon_id: identifierSchema.optional(),
+  code: z.string(),
+  name: z.string(),
+  source: z.enum(["ISSUABLE", "OWNED"]),
+  discount_amount: nonNegativeIntSchema,
+  discounted_amount: nonNegativeIntSchema,
+  issue_required: z.boolean(),
+  expires_at: z.string().optional(),
+});
+
 export const productSchema = z.object({
   id: identifierSchema,
   market_id: identifierSchema,
@@ -73,6 +85,7 @@ export const productSchema = z.object({
   base_price: nonNegativeIntSchema,
   discount_price: nonNegativeIntSchema.default(0),
   coupon_offer: productCouponOfferSchema.optional(),
+  best_coupon_quote: bestCouponQuoteSchema.optional(),
   coupon_lowest_price: nonNegativeIntSchema.default(0),
   shipping_type: z.string().default("NORMAL"),
   delivery_type: z.string().optional(),

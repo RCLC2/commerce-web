@@ -23,11 +23,12 @@ export function groupCartItemsForDisplay<T extends CartItem>(
   const groups = new Map<string, CartDisplayGroup<T>>();
   for (const item of items) {
     const key = cartDisplayGroupKey(item);
-    const currentPriceAvailable = item.current_price !== undefined;
-    const effectivePrice = item.current_price ?? item.price_at_added;
-    const priceAtAddedTotal = item.price_at_added * item.quantity;
+    const currentPriceAvailable = item.current_coupon_price !== undefined || item.current_price !== undefined;
+    const effectivePrice = item.current_coupon_price ?? item.current_price ?? item.coupon_price_at_added ?? item.price_at_added;
+    const priceAtAdded = item.coupon_price_at_added ?? item.price_at_added;
+    const priceAtAddedTotal = priceAtAdded * item.quantity;
     const priceChangeAmount = currentPriceAvailable
-      ? (effectivePrice - item.price_at_added) * item.quantity
+      ? (effectivePrice - priceAtAdded) * item.quantity
       : 0;
     const existing = groups.get(key);
     if (existing) {
