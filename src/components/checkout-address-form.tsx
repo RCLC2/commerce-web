@@ -7,14 +7,13 @@ import { Button } from "./ui/button";
 import { Field } from "./ui/field";
 import { Input } from "./ui/input";
 
-export type CheckoutAddressInput = CreateShippingAddressRequest;
-
 type CheckoutAddressFormProps = {
   onCancel?: () => void;
   pending: boolean;
   error?: string;
+  submitLabel?: string;
 } & (
-  | { firstAddress: boolean; initialAddress?: never; onSave: (address: CheckoutAddressInput) => void }
+  | { firstAddress: boolean; initialAddress?: never; onSave: (address: CreateShippingAddressRequest) => void }
   | { initialAddress: OrderShippingAddressInput; firstAddress?: never; onSave: (address: OrderShippingAddressInput) => void }
 );
 
@@ -63,7 +62,7 @@ export function CheckoutAddressForm(props: CheckoutAddressFormProps) {
         <Field className="sm:col-span-2" label="상세 주소" htmlFor={fieldID + "-line2"}><Input ref={detailInput} id={fieldID + "-line2"} value={draft.line2} onChange={(event) => change("line2", event.target.value)} autoComplete="address-line2" placeholder="동·호수 등 상세 주소" maxLength={255} /></Field>
         {error ? <p className="text-sm text-status-negative sm:col-span-2" role="alert">{error}</p> : null}
         <div className="flex gap-2 sm:col-span-2">
-          <Button type="submit" size="sm" disabled={pending}>{pending ? "저장 중" : initialAddress ? "변경사항 저장" : "배송지 저장하고 사용"}</Button>
+          <Button type="submit" size="sm" disabled={pending}>{pending ? "저장 중" : props.submitLabel ?? (initialAddress ? "변경사항 저장" : "배송지 저장하고 사용")}</Button>
           {onCancel ? <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={onCancel}>취소</Button> : null}
         </div>
       </fieldset>

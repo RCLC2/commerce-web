@@ -5,7 +5,7 @@ import { ClipboardList as PageIcon, MapPin, Plus } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button-link";
 
-import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -28,6 +28,7 @@ import {
   shouldDiscardCheckoutRestoreStatus,
   submitServerAuthoritativeCheckout,
 } from "@/lib/queries/checkout";
+import { useCreateShippingAddress } from "@/lib/queries/shipping-addresses";
 import { useSessionStore } from "@/lib/session-store";
 import type { Address, CartItem, OrderResponse, PaymentRequest } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
@@ -42,7 +43,7 @@ import { Notice } from "./ui/notice";
 import { OrderSummary } from "./ui/order-summary";
 import { Surface } from "./ui/surface";
 import { SavedAddressEditor } from "./saved-address-editor";
-import { CheckoutAddressForm, type CheckoutAddressInput } from "./checkout-address-form";
+import { CheckoutAddressForm } from "./checkout-address-form";
 
 function formatDeduction(amount: number) {
   return amount > 0 ? `-${formatPrice(amount)}` : formatPrice(0);
@@ -50,7 +51,6 @@ function formatDeduction(amount: number) {
 
 export function CheckoutPage() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const token = useSessionStore((state) => state.accessToken);
   const memberID = useSessionStore((state) => state.memberID);
@@ -93,21 +93,7 @@ export function CheckoutPage() {
     queryFn: () => api.listAddresses(effectiveToken),
     enabled: Boolean(effectiveToken),
   });
-  const createAddress = useMutation({
-    mutationFn: (address: CheckoutAddressInput) => api.createAddress(effectiveToken, address),
-    onSuccess: async (address) => {
-      const addressKey = queryKeys.addresses(memberID);
-      await queryClient.cancelQueries({ queryKey: addressKey, exact: true });
-      queryClient.setQueryData<Address[]>(addressKey, (current) => [
-        address,
-        ...(current ?? []).filter((entry) => entry.id !== address.id)
-          .map((entry) => address.is_default ? { ...entry, is_default: false } : entry),
-      ]);
-      setSelectedAddressID(address.id);
-      setAddingAddress(false);
-      void queryClient.invalidateQueries({ queryKey: addressKey, exact: true });
-    },
-  });
+  const createAddress = useCreateShippingAddress(effectiveToken, memberID);
   const confirmedAddress = confirmedOrder?.deliveries?.find((delivery) => delivery.address) ?? confirmedOrder?.delivery;
   const confirmedLineItems = confirmedOrder?.market_orders?.flatMap((marketOrder) =>
     marketOrder.line_items) ?? [];
@@ -526,7 +512,12 @@ export function CheckoutPage() {
                 firstAddress={firstAddress}
                 pending={createAddress.isPending}
                 error={createAddress.error ? apiErrorMessage(createAddress.error) : undefined}
-                onSave={(address) => createAddress.mutate(address)}
+                onSave={(address) => createAddress.mutate(address, {
+                  onSuccess: (saved) => {
+                    setSelectedAddressID(saved.id);
+                    setAddingAddress(false);
+                  },
+                })}
                 onCancel={() => setAddressFormOpen(false)}
               />
             ) : null}
@@ -651,7 +642,7 @@ export function CheckoutPage() {
         </aside>
       </div>
       {!paymentRequest ? (
-        <BottomActionBar className="-mx-4 md:hidden">
+        <BottomActionBar className="-mx-4 md:hidden" role="region" aria-label="주문 결제 요약">
           <div className="min-w-0 flex-1 self-center">
             <p className="text-xs font-bold text-content-secondary">{confirmedOrder ? "결제 금액" : "예상 결제 금액"}</p>
             <p className="truncate text-lg font-bold">{displayedAmount}</p>

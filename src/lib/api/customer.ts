@@ -149,6 +149,8 @@ export const customerApi = {
     normalizeAddress(await requestParsed(rawAddressSchema, "/api/v1/me/addresses", { method: "POST", token, body: JSON.stringify(payload) })),
   updateAddress: (token: string, addressID: number, payload: UpdateShippingAddressRequest) =>
     requestVoid(`/api/v1/me/addresses/${addressID}`, { method: "PATCH", token, body: JSON.stringify(payload) }),
+  deleteAddress: (token: string, addressID: number) =>
+    requestVoid(`/api/v1/me/addresses/${addressID}`, { method: "DELETE", token }),
   listMyReviews: async (token: string) =>
     (await requestParsed(z.array(rawReviewMutationSchema), "/api/v1/me/reviews", { token })).map(normalizeReviewMutation),
   getNotificationPage: (token: string, cursor?: string) => requestParsed(

@@ -174,7 +174,6 @@ it("shares address edits with My Page and submits the selected address only afte
   );
 
   const myPage = within(screen.getByRole("region", { name: "마이페이지" }));
-  fireEvent.click(myPage.getByRole("button", { name: "배송지 관리" }));
   fireEvent.click(await myPage.findByRole("button", { name: /회사.*배송지 수정/ }));
   fireEvent.change(myPage.getByLabelText("상세 주소"), { target: { value: "6호" } });
   fireEvent.click(myPage.getByRole("button", { name: "변경사항 저장" }));
