@@ -119,3 +119,27 @@ describe("inline order history filters", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
+
+it("retries a failed address refresh without saving twice", async () => {
+  useSessionStore.setState({ accessToken: "token", memberID: 1, role: "MEMBER", hydrated: true });
+  vi.mocked(api.me).mockResolvedValue({ point_balance: 0 } as Awaited<ReturnType<typeof api.me>>);
+  vi.mocked(api.listAllOrders).mockResolvedValue([]);
+  vi.mocked(api.listCoupons).mockResolvedValue([]);
+  vi.mocked(api.listIssuableCoupons).mockResolvedValue([]);
+  const address = { id: 1, receiver: "받는 사람", phone: "01012345678", zip_code: "12345", line1: "서울", line2: "1호", is_default: true };
+  vi.mocked(api.listAddresses)
+    .mockResolvedValueOnce([address])
+    .mockRejectedValueOnce(new Error("network"))
+    .mockResolvedValue([{ ...address, line2: "3호" }]);
+  vi.mocked(api.updateAddress).mockResolvedValue(undefined);
+
+  mountMyPage();
+  fireEvent.click(screen.getByRole("button", { name: "배송지 관리" }));
+  fireEvent.click(await screen.findByRole("button", { name: /받는 사람.*배송지 수정/ }));
+  fireEvent.change(screen.getByLabelText("상세 주소"), { target: { value: "3호" } });
+  fireEvent.click(screen.getByRole("button", { name: "변경사항 저장" }));
+  fireEvent.click(await screen.findByRole("button", { name: "배송지 다시 불러오기" }));
+
+  expect(await screen.findByText("(12345) 서울 3호")).toBeVisible();
+  expect(api.updateAddress).toHaveBeenCalledTimes(1);
+});

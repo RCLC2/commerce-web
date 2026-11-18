@@ -18,6 +18,11 @@ export type CreateShippingAddressRequest = OrderShippingAddressInput & {
   is_default: boolean;
 };
 
+export type UpdateShippingAddressRequest = OrderShippingAddressInput & {
+  address_name?: string;
+  is_default?: boolean;
+};
+
 export type OrderQuoteRequest = {
   cart_item_ids: number[];
   used_coupon_id?: number;

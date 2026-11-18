@@ -1,7 +1,7 @@
 "use client";
 
 import { PageHeading } from "./ui/page-heading";
-import { ClipboardList as PageIcon } from "lucide-react";
+import { ClipboardList as PageIcon, MapPin, Plus } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button-link";
 
@@ -41,7 +41,7 @@ import { Input, Select } from "./ui/input";
 import { Notice } from "./ui/notice";
 import { OrderSummary } from "./ui/order-summary";
 import { Surface } from "./ui/surface";
-import { EmptyState } from "./ui/feedback";
+import { SavedAddressEditor } from "./saved-address-editor";
 import { CheckoutAddressForm, type CheckoutAddressInput } from "./checkout-address-form";
 
 function formatDeduction(amount: number) {
@@ -69,7 +69,9 @@ export function CheckoutPage() {
   const [pendingAttemptBlocked, setPendingAttemptBlocked] = useState(false);
   const [restoreNonce, setRestoreNonce] = useState(0);
   const [selectedAddressID, setSelectedAddressID] = useState<number>();
-  const [editingAddress, setEditingAddress] = useState(false);
+  const [addingAddress, setAddingAddress] = useState(false);
+  const [addressEdit, setAddressEdit] = useState<{ memberID: number | null; address: Address }>();
+  const editingAddress = addressEdit?.memberID === memberID ? addressEdit.address : undefined;
 
   const cart = useQuery({
     queryKey: queryKeys.cart(memberID),
@@ -93,11 +95,17 @@ export function CheckoutPage() {
   });
   const createAddress = useMutation({
     mutationFn: (address: CheckoutAddressInput) => api.createAddress(effectiveToken, address),
-    onSuccess: (address) => {
-      queryClient.setQueryData<Address[]>(queryKeys.addresses(memberID), (current) => [...(current ?? []), address]);
+    onSuccess: async (address) => {
+      const addressKey = queryKeys.addresses(memberID);
+      await queryClient.cancelQueries({ queryKey: addressKey, exact: true });
+      queryClient.setQueryData<Address[]>(addressKey, (current) => [
+        address,
+        ...(current ?? []).filter((entry) => entry.id !== address.id)
+          .map((entry) => address.is_default ? { ...entry, is_default: false } : entry),
+      ]);
       setSelectedAddressID(address.id);
-      setEditingAddress(false);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.addresses(memberID) });
+      setAddingAddress(false);
+      void queryClient.invalidateQueries({ queryKey: addressKey, exact: true });
     },
   });
   const confirmedAddress = confirmedOrder?.deliveries?.find((delivery) => delivery.address) ?? confirmedOrder?.delivery;
@@ -178,7 +186,7 @@ export function CheckoutPage() {
         line2: selectedAddress!.line2,
       },
     }),
-    enabled: Boolean(effectiveToken && !createdOrderCode && cart.isSuccess && addresses.isSuccess && selectedAddress && items.length),
+    enabled: Boolean(effectiveToken && !createdOrderCode && !editingAddress && cart.isSuccess && addresses.isSuccess && selectedAddress && items.length),
     retry: false,
   });
   const quoteLineTotals = new Map(quote.data?.line_items.map((line) => [line.cart_item_id, line.line_total]));
@@ -392,18 +400,27 @@ export function CheckoutPage() {
 
   const blockingError = cart.error ?? (!createdOrderCode ? addresses.error : null);
   const supportingError = coupons.error ?? profile.error;
+  const firstAddress = addresses.isSuccess && addresses.data.length === 0;
+  const addressChangesLocked = !retryStateReady || Boolean(createdOrderCode) || checkout.isPending || pendingAttemptBlocked;
   const checkoutDisabled =
     !retryStateReady
     || (!createdOrderCode && (
       !items.length
       || !selectedAddress
       || !Number.isSafeInteger(expectedAmount)
-      || !quote.data
+      || !quote.isSuccess
+      || Boolean(editingAddress)
+      || addingAddress
       || quote.isFetching
       || pendingAttemptBlocked
     ))
     || Boolean(blockingError && !createdOrderCode)
     || checkout.isPending;
+
+  function setAddressFormOpen(open: boolean) {
+    createAddress.reset();
+    setAddingAddress(open);
+  }
 
   function renderCheckoutButton() {
     return (
@@ -450,7 +467,7 @@ export function CheckoutPage() {
             <h2 className="font-bold">배송지</h2>
             {(addresses.data?.length ?? 0) > 1 ? (
               <Field className="mt-3" label="배송받을 주소 선택" htmlFor="checkout-address">
-                <Select id="checkout-address" disabled={Boolean(createdOrderCode)} value={selectedAddress?.id ?? ""} onChange={(event) => setSelectedAddressID(Number(event.target.value))}>
+                <Select id="checkout-address" disabled={addressChangesLocked || Boolean(editingAddress) || addingAddress} value={selectedAddress?.id ?? ""} onChange={(event) => setSelectedAddressID(Number(event.target.value))}>
                   {addresses.data?.map((address) => <option key={address.id} value={address.id}>{address.receiver} · {address.line1}{address.is_default ? " (기본 배송지)" : ""}</option>)}
                 </Select>
               </Field>
@@ -469,23 +486,64 @@ export function CheckoutPage() {
               <p className="mt-3 text-sm text-content-secondary">{confirmedOrder ? "주문에 저장된 배송지 정보가 없습니다." : "주문 배송지를 확인하는 중입니다."}</p>
             ) : selectedAddress ? (
               <div className="mt-3 text-sm leading-6">
-                <p className="font-bold">{selectedAddress.receiver} / {selectedAddress.phone}</p>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <p className="font-bold">{selectedAddress.receiver} / {selectedAddress.phone}</p>
+                  {selectedAddress.is_default ? <span className="rounded-full bg-action-secondary px-2 py-0.5 text-xs font-bold text-action-primary">기본 배송지</span> : null}
+                </div>
                 <p className="text-content-secondary">({selectedAddress.zip_code}) {selectedAddress.line1} {selectedAddress.line2}</p>
               </div>
-            ) : addresses.isSuccess ? <EmptyState className="mt-3 px-4 py-5" icon={<PageIcon className="size-7" />} title="등록된 배송지가 없습니다" description="배송지를 등록한 뒤 주문을 진행해주세요." /> : null}
-            {!createdOrderCode && addresses.isSuccess && (editingAddress || !addresses.data?.length) ? (
+            ) : firstAddress ? (
+              <div className="mt-3 rounded-control border border-action-primary/20 bg-action-secondary/35 p-4">
+                <div className="flex items-start gap-3">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-control bg-action-secondary text-action-primary">
+                    <MapPin className="size-5" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="font-bold">첫 배송지 등록</h3>
+                    <p className="mt-1 text-sm text-content-secondary">이번 주문에 사용하고 기본 배송지로 저장해요.</p>
+                  </div>
+                </div>
+                {!addressChangesLocked && !addingAddress ? (
+                  <Button className="mt-4 w-full sm:w-auto" size="sm" onClick={() => setAddressFormOpen(true)}>
+                    <Plus className="size-4" aria-hidden="true" />
+                    첫 배송지 추가
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+            {editingAddress ? (
+              <SavedAddressEditor
+                key={`${memberID}:${editingAddress.id}`}
+                address={editingAddress}
+                token={effectiveToken}
+                memberID={memberID}
+                onCancel={() => setAddressEdit(undefined)}
+                onSaved={() => setAddressEdit(undefined)}
+              />
+            ) : null}
+            {!addressChangesLocked && !editingAddress && addresses.isSuccess && addingAddress ? (
               <CheckoutAddressForm
-                firstAddress={!addresses.data?.length}
+                firstAddress={firstAddress}
                 pending={createAddress.isPending}
                 error={createAddress.error ? apiErrorMessage(createAddress.error) : undefined}
                 onSave={(address) => createAddress.mutate(address)}
-                onCancel={addresses.data?.length ? () => { createAddress.reset(); setEditingAddress(false); } : undefined}
+                onCancel={() => setAddressFormOpen(false)}
               />
             ) : null}
-            {addresses.isSuccess && Boolean(addresses.data?.length) && !editingAddress ? (
-              <Button className="mt-3" size="sm" variant="secondary" disabled={Boolean(createdOrderCode)} onClick={() => { createAddress.reset(); setEditingAddress(true); }}>새 배송지 추가</Button>
+            {!addressChangesLocked && addresses.isSuccess && selectedAddress && !addingAddress && !editingAddress ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant="secondary" onClick={() => {
+                  setSelectedAddressID(selectedAddress.id);
+                  setAddressEdit({ memberID, address: selectedAddress });
+                }}>배송지 수정</Button>
+                <Button type="button" size="sm" variant="secondary" onClick={() => setAddressFormOpen(true)}>새 배송지 추가</Button>
+              </div>
             ) : null}
-            {selectedAddress || confirmedAddress?.address ? <p className="mt-3 text-xs font-bold text-status-positive">이 주소로 배송됩니다. 받는 분과 연락처를 확인해주세요.</p> : null}
+            {!createdOrderCode && createAddress.isSuccess && createAddress.data.id === selectedAddress?.id ? (
+              <p className="mt-3 text-xs font-bold text-status-positive" role="status">배송지가 저장되어 이번 주문에 적용됐어요.</p>
+            ) : selectedAddress || confirmedAddress?.address ? (
+              <p className="mt-3 text-xs font-bold text-status-positive">이 주소로 배송됩니다. 받는 분과 연락처를 확인해주세요.</p>
+            ) : null}
             {arrivalRange || deliveryLabels.length ? (
               <div className="mt-3 border-t border-border-subtle pt-3 text-xs text-content-secondary">
                 {arrivalRange ? <p><span className="font-bold text-content-primary">예상 도착일</span> {arrivalRange}</p> : null}
