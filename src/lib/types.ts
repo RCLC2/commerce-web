@@ -114,17 +114,6 @@ export type PLPTagChip = {
   tone: ProductBadgeTone;
 };
 
-export type ProductCouponOffer = {
-  coupon_id: number;
-  code: string;
-  name: string;
-  target_type: "PRODUCT" | "PROMOTION";
-  event_id?: number;
-  discount_amount: number;
-  discounted_amount: number;
-  requires_claim: boolean;
-};
-
 export type BestCouponQuote = {
   coupon_id: number;
   user_coupon_id?: number;
@@ -148,7 +137,6 @@ export type Product = {
   description_source?: string;
   base_price: number;
   discount_price: number;
-  coupon_offer?: ProductCouponOffer;
   best_coupon_quote?: BestCouponQuote;
   coupon_lowest_price?: number;
   shipping_type: "NORMAL" | "FREE" | string;
@@ -430,14 +418,8 @@ export type CartItem = {
   quantity: number;
   price_at_added: number;
   coupon_price_at_added?: number;
-  coupon_id_at_added?: number;
-  user_coupon_id_at_added?: number;
-  coupon_issue_required_at_added?: boolean;
   current_price?: number;
   current_coupon_price?: number;
-  best_coupon_quote?: BestCouponQuote;
-  price_change_amount?: number;
-  price_change_rate?: number;
   product?: Product;
 };
 

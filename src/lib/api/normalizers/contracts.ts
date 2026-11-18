@@ -57,21 +57,8 @@ export function normalizeCartItem(raw: z.infer<typeof rawCartSchema>): CartItem 
     quantity: raw.Quantity,
     price_at_added: raw.PriceAtAdded,
     coupon_price_at_added: raw.CouponPriceAtAdded,
-    coupon_id_at_added: raw.CouponIDAtAdded,
-    user_coupon_id_at_added: raw.UserCouponIDAtAdded,
-    coupon_issue_required_at_added: raw.CouponIssueRequiredAtAdded,
     current_price: raw.CurrentPrice,
     current_coupon_price: raw.CurrentCouponPrice,
-    best_coupon_quote: raw.BestCouponQuote ? {
-      coupon_id: raw.BestCouponQuote.CouponID,
-      user_coupon_id: raw.BestCouponQuote.UserCouponID,
-      source: raw.BestCouponQuote.Source,
-      discount_amount: raw.BestCouponQuote.DiscountAmount,
-      discounted_amount: raw.BestCouponQuote.DiscountedAmount,
-      issue_required: raw.BestCouponQuote.IssueRequired,
-    } : undefined,
-    price_change_amount: raw.PriceChangeAmount,
-    price_change_rate: raw.PriceChangeRate,
   };
 }
 

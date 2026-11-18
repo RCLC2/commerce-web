@@ -308,8 +308,7 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
   const price = product.discount_price || product.base_price;
   const saleRate = discountRate(product.base_price, product.discount_price);
   const couponQuote = product.best_coupon_quote;
-  const couponOffer = product.coupon_offer;
-  const couponPrice = product.coupon_lowest_price || couponQuote?.discounted_amount || couponOffer?.discounted_amount;
+  const couponPrice = product.coupon_lowest_price || couponQuote?.discounted_amount;
 
   function moveImage(delta: number) {
     setActiveImage((current) => (current + delta + images.length) % images.length);
@@ -429,9 +428,9 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
               <span className="text-3xl font-bold">{formatPrice(price)}</span>
             </div>
             {saleRate > 0 ? <p className="mt-1 text-sm text-content-secondary line-through">{formatPrice(product.base_price)}</p> : null}
-            {(couponQuote || couponOffer) && couponPrice ? (
+            {couponQuote && couponPrice ? (
               <div className="mt-3 rounded-control border border-promotion/20 bg-promotion-subtle px-3 py-2.5 text-promotion">
-                <p className="text-xs font-bold">{couponQuote?.source === "OWNED" ? "보유 쿠폰 적용 시" : couponQuote?.issue_required || couponOffer?.requires_claim ? "쿠폰을 받으면" : "쿠폰 적용 시"}</p>
+                <p className="text-xs font-bold">{couponQuote.source === "OWNED" ? "보유 쿠폰 적용 시" : couponQuote.issue_required ? "쿠폰을 받으면" : "쿠폰 적용 시"}</p>
                 <p className="mt-0.5 text-xl font-bold">{formatPrice(couponPrice)}</p>
               </div>
             ) : null}

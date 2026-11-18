@@ -115,8 +115,6 @@ describe("cart editing", () => {
       quantity: 2,
       price_at_added: 10_000,
       current_price: 12_500,
-      price_change_amount: 2_500,
-      price_change_rate: 25,
     }];
     mountCart();
 

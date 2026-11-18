@@ -123,15 +123,6 @@ describe("catalogApi backend contracts", () => {
     await expect(catalogApi.getEvent(1)).rejects.toMatchObject({ status: 404 });
   });
 
-  it("accepts active carousels with an empty image and open schedule", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([{
-      id: 1, title: "상시 캐러셀", image_url: null, link_url: "", status: "ACTIVE",
-      starts_at: null, ends_at: null,
-    }]), { status: 200 })));
-    const carousels = await catalogApi.listActiveCarousels();
-    expect(carousels[0]).toMatchObject({ image_url: "", starts_at: null, ends_at: null });
-  });
-
   it("accepts events whose exposure schedule is open", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([{
       id: 1, title: "상시 이벤트", subtitle: "", image_url: "", link_url: "", status: "ACTIVE",

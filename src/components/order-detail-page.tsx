@@ -5,7 +5,7 @@ import { ReceiptText as PageIcon } from "lucide-react";
 
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { getEffectiveToken } from "@/lib/auth-token";
 import { canWriteOrderLineReview, reviewedOrderLineItemIDs } from "@/lib/product-engagement";
@@ -24,11 +24,7 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Notice } from "./ui/notice";
 import { OrderStatus } from "./ui/order-status";
-import { OrderCashReceipts } from "./order-cash-receipts";
 import { OrderRefundSummary } from "./order-refund-summary";
-import { CustomerOrderReturns } from "./customer-order-returns";
-import { returnsApi, hasActiveReturnForLine } from "@/lib/returns-api";
-import { returnKeys } from "./order-return-shared";
 import { OrderSummary } from "./ui/order-summary";
 import { Surface } from "./ui/surface";
 import { BackButton } from "./ui/back-button";
@@ -41,7 +37,6 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   const memberID = useSessionStore((state) => state.memberID);
   const effectiveToken = getEffectiveToken(token) ?? "";
   const queryClient = useQueryClient();
-  const refundDetails = useRef<HTMLDivElement>(null);
   const [trackingInfo, setTrackingInfo] = useState<TrackingInfo | null>(null);
   const [reviewingLineItemID, setReviewingLineItemID] = useState<number | null>(null);
   const [submittedLineItemIDs, setSubmittedLineItemIDs] = useState<Set<number>>(() => new Set());
@@ -49,11 +44,6 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
   const { data: order, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: queryKeys.order(orderCode, memberID),
     queryFn: () => api.getOrder(effectiveToken, orderCode),
-    enabled: Boolean(effectiveToken),
-  });
-  const returnRequests = useQuery({
-    queryKey: returnKeys.requests(effectiveToken, orderCode),
-    queryFn: () => returnsApi.requests(effectiveToken, orderCode),
     enabled: Boolean(effectiveToken),
   });
   const myReviews = useQuery({
@@ -141,7 +131,6 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
           <InfoBox label="최초 결제액" value={formatPrice(amount)} />
         </div>
         {order.payment_details && order.payment_method ? <p className="mt-3 text-xs text-content-secondary">결제 대행: {paymentMethodLabel(order.payment_method)}</p> : null}
-        <OrderCashReceipts memberID={memberID ?? undefined} token={effectiveToken} orderCode={orderCode} method={order.payment_details?.method} />
         <OrderProgress status={order.status} />
       </Surface>
 
@@ -204,7 +193,6 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
                   });
                   const isReviewing = reviewingLineItemID === item.id;
                   const canToggleReview = reviewEligible && (!myReviews.isFetching || isReviewing);
-                  const returnInProgress = hasActiveReturnForLine(item.id, returnRequests.data ?? []);
 
                   return (
                     <div key={item.id} className="border-t border-border-subtle pt-4 first:border-t-0 first:pt-0">
@@ -224,8 +212,7 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
                           </p>
                           <OrderItemActions
                             item={item}
-                            busy={confirmPurchase.isPending || !returnRequests.isSuccess || returnInProgress}
-                            returnInProgress={returnInProgress}
+                            busy={confirmPurchase.isPending}
                             completed={completed}
                             reviewSubmitted={serverReviewed || submittedLineItemIDs.has(item.id)}
                             canWriteReview={canToggleReview}
@@ -256,37 +243,8 @@ export function OrderDetailPage({ orderCode }: { orderCode: string }) {
             </div>
           )) : <EmptyState icon={<PageIcon className="size-7" />} title="표시할 주문 상품이 없습니다" description="주문 정보는 계속 확인할 수 있어요." />}
         </section>
-        <CustomerOrderReturns
-          token={effectiveToken}
-          orderCode={orderCode}
-          onShowRefundDetails={order.refund ? () => {
-            const section = refundDetails.current;
-            if (!section) return;
-            section.focus({ preventScroll: true });
-            section.scrollIntoView({
-              block: "start",
-              behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
-            });
-          } : undefined}
-          markets={(order.market_orders ?? []).map((market) => ({
-            id: market.market_id,
-            name: marketByID.get(market.market_id)?.name ?? `마켓 ${market.market_id}`,
-            items: market.line_items.map((item) => ({
-              id: item.id,
-              name: productByID.get(item.product_id)?.name ?? item.product?.name ?? `상품 ${item.product_id}`,
-              optionLabel: (() => {
-                const option = (item.product ?? productByID.get(item.product_id))?.options?.find((candidate) => candidate.id === item.option_id);
-                return option ? [option.option_name, option.option_value].filter(Boolean).join(": ") : undefined;
-              })(),
-              quantity: item.quantity,
-              price: item.price,
-              status: item.status,
-              purchaseConfirmedAt: item.purchase_confirmed_at,
-            })),
-          }))}
-        />
         {order.refund ? (
-          <div ref={refundDetails} tabIndex={-1} aria-label="환불 상세" className="mt-6 scroll-mt-24">
+          <div aria-label="환불 상세" className="mt-6">
             <OrderRefundSummary refund={order.refund} />
           </div>
         ) : null}
@@ -349,7 +307,6 @@ function OrderProgress({ status }: { status: string }) {
 function OrderItemActions({
   item,
   busy,
-  returnInProgress,
   completed,
   reviewSubmitted,
   canWriteReview,
@@ -359,7 +316,6 @@ function OrderItemActions({
 }: {
   item: OrderLineItemResponse;
   busy: boolean;
-  returnInProgress: boolean;
   completed: boolean;
   reviewSubmitted: boolean;
   canWriteReview: boolean;
@@ -372,7 +328,7 @@ function OrderItemActions({
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2">
       {delivered ? (
-        <Button size="sm" disabled={busy} aria-describedby={returnInProgress ? `purchase-return-${item.id}` : undefined} onClick={onConfirm}>
+        <Button size="sm" disabled={busy} onClick={onConfirm}>
           구매 확정
         </Button>
       ) : null}
@@ -383,11 +339,6 @@ function OrderItemActions({
         </Button>
       ) : null}
       {completed ? <OrderStatus status="COMPLETED" /> : null}
-      {delivered && returnInProgress ? (
-        <p id={`purchase-return-${item.id}`} className="w-full text-xs leading-5 text-content-secondary">
-          반품 처리 중인 상품은 구매확정할 수 없습니다.
-        </p>
-      ) : null}
     </div>
   );
 }

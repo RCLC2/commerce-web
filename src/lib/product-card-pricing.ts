@@ -73,9 +73,6 @@ export function couponPriceForProduct(product: Product): number | undefined {
   if (typeof product.coupon_lowest_price === "number" && product.coupon_lowest_price > 0) {
     return product.coupon_lowest_price;
   }
-  if (product.coupon_offer && product.coupon_offer.discounted_amount >= 0) {
-    return product.coupon_offer.discounted_amount;
-  }
   return undefined;
 }
 

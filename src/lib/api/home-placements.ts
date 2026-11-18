@@ -104,12 +104,6 @@ export const homePlacementApi = {
       token,
       body: JSON.stringify(payload),
     }),
-  updateAdminHomeCard: (token: string, cardID: number, payload: Record<string, unknown>) =>
-    requestParsed(homeCardSchema, `/api/v1/admin/home-cards/${cardID}`, {
-      method: "PUT",
-      token,
-      body: JSON.stringify(payload),
-    }),
   setAdminHomeCardActive: (token: string, cardID: number, active: boolean) =>
     requestParsed(homeCardSchema, `/api/v1/admin/home-cards/${cardID}/${active ? "activate" : "deactivate"}`, {
       method: "POST",

@@ -13,22 +13,18 @@ import {
   rawAddressSchema,
   rawCartSchema,
   rawCouponDefinitionSchema,
-  rawIssuableCouponQuoteSchema,
   rawOwnedCouponSchema,
   rawPaymentRequestSchema,
   rawReviewMutationSchema,
-  rawSettlementSummarySchema,
 } from "./contracts/raw";
 import {
   normalizeAddress,
   normalizeCartItem,
   normalizeCouponDefinition,
-  normalizeIssuableCouponQuote,
   normalizeOwnedCoupon,
   normalizePaymentRequest,
   normalizePublicProduct,
   normalizeReviewMutation,
-  normalizeSettlementSummary,
 } from "./normalizers/contracts";
 
 export type CreateOrderLineReviewPayload = {
@@ -36,13 +32,6 @@ export type CreateOrderLineReviewPayload = {
   content: string;
   images?: { s3_key?: string; object_key?: string; sort_order: number; is_representative: boolean }[];
 };
-
-export type CustomerOrderListStatus = "PAYMENT_PENDING" | "PAID" | "PLACED" | "CANCELLED";
-
-const rawReviewPageSchema = z.object({
-  items: z.array(rawReviewMutationSchema),
-  next_cursor: z.string().optional(),
-});
 
 const inboxNotificationSchema = z.object({
   id: z.number().int().positive(),
@@ -88,28 +77,6 @@ async function listAllOrders(token: string) {
   }
 }
 
-async function collectCursorPages<T>(loadPage: (cursor?: string) => Promise<{ items: T[]; next_cursor?: string }>) {
-  const items: T[] = [];
-  const seenCursors = new Set<string>();
-  let cursor: string | undefined;
-  while (true) {
-    const page = await loadPage(cursor);
-    items.push(...page.items);
-    const nextCursor = page.next_cursor;
-    if (!nextCursor || seenCursors.has(nextCursor)) return items;
-    seenCursors.add(nextCursor);
-    cursor = nextCursor;
-  }
-}
-
-export function normalizeCouponQuoteOrderAmount(orderAmount: number): number {
-  const normalized = Math.floor(orderAmount);
-  if (!Number.isFinite(orderAmount) || !Number.isSafeInteger(normalized) || normalized < 0) {
-    throw new RangeError("쿠폰 견적 주문 금액은 0 이상의 안전한 유한 정수여야 합니다.");
-  }
-  return normalized;
-}
-
 export const customerApi = {
   addCartItem: (token: string, payload: { product_id: number; option_id: number; quantity: number }) =>
     requestParsed(statusResponseSchema, "/api/v1/cart/items", {
@@ -133,22 +100,12 @@ export const customerApi = {
   listIssuableCoupons: async (token: string) =>
     (await requestParsed(z.array(rawCouponDefinitionSchema), "/api/v1/coupons/issuable", { token }))
       .map(normalizeCouponDefinition),
-  listIssuableCouponQuotes: async (token: string, orderAmount: number) => {
-    const normalizedOrderAmount = normalizeCouponQuoteOrderAmount(orderAmount);
-    return (await requestParsed(
-      z.array(rawIssuableCouponQuoteSchema),
-      `/api/v1/coupons/issuable?order_amount=${normalizedOrderAmount}`,
-      { token },
-    )).map(normalizeIssuableCouponQuote);
-  },
   issueCoupon: (token: string, couponID: number) =>
     requestVoid(`/api/v1/coupons/${couponID}/issue`, { method: "POST", token }),
   listAddresses: async (token: string) =>
     (await requestParsed(z.array(rawAddressSchema), "/api/v1/me/addresses", { token })).map(normalizeAddress),
   createAddress: async (token: string, payload: CreateShippingAddressRequest) =>
     normalizeAddress(await requestParsed(rawAddressSchema, "/api/v1/me/addresses", { method: "POST", token, body: JSON.stringify(payload) })),
-  updateAddress: (token: string, addressID: number, payload: { address_name?: string; receiver: string; phone: string; zip_code: string; line1: string; line2: string; is_default: boolean }) =>
-    requestVoid(`/api/v1/me/addresses/${addressID}`, { method: "PATCH", token, body: JSON.stringify(payload) }),
   listMyReviews: async (token: string) =>
     (await requestParsed(z.array(rawReviewMutationSchema), "/api/v1/me/reviews", { token })).map(normalizeReviewMutation),
   getNotificationPage: (token: string, cursor?: string) => requestParsed(
@@ -159,16 +116,6 @@ export const customerApi = {
   unreadNotificationCount: (token: string) => requestParsed(z.object({ unread_count: z.number().int().nonnegative() }), "/api/v1/me/notifications/unread-count", { token }),
   markAllNotificationsRead: (token: string, readThrough: string) => requestVoid("/api/v1/notifications/read-all", { method: "POST", token, body: JSON.stringify({ read_through: readThrough }) }),
   acknowledgeNotificationToasts: (token: string, notificationIDs: number[]) => requestVoid("/api/v1/notifications/toast-ack", { method: "POST", token, body: JSON.stringify({ notification_ids: notificationIDs }) }),
-  listNotifications: async (token: string) => {
-    const items: z.infer<typeof inboxNotificationSchema>[] = [];
-    let cursor: string | undefined;
-    do {
-      const page = await customerApi.getNotificationPage(token, cursor);
-      items.push(...page.items);
-      cursor = page.next_cursor;
-    } while (cursor);
-    return items;
-  },
   listMyRecommendations: async (token: string, params: { limit?: number; offset?: number } = {}) => {
     const search = new URLSearchParams();
     if (params.limit) search.set("limit", String(params.limit));
@@ -209,14 +156,6 @@ export const customerApi = {
     }),
   quoteOrder: (token: string, payload: OrderQuoteRequest) =>
     requestParsed(orderQuoteSchema, "/api/v1/orders/quote", { method: "POST", token, body: JSON.stringify(payload) }),
-  listOrders: (token: string, params?: { status?: CustomerOrderListStatus; limit?: number; offset?: number }) => {
-    const query = new URLSearchParams();
-    if (params?.status) query.set("status", params.status);
-    if (params?.limit) query.set("limit", String(params.limit));
-    if (params?.offset) query.set("offset", String(params.offset));
-    const suffix = query.toString() ? `?${query.toString()}` : "";
-    return requestParsed(z.array(orderSchema), `/api/v1/orders${suffix}`, { token });
-  },
   listAllOrders,
   getOrder: (token: string, orderCode: string) =>
     requestParsed(orderSchema, `/api/v1/orders/${orderCode}`, { token }),
@@ -269,9 +208,4 @@ export const customerApi = {
     requestVoid(`/api/v1/products/${productID}/like`, { method: "POST", token }),
   removeLike: (token: string, productID: number) =>
     requestVoid(`/api/v1/products/${productID}/like`, { method: "DELETE", token }),
-  markNotificationRead: (token: string, notificationID: number) =>
-    requestVoid(`/api/v1/notifications/${notificationID}/read`, { method: "POST", token }),
-  getSettlementSummary: (token: string, marketID: number) =>
-    requestParsed(rawSettlementSummarySchema, `/api/v1/settlements/${marketID}/summary`, { token })
-      .then(normalizeSettlementSummary),
 };

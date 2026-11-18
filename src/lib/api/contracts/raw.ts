@@ -16,21 +16,8 @@ export const rawCartSchema = z.object({
   Quantity: z.number().int().positive(),
   PriceAtAdded: nonNegativeIntSchema,
   CouponPriceAtAdded: nonNegativeIntSchema.optional(),
-  CouponIDAtAdded: identifierSchema.optional(),
-  UserCouponIDAtAdded: identifierSchema.optional(),
-  CouponIssueRequiredAtAdded: z.boolean().default(false),
   CurrentPrice: nonNegativeIntSchema.optional(),
   CurrentCouponPrice: nonNegativeIntSchema.optional(),
-  BestCouponQuote: z.object({
-    CouponID: identifierSchema,
-    UserCouponID: identifierSchema.optional(),
-    Source: z.enum(["ISSUABLE", "OWNED"]),
-    DiscountAmount: nonNegativeIntSchema,
-    DiscountedAmount: nonNegativeIntSchema,
-    IssueRequired: z.boolean(),
-  }).optional(),
-  PriceChangeAmount: z.number().int().optional(),
-  PriceChangeRate: z.number().int().optional(),
 });
 
 export const rawAddressSchema = z.object({

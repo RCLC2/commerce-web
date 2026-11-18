@@ -47,7 +47,6 @@ const signUp = (payload: {
 
 export const authApi = {
   signin: signIn,
-  login: signIn,
   signup: signUp,
   register: signUp,
   me: (token: string) => requestParsed(memberProfileSchema, "/api/v1/me", { token }),
