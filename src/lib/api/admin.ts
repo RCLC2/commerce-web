@@ -4,27 +4,16 @@ import type { CMSCarousel, CMSHomeSection } from "../types";
 import {
   carouselSchema,
   categorySchema,
-  eventSchema,
   homeSectionSchema,
-  recommendationSchema,
-  statusResponseSchema,
-  trackingInfoSchema,
 } from "./contracts/schemas";
 import {
   adminDashboardRawSchema,
   rawAdminCouponSchema,
-  rawAuditLogSchema,
-  rawNotificationSchema,
-  rawSettlementSchema,
 } from "./contracts/raw";
 import {
   normalizeAdminDashboard,
   normalizeAdminCoupon,
-  normalizeAuditLog,
-  normalizeNotification,
-  normalizeSettlement,
 } from "./normalizers/contracts";
-import { collectAllUniquePages } from "./pagination";
 
 const impersonationSchema = z.object({
   access_token: z.string().min(1),
@@ -34,12 +23,6 @@ const impersonationSchema = z.object({
   market_name: z.string(),
   issued_for: z.string(),
 });
-const dailyAccrualSchema = z.object({
-  accrued_lines: z.number().int().nonnegative(),
-  updated_settlements: z.number().int().nonnegative(),
-});
-const paidCountSchema = z.object({ paid_count: z.number().int().nonnegative() });
-const settlementActionLogsSchema = z.object({ items: z.array(rawAuditLogSchema) });
 const notificationCampaignSchema = z.object({
   id: z.number().int().positive(), created_by_member_id: z.number().int().positive(), target_type: z.enum(["MEMBER", "SEGMENT"]), target_member_id: z.number().int().positive().nullable().optional(), segment_key: z.string().nullable().optional(), message_id: z.number().int().positive(), status: z.string(), candidate_count: z.number().int().nonnegative(), delivered_count: z.number().int().nonnegative(), excluded_count: z.number().int().nonnegative(), failed_count: z.number().int().nonnegative(), last_error: z.string().optional(), workflow_id: z.string().optional(), created_at: z.string(), started_at: z.string().nullable().optional(), completed_at: z.string().nullable().optional(),
 });
@@ -52,26 +35,6 @@ export const adminApi = {
   createNotificationCampaign: (token: string, payload: { target_type: "MEMBER" | "SEGMENT"; target_member_id?: number; segment_key?: string; kind: "INFORMATION" | "MARKETING"; title: string; body: string; destination_path: string; toast_enabled: boolean; toast_expires_at?: string }) => requestParsed(notificationCampaignSchema, "/api/v1/admin/notification-campaigns", { method: "POST", token, body: JSON.stringify(payload) }),
   adminDashboard: async (token: string) =>
     normalizeAdminDashboard(await requestParsed(adminDashboardRawSchema, "/api/v1/admin/dashboard", { token })),
-  adminOrderActionLogs: async (token: string) =>
-    (await collectAllUniquePages(
-      (limit, offset) => requestParsed(
-        z.array(rawAuditLogSchema),
-        `/api/v1/admin/orders/action-logs?limit=${limit}&offset=${offset}`,
-        { token },
-      ),
-      (log) => log.ID,
-    ))
-      .map(normalizeAuditLog),
-  adminSettlementActionLogs: async (token: string) =>
-    (await collectAllUniquePages(
-      async (limit, offset) => (await requestParsed(
-        settlementActionLogsSchema,
-        `/api/v1/admin/settlements/action-logs?limit=${limit}&offset=${offset}`,
-        { token },
-      )).items,
-      (log) => log.ID,
-    ))
-      .map(normalizeAuditLog),
   adminCoupons: async (token: string, memberID?: number | null) =>
     (await requestParsed(
       z.array(rawAdminCouponSchema),
@@ -79,8 +42,6 @@ export const adminApi = {
       { token },
     )).map(normalizeAdminCoupon),
   adminCarousels: (token: string) => requestParsed(z.array(carouselSchema), "/api/v1/admin/carousels", { token }),
-  adminEvents: (token: string) =>
-    requestParsed(z.array(eventSchema), "/api/v1/admin/events", { token }),
   adminCategories: (token: string) =>
     requestParsed(z.array(categorySchema), "/api/v1/admin/categories", { token }),
   createCategory: (
@@ -136,18 +97,6 @@ export const adminApi = {
     requestVoid("/api/v1/carousels", { method: "POST", token, body: JSON.stringify(payload) }),
   createSellerImpersonationToken: (token: string, marketID: number) =>
     requestParsed(impersonationSchema, `/api/v1/admin/markets/${marketID}/impersonation-token`, { method: "POST", token }),
-  accrueDailySettlements: (token: string) =>
-    requestParsed(dailyAccrualSchema, "/api/v1/admin/settlements/accrue-daily", { method: "POST", token }),
-  payDueSettlements: (token: string) =>
-    requestParsed(paidCountSchema, "/api/v1/admin/settlements/pay-due", { method: "POST", token }),
-  confirmSettlement: (token: string, settlementID: number) =>
-    requestVoid(`/api/v1/admin/settlements/${settlementID}/confirm`, { method: "POST", token }),
-  paySettlement: async (token: string, settlementID: number) =>
-    normalizeSettlement(await requestParsed(
-      rawSettlementSchema,
-      `/api/v1/admin/settlements/${settlementID}/pay`,
-      { method: "POST", token },
-    )),
   issueCouponToMember: (token: string, couponID: number, memberID: number) =>
     requestParsed(
       z.object({ status: z.string(), coupon_id: z.number().int().positive(), member_id: z.number().int().positive() }),
@@ -158,13 +107,4 @@ export const adminApi = {
     requestParsed(carouselSchema, `/api/v1/carousels/${carouselID}`, { method: "PUT", token, body: JSON.stringify(payload) }),
   deactivateCarousel: (token: string, carouselID: number) =>
     requestVoid(`/api/v1/carousels/${carouselID}`, { method: "DELETE", token }),
-  refreshDeliveryTracking: (token: string, deliveryID: number) =>
-    requestParsed(trackingInfoSchema, `/api/v1/deliveries/${deliveryID}/refresh-tracking`, { method: "POST", token }),
-  getUserNotifications: (token: string, userID: number) =>
-    requestParsed(z.array(rawNotificationSchema), `/api/v1/users/${userID}/notifications`, { token })
-      .then((notifications) => notifications.map(normalizeNotification)),
-  getUserRecommendations: (token: string, userID: number) =>
-    requestParsed(z.array(recommendationSchema), `/api/v1/users/${userID}/recommendations`, { token }),
-  adminMutation: (token: string, path: string, payload: Record<string, unknown>) =>
-    requestParsed(statusResponseSchema, path, { method: "POST", token, body: JSON.stringify(payload) }),
 };

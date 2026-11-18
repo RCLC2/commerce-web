@@ -52,15 +52,16 @@ export const plpTagChipSchema = z.object({
   tone: z.enum(["shipping", "delivery", "exclusive", "new", "default"]),
 });
 
-export const productCouponOfferSchema = z.object({
+export const bestCouponQuoteSchema = z.object({
   coupon_id: identifierSchema,
-  code: z.string().min(1),
-  name: z.string().min(1),
-  target_type: z.enum(["PRODUCT", "PROMOTION"]),
-  event_id: identifierSchema.optional(),
+  user_coupon_id: identifierSchema.optional(),
+  code: z.string(),
+  name: z.string(),
+  source: z.enum(["ISSUABLE", "OWNED"]),
   discount_amount: nonNegativeIntSchema,
   discounted_amount: nonNegativeIntSchema,
-  requires_claim: z.boolean(),
+  issue_required: z.boolean(),
+  expires_at: z.string().optional(),
 });
 
 export const productSchema = z.object({
@@ -72,7 +73,7 @@ export const productSchema = z.object({
   summary_description: z.string().optional(),
   base_price: nonNegativeIntSchema,
   discount_price: nonNegativeIntSchema.default(0),
-  coupon_offer: productCouponOfferSchema.optional(),
+  best_coupon_quote: bestCouponQuoteSchema.optional(),
   coupon_lowest_price: nonNegativeIntSchema.default(0),
   shipping_type: z.string().default("NORMAL"),
   delivery_type: z.string().optional(),

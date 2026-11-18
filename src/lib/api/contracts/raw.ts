@@ -15,6 +15,9 @@ export const rawCartSchema = z.object({
   OptionID: identifierSchema,
   Quantity: z.number().int().positive(),
   PriceAtAdded: nonNegativeIntSchema,
+  CouponPriceAtAdded: nonNegativeIntSchema.optional(),
+  CurrentPrice: nonNegativeIntSchema.optional(),
+  CurrentCouponPrice: nonNegativeIntSchema.optional(),
 });
 
 export const rawAddressSchema = z.object({

@@ -122,7 +122,6 @@ export const experimentApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  getExperiment: (id: number, options: ExperimentApiOptions) => experimentRequest<Experiment>(`/v1/experiments/${id}`, options),
   getResult: (id: number, options: ExperimentApiOptions) => experimentRequest<ExperimentResult>(`/v1/experiments/${id}/results`, options),
   changeStatus: (id: number, action: "start" | "pause" | "resume" | "end", options: ExperimentApiOptions) =>
     experimentRequest<Experiment>(`/v1/experiments/${id}/${action}`, { ...options, method: "POST" }),

@@ -11,6 +11,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
+import { getEffectiveToken } from "@/lib/auth-token";
+import { useSessionStore } from "@/lib/session-store";
 import type { PLPInformation, PLPProductParams } from "@/lib/types";
 import { ApiErrorState } from "./api-error-state";
 import { PageLayout } from "./page-layout";
@@ -60,6 +62,9 @@ function rememberProduct(listURL: string, productID: number) {
 export function ProductListPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const token = useSessionStore((state) => state.accessToken);
+  const memberID = useSessionStore((state) => state.memberID);
+  const effectiveToken = getEffectiveToken(token);
   const [detailFiltersOpen, setDetailFiltersOpen] = useState(false);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [draftQuery, setDraftQuery] = useState("");
@@ -117,14 +122,14 @@ export function ProductListPage() {
     pageSize: 1,
   };
   const draftCountQuery = useQuery({
-    queryKey: ["plp-filter-preview", draftRequest],
-    queryFn: () => api.listPLPProducts(draftRequest),
+    queryKey: ["plp-filter-preview", memberID, draftRequest],
+    queryFn: () => effectiveToken ? api.listPLPProducts(draftRequest, effectiveToken) : api.listPLPProducts(draftRequest),
     enabled: filterSheetOpen && informationQuery.isSuccess,
   });
   const productsQuery = useInfiniteQuery({
-    queryKey: queryKeys.plpProducts(request),
+    queryKey: [...queryKeys.plpProducts(request), memberID],
     initialPageParam: 1,
-    queryFn: ({ pageParam }) => api.listPLPProducts({ ...request, page: pageParam }),
+    queryFn: ({ pageParam }) => effectiveToken ? api.listPLPProducts({ ...request, page: pageParam }, effectiveToken) : api.listPLPProducts({ ...request, page: pageParam }),
     getNextPageParam: (lastPage) => lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined,
     enabled: informationQuery.isSuccess,
   });

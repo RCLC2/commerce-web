@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { adminConsoleApi } from "../admin-console-api";
 import { adminApi } from "./admin";
 import { authApi } from "./auth";
-import { customerApi, normalizeCouponQuoteOrderAmount } from "./customer";
+import { customerApi } from "./customer";
 import { sellerApi } from "./seller";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -213,15 +213,6 @@ describe("coupon response regressions", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify([coupon]), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify([{
-        coupon,
-        max_discount: 5000,
-        discount_amount: 3000,
-        platform_coupon_amount: 2250,
-        market_coupon_amount: 750,
-        market_coupon_rate: 25,
-        discounted_amount: 27000,
-      }]), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify([{
         ID: 11,
         UserID: 12,
         CouponID: 7,
@@ -236,9 +227,6 @@ describe("coupon response regressions", () => {
     await expect(customerApi.listIssuableCoupons("token")).resolves.toMatchObject([
       { id: 7, name: "신규 회원 10% 쿠폰", expires_at: undefined },
     ]);
-    await expect(customerApi.listIssuableCouponQuotes("token", 30000)).resolves.toMatchObject([
-      { coupon: { id: 7 }, discount_amount: 3000, market_coupon_amount: 750 },
-    ]);
     await expect(customerApi.listCoupons("token")).resolves.toMatchObject([
       { id: 11, coupon_id: 7, status: "AVAILABLE", coupon: { id: 7 } },
     ]);
@@ -249,7 +237,6 @@ describe("coupon response regressions", () => {
     });
     expect(requestedPaths).toEqual([
       "/api/v1/coupons/issuable",
-      "/api/v1/coupons/issuable?order_amount=30000",
       "/api/v1/coupons",
     ]);
   });
@@ -278,17 +265,6 @@ describe("coupon response regressions", () => {
     }]);
   });
 
-  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -1, Number.MAX_VALUE])(
-    "rejects an unsafe coupon quote order amount %s before fetching",
-    async (amount) => {
-      const fetchMock = vi.fn();
-      vi.stubGlobal("fetch", fetchMock);
-
-      expect(() => normalizeCouponQuoteOrderAmount(amount)).toThrow(RangeError);
-      await expect(customerApi.listIssuableCouponQuotes("token", amount)).rejects.toThrow(RangeError);
-      expect(fetchMock).not.toHaveBeenCalled();
-    },
-  );
 });
 
 describe("origin/main mixed contract regressions", () => {
@@ -337,21 +313,9 @@ describe("origin/main mixed contract regressions", () => {
       order_line_item_id: 6,
     });
     expect(review).not.toHaveProperty("created_at");
-    await expect(customerApi.listNotifications("token")).resolves.toEqual([{
-      id: 9,
-      member_id: 3,
-      message_id: 12,
-      created_at: "2026-07-29T00:00:00Z",
-      read_at: null,
-      message: {
-        id: 12,
-        kind: "INFORMATION",
-        title: "배송",
-        body: "출고되었습니다",
-        destination_path: "/orders/ORDER-1",
-        toast_enabled: true,
-      },
-    }]);
+    await expect(customerApi.getNotificationPage("token")).resolves.toMatchObject({
+      items: [{ id: 9, message: { title: "배송" } }],
+    });
     expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("/api/v1/me/notifications?limit=50"), expect.any(Object));
   });
 
@@ -397,151 +361,4 @@ describe("origin/main mixed contract regressions", () => {
     });
   });
 
-  it("uses the backend fulfillment DTOs for dormant supplied, location, inventory, and outbound helpers", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ID: 20,
-        ProductOptionID: 4,
-        Provider: "SHOPIFY",
-        SKUCode: "SKU-4",
-        SupplierCode: "SUP-4",
-      }), { status: 201 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ID: 21,
-        LocationID: 3,
-        Name: "기본 창고",
-        ChannelType: "ONLINE",
-        IsVirtual: false,
-      }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ID: 22,
-        ProductOptionID: 4,
-        SuppliedOptionID: 20,
-        LocationID: 3,
-        InboundReference: "IN-1",
-        AvailableQuantity: 8,
-        AllocatedQuantity: 2,
-      }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        external_order_id: "external-1",
-        external_name: "External #1",
-      }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(null, { status: 204 }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(sellerApi.registerSuppliedProductOption("token", {
-      product_option_id: 4,
-      provider: "SHOPIFY",
-      sku_code: "SKU-4",
-      supplier_code: "SUP-4",
-    })).resolves.toMatchObject({ id: 20, sku_code: "SKU-4" });
-    await expect(sellerApi.upsertInventoryLocation("token", {
-      location_id: 3,
-      name: "기본 창고",
-      channel_type: "ONLINE",
-    })).resolves.toMatchObject({ id: 21, location_id: 3, is_virtual: false });
-    await expect(sellerApi.adjustInventory("token", {
-      product_option_id: 4,
-      supplied_option_id: 20,
-      location_id: 3,
-      inbound_reference: "IN-1",
-      available_quantity_delta: 8,
-      allocated_quantity_delta: 2,
-      transaction_type: "INBOUND",
-      reference_type: "PURCHASE",
-      reference_id: "PO-1",
-      memo: "입고",
-    })).resolves.toMatchObject({ id: 22, available_quantity: 8 });
-    await expect(sellerApi.syncOutboundOrder("token", "ORDER-1", {
-      market_id: 1,
-      provider: "SHOPIFY",
-    })).resolves.toEqual({
-      external_order_id: "external-1",
-      external_name: "External #1",
-    });
-    await expect(sellerApi.syncOutboundOrderStatus("token", "ORDER-1", {
-      market_id: 1,
-      provider: "SHOPIFY",
-      external_order_id: "external-1",
-      status: "FULFILLED",
-    })).resolves.toBeUndefined();
-
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
-      product_option_id: 4,
-      provider: "SHOPIFY",
-      sku_code: "SKU-4",
-      supplier_code: "SUP-4",
-    });
-    expect(JSON.parse(fetchMock.mock.calls[4][1].body)).toMatchObject({
-      external_order_id: "external-1",
-      status: "FULFILLED",
-    });
-  });
-
-  it("decodes settlement log wrappers and settlement account PascalCase/empty PUT contracts", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        items: [{
-          ID: 3,
-          AdminID: 1,
-          Action: "CONFIRM_SETTLEMENT",
-          SettlementID: 7,
-          TargetType: "SETTLEMENT",
-          CreatedAt: "2026-07-29T00:00:00Z",
-        }],
-      }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ID: 2,
-        MarketID: 7,
-        BankCode: "004",
-        AccountNumber: "123-456",
-        AccountHolder: "홍길동",
-        CreatedAt: "2026-07-29T00:00:00Z",
-      }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(null, { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(adminApi.adminSettlementActionLogs("token")).resolves.toMatchObject([
-      { id: 3, settlement_id: 7 },
-    ]);
-    await expect(sellerApi.getSettlementAccount("token", 7)).resolves.toMatchObject({
-      id: 2,
-      market_id: 7,
-      bank_code: "004",
-    });
-    await expect(sellerApi.upsertSettlementAccount("token", 7, {
-      bank_code: "004",
-      account_number: "123-456",
-      account_holder: "홍길동",
-    })).resolves.toBeUndefined();
-    expect(JSON.parse(fetchMock.mock.calls[3][1].body)).toEqual({
-      BankCode: "004",
-      AccountNumber: "123-456",
-      AccountHolder: "홍길동",
-    });
-    expect(fetchMock.mock.calls[0][0]).toContain(
-      "/api/v1/admin/settlements/action-logs?limit=100&offset=0",
-    );
-  });
-
-  it("decodes the customer settlement summary contract", async () => {
-    const settlement = {
-      ID: 7,
-      MarketID: 2,
-      TargetMonth: "2026-07",
-      TotalSalesAmount: 10000,
-      CommissionAmount: 1000,
-      FinalSettlementAmount: 9000,
-      Status: "PREPARED",
-    };
-    const fetchMock = vi.fn().mockResolvedValueOnce(
-      new Response(JSON.stringify({ settlements: [settlement] }), { status: 200 }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(customerApi.getSettlementSummary("token", 2)).resolves.toMatchObject({
-      settlements: [{ id: 7, market_id: 2 }],
-    });
-  });
 });

@@ -37,7 +37,6 @@ import { Button } from "./ui/button";
 import { Notice } from "./ui/notice";
 import { OrderSummary } from "./ui/order-summary";
 import { OrderRefundSummary } from "./order-refund-summary";
-import { OrderReturnManagement } from "./order-return-management";
 
 function filterValue(value: string) {
   return value === "ALL" ? undefined : value;
@@ -388,27 +387,6 @@ export function AdminOrdersPageV2() {
           <div className="grid gap-6">
             {cancelMutation.error ? <Notice tone="error">{apiErrorMessage(cancelMutation.error)}</Notice> : null}
             {cancelResolution ? <Notice tone="success">{cancelResolution}</Notice> : null}
-            <OrderReturnManagement
-              key={orderQuery.data.order_code}
-              token={token}
-              orderCode={orderQuery.data.order_code}
-              role="ADMIN"
-              markets={orderQuery.data.market_orders.map((market) => ({
-                id: market.market_id,
-                name: market.market_name,
-                shippingFee: market.shipping_fee,
-                items: market.items.map((item) => ({
-                  id: item.id, name: item.product_name, quantity: item.quantity,
-                  optionLabel: [item.option_name, item.option_value].filter(Boolean).join(": "),
-                  price: item.price, status: item.status,
-                })),
-              }))}
-              pickupDefault={orderQuery.data.delivery ? {
-                recipient_name: orderQuery.data.delivery.receiver_name,
-                phone: orderQuery.data.delivery.receiver_phone,
-                address: orderQuery.data.delivery.address,
-              } : undefined}
-            />
             {orderQuery.data.refund ? <OrderRefundSummary refund={orderQuery.data.refund} revealOnMount /> : null}
             <DetailGrid>
               <DetailItem label="구매자">{orderQuery.data.buyer.email}</DetailItem>

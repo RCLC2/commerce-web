@@ -54,7 +54,7 @@ describe("cart editing", () => {
 
     expect(await screen.findByText(/현재 주문 가능한 수량은 3개입니다/)).toBeVisible();
     expect(screen.getByRole("button", { name: "선택 상품 주문하기" })).toBeDisabled();
-    expect(screen.getByText("상품 금액 합계")).toBeVisible();
+    expect(screen.getByText("상품 금액 합계 (쿠폰 적용 전)")).toBeVisible();
     expect(screen.queryByText("배송비")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "옵션·수량 변경" }));
     const sheet = screen.getByRole("dialog", { name: "옵션·수량 변경" });
@@ -107,6 +107,22 @@ describe("cart editing", () => {
     expect(api.updateCartItems).toHaveBeenCalledWith("token", { cart_item_ids: [1,2], option_id: 20, quantity: 2 });
     expect(screen.getByText(/색상 · 블랙/)).toBeInTheDocument();
     expect(screen.getAllByText("24,000원").length).toBeGreaterThan(0);
+  });
+
+  it("shows the current total and how much the price changed since adding", async () => {
+    rows = [{
+      ...rows[0],
+      quantity: 2,
+      price_at_added: 10_000,
+      current_price: 12_500,
+    }];
+    mountCart();
+
+    expect(await screen.findByText("담은 뒤 5,000원 올랐어요")).toBeVisible();
+    expect(screen.getByText("20,000원")).toHaveClass("line-through");
+    expect(screen.getAllByText("25,000원").length).toBeGreaterThan(0);
+    expect(screen.getByText("담을 때보다")).toBeVisible();
+    expect(screen.getByText("+5,000원")).toHaveClass("text-status-negative");
   });
 
   it("caps quantity only when the new option has insufficient stock and explains the change", async () => {

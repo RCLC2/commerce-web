@@ -61,8 +61,8 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
   const purchasePanelRef = useRef<HTMLElement | null>(null);
 
   const productQuery = useQuery({
-    queryKey: queryKeys.product(productId),
-    queryFn: () => api.getProduct(productId),
+    queryKey: [...queryKeys.product(productId), memberID],
+    queryFn: () => api.getProduct(productId, effectiveToken ?? undefined),
     initialData: initialProduct,
   });
   const reviewsQuery = useQuery({
@@ -307,8 +307,8 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
   const detailHtml = resolveProductDetailHtml(product);
   const price = product.discount_price || product.base_price;
   const saleRate = discountRate(product.base_price, product.discount_price);
-  const couponOffer = product.coupon_offer;
-  const couponPrice = product.coupon_lowest_price || couponOffer?.discounted_amount;
+  const couponQuote = product.best_coupon_quote;
+  const couponPrice = product.coupon_lowest_price || couponQuote?.discounted_amount;
 
   function moveImage(delta: number) {
     setActiveImage((current) => (current + delta + images.length) % images.length);
@@ -428,9 +428,9 @@ export function ProductDetailExperience({ productId, initialProduct }: { product
               <span className="text-3xl font-bold">{formatPrice(price)}</span>
             </div>
             {saleRate > 0 ? <p className="mt-1 text-sm text-content-secondary line-through">{formatPrice(product.base_price)}</p> : null}
-            {couponOffer && couponPrice ? (
+            {couponQuote && couponPrice ? (
               <div className="mt-3 rounded-control border border-promotion/20 bg-promotion-subtle px-3 py-2.5 text-promotion">
-                <p className="text-xs font-bold">{couponOffer.requires_claim ? "이벤트에서 쿠폰을 받으면" : "쿠폰을 받으면"}</p>
+                <p className="text-xs font-bold">{couponQuote.source === "OWNED" ? "보유 쿠폰 적용 시" : couponQuote.issue_required ? "쿠폰을 받으면" : "쿠폰 적용 시"}</p>
                 <p className="mt-0.5 text-xl font-bold">{formatPrice(couponPrice)}</p>
               </div>
             ) : null}

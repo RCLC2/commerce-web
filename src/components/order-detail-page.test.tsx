@@ -9,7 +9,6 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
-import { returnsApi } from "@/lib/returns-api";
 import { useSessionStore } from "@/lib/session-store";
 import { queryKeys } from "@/lib/query-keys";
 import type { OrderResponse } from "@/lib/types";
@@ -20,10 +19,6 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/api", () => ({
   api: { getOrder: vi.fn(), listMyReviews: vi.fn() },
-}));
-vi.mock("@/lib/returns-api", async (original) => ({
-  ...(await original<typeof import("@/lib/returns-api")>()),
-  returnsApi: { requests: vi.fn() },
 }));
 
 const order: Awaited<ReturnType<typeof api.getOrder>> = {
@@ -70,7 +65,6 @@ beforeEach(() => {
   });
   vi.mocked(api.getOrder).mockResolvedValue(order);
   vi.mocked(api.listMyReviews).mockResolvedValue([]);
-  vi.mocked(returnsApi.requests).mockResolvedValue([]);
 });
 afterEach(() => {
   cleanup();
@@ -78,12 +72,9 @@ afterEach(() => {
   useSessionStore.setState({ accessToken: null, memberID: null });
 });
 
-it("adds refund details below returns without moving focus until the buyer chooses to view them", async () => {
+it("adds refund details without moving focus", async () => {
   const client = mount();
   await screen.findByRole("heading", { name: "주문 상세" });
-  expect(
-    screen.queryByRole("button", { name: "환불 상세 보기" }),
-  ).not.toBeInTheDocument();
   const focusBefore = document.activeElement;
   act(() =>
     client.setQueryData(queryKeys.order("ORD-3", 3), {
@@ -97,30 +88,7 @@ it("adds refund details below returns without moving focus until the buyer choos
   });
   expect(document.activeElement).toBe(focusBefore);
   expect(screen.getByRole("complementary")).not.toContainElement(details);
-  expect(
-    screen
-      .getByRole("region", { name: "반품 신청 및 내역" })
-      .compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING,
-  ).toBeTruthy();
-  const scroll = vi.fn();
-  Object.defineProperty(details, "scrollIntoView", { value: scroll });
-  const motion = { matches: false };
-  vi.stubGlobal(
-    "matchMedia",
-    vi.fn(() => motion),
-  );
-  fireEvent.click(screen.getByRole("button", { name: "환불 상세 보기" }));
-  expect(details).toHaveFocus();
-  expect(scroll).toHaveBeenLastCalledWith({
-    block: "start",
-    behavior: "smooth",
-  });
-  motion.matches = true;
-  fireEvent.click(screen.getByRole("button", { name: "환불 상세 보기" }));
-  expect(scroll).toHaveBeenLastCalledWith({
-    block: "start",
-    behavior: "instant",
-  });
+  expect(screen.getByText("23,000원")).toBeInTheDocument();
   expect(api.getOrder).toHaveBeenCalledTimes(1);
 });
 

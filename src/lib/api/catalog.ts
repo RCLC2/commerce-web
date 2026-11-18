@@ -2,7 +2,6 @@ import { z } from "zod";
 import { requestParsed, requestVoid } from "../api-client";
 import type { PLPInformation, PLPProductPage, PLPProductParams } from "../types";
 import {
-  carouselSchema,
   categoryInformationSchema,
   categorySchema,
   eventSchema,
@@ -15,7 +14,6 @@ import {
   productSchema,
   reviewSchema,
   reviewSummarySchema,
-  statusResponseSchema,
 } from "./contracts/schemas";
 import { normalizePublicProduct } from "./normalizers/contracts";
 
@@ -57,8 +55,8 @@ export const catalogApi = {
   listCategories: () => requestParsed(z.array(categorySchema), "/api/v1/categories"),
   getPLPInformation: (): Promise<PLPInformation> =>
     requestParsed(plpInformationSchema, "/api/v1/plp-information"),
-  listPLPProducts: async (params: PLPProductParams = {}): Promise<PLPProductPage> => {
-    const page = await requestParsed(plpProductPageSchema, plpProductsPath(params));
+  listPLPProducts: async (params: PLPProductParams = {}, token?: string): Promise<PLPProductPage> => {
+    const page = await requestParsed(plpProductPageSchema, plpProductsPath(params), { token });
     return { ...page, items: page.items.map(normalizePublicProduct) };
   },
   listCategoryTree: () => requestParsed(z.array(categorySchema), "/api/v1/categories/tree"),
@@ -110,8 +108,8 @@ export const catalogApi = {
   },
   listPromotionProducts: () => parseProducts("/api/v1/products/promotions"),
   listLatestProducts: () => parseProducts("/api/v1/products/latest"),
-  getProduct: (id: number) =>
-    requestParsed(productDetailSchema, `/api/v1/products/${id}`).then((detail) => normalizePublicProduct({
+  getProduct: (id: number, token?: string) =>
+    requestParsed(productDetailSchema, `/api/v1/products/${id}`, { token }).then((detail) => normalizePublicProduct({
       ...detail.product,
       discount_price: detail.product.discount_price
         || discountPriceFromLowest(detail.product.base_price, detail.lowest_price),
@@ -134,10 +132,6 @@ export const catalogApi = {
     const shelf = await requestParsed(similarProductsSchema, `/api/v1/products/${id}/similar?limit=${limit}`);
     return { items: shelf.items.map(normalizePublicProduct) };
   },
-  listActiveCarousels: () =>
-    requestParsed(z.array(carouselSchema), "/api/v1/carousels/active"),
-  recordCampaignClick: (campaignID: number) =>
-    requestParsed(statusResponseSchema, `/api/v1/cms/campaigns/${campaignID}/click`, { method: "POST" }),
 };
 
 function discountPriceFromLowest(basePrice: number, lowestPrice?: number): number {
