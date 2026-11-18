@@ -23,6 +23,7 @@ import { PageLayout } from "./page-layout";
 import { CommerceMoneyWallet } from "./commerce-money-wallet";
 import { MyInquirySummary } from "./my-inquiry-summary";
 import { MyPageSupport } from "./my-page-support";
+import { MyShippingAddresses } from "./my-shipping-addresses";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 import { EmptyState, InlineLoadingState, LoadingSpinner, LoginRequiredState } from "./ui/feedback";
@@ -104,6 +105,8 @@ export function MyPage() {
       {queryError ? <div className="mt-5 rounded-control border border-status-negative-border bg-status-negative-subtle p-4 text-sm" role="alert"><p className="font-bold text-status-negative">{apiErrorMessage(queryError)}</p><Button className="mt-3" size="sm" variant="secondary" onClick={() => { void profileQuery.refetch(); void ordersQuery.refetch(); void couponsQuery.refetch(); void issuableQuery.refetch(); void reviewsQuery.refetch(); }}>다시 시도</Button></div> : null}
 
       <CommerceMoneyWallet pointBalance={profileQuery.isSuccess ? profileQuery.data.point_balance : null} pointsError={profileQuery.isError} onRetryPoints={() => { void profileQuery.refetch(); }} />
+
+      <MyShippingAddresses key={memberID} token={token} memberID={memberID} />
 
       <aside className="relative mt-6 flex min-h-28 items-center justify-between gap-4 overflow-hidden rounded-surface border border-action-primary/10 bg-action-secondary/40 px-5 py-5 sm:px-7" aria-label="광고 영역">
         <div><p className="text-[10px] font-bold tracking-[0.18em] text-action-primary">FOR YOUR NEXT FAVORITE</p><p className="mt-2 text-base font-bold">나를 위한 새로운 쇼핑 소식</p><p className="mt-1 text-xs text-content-secondary">새로운 혜택으로 곧 찾아올게요.</p></div>

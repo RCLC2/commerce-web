@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
@@ -16,6 +16,8 @@ vi.mock("@/lib/api", () => ({
     listAddresses: vi.fn(),
     getProduct: vi.fn(),
     updateAddress: vi.fn(),
+    createAddress: vi.fn(),
+    deleteAddress: vi.fn(),
   },
 }));
 
@@ -96,7 +98,7 @@ describe("inline order history filters", () => {
     ]);
     mountMyPage();
     expect(screen.getByRole("region", { name: "commerce money" })).toBeInTheDocument();
-    expect(api.listAddresses).not.toHaveBeenCalled();
+    expect(api.listAddresses).toHaveBeenCalledWith("token");
     const reviews = screen.getByRole("link", { name: "내가 쓴 리뷰" });
     expect(reviews).toHaveAttribute("href", "/mypage/reviews");
     expect(await within(reviews).findByText("2건")).toBeInTheDocument();
@@ -118,4 +120,62 @@ describe("inline order history filters", () => {
     expect(within(orders).getAllByRole("link")).toHaveLength(2);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
+});
+
+it("retries a failed address refresh without saving twice", async () => {
+  useSessionStore.setState({ accessToken: "token", memberID: 1, role: "MEMBER", hydrated: true });
+  vi.mocked(api.me).mockResolvedValue({ point_balance: 0 } as Awaited<ReturnType<typeof api.me>>);
+  vi.mocked(api.listAllOrders).mockResolvedValue([]);
+  vi.mocked(api.listCoupons).mockResolvedValue([]);
+  vi.mocked(api.listIssuableCoupons).mockResolvedValue([]);
+  const address = { id: 1, receiver: "받는 사람", phone: "01012345678", zip_code: "12345", line1: "서울", line2: "1호", is_default: true };
+  vi.mocked(api.listAddresses)
+    .mockResolvedValueOnce([address])
+    .mockRejectedValueOnce(new Error("network"))
+    .mockResolvedValue([{ ...address, line2: "3호" }]);
+  vi.mocked(api.updateAddress).mockResolvedValue(undefined);
+
+  mountMyPage();
+  fireEvent.click(await screen.findByRole("button", { name: /받는 사람.*배송지 수정/ }));
+  fireEvent.change(screen.getByLabelText("상세 주소"), { target: { value: "3호" } });
+  fireEvent.click(screen.getByRole("button", { name: "변경사항 저장" }));
+  fireEvent.click(await screen.findByRole("button", { name: "배송지 다시 불러오기" }));
+
+  expect(await screen.findByText("(12345) 서울 3호")).toBeVisible();
+  expect(api.updateAddress).toHaveBeenCalledTimes(1);
+});
+
+it("shows addresses on entry and updates the list after adding and deleting", async () => {
+  useSessionStore.setState({ accessToken: "token", memberID: 1, role: "MEMBER", hydrated: true });
+  vi.mocked(api.me).mockResolvedValue({ point_balance: 0 } as Awaited<ReturnType<typeof api.me>>);
+  vi.mocked(api.listAllOrders).mockResolvedValue([]);
+  vi.mocked(api.listCoupons).mockResolvedValue([]);
+  vi.mocked(api.listIssuableCoupons).mockResolvedValue([]);
+  const first = { id: 1, receiver: "기존 수령인", phone: "01012345678", zip_code: "12345", line1: "서울", line2: "1호", is_default: true };
+  const second = { id: 2, receiver: "새 수령인", phone: "01012345679", zip_code: "54321", line1: "부산", line2: "", is_default: false };
+  let saved = [first];
+  vi.mocked(api.listAddresses).mockImplementation(async () => saved);
+  vi.mocked(api.createAddress).mockImplementation(async () => {
+    saved = [second, first];
+    return second;
+  });
+  vi.mocked(api.deleteAddress).mockImplementation(async () => { saved = [{ ...second, is_default: true }]; });
+
+  mountMyPage();
+  const panel = within(screen.getByRole("region", { name: "배송지 관리" }));
+  expect(await panel.findByText("(12345) 서울 1호")).toBeVisible();
+  fireEvent.click(panel.getByRole("button", { name: "배송지 추가" }));
+  fireEvent.change(panel.getByLabelText(/^받는 분/), { target: { value: second.receiver } });
+  fireEvent.change(panel.getByLabelText(/^연락처/), { target: { value: second.phone } });
+  fireEvent.change(panel.getByLabelText(/^우편번호/), { target: { value: second.zip_code } });
+  fireEvent.change(panel.getByLabelText(/^기본 주소/), { target: { value: second.line1 } });
+  fireEvent.click(panel.getByRole("button", { name: "배송지 저장" }));
+  expect(await panel.findByText("(54321) 부산")).toBeVisible();
+
+  fireEvent.click(panel.getByRole("button", { name: /기존 수령인.*배송지 삭제/ }));
+  expect(api.deleteAddress).not.toHaveBeenCalled();
+  fireEvent.click(within(screen.getByRole("dialog", { name: "배송지를 삭제할까요?" })).getByRole("button", { name: "배송지 삭제" }));
+  await waitFor(() => expect(panel.getByText("기본 배송지").closest("li")).toHaveTextContent("부산"));
+  expect(panel.queryByText("(12345) 서울 1호")).not.toBeInTheDocument();
+  expect(api.deleteAddress).toHaveBeenCalledWith("token", first.id);
 });

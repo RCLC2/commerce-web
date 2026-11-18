@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import { useSessionStore } from "@/lib/session-store";
 import type { Product } from "@/lib/types";
 import { CheckoutPage } from "./checkout-page";
+import { MyShippingAddresses } from "./my-shipping-addresses";
 
 const push = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({
@@ -12,7 +13,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/lib/api", () => ({ api: {
-  listCart: vi.fn(), listCoupons: vi.fn(), me: vi.fn(), listAddresses: vi.fn(), createAddress: vi.fn(), quoteOrder: vi.fn(),
+  listCart: vi.fn(), listCoupons: vi.fn(), me: vi.fn(), listAddresses: vi.fn(), createAddress: vi.fn(), updateAddress: vi.fn(), quoteOrder: vi.fn(),
   getProduct: vi.fn(), placeOrder: vi.fn(), getOrder: vi.fn(),
   createPaymentRequest: vi.fn(), listAllOrders: vi.fn(),
 } }));
@@ -81,7 +82,10 @@ it("searches and registers the first default address, selects it and enables che
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(<QueryClientProvider client={client}><CheckoutPage /></QueryClientProvider>);
 
-  expect(await screen.findByRole("form", { name: "배송지 등록" })).toBeVisible();
+  const addFirstAddress = await screen.findByRole("button", { name: "첫 배송지 추가" });
+  expect(screen.queryByRole("form", { name: "배송지 등록" })).not.toBeInTheDocument();
+  fireEvent.click(addFirstAddress);
+  expect(screen.getByRole("form", { name: "배송지 등록" })).toBeVisible();
   fireEvent.change(screen.getByLabelText(/^받는 분/), { target: { value: "새 고객" } });
   fireEvent.change(screen.getByLabelText(/^연락처/), { target: { value: "010-3333-3333" } });
   expect(screen.getAllByRole("button", { name: "결제 진행하기" })[0]).toBeDisabled();
@@ -97,6 +101,7 @@ it("searches and registers the first default address, selects it and enables che
   await waitFor(() => expect(api.createAddress).toHaveBeenCalledWith("token", expect.objectContaining({ receiver: "새 고객", is_default: true })));
   await waitFor(() => expect(api.quoteOrder).toHaveBeenCalledWith("token", expect.objectContaining({ shipping_address: expect.objectContaining({ line1: "새 주소" }) })));
   expect(await screen.findByText("(33333) 새 주소 3호")).toBeVisible();
+  expect(screen.getByText("기본 배송지")).toBeVisible();
   expect(screen.getByText("결제 예정 금액")).toBeVisible();
   await waitFor(() => expect(screen.getAllByRole("button", { name: "결제 진행하기" })[0]).toBeEnabled());
 });
@@ -138,6 +143,64 @@ it("shows the recovery warning only when restoring a saved order and uses its sa
   const client = new QueryClient({defaultOptions:{queries:{retry:false}}});
   render(<QueryClientProvider client={client}><CheckoutPage /></QueryClientProvider>);
   expect(await screen.findByText("복구한 주문은 현재 장바구니와 별개입니다")).toBeVisible();
+  expect(screen.queryByRole("button", { name: "배송지 수정" })).not.toBeInTheDocument();
   expect(await screen.findByText("주문에 저장된 주소")).toBeVisible();
   expect(api.placeOrder).not.toHaveBeenCalled();
+});
+
+it("shares address edits with My Page and submits the selected address only after its new quote", async () => {
+  const first = { id: 1, receiver: "집", phone: "01011111111", zip_code: "11111", line1: "첫 주소", line2: "1호", is_default: true };
+  const second = { id: 2, receiver: "회사", phone: "01022222222", zip_code: "22222", line1: "둘째 주소", line2: "2호", is_default: false };
+  let saved = [first, second];
+  vi.mocked(api.listAddresses).mockImplementation(async () => saved);
+  vi.mocked(api.updateAddress).mockImplementation(async (_token, id, update) => {
+    saved = saved.map((address) => address.id === id ? { ...address, ...update } : address);
+  });
+  const quote = { product_total: 30_000, discount_total: 0, used_point: 0, shipping_fee: 0, payment_amount: 30_000, line_items: [{ cart_item_id: 10, unit_price: 10_000, line_total: 10_000 }, { cart_item_id: 11, unit_price: 20_000, line_total: 20_000 }] };
+  let resolveQuote: () => void = () => {};
+  vi.mocked(api.quoteOrder).mockImplementation(async (_token, input) => {
+    if (input.shipping_address.line2 === "7호") {
+      return new Promise((resolve) => { resolveQuote = () => resolve(quote); });
+    }
+    return quote;
+  });
+
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={client}>
+      <div role="region" aria-label="마이페이지"><MyShippingAddresses token="token" memberID={1} /></div>
+      <CheckoutPage />
+    </QueryClientProvider>,
+  );
+
+  const myPage = within(screen.getByRole("region", { name: "마이페이지" }));
+  fireEvent.click(await myPage.findByRole("button", { name: /회사.*배송지 수정/ }));
+  fireEvent.change(myPage.getByLabelText("상세 주소"), { target: { value: "6호" } });
+  fireEvent.click(myPage.getByRole("button", { name: "변경사항 저장" }));
+  expect(await myPage.findByText("(22222) 둘째 주소 6호")).toBeVisible();
+
+  const select = screen.getByLabelText("배송받을 주소 선택");
+  fireEvent.change(select, { target: { value: "2" } });
+  expect(await screen.findAllByText("(22222) 둘째 주소 6호")).toHaveLength(2);
+  const submit = screen.getAllByRole("button", { name: "결제 진행하기" })[0];
+  await waitFor(() => expect(submit).toBeEnabled());
+
+  fireEvent.click(screen.getByRole("button", { name: "배송지 수정" }));
+  expect(screen.getByLabelText("상세 주소")).toHaveValue("6호");
+  expect(select).toBeDisabled();
+  expect(submit).toBeDisabled();
+  fireEvent.change(screen.getByLabelText("상세 주소"), { target: { value: "7호" } });
+  fireEvent.click(screen.getByRole("button", { name: "변경사항 저장" }));
+  const payload = { receiver: second.receiver, phone: second.phone, zip_code: second.zip_code, line1: second.line1, line2: "7호" };
+  await waitFor(() => expect(api.quoteOrder).toHaveBeenLastCalledWith("token", expect.objectContaining({ shipping_address: payload })));
+  expect(api.updateAddress).toHaveBeenLastCalledWith("token", 2, payload);
+  expect(select).toHaveValue("2");
+  expect(await myPage.findByText("(22222) 둘째 주소 7호")).toBeVisible();
+  expect(submit).toBeDisabled();
+  expect(api.placeOrder).not.toHaveBeenCalled();
+
+  act(() => resolveQuote());
+  await waitFor(() => expect(submit).toBeEnabled());
+  fireEvent.click(submit);
+  await waitFor(() => expect(api.placeOrder).toHaveBeenCalledWith("token", expect.objectContaining({ shipping_address: payload })));
 });

@@ -1,4 +1,4 @@
-import { orderQuoteSchema, type UpdateCartItemGroupRequest, type CreateShippingAddressRequest, type OrderQuoteRequest } from "./checkout-contracts";
+import { orderQuoteSchema, type UpdateCartItemGroupRequest, type CreateShippingAddressRequest, type UpdateShippingAddressRequest, type OrderQuoteRequest } from "./checkout-contracts";
 import { z } from "zod";
 import { requestParsed, requestVoid } from "../api-client";
 import {
@@ -147,8 +147,10 @@ export const customerApi = {
     (await requestParsed(z.array(rawAddressSchema), "/api/v1/me/addresses", { token })).map(normalizeAddress),
   createAddress: async (token: string, payload: CreateShippingAddressRequest) =>
     normalizeAddress(await requestParsed(rawAddressSchema, "/api/v1/me/addresses", { method: "POST", token, body: JSON.stringify(payload) })),
-  updateAddress: (token: string, addressID: number, payload: { address_name?: string; receiver: string; phone: string; zip_code: string; line1: string; line2: string; is_default: boolean }) =>
+  updateAddress: (token: string, addressID: number, payload: UpdateShippingAddressRequest) =>
     requestVoid(`/api/v1/me/addresses/${addressID}`, { method: "PATCH", token, body: JSON.stringify(payload) }),
+  deleteAddress: (token: string, addressID: number) =>
+    requestVoid(`/api/v1/me/addresses/${addressID}`, { method: "DELETE", token }),
   listMyReviews: async (token: string) =>
     (await requestParsed(z.array(rawReviewMutationSchema), "/api/v1/me/reviews", { token })).map(normalizeReviewMutation),
   getNotificationPage: (token: string, cursor?: string) => requestParsed(
