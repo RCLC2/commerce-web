@@ -23,6 +23,7 @@ import {
   StatusBadge,
   SummaryStrip,
 } from "./console-layout";
+import { AdminFAQSection } from "./admin-faq-section";
 import { SafeImage } from "./safe-image";
 import { Button } from "./ui/button";
 
@@ -352,9 +353,9 @@ export function AdminCMSPage() {
     <ConsoleLayout title="관리자" subtitle="플랫폼 운영 콘솔" links={adminLinks}>
       <ConsoleHeader
         title="콘텐츠 관리"
-        description="홈 구좌, 이벤트 캐러셀, 카테고리 노출 순서를 백엔드 설정 기준으로 관리합니다."
-        action={<Select className="h-11 rounded-control border border-border-interactive bg-surface-raised px-3 text-sm font-bold" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">전체 상태</option><option value="ACTIVE">활성</option><option value="INACTIVE">비활성</option></Select>}
+        description="고객센터 FAQ, 홈 구좌, 이벤트 캐러셀, 카테고리 노출 순서를 관리합니다."
       />
+      <AdminFAQSection token={token} />
 
       <ConsoleSection className="mt-5" title={sectionEditingID ? "홈 구좌 수정" : "홈 구좌 등록"}>
         <div className="grid gap-3 lg:grid-cols-[90px_1fr_1.2fr_1.1fr_130px_auto]">
@@ -428,15 +429,32 @@ export function AdminCMSPage() {
         {saveCarousel.error ? <p className="mt-3 text-sm font-bold text-status-negative">{apiErrorMessage(saveCarousel.error)}</p> : null}
       </ConsoleSection>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-2">
-        {filteredCarousels.map((carousel) => (
-          <ConsoleSection key={carousel.id}>
-            <div className="relative aspect-[16/7] overflow-hidden rounded-md bg-surface-subtle"><SafeImage src={carousel.image_url} alt="" fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" /></div>
-            <div className="mt-3 flex items-start justify-between gap-3"><div><p className="font-bold">{carousel.title}</p><p className="mt-1 text-xs font-bold text-content-secondary">순서 {carousel.display_order ?? 0} · {carousel.link_url}</p><p className="mt-1 text-xs font-bold text-content-secondary">{cmsScheduleText(carousel.starts_at, carousel.ends_at)}</p></div><StatusBadge value={carousel.status} /></div>
-            <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" onClick={() => editCarousel(carousel)}>수정</Button><Button size="sm" variant="secondary" disabled={deactivateCarousel.isPending || carousel.status !== "ACTIVE"} onClick={() => deactivateCarousel.mutate(carousel.id)}>비활성화</Button></div>
-          </ConsoleSection>
-        ))}
-      </div>
+      <section className="mt-5" aria-labelledby="cms-carousel-list-title">
+        <header className="mb-3 flex items-center justify-between gap-3">
+          <h3 id="cms-carousel-list-title" className="font-bold">이벤트 캐러셀 목록</h3>
+          <div className="shrink-0">
+            <Select
+              aria-label="이벤트 캐러셀 상태 필터"
+              className="h-11 rounded-control border border-border-interactive bg-surface-raised px-3 text-sm font-bold"
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+            >
+              <option value="ALL">전체 상태</option>
+              <option value="ACTIVE">활성</option>
+              <option value="INACTIVE">비활성</option>
+            </Select>
+          </div>
+        </header>
+        <div className="grid gap-4 md:grid-cols-2">
+          {filteredCarousels.map((carousel) => (
+            <ConsoleSection key={carousel.id}>
+              <div className="relative aspect-[16/7] overflow-hidden rounded-md bg-surface-subtle"><SafeImage src={carousel.image_url} alt="" fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" /></div>
+              <div className="mt-3 flex items-start justify-between gap-3"><div><p className="font-bold">{carousel.title}</p><p className="mt-1 text-xs font-bold text-content-secondary">순서 {carousel.display_order ?? 0} · {carousel.link_url}</p><p className="mt-1 text-xs font-bold text-content-secondary">{cmsScheduleText(carousel.starts_at, carousel.ends_at)}</p></div><StatusBadge value={carousel.status} /></div>
+              <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" onClick={() => editCarousel(carousel)}>수정</Button><Button size="sm" variant="secondary" disabled={deactivateCarousel.isPending || carousel.status !== "ACTIVE"} onClick={() => deactivateCarousel.mutate(carousel.id)}>비활성화</Button></div>
+            </ConsoleSection>
+          ))}
+        </div>
+      </section>
     </ConsoleLayout>
   );
 }

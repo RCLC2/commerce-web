@@ -5,6 +5,7 @@ import { advertisingApi } from "./api/advertising";
 import { catalogApi } from "./api/catalog";
 import { customerApi } from "./api/customer";
 import { eventDetailApi } from "./api/event-detail";
+import { faqApi } from "./api/faqs";
 import { mediaApi } from "./api/media";
 import { searchApi } from "./api/search";
 import { sellerApi } from "./api/seller";
@@ -20,6 +21,7 @@ export const api = {
   ...searchApi,
   ...authApi,
   ...customerApi,
+  ...faqApi,
   ...mediaApi,
   ...advertisingApi,
   ...sellerApi,

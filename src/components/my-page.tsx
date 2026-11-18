@@ -128,7 +128,7 @@ export function MyPage() {
           {ordersQuery.isSuccess && !filteredOrders.length ? <EmptyState icon={<ShoppingBag className="size-7" />} title="조건에 맞는 주문이 없습니다" description="주문 상태를 바꾸거나 다른 상품명으로 검색해보세요." /> : null}
         </div>
       </section>
-      <MyPageSupport onLogout={() => { logout(); router.push("/login"); }} />
+      <MyPageSupport token={token} onLogout={() => { logout(); router.push("/login"); }} />
     </PageLayout>
   );
 }
