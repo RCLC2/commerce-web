@@ -16,6 +16,7 @@ const guideQuestions = [
 
 export function MyPageSupport({ token, onLogout }: { token: string; onLogout: () => void }) {
   const [activeSheet, setActiveSheet] = useState<"support" | "guide" | null>(null);
+  const [openFAQID, setOpenFAQID] = useState<number | null>(null);
   const isGuide = activeSheet === "guide";
   const faqs = useQuery({
     queryKey: queryKeys.faqs,
@@ -26,6 +27,12 @@ export function MyPageSupport({ token, onLogout }: { token: string; onLogout: ()
   const questions = isGuide
     ? guideQuestions.map(([question, answer]) => ({ id: question, question, answer }))
     : (faqs.data ?? []);
+
+  function closeSheet() {
+    setActiveSheet(null);
+    setOpenFAQID(null);
+  }
+
   return <>
     <section className="mt-8 w-full border-t border-border-subtle pt-2" aria-label="고객 지원">
       {([
@@ -34,7 +41,7 @@ export function MyPageSupport({ token, onLogout }: { token: string; onLogout: ()
       ] as const).map(({ id, label, description, icon: Icon }) => <button key={id} type="button" className="flex w-full items-center gap-4 border-b border-border-subtle px-2 py-5 text-left transition hover:bg-action-secondary/40 sm:px-4" aria-label={label} aria-haspopup="dialog" aria-expanded={activeSheet === id} onClick={() => setActiveSheet(id)}><span className="grid size-11 shrink-0 place-items-center rounded-control bg-surface-subtle text-action-primary"><Icon size={22} /></span><span className="min-w-0 flex-1"><span className="block text-sm font-bold">{label}</span><span className="mt-1 block text-xs text-content-secondary">{description}</span></span><ChevronRight size={18} className="shrink-0 text-content-tertiary" /></button>)}
       <Button variant="ghost" className="mt-3 w-full text-content-secondary" onClick={onLogout}><LogOut size={16} /> 로그아웃</Button>
     </section>
-    <BottomSheet open={activeSheet !== null} onClose={() => setActiveSheet(null)} title={isGuide ? "이용안내" : "고객센터"} description={isGuide ? "쇼핑 서비스 사용법과 계정 관리를 확인하세요." : "주문·배송·반품에 관한 궁금한 점을 확인하세요."} className="mx-auto max-w-6xl">
+    <BottomSheet open={activeSheet !== null} onClose={closeSheet} title={isGuide ? "이용안내" : "고객센터"} description={isGuide ? "쇼핑 서비스 사용법과 계정 관리를 확인하세요." : "주문·배송·반품에 관한 궁금한 점을 확인하세요."} className="mx-auto max-w-6xl">
       <h3 className="text-sm font-bold">{isGuide ? "쇼핑 서비스 이용 방법" : "자주 묻는 질문"}</h3>
       {!isGuide && faqs.isPending ? <p role="status" className="mt-3 text-sm text-content-secondary">FAQ를 불러오는 중입니다.</p> : null}
       {!isGuide && faqs.isError ? (
@@ -47,8 +54,15 @@ export function MyPageSupport({ token, onLogout }: { token: string; onLogout: ()
       {questions.length > 0 ? (
         <div className="mt-3 divide-y divide-border-subtle rounded-surface border border-border-subtle px-4">
           {questions.map(({ id, question, answer }) => (
-            <details key={id} className="group py-4">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 break-words text-sm font-medium [&::-webkit-details-marker]:hidden">
+            <details key={id} open={typeof id === "number" ? openFAQID === id : undefined} className="group py-4">
+              <summary
+                className="flex cursor-pointer list-none items-center justify-between gap-3 break-words text-sm font-medium [&::-webkit-details-marker]:hidden"
+                onClick={(event) => {
+                  if (typeof id !== "number") return;
+                  event.preventDefault();
+                  setOpenFAQID((current) => current === id ? null : id);
+                }}
+              >
                 {question}
                 <ChevronRight size={16} className="shrink-0 text-content-tertiary transition-transform group-open:rotate-90" />
               </summary>

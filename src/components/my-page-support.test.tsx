@@ -41,6 +41,26 @@ describe("my page support", () => {
     expect(trigger).toHaveFocus();
   });
 
+  it("closes the open FAQ when another question is selected", async () => {
+    vi.mocked(api.listFAQs).mockResolvedValue([
+      { id: 1, question: "첫 번째 질문", answer: "첫 번째 답변", sequence: 0 },
+      { id: 2, question: "두 번째 질문", answer: "두 번째 답변", sequence: 1 },
+    ]);
+    mountSupport();
+    fireEvent.click(screen.getByRole("button", { name: "고객센터" }));
+    const sheet = screen.getByRole("dialog", { name: "고객센터" });
+    const first = await within(sheet).findByText("첫 번째 질문", { selector: "summary" });
+    const second = within(sheet).getByText("두 번째 질문", { selector: "summary" });
+
+    fireEvent.click(first);
+    expect(first.closest("details")).toHaveAttribute("open");
+    fireEvent.click(second);
+    expect(first.closest("details")).not.toHaveAttribute("open");
+    expect(second.closest("details")).toHaveAttribute("open");
+    fireEvent.click(second);
+    expect(second.closest("details")).not.toHaveAttribute("open");
+  });
+
   it("opens usage guidance with shopping and account management", () => {
     const onLogout = vi.fn();
     mountSupport(onLogout);
